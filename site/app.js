@@ -148,10 +148,17 @@ zurueck.onclick = () => {
 
 kalenderAnzeigen();
 
+
 date.addEventListener('change', () => {
+  if (date.value) {
+    const [jahr, monat] = date.value.split('-').map(Number);
+    kalenderMonat = new Date(jahr, monat - 1, 1);
+  }
+
   datumPruefen();
   kalenderAnzeigen();
 });
+
 
 fetch('/api/sperrzeiten')
   .then(antwort => {
