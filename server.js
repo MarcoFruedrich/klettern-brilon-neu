@@ -18,6 +18,53 @@ if(route==='/api/admin/logout'&&req.method==='POST'){const match=(req.headers.co
 if(route.match(/^\/api\/admin\/buchungen\/[0-9a-f-]{36}$/)&&req.method==='PATCH'){if(!admin(req,res))return;if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});const id=route.split('/').pop(),d=await body(req);if(!d||typeof d!=='object'||Array.isArray(d))return reply(res,400,{error:'Ungültige Eingabe.'});const status=d.status,notiz=safeText(d.bearbeitungsnotiz,2000);if(!['offen','bestaetigt','abgelehnt','storniert'].includes(status))return reply(res,400,{error:'Ungültiger Buchungsstatus.'});const q=await pool.query('UPDATE brilon_buchungen SET status=$1,bearbeitungsnotiz=$2,updated_at=NOW() WHERE id=$3 RETURNING id,status,bearbeitungsnotiz,updated_at',[status,notiz,id]);if(!q.rowCount)return reply(res,404,{error:'Buchung nicht gefunden.'});return reply(res,200,q.rows[0])}
 
 
+if(route==='/api/admin/kalender'&&req.method==='GET'){
+  if(!admin(req,res))return;
+  if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+  const q=await pool.query(
+    'SELECT id,titel,datum::text AS datum,enddatum::text AS enddatum,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,typ,beschreibung FROM brilon_kalender ORDER BY datum,uhrzeit NULLS LAST LIMIT 1000'
+  );
+  return reply(res,200,q.rows);
+}
+
+if(route==='/api/admin/kalender'&&req.method==='POST'){
+  if(!admin(req,res))return;
+  if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+
+  const d=await body(req);
+  if(!d||typeof d!=='object'||Array.isArray(d))
+    return reply(res,400,{error:'Ungültige Eingabe.'});
+
+  const titel=safeText(d.titel,120);
+  const datum=safeText(d.datum,10);
+  const enddatum=safeText(d.enddatum,10)||null;
+  const uhrzeit=safeText(d.uhrzeit,5)||null;
+  const endzeit=safeText(d.endzeit,5)||null;
+  const typ=safeText(d.typ,20);
+  const beschreibung=safeText(d.beschreibung,1000);
+
+  const gueltigesDatum=v=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
+    const t=new Date(v+'T12:00:00Z');
+    return !Number.isNaN(t.getTime())&&
+      t.toISOString().slice(0,10)===v;
+  };
+
+  if(!titel||!gueltigesDatum(datum)||
+     (enddatum&&(!gueltigesDatum(enddatum)||enddatum<datum))||
+     (uhrzeit&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(uhrzeit))||
+     (endzeit&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(endzeit))||
+     !['termin','sperrzeit'].includes(typ))
+    return reply(res,400,{error:'Ungültige Kalenderdaten.'});
+
+  const q=await pool.query(
+    'INSERT INTO brilon_kalender(titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+    [titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung]
+  );
+
+  return reply(res,201,{id:q.rows[0].id});
+}
+
 if(route.startsWith('/api/admin/')){if(!admin(req,res))return;if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});if(route==='/api/admin/buchungen'&&req.method==='GET'){const q=await pool.query('SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at FROM brilon_buchungen ORDER BY created_at DESC LIMIT 250');return reply(res,200,q.rows)}if(route==='/api/admin/aktionen'&&req.method==='POST'){const d=await body(req),titel=safeText(d.titel,120),datum=safeText(d.datum,10)||null,beschreibung=safeText(d.beschreibung,1000);if(!titel||datum&&!/^\d{4}-\d{2}-\d{2}$/.test(datum))return reply(res,400,{error:'Ungültige Eingabe.'});const q=await pool.query('INSERT INTO brilon_aktionen(id,data) VALUES ($1,$2) RETURNING id',[crypto.randomUUID(),JSON.stringify({titel,datum,beschreibung})]);return reply(res,201,{id:q.rows[0].id})}const m=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})$/);if(m&&req.method==='DELETE'){await pool.query('DELETE FROM brilon_aktionen WHERE id=$1',[m[1]]);return reply(res,200,{success:true})}return reply(res,404,{error:'Nicht gefunden.'})}if(route.startsWith('/api/'))return reply(res,404,{error:'Nicht gefunden.'});if(req.method!=='GET'&&req.method!=='HEAD')return reply(res,405,{error:'Methode nicht erlaubt.'});const file=route==='/'?'/index.html':route;const target=path.resolve(ROOT,'.'+file);if(!target.startsWith(ROOT+path.sep))return reply(res,403,{error:'Nicht erlaubt.'});fs.readFile(target,(err,data)=>{if(err){res.writeHead(404);return res.end('Nicht gefunden')}res.writeHead(200,{'Content-Type':mime[path.extname(target)]||'application/octet-stream','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'none'"});res.end(req.method==='HEAD'?undefined:data)})
 }catch(e){console.error('Anfragefehler:',e.message);reply(res,e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?400:500,{error:e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?e.message:'Interner Serverfehler.'})}}
 async function start(){if(pool){await pool.query('SELECT 1');await pool.query('CREATE TABLE IF NOT EXISTS brilon_buchungen (id UUID PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())');await pool.query('CREATE TABLE IF NOT EXISTS brilon_aktionen (id BIGSERIAL PRIMARY KEY,titel TEXT NOT NULL,datum DATE,beschreibung TEXT,created_at TIMESTAMPTZ DEFAULT NOW())');console.log('PostgreSQL verbunden')}else console.warn('DATABASE_URL fehlt: Datenbankfunktionen nicht verfügbar');http.createServer(main).listen(PORT,'0.0.0.0',()=>console.log('Server auf Port '+PORT))}start().catch(e=>{console.error('Datenbank-Start fehlgeschlagen:',e.message);process.exit(1)});
