@@ -28,7 +28,116 @@ function datumPruefen() {
     : '✓ Für diesen Tag kannst du eine Terminanfrage stellen.';
 }
 
-date.addEventListener('change', datumPruefen);
+
+const kalenderBereich = document.getElementById('buchungskalender');
+let kalenderMonat = new Date();
+kalenderMonat.setDate(1);
+
+function kalenderAnzeigen() {
+  if (!kalenderBereich) return;
+
+  kalenderBereich.replaceChildren();
+
+  const kopf = document.createElement('div');
+  kopf.className = 'kalender-kopf';
+
+  const zurueck = document.createElement('button');
+  zurueck.type = 'button';
+  zurueck.textContent = '←';
+
+  const titel = document.createElement('strong');
+  titel.textContent = kalenderMonat.toLocaleDateString('de-DE', {
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const weiter = document.createElement('button');
+  weiter.type = 'button';
+  weiter.textContent = '→';
+
+  zurueck.onclick = () => {
+    kalenderMonat.setMonth(kalenderMonat.getMonth() - 1);
+    kalenderAnzeigen();
+  };
+
+  weiter.onclick = () => {
+    kalenderMonat.setMonth(kalenderMonat.getMonth() + 1);
+    kalenderAnzeigen();
+  };
+
+  kopf.append(zurueck, titel, weiter);
+  kalenderBereich.append(kopf);
+
+  const tage = document.createElement('div');
+  tage.className = 'kalender-tage';
+
+  for (const name of ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']) {
+    const zelle = document.createElement('span');
+    zelle.textContent = name;
+    zelle.className = 'kalender-wochentag';
+    tage.append(zelle);
+  }
+
+  const jahr = kalenderMonat.getFullYear();
+  const monat = kalenderMonat.getMonth();
+  const ersterTag = new Date(jahr, monat, 1);
+  const leerfelder = (ersterTag.getDay() + 6) % 7;
+  const anzahlTage = new Date(jahr, monat + 1, 0).getDate();
+
+  for (let i = 0; i < leerfelder; i++) {
+    tage.append(document.createElement('span'));
+  }
+
+  const heute = new Date();
+  heute.setHours(0, 0, 0, 0);
+
+  for (let tag = 1; tag <= anzahlTage; tag++) {
+    const datumObjekt = new Date(jahr, monat, tag);
+    const datumWert =
+      jahr + '-' +
+      String(monat + 1).padStart(2, '0') + '-' +
+      String(tag).padStart(2, '0');
+
+    const gesperrt = sperrzeitenGeladen &&
+      sperrzeiten.some(eintrag =>
+        datumWert >= eintrag.datum &&
+        datumWert <= eintrag.enddatum
+      );
+
+    const knopf = document.createElement('button');
+    knopf.type = 'button';
+    knopf.textContent = tag;
+    knopf.className = 'kalender-tag';
+
+    if (gesperrt) knopf.classList.add('gesperrt');
+    else if (sperrzeitenGeladen) knopf.classList.add('frei');
+
+    if (date.value === datumWert) {
+      knopf.classList.add('ausgewaehlt');
+    }
+
+    if (datumObjekt < heute || gesperrt) {
+      knopf.disabled = true;
+    }
+
+    knopf.onclick = () => {
+      date.value = datumWert;
+      datumPruefen();
+      kalenderAnzeigen();
+    };
+
+    tage.append(knopf);
+  }
+
+  kalenderBereich.append(tage);
+}
+
+kalenderAnzeigen();
+
+date.addEventListener('change', () => {
+  datumPruefen();
+  kalenderAnzeigen();
+});
 
 fetch('/api/sperrzeiten')
   .then(antwort => {
@@ -39,6 +148,7 @@ fetch('/api/sperrzeiten')
     sperrzeiten = daten;
     sperrzeitenGeladen = true;
     datumPruefen();
+    kalenderAnzeigen();
   })
   .catch(() => {
     sperrzeitenGeladen = false;
