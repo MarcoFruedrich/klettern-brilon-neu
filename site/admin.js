@@ -509,6 +509,32 @@ kalenderAnzeigen();
         karte.append(el('p', eintrag.beschreibung));
       }
 
+          const loeschenButton = document.createElement('button');
+    loeschenButton.type = 'button';
+    loeschenButton.className = 'btn secondary';
+    loeschenButton.textContent = 'Termin löschen';
+
+    loeschenButton.onclick = async () => {
+      if (!confirm('Diesen Termin oder diese Sperrzeit wirklich löschen?')) {
+        return;
+      }
+
+      loeschenButton.disabled = true;
+
+      try {
+        await api('/api/admin/kalender/' + encodeURIComponent(eintrag.id), {
+          method: 'DELETE'
+        });
+
+        await eigeneKalenderEintraegeLaden();
+        kalenderFormStatus.textContent = 'Kalendereintrag erfolgreich gelöscht.';
+      } catch (err) {
+        kalenderFormStatus.textContent = 'Löschen fehlgeschlagen: ' + err.message;
+        loeschenButton.disabled = false;
+      }
+    };
+
+    karte.append(loeschenButton);
       kalenderEintraege.append(karte);
     }
   } catch (err) {
