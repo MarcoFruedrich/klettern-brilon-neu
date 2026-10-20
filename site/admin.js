@@ -235,3 +235,153 @@ document.getElementById('special-form').onsubmit = async e => {
 };
 
 refresh();
+
+/* Buchungskalender – Klettern & Abenteuer Brilon */
+
+let kalenderDatum = new Date();
+kalenderDatum.setDate(1);
+
+let kalenderBuchungen = [];
+
+const kalenderMonat = document.getElementById('calendar-month');
+const kalenderRaster = document.getElementById('calendar-grid');
+const kalenderInfo = document.getElementById('calendar-info');
+
+const kalenderFarben = {
+  offen: '#facc15',
+  bestaetigt: '#22c55e',
+  abgelehnt: '#ef4444',
+  storniert: '#94a3b8'
+};
+
+function kalenderAnzeigen() {
+  if (!kalenderRaster) return;
+
+  kalenderRaster.replaceChildren();
+
+  kalenderMonat.textContent = kalenderDatum.toLocaleDateString(
+    'de-DE',
+    { month: 'long', year: 'numeric' }
+  );
+
+  const jahr = kalenderDatum.getFullYear();
+  const monat = kalenderDatum.getMonth();
+
+  const ersterTag = new Date(jahr, monat, 1);
+  const anzahlTage = new Date(jahr, monat + 1, 0).getDate();
+  const startPosition = (ersterTag.getDay() + 6) % 7;
+
+  kalenderRaster.style.display = 'grid';
+  kalenderRaster.style.gridTemplateColumns = 'repeat(7, minmax(0, 1fr))';
+  kalenderRaster.style.gap = '5px';
+
+  for (const name of ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']) {
+    const kopf = document.createElement('div');
+    kopf.textContent = name;
+    kopf.style.textAlign = 'center';
+    kopf.style.fontWeight = 'bold';
+    kopf.style.padding = '8px 0';
+    kalenderRaster.append(kopf);
+  }
+
+  for (let i = 0; i < startPosition; i++) {
+    kalenderRaster.append(document.createElement('div'));
+  }
+
+  for (let tag = 1; tag <= anzahlTage; tag++) {
+    const datum = [
+      jahr,
+      String(monat + 1).padStart(2, '0'),
+      String(tag).padStart(2, '0')
+    ].join('-');
+
+    const termine = kalenderBuchungen.filter(
+      b => b.data && b.data.datum === datum &&
+        !['abgelehnt', 'storniert'].includes(b.status)
+    );
+
+    const feld = document.createElement('button');
+    feld.type = 'button';
+    feld.textContent = String(tag);
+    feld.style.minHeight = '65px';
+    feld.style.padding = '6px';
+    feld.style.border = '1px solid #526477';
+    feld.style.borderRadius = '5px';
+    feld.style.background = '#1b2b3a';
+    feld.style.color = 'white';
+    feld.style.cursor = 'pointer';
+
+    if (termine.length) {
+      const hatBestaetigung = termine.some(
+        b => b.status === 'bestaetigt'
+      );
+
+      feld.style.borderColor = hatBestaetigung
+        ? kalenderFarben.bestaetigt
+        : kalenderFarben.offen;
+
+      const anzahl = document.createElement('div');
+      anzahl.textContent = termine.length +
+        (termine.length === 1 ? ' Termin' : ' Termine');
+      anzahl.style.fontSize = '11px';
+      anzahl.style.marginTop = '6px';
+      anzahl.style.color = hatBestaetigung
+        ? kalenderFarben.bestaetigt
+        : kalenderFarben.offen;
+
+      feld.append(anzahl);
+    }
+
+    feld.onclick = () => {
+      kalenderInfo.replaceChildren();
+
+      const titel = document.createElement('strong');
+      titel.textContent = new Date(jahr, monat, tag)
+        .toLocaleDateString('de-DE');
+      kalenderInfo.append(titel);
+
+      if (!termine.length) {
+        kalenderInfo.append(
+          document.createTextNode(' – Keine aktiven Buchungsanfragen.')
+        );
+        return;
+      }
+
+      for (const b of termine) {
+        const eintrag = document.createElement('p');
+        eintrag.textContent =
+          (b.data.uhrzeit || 'Uhrzeit offen') + ' – ' +
+          (b.data.angebot || 'Kletterangebot') + ' – ' +
+          (b.data.name || 'Unbekannt') + ' (' +
+          (statusNamen[b.status] || 'Offen') + ')';
+
+        kalenderInfo.append(eintrag);
+      }
+    };
+
+    kalenderRaster.append(feld);
+  }
+}
+
+async function kalenderLaden() {
+  try {
+    kalenderBuchungen = await api('/api/admin/buchungen');
+    kalenderAnzeigen();
+  } catch (err) {
+    kalenderInfo.textContent =
+      'Kalender konnte nicht geladen werden: ' + err.message;
+  }
+}
+
+document.getElementById('calendar-prev').onclick = () => {
+  kalenderDatum.setMonth(kalenderDatum.getMonth() - 1);
+  kalenderAnzeigen();
+};
+
+document.getElementById('calendar-next').onclick = () => {
+  kalenderDatum.setMonth(kalenderDatum.getMonth() + 1);
+  kalenderAnzeigen();
+};
+
+kalenderLaden();
+
