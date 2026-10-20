@@ -139,7 +139,34 @@ async function refresh() {
         }
       };
 
-      c.append(speichern, meldung);
+    
+const loeschen = el('button', 'Buchungsanfrage löschen');
+loeschen.type = 'button';
+loeschen.className = 'danger';
+
+loeschen.onclick = async () => {
+  const bestaetigt = confirm(
+    'Möchtest du diese Buchungsanfrage wirklich dauerhaft löschen?'
+  );
+
+  if (!bestaetigt) return;
+
+  loeschen.disabled = true;
+  meldung.textContent = 'Buchungsanfrage wird gelöscht ...';
+
+  try {
+    await api('/api/admin/buchungen/' + encodeURIComponent(b.id), {
+      method: 'DELETE'
+    });
+
+    c.remove();
+  } catch (err) {
+    meldung.textContent = 'Fehler beim Löschen: ' + err.message;
+    loeschen.disabled = false;
+  }
+};
+
+     c.append(speichern, loeschen, meldung);
       box.append(c);
     }
 
