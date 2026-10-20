@@ -389,7 +389,6 @@ if (eigeneTermine.length) {
 
         kalenderInfo.append(eintrag);
       }
-    }
     
 for (const e of eigeneTermine) {
   const eintrag = document.createElement('p');
