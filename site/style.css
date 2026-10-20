@@ -1,1 +1,110 @@
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#101923;color:#f4f6f8;font:16px/1.65 system-ui,-apple-system,Segoe UI,sans-serif}a{color:#f4c447}header{position:sticky;top:0;z-index:4;background:#101923ed;border-bottom:1px solid #33404a;display:flex;align-items:center;justify-content:space-between;padding:15px max(5%,calc((100vw - 1140px)/2))}.logo{color:#fff;text-decoration:none;font-weight:900;font-size:22px;line-height:1.1}.logo span{color:#f5bf36}.logo small{display:block;color:#b8c6d0;font-size:11px;letter-spacing:2px;margin-top:6px;text-transform:uppercase}nav{display:flex;gap:24px}nav a{color:#d9e1e8;text-decoration:none;font-size:14px}nav a:hover{color:#f4c447}.menu{display:none}main{max-width:1140px;margin:auto;padding:0 24px}section{padding:85px 0;border-bottom:1px solid #2a3844}.hero{min-height:620px;display:flex;flex-direction:column;justify-content:center;background:radial-gradient(ellipse at 90% 35%,#32404b 0,transparent 55%)}.eyebrow{font-weight:800;color:#f4c447;letter-spacing:3px;font-size:12px}h1{font-size:clamp(42px,6vw,78px);line-height:1.08;letter-spacing:-2px;margin:20px 0;max-width:1000px}h1 em{font-style:normal;color:#f4c447}h2{font-size:clamp(28px,4vw,43px);line-height:1.15;margin:14px 0 28px}h3{margin:0 0 8px}p{color:#c7d0d9}.hero>p{max-width:660px;font-size:19px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin:24px 0}.btn{border:0;border-radius:7px;background:#f4c447;color:#14202b!important;padding:14px 24px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-block;font-size:15px}.btn:hover{background:#ffda73}.btn.secondary{background:#2d3c48;color:#fff!important}.facts{display:flex;gap:30px;flex-wrap:wrap;margin-top:45px;color:#e3e9ee;font-size:14px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}.cards article,form,.panel{background:#1b2935;border:1px solid #334351;border-radius:12px;padding:26px}.cards article p{margin-bottom:0}.symbol{font-size:32px;margin-bottom:12px}.split{display:grid;grid-template-columns:1fr 1.15fr;gap:60px}.hint{font-size:14px}form{display:grid;gap:15px}label{display:grid;gap:6px;color:#e7edf1;font-size:14px;font-weight:650}input,select,textarea{width:100%;padding:12px;background:#111d27;color:white;border:1px solid #4b5b67;border-radius:6px;font:inherit}input:focus,select:focus,textarea:focus{outline:2px solid #f4c447}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.check{display:flex;gap:10px;font-weight:400}.check input{width:auto;align-self:start;margin-top:7px}.hidden{position:absolute;left:-10000px}#booking-status{margin:0;font-weight:700}footer{max-width:1140px;margin:auto;padding:35px 24px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;color:#aebcc6;font-size:14px}.narrow{max-width:850px;margin:auto;padding:35px 24px}.admin-grid{display:grid;gap:15px}.booking{padding:16px;border:1px solid #40515e;border-radius:8px;background:#17242f;overflow-wrap:anywhere}.booking p{margin:5px 0}button.danger{background:#80484a;color:white;border:0;padding:8px;border-radius:4px;cursor:pointer}@media(max-width:750px){.menu{display:block;background:none;color:white;border:0;font-size:25px}nav{display:none;position:absolute;top:72px;left:0;right:0;background:#14222d;padding:25px;flex-direction:column}nav.open{display:flex}.split{grid-template-columns:1fr;gap:15px}.two{grid-template-columns:1fr}.hero{min-height:540px}.facts{gap:12px}section{padding:55px 0}}
+
+/* Öffentlicher Buchungskalender */
+
+.buchungskalender {
+  margin-top: 16px;
+  padding: 16px;
+  background: #142331;
+  border: 1px solid #3a5061;
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.kalender-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  color: #ffffff;
+}
+
+.kalender-kopf strong {
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.kalender-kopf button {
+  background: #304454;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+
+.kalender-kopf button:hover {
+  background: #466176;
+}
+
+.kalender-tage {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.kalender-wochentag {
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #b9c9d5;
+  padding: 8px 0;
+}
+
+.kalender-tag {
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 0;
+  border: 1px solid #405668;
+  border-radius: 6px;
+  background: #243747;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.kalender-tag.frei {
+  background: #20543c;
+  border-color: #37815a;
+  color: #ffffff;
+}
+
+.kalender-tag.gesperrt {
+  background: #713039;
+  border-color: #a64b56;
+  color: #ffffff;
+}
+
+.kalender-tag.ausgewaehlt {
+  background: #f6c445;
+  border: 2px solid #ffffff;
+  color: #17212b;
+  font-weight: bold;
+}
+
+.kalender-tag:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.kalender-tag:not(:disabled):hover {
+  border-color: #f6c445;
+  filter: brightness(1.2);
+}
+
+@media (max-width: 480px) {
+  .buchungskalender {
+    padding: 10px;
+  }
+
+ .kalender-tage {
+    gap: 3px;
+  }
+
+  .kalender-tag {
+    min-height: 38px;
+    font-size: 12px;
+  }
+}
