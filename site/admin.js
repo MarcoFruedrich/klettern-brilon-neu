@@ -383,5 +383,17 @@ document.getElementById('calendar-next').onclick = () => {
   kalenderAnzeigen();
 };
 
-kalenderLaden();
+const bisherigesRefresh = refresh;
+
+refresh = async function() {
+  await bisherigesRefresh();
+
+  if (!workspace.hidden) {
+    await kalenderLaden();
+  }
+};
+
+if (!workspace.hidden) {
+  kalenderLaden();
+}
 
