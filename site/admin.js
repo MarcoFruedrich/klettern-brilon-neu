@@ -397,3 +397,103 @@ if (!workspace.hidden) {
   kalenderLaden();
 }
 
+/* Eigene Termine und Sperrzeiten speichern und anzeigen */
+
+const kalenderFormular = document.getElementById('calendar-form');
+const kalenderFormStatus = document.getElementById('calendar-form-status');
+const kalenderEintraege = document.getElementById('calendar-entries');
+
+async function eigeneKalenderEintraegeLaden() {
+  try {
+    const eintraege = await api('/api/admin/kalender');
+    kalenderEintraege.replaceChildren();
+
+    if (!eintraege.length) {
+      kalenderEintraege.append(
+        el('p', 'Noch keine eigenen Termine oder Sperrzeiten eingetragen.')
+      );
+      return;
+    }
+
+    for (const eintrag of eintraege) {
+      const karte = el('div');
+      karte.className = 'booking';
+
+      karte.append(
+        el('strong',
+          (eintrag.typ === 'sperrzeit' ? 'Gesperrt: ' : 'Termin: ') +
+          eintrag.titel
+        )
+      );
+
+      let zeitraum = eintrag.datum;
+
+      if (eintrag.enddatum) {
+        zeitraum += ' bis ' + eintrag.enddatum;
+      }
+
+      if (eintrag.uhrzeit) {
+        zeitraum += ' | ' + eintrag.uhrzeit.slice(0, 5) + ' Uhr';
+      }
+
+      if (eintrag.endzeit) {
+        zeitraum += ' bis ' + eintrag.endzeit.slice(0, 5) + ' Uhr';
+      }
+
+      karte.append(el('p', zeitraum));
+
+      if (eintrag.beschreibung) {
+        karte.append(el('p', eintrag.beschreibung));
+      }
+
+      kalenderEintraege.append(karte);
+    }
+  } catch (err) {
+    kalenderFormStatus.textContent =
+      'Kalendereinträge konnten nicht geladen werden: ' + err.message;
+  }
+}
+
+kalenderFormular.onsubmit = async event => {
+  event.preventDefault();
+
+  const knopf = kalenderFormular.querySelector('button[type="submit"]');
+  knopf.disabled = true;
+  kalenderFormStatus.textContent = 'Termin wird gespeichert ...';
+
+  try {
+    const daten = Object.fromEntries(
+      new FormData(kalenderFormular).entries()
+    );
+
+    await api('/api/admin/kalender', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(daten)
+    });
+
+    kalenderFormular.reset();
+    kalenderFormStatus.textContent = 'Termin erfolgreich gespeichert.';
+
+    await eigeneKalenderEintraegeLaden();
+  } catch (err) {
+    kalenderFormStatus.textContent =
+      'Fehler beim Speichern: ' + err.message;
+  } finally {
+    knopf.disabled = false;
+  }
+};
+
+const bisherigesKalenderLaden = kalenderLaden;
+
+kalenderLaden = async function() {
+  await bisherigesKalenderLaden();
+
+  if (!workspace.hidden) {
+    await eigeneKalenderEintraegeLaden();
+  }
+};
+
+
