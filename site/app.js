@@ -62,6 +62,8 @@ function buchungsdauerBerechnen() {
   if (dauer === null) {
     dauerAnzeige.textContent =
       'Individuelle Anfrage – Dauer nach Absprache';
+
+    if (endzeitAnzeige) endzeitAnzeige.textContent = '';
     return;
   }
 
@@ -71,11 +73,39 @@ function buchungsdauerBerechnen() {
   dauerAnzeige.textContent =
     'Voraussichtliche Dauer: ' +
     stunden + (minuten ? ',5' : '') + ' Stunden';
-}
 
+  if (endzeitAnzeige) {
+    const startzeit = uhrzeitAuswahl?.value;
+
+    if (!startzeit) {
+      endzeitAnzeige.textContent =
+        'Bitte Anfangszeit auswählen, um die Endzeit zu berechnen.';
+    } else {
+      const [startStunden, startMinuten] =
+        startzeit.split(':').map(Number);
+
+      const endeMinuten =
+        startStunden * 60 + startMinuten + dauer;
+
+      const endeStunden = Math.floor(endeMinuten / 60);
+      const restMinuten = endeMinuten % 60;
+
+      const endzeit =
+        String(endeStunden).padStart(2, '0') + ':' +
+        String(restMinuten).padStart(2, '0');
+
+      endzeitAnzeige.textContent =
+        'Voraussichtliches Ende: ' + endzeit + ' Uhr';
+    }
+  }
+}
+  
 if (teilnehmerEingabe) {
   teilnehmerEingabe.addEventListener('input', buchungsdauerBerechnen);
   buchungsdauerBerechnen();
+}
+if (uhrzeitAuswahl) {
+  uhrzeitAuswahl.addEventListener('change', buchungsdauerBerechnen);
 }
 function datumPruefen() {
   const gewaehltesDatum = date.value;
