@@ -3,7 +3,39 @@ document.getElementById('year').textContent=new Date().getFullYear();const date=
 const verfuegbarkeit = document.getElementById('datum-verfuegbarkeit');
 let sperrzeiten = [];
 let sperrzeitenGeladen = false;
+const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
+const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 
+const buchbareUhrzeiten = [
+  '09:00',
+  '10:00',
+  '11:00',
+  '13:00',
+  '14:00',
+  '15:00'
+];
+
+function uhrzeitenAnzeigen() {
+  if (!uhrzeitAuswahl) return;
+
+  uhrzeitAuswahl.replaceChildren();
+
+  const platzhalter = document.createElement('option');
+  platzhalter.value = '';
+  platzhalter.textContent = 'Bitte Anfangszeit auswählen';
+  uhrzeitAuswahl.append(platzhalter);
+
+  buchbareUhrzeiten.forEach(uhrzeit => {
+    const option = document.createElement('option');
+    option.value = uhrzeit;
+    option.textContent = uhrzeit + ' Uhr';
+    uhrzeitAuswahl.append(option);
+  });
+
+  uhrzeitHinweis.textContent =
+    'Bitte wähle deine gewünschte Anfangszeit.';
+}
+uhrzeitenAnzeigen();
 function datumPruefen() {
   const gewaehltesDatum = date.value;
 
