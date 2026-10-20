@@ -41,6 +41,41 @@ function uhrzeitenAnzeigen() {
     'Bitte wähle deine gewünschte Anfangszeit.';
 }
 uhrzeitenAnzeigen();
+const teilnehmerEingabe = document.getElementById('buchungs-teilnehmer');
+const dauerAnzeige = document.getElementById('buchungs-dauer');
+
+function buchungsdauerBerechnen() {
+  if (!teilnehmerEingabe || !dauerAnzeige) return;
+
+  const anzahl = Number(teilnehmerEingabe.value);
+  let dauer = null;
+
+  if (anzahl >= 5 && anzahl <= 10) {
+    dauer = 150;
+  } else if (anzahl >= 11 && anzahl <= 15) {
+    dauer = 180;
+  } else if (anzahl >= 16 && anzahl <= 20) {
+    dauer = 210;
+  }
+
+  if (dauer === null) {
+    dauerAnzeige.textContent =
+      'Individuelle Anfrage – Dauer nach Absprache';
+    return;
+  }
+
+  const stunden = Math.floor(dauer / 60);
+  const minuten = dauer % 60;
+
+  dauerAnzeige.textContent =
+    'Voraussichtliche Dauer: ' +
+    stunden + (minuten ? ',5' : '') + ' Stunden';
+}
+
+if (teilnehmerEingabe) {
+  teilnehmerEingabe.addEventListener('input', buchungsdauerBerechnen);
+  buchungsdauerBerechnen();
+}
 function datumPruefen() {
   const gewaehltesDatum = date.value;
 
