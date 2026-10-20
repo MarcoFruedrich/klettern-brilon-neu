@@ -509,6 +509,35 @@ kalenderAnzeigen();
         karte.append(el('p', eintrag.beschreibung));
       }
 
+      const bearbeitenButton = document.createElement('button');
+bearbeitenButton.type = 'button';
+bearbeitenButton.className = 'btn secondary';
+bearbeitenButton.textContent = 'Termin bearbeiten';
+
+bearbeitenButton.onclick = () => {
+  kalenderBearbeitenId = eintrag.id;
+
+  for (const name of [
+    'typ', 'titel', 'datum', 'enddatum',
+    'uhrzeit', 'endzeit', 'beschreibung'
+  ]) {
+    const feld = kalenderFormular.elements.namedItem(name);
+    if (feld) feld.value = eintrag[name] || '';
+  }
+
+  kalenderFormular.querySelector('button[type="submit"]').textContent =
+    'Änderungen speichern';
+
+  kalenderFormStatus.textContent =
+    'Du bearbeitest jetzt: ' + eintrag.titel;
+
+  kalenderFormular.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  });
+};
+
+karte.append(bearbeitenButton);
           const loeschenButton = document.createElement('button');
     loeschenButton.type = 'button';
     loeschenButton.className = 'btn secondary';
@@ -543,6 +572,7 @@ kalenderAnzeigen();
   }
 }
 
+let kalenderBearbeitenId = null;
 kalenderFormular.onsubmit = async event => {
   event.preventDefault();
 
@@ -555,8 +585,12 @@ kalenderFormular.onsubmit = async event => {
       new FormData(kalenderFormular).entries()
     );
 
-    await api('/api/admin/kalender', {
-      method: 'POST',
+    await api(
+  kalenderBearbeitenId
+    ? '/api/admin/kalender/' + encodeURIComponent(kalenderBearbeitenId)
+    : '/api/admin/kalender',
+  {
+     method: kalenderBearbeitenId ? 'PATCH' : 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -564,6 +598,8 @@ kalenderFormular.onsubmit = async event => {
     });
 
     kalenderFormular.reset();
+    kalenderBearbeitenId = null;
+knopf.textContent = 'Termin oder Sperrzeit speichern';
     kalenderFormStatus.textContent = 'Termin erfolgreich gespeichert.';
 
     await eigeneKalenderEintraegeLaden();
