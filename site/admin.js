@@ -422,7 +422,7 @@ for (const e of eigeneTermine) {
 };
     kalenderRaster.append(feld);
   }
-
+}
 
 async function kalenderLaden() {
   try {
