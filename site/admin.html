@@ -1,1 +1,80 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verwaltung | Klettern Brilon</title><link rel="stylesheet" href="/style.css"></head><body><header><a class="logo" href="/">🧗 Klettern <span>& Abenteuer</span><small>Verwaltung</small></a><nav><a href="/">Zur Website</a></nav></header><main class="narrow"><h1 style="font-size:42px">Verwaltung</h1><p>Geschützter Bereich für Anfragen und Sonderangebote.</p><form id="login"><label>Benutzername<input id="username" autocomplete="username" required></label><label>Passwort<input id="password" type="password" autocomplete="current-password" required></label><button class="btn">Anmelden</button></form><div id="workspace" hidden><button id="logout" class="btn secondary">Abmelden</button><h2>Buchungsanfragen</h2><div id="bookings" class="admin-grid"></div><h2>Sonderangebote verwalten</h2><form id="special-form"><label>Titel<input name="titel" maxlength="120" required></label><label>Datum<input name="datum" type="date"></label><label>Beschreibung<textarea name="beschreibung" maxlength="1000"></textarea></label><button class="btn">Angebot veröffentlichen</button></form><div id="special-list" class="admin-grid"></div></div><p id="status" role="status"></p></main><script src="/admin.js"></script></body></html>
+
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Verwaltung | Klettern Brilon</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href="/">
+      🧗 Klettern <span>& Abenteuer</span>
+      <small>Verwaltung</small>
+    </a>
+    <nav><a href="/">Zur Website</a></nav>
+  </header>
+
+  <main class="narrow">
+    <h1 style="font-size:42px">Verwaltung</h1>
+    <p>Geschützter Bereich für Anfragen und Sonderangebote.</p>
+
+    <form id="login">
+      <label>Benutzername
+        <input id="username" autocomplete="username" required>
+      </label>
+      <label>Passwort
+        <input id="password" type="password"
+               autocomplete="current-password" required>
+      </label>
+      <button class="btn">Anmelden</button>
+    </form>
+
+    <div id="workspace" hidden>
+      <button id="logout" class="btn secondary">Abmelden</button>
+
+      <h2>Buchungsanfragen</h2>
+      <div id="bookings" class="admin-grid"></div>
+
+      <h2>Buchungskalender</h2>
+      <p>Übersicht der angefragten und bestätigten Klettertermine.</p>
+
+      <section id="calendar-section" class="booking">
+        <div class="calendar-navigation">
+          <button type="button" id="calendar-prev" class="btn secondary">
+            ← Vorheriger Monat
+          </button>
+          <strong id="calendar-month">Monat</strong>
+          <button type="button" id="calendar-next" class="btn secondary">
+            Nächster Monat →
+          </button>
+        </div>
+
+        <div id="calendar-grid"></div>
+        <p id="calendar-info" role="status"></p>
+      </section>
+
+      <h2>Sonderangebote verwalten</h2>
+      <form id="special-form">
+        <label>Titel
+          <input name="titel" maxlength="120" required>
+        </label>
+        <label>Datum
+          <input name="datum" type="date">
+        </label>
+        <label>Beschreibung
+          <textarea name="beschreibung" maxlength="1000"></textarea>
+        </label>
+        <button class="btn">Angebot veröffentlichen</button>
+      </form>
+
+      <div id="special-list" class="admin-grid"></div>
+    </div>
+
+    <p id="status" role="status"></p>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>
