@@ -55,6 +55,73 @@
         <p id="calendar-info" role="status"></p>
       </section>
 
+      
+<!-- Eigene Termine und Sperrzeiten verwalten -->
+<h2>Eigene Termine & Sperrzeiten</h2>
+<p>
+  Hier kannst du Kletterveranstaltungen eintragen
+  oder Tage und Zeiträume für Buchungen sperren.
+</p>
+
+<form id="calendar-form">
+  <label>
+    Art des Eintrags
+    <select name="typ" required>
+      <option value="termin">Eigener Klettertermin</option>
+      <option value="sperrzeit">Sperrzeit / Nicht verfügbar</option>
+    </select>
+  </label>
+
+  <label>
+    Titel
+    <input
+      name="titel"
+      maxlength="120"
+      placeholder="z. B. Schulklasse, Geburtstag oder Urlaub"
+      required
+    >
+  </label>
+
+  <label>
+    Beginn (Datum)
+    <input name="datum" type="date" required>
+  </label>
+
+  <label>
+    Ende (Datum, optional)
+    <input name="enddatum" type="date">
+  </label>
+
+  <label>
+    Beginn (Uhrzeit, optional)
+    <input name="uhrzeit" type="time">
+  </label>
+
+  <label>
+    Ende (Uhrzeit, optional)
+    <input name="endzeit" type="time">
+  </label>
+
+  <label>
+    Beschreibung / Interne Hinweise
+    <textarea
+      name="beschreibung"
+      maxlength="1000"
+      rows="3"
+      placeholder="Weitere Informationen zum Termin"
+    ></textarea>
+  </label>
+
+  <button type="submit" class="btn">
+    Termin oder Sperrzeit speichern
+  </button>
+</form>
+
+<p id="calendar-form-status" role="status"></p>
+
+<h3>Meine eingetragenen Termine und Sperrzeiten</h3>
+<div id="calendar-entries" class="admin-grid"></div>
+
       <h2>Sonderangebote verwalten</h2>
       <form id="special-form">
         <label>Titel
