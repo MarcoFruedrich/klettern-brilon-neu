@@ -26,7 +26,26 @@ if (sperrung.rowCount > 0) {
   });
 }
 const id=crypto.randomUUID();await pool.query('INSERT INTO brilon_buchungen (id,data) VALUES ($1,$2)',[id,JSON.stringify(data)]);return reply(res,201,{success:true,id})}
-if(route==='/api/aktionen'&&req.method==='GET'){if(!pool)return reply(res,200,[]);const q=await pool.query("SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,data->>'beschreibung' AS beschreibung FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100");return reply(res,200,q.rows)}
+
+if (route === '/api/sperrzeiten' && req.method === 'GET') {
+  if (!pool) {
+    return reply(res, 503, {
+      error: 'Verfügbarkeit derzeit nicht abrufbar.'
+    });
+  }
+
+  const q = await pool.query(
+    `SELECT datum::text AS datum,
+            COALESCE(enddatum, datum)::text AS enddatum
+     FROM brilon_kalender
+     WHERE typ = 'sperrzeit'
+     ORDER BY datum ASC`
+  );
+
+  return reply(res, 200, q.rows);
+}
+
+  if(route==='/api/aktionen'&&req.method==='GET'){if(!pool)return reply(res,200,[]);const q=await pool.query("SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,data->>'beschreibung' AS beschreibung FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100");return reply(res,200,q.rows)}
 if(route==='/api/admin/login'&&req.method==='POST'){if(!limit('login:'+ip,6))return reply(res,429,{error:'Zu viele Versuche.'});const d=await body(req),username=process.env.ADMIN_USER,password=process.env.ADMIN_PASSWORD;if(!username||!password)return reply(res,503,{error:'Admin-Zugang nicht eingerichtet.'});const a=Buffer.from(String(d.username||'')),b=Buffer.from(username),c=Buffer.from(String(d.password||'')),e=Buffer.from(password);if(a.length!==b.length||c.length!==e.length||!crypto.timingSafeEqual(a,b)||!crypto.timingSafeEqual(c,e))return reply(res,401,{error:'Zugangsdaten nicht korrekt.'});const token=crypto.randomBytes(32).toString('hex');sessions.set(token,Date.now()+8*3600000);return reply(res,200,{success:true},{'Set-Cookie':`${cookieName}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`})}
 if(route==='/api/admin/logout'&&req.method==='POST'){const match=(req.headers.cookie||'').match(/brilon_session=([a-f0-9]{64})/);if(match)sessions.delete(match[1]);return reply(res,200,{success:true},{'Set-Cookie':`${cookieName}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`})}
 
