@@ -254,6 +254,7 @@ const kalenderFarben = {
   storniert: '#94a3b8'
 };
 
+let eigeneKalenderTermine = [];
 function kalenderAnzeigen() {
   if (!kalenderRaster) return;
 
@@ -300,6 +301,12 @@ function kalenderAnzeigen() {
         !['abgelehnt', 'storniert'].includes(b.status)
     );
 
+const eigeneTermine = eigeneKalenderTermine.filter(e => {
+  const beginn = e.datum;
+  const ende = e.enddatum || e.datum;
+  return datum >= beginn && datum <= ende;
+});
+
     const feld = document.createElement('button');
     feld.type = 'button';
     feld.textContent = String(tag);
@@ -331,6 +338,31 @@ function kalenderAnzeigen() {
 
       feld.append(anzahl);
     }
+    
+if (eigeneTermine.length) {
+  const hatSperrzeit = eigeneTermine.some(
+    e => e.typ === 'sperrzeit'
+  );
+
+  feld.style.borderColor = hatSperrzeit
+    ? '#ef4444'
+    : '#38bdf8';
+
+  const anzahlEigene = document.createElement('div');
+
+  anzahlEigene.textContent =
+    eigeneTermine.length +
+    (hatSperrzeit ? ' Sperrzeit/Termin' : ' eigener Termin');
+
+  anzahlEigene.style.fontSize = '11px';
+  anzahlEigene.style.marginTop = '4px';
+  anzahlEigene.style.color = hatSperrzeit
+    ? '#ef4444'
+    : '#38bdf8';
+
+  feld.append(anzahlEigene);
+}
+
 
     feld.onclick = () => {
       kalenderInfo.replaceChildren();
@@ -340,7 +372,7 @@ function kalenderAnzeigen() {
         .toLocaleDateString('de-DE');
       kalenderInfo.append(titel);
 
-      if (!termine.length) {
+     if (!termine.length && !eigeneTermine.length) {
         kalenderInfo.append(
           document.createTextNode(' – Keine aktiven Buchungsanfragen.')
         );
@@ -357,8 +389,38 @@ function kalenderAnzeigen() {
 
         kalenderInfo.append(eintrag);
       }
-    };
+    }
+    
+for (const e of eigeneTermine) {
+  const eintrag = document.createElement('p');
 
+  const art = e.typ === 'sperrzeit'
+    ? 'GESPERRT'
+    : 'Eigener Klettertermin';
+
+  const beginn = e.uhrzeit
+    ? e.uhrzeit.slice(0, 5) + ' Uhr'
+    : 'Ganztägig';
+
+  const ende = e.endzeit
+    ? ' bis ' + e.endzeit.slice(0, 5) + ' Uhr'
+    : '';
+
+  eintrag.textContent =
+    art + ': ' + e.titel + ' – ' + beginn + ende;
+
+  if (e.beschreibung) {
+    eintrag.textContent += ' – ' + e.beschreibung;
+  }
+
+  eintrag.style.color = e.typ === 'sperrzeit'
+    ? '#ef4444'
+    : '#38bdf8';
+
+  kalenderInfo.append(eintrag);
+}
+
+};
     kalenderRaster.append(feld);
   }
 }
@@ -406,6 +468,8 @@ const kalenderEintraege = document.getElementById('calendar-entries');
 async function eigeneKalenderEintraegeLaden() {
   try {
     const eintraege = await api('/api/admin/kalender');
+    eigeneKalenderTermine = eintraege;
+kalenderAnzeigen();
     kalenderEintraege.replaceChildren();
 
     if (!eintraege.length) {
