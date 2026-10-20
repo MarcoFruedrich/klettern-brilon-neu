@@ -43,6 +43,7 @@ function uhrzeitenAnzeigen() {
 uhrzeitenAnzeigen();
 const teilnehmerEingabe = document.getElementById('buchungs-teilnehmer');
 const dauerAnzeige = document.getElementById('buchungs-dauer');
+const endzeitAnzeige = document.getElementById('buchungs-endzeit');
 
 function buchungsdauerBerechnen() {
   if (!teilnehmerEingabe || !dauerAnzeige) return;
