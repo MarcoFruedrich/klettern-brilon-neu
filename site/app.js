@@ -55,10 +55,24 @@ function kalenderAnzeigen() {
   weiter.type = 'button';
   weiter.textContent = '→';
 
-  zurueck.onclick = () => {
-    kalenderMonat.setMonth(kalenderMonat.getMonth() - 1);
-    kalenderAnzeigen();
-  };
+  
+zurueck.onclick = () => {
+  const vorherigerMonat = new Date(
+    kalenderMonat.getFullYear(),
+    kalenderMonat.getMonth() - 1,
+    1
+  );
+
+  const aktuellerMonat = new Date();
+  aktuellerMonat.setDate(1);
+  aktuellerMonat.setHours(0, 0, 0, 0);
+
+  if (vorherigerMonat < aktuellerMonat) return;
+
+  kalenderMonat = vorherigerMonat;
+  kalenderAnzeigen();
+};
+
 
   weiter.onclick = () => {
     kalenderMonat.setMonth(kalenderMonat.getMonth() + 1);
