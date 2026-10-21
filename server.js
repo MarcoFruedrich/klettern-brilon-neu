@@ -118,6 +118,49 @@ async function main(req,res){
       return reply(res,201,{success:true,id:ergebnis.id});
     }
 
+    if(route==='/api/belegte-zeiten'&&req.method==='GET'){
+      if(!pool)return reply(res,503,{
+        error:'Verfügbarkeit derzeit nicht abrufbar.'
+      });
+
+      const datum=safeText(u.searchParams.get('datum'),10);
+      const gueltig=/^\d{4}-\d{2}-\d{2}$/.test(datum)&&
+        !Number.isNaN(Date.parse(datum))&&
+        new Date(datum).toISOString().slice(0,10)===datum;
+
+      if(!gueltig)return reply(res,400,{
+        error:'Bitte ein gültiges Datum angeben.'
+      });
+
+      const q=await pool.query(
+        `SELECT data
+         FROM brilon_buchungen
+         WHERE data->>'datum'=$1
+         AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,
+        [datum]
+      );
+
+      const buchungen=q.rows.map(r=>buchungsfenster(r.data));
+
+      const zeiten=[];
+      for(let stunde=9;stunde<=19;stunde++){
+        const uhrzeit=String(stunde).padStart(2,'0')+':00';
+        const start=stunde*60;
+
+        // Individuelle Angebote werden vorsichtshalber
+        // wie eine ganztägige Reservierung behandelt.
+        const belegt=buchungen.some(fenster=>
+          !fenster||(start>=fenster[0]&&start<fenster[1])
+        );
+
+        zeiten.push({uhrzeit,belegt});
+      }
+
+      return reply(res,200,{datum,zeiten});
+    }
+
+
+    
     if(route==='/api/sperrzeiten'&&req.method==='GET'){
       if(!pool)return reply(res,503,{
         error:'Verfügbarkeit derzeit nicht abrufbar.'
