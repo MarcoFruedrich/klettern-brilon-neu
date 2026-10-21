@@ -337,11 +337,12 @@ Promise.allSettled([
         return reply(res,400,{error:'Ungültiger Buchungsstatus.'});
 
       const ergebnis=await reservierungsTransaktion(async client=>{
-        const alt=await client.query(
-         
-'SELECT id,data,status FROM brilon_buchungen WHERE id=$1'
+        
+const alt=await client.query(
+  'SELECT id,data,status FROM brilon_buchungen WHERE id=$1',
+  [id]
+);
 
-        );
         if(!alt.rowCount)return {fehlt:true};
         
 const alterStatus = alt.rows[0].status;
