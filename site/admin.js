@@ -168,7 +168,11 @@ loeschen.onclick = async () => {
   }
 };
 
-     c.append(speichern, loeschen, meldung);
+     const zahlungSenden = el('button', 'Zahlungsinformationen senden');
+zahlungSenden.type = 'button';
+zahlungSenden.disabled = true;
+zahlungSenden.title = 'E-Mail-Versand wird noch eingerichtet'; 
+    c.append(speichern, zahlungSenden, loeschen, meldung);
       box.append(c);
     }
 
