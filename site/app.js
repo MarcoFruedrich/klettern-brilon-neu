@@ -373,3 +373,25 @@ status.style.border='2px solid #a61b1b';
 status.style.borderRadius='10px';
 status.style.backgroundColor='#fff0f0';
 status.scrollIntoView({behavior:'smooth',block:'center'})}finally{btn.disabled=false}});async function specials(){const root=document.getElementById('specials');try{const r=await fetch('/api/aktionen');if(!r.ok)throw Error();const items=await r.json();root.replaceChildren();if(!items.length){const p=document.createElement('p');p.textContent='Neue Sonderangebote werden hier veröffentlicht. Frage gerne nach freien Terminen!';root.append(p)}for(const item of items){const a=document.createElement('article');const h=document.createElement('h3');h.textContent=item.titel;const d=document.createElement('p');d.textContent=item.datum||'Termin nach Vereinbarung';const t=document.createElement('p');t.textContent=item.beschreibung||'';a.append(h,d,t);root.append(a)}}catch{root.textContent='Sonderangebote derzeit nicht abrufbar.'}}specials();
+async function angeboteLaden() {
+  const auswahl = document.getElementById('angebot-auswahl');
+  if (!auswahl) return;
+
+  try {
+    const res = await fetch('/api/angebote');
+    if (!res.ok) throw new Error('Angebote nicht erreichbar');
+
+    const angebote = await res.json();
+
+    for (const angebot of angebote) {
+      const option = document.createElement('option');
+      option.value = angebot.name;
+      option.textContent = angebot.name;
+      auswahl.appendChild(option);
+    }
+  } catch (fehler) {
+    console.error('Erlebnisangebote konnten nicht geladen werden:', fehler);
+  }
+}
+
+angeboteLaden();
