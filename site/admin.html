@@ -147,6 +147,33 @@
     mit individuellen Gruppenpreisen verwalten.
   </p>
 
+  
+<h3>Neues Erlebnisangebot</h3>
+
+<form id="neues-angebot-form">
+  <label>
+    Name des Angebots
+    <input name="name" required
+      placeholder="z. B. Kistenklettern">
+  </label>
+
+  <label>
+    Beschreibung
+    <textarea name="beschreibung" rows="3"
+      placeholder="Was erwartet die Teilnehmer?"></textarea>
+  </label>
+
+  <label>
+    Dauer in Minuten
+    <input name="dauer" type="number"
+      min="15" placeholder="z. B. 90">
+  </label>
+
+  <button type="submit" class="btn">
+    Neues Angebot hinzufügen
+  </button>
+</form>
+
   <div id="angebote-admin-liste"></div>
 </section>
 
