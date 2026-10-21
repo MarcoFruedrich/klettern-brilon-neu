@@ -16,6 +16,31 @@ const mailTransporter = nodemailer.createTransport({
 
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:{ca:process.env.DATABASE_CA_CERT,rejectUnauthorized:true}}):null;
 const sessions=new Map(), attempts=new Map();const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon'};
+async function brevoMail(empfaenger, betreff, inhalt) {
+  const antwort = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'api-key': process.env.BREVO_API_KEY
+    },
+    body: JSON.stringify({
+      sender: {
+        name: 'Klettern & Abenteuer Brilon',
+        email: 'vormund.friedrich@gmail.com'
+      },
+      to: [{ email: empfaenger }],
+      subject: betreff,
+      textContent: inhalt
+    })
+  });
+
+  if (!antwort.ok) {
+    throw new Error(
+      'Brevo HTTP ' + antwort.status + ': ' + await antwort.text()
+    );
+  }
+}
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers});res.end(JSON.stringify(data))}
 async function body(req){let data='';for await(const chunk of req){data+=chunk;if(data.length>16000)throw Error('Anfrage zu groß')}try{return JSON.parse(data)}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){const now=Date.now(),a=attempts.get(key)||[];const next=a.filter(t=>t>now-window);next.push(now);attempts.set(key,next);return next.length<=max}
@@ -147,31 +172,7 @@ const buchungsdetails = [
 ].join('\n');
 
 
-async function brevoMail(empfaenger, betreff, inhalt) {
-  const antwort = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'content-type': 'application/json',
-      'api-key': process.env.BREVO_API_KEY
-    },
-    body: JSON.stringify({
-      sender: {
-        name: 'Klettern & Abenteuer Brilon',
-        email: 'vormund.friedrich@gmail.com'
-      },
-      to: [{ email: empfaenger }],
-      subject: betreff,
-      textContent: inhalt
-    })
-  });
 
-  if (!antwort.ok) {
-    throw new Error(
-      'Brevo HTTP ' + antwort.status + ': ' + await antwort.text()
-    );
-  }
-}
 
 Promise.allSettled([
   brevoMail(
@@ -337,9 +338,14 @@ Promise.allSettled([
 
       const ergebnis=await reservierungsTransaktion(async client=>{
         const alt=await client.query(
-          'SELECT id,data FROM brilon_buchungen WHERE id=$1',[id]
+         
+'SELECT id,data,status FROM brilon_buchungen WHERE id=$1'
+
         );
         if(!alt.rowCount)return {fehlt:true};
+        
+const alterStatus = alt.rows[0].status;
+
 
         if(status==='offen'||status==='bestaetigt'){
           const data=alt.rows[0].data;
@@ -353,13 +359,59 @@ Promise.allSettled([
           'UPDATE brilon_buchungen SET status=$1,bearbeitungsnotiz=$2,updated_at=NOW() WHERE id=$3 RETURNING id,status,bearbeitungsnotiz,updated_at',
           [status,notiz,id]
         );
-        return {buchung:q.rows[0]};
+       
+return {
+  buchung: q.rows[0],
+  alterStatus,
+  kundenDaten: alt.rows[0].data
+};
+
       });
 
       if(ergebnis.fehlt)
         return reply(res,404,{error:'Buchung nicht gefunden.'});
       if(ergebnis.konflikt)
         return reply(res,409,{error:ergebnis.konflikt});
+
+      
+if (ergebnis.alterStatus !== status && status !== 'offen') {
+  const kunde = ergebnis.kundenDaten;
+  const empfaenger = kunde?.email;
+
+  const nachrichten = {
+    bestaetigt: {
+      betreff: 'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
+      text: 'Deine Buchung wurde verbindlich bestätigt.'
+    },
+    abgelehnt: {
+      betreff: 'Rückmeldung zu deiner Buchungsanfrage – Klettern Brilon',
+      text: 'Leider können wir deine Buchungsanfrage nicht annehmen.'
+    },
+    storniert: {
+      betreff: 'Deine Buchung wurde storniert – Klettern Brilon',
+      text: 'Deine Buchung wurde storniert.'
+    }
+  };
+
+  const nachricht = nachrichten[status];
+
+  if (empfaenger && nachricht) {
+    const inhalt =
+      `Hallo ${kunde.name || ''},\n\n` +
+      `${nachricht.text}\n\n` +
+      `Datum: ${kunde.datum || 'Nicht angegeben'}\n` +
+      `Beginn: ${kunde.uhrzeit || 'Nach Absprache'} Uhr\n` +
+      `Teilnehmer: ${kunde.teilnehmer || 'Nicht angegeben'}\n\n` +
+      `Bei Fragen antworte bitte auf diese E-Mail.\n\n` +
+      `Gut Seil!\nKlettern & Abenteuer Brilon`;
+
+    brevoMail(empfaenger, nachricht.betreff, inhalt)
+      .catch(fehler => {
+        console.error('Status-E-Mail fehlgeschlagen:', fehler);
+      });
+  }
+}
+
       return reply(res,200,ergebnis.buchung);
     }
 
