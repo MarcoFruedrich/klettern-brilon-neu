@@ -560,6 +560,35 @@ if (ergebnis.alterStatus !== status && status !== 'offen') {
       return reply(res,404,{error:'Nicht gefunden.'});
     }
 
+    
+if (route === '/api/admin/angebote' && req.method === 'POST') {
+  const d = await body(req);
+
+  const name = safeText(d.name, 120);
+  const beschreibung = safeText(d.beschreibung, 1000);
+  const dauer = Number(d.dauer);
+
+  if (!name || !Number.isInteger(dauer) ||
+      dauer < 15 || dauer > 1440) {
+    return reply(res, 400, {
+      error: 'Bitte Namen und gültige Dauer eingeben.'
+    });
+  }
+
+  const q = await pool.query(
+    `INSERT INTO brilon_angebote
+      (name, beschreibung, dauer, preise, aktiv)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id`,
+    [name, beschreibung, dauer, '{}', false]
+  );
+
+  return reply(res, 201, {
+    success: true,
+    id: q.rows[0].id
+  });
+}
+
     if(route.startsWith('/api/'))
       return reply(res,404,{error:'Nicht gefunden.'});
 
