@@ -557,9 +557,7 @@ if (ergebnis.alterStatus !== status && status !== 'offen') {
         await pool.query('DELETE FROM brilon_aktionen WHERE id=$1',[m[1]]);
         return reply(res,200,{success:true});
       }
-      return reply(res,404,{error:'Nicht gefunden.'});
-    }
-
+     
     
 if (route === '/api/admin/angebote' && req.method === 'POST') {
   const d = await body(req);
@@ -588,8 +586,15 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
     id: q.rows[0].id
   });
 }
+  
+      return reply(res,404,{error:'Nicht gefunden.'});
+    }
+
+    
+
 
     if(route.startsWith('/api/'))
+      
       return reply(res,404,{error:'Nicht gefunden.'});
 
     if(req.method!=='GET'&&req.method!=='HEAD')
