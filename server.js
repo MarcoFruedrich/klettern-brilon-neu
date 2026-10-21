@@ -631,13 +631,20 @@ if (preisRoute && req.method === 'PATCH') {
     neuePreise[gruppe] = preis;
   }
 
-  const q = await pool.query(
-    `UPDATE brilon_angebote
-     SET preise = $1::jsonb
-     WHERE id = $2
-     RETURNING id, preise`,
-    [JSON.stringify(neuePreise), preisRoute[1]]
-  );
+  
+const aktiv = typeof d.aktiv === 'boolean'
+  ? d.aktiv
+  : null;
+
+const q = await pool.query(
+  `UPDATE brilon_angebote
+   SET preise = $1::jsonb,
+       aktiv = COALESCE($3, aktiv)
+   WHERE id = $2
+   RETURNING id, preise, aktiv`,
+  [JSON.stringify(neuePreise), preisRoute[1], aktiv]
+);
+
 
   if (!q.rowCount) {
     return reply(res, 404, {
