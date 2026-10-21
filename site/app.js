@@ -41,6 +41,80 @@ function uhrzeitenAnzeigen() {
     'Bitte wähle deine gewünschte Anfangszeit.';
 }
 uhrzeitenAnzeigen();
+
+async function belegteUhrzeitenLaden() {
+  if (!uhrzeitAuswahl || !date.value) return;
+
+  const datum = date.value;
+  const teilnehmer = Number(
+    document.getElementById('buchungs-teilnehmer')?.value
+  );
+
+  const dauer =
+    teilnehmer >= 5 && teilnehmer <= 10 ? 150 :
+    teilnehmer >= 11 && teilnehmer <= 15 ? 180 :
+    teilnehmer >= 16 && teilnehmer <= 20 ? 210 : null;
+
+  const vorherigeAuswahl = uhrzeitAuswahl.value;
+
+  uhrzeitHinweis.textContent = 'Freie Uhrzeiten werden geprüft …';
+  uhrzeitAuswahl.disabled = true;
+
+  try {
+    const antwort = await fetch(
+      '/api/belegte-zeiten?datum=' + encodeURIComponent(datum)
+    );
+
+    if (!antwort.ok) throw new Error('Verfügbarkeit nicht abrufbar');
+
+    const daten = await antwort.json();
+
+    if (date.value !== datum) return;
+
+    // Die bisherige Serverabfrage liefert einzelne belegte Startzeiten.
+    // Für eine vollständige Überschneidungsprüfung benötigen wir
+    // zusätzlich die Anfangs- und Endzeiten aller Reservierungen.
+    // Bis dahin zeigen wir nur die direkt gemeldeten Belegungen an.
+    const belegteZeiten = new Set(
+      daten.zeiten.filter(eintrag => eintrag.belegt)
+        .map(eintrag => eintrag.uhrzeit)
+    );
+
+    uhrzeitenAnzeigen();
+
+    for (const option of uhrzeitAuswahl.options) {
+      if (belegteZeiten.has(option.value)) {
+        option.disabled = true;
+        option.textContent = option.value + ' Uhr – Belegt';
+      }
+    }
+
+    if (vorherigeAuswahl &&
+        !belegteZeiten.has(vorherigeAuswahl)) {
+      uhrzeitAuswahl.value = vorherigeAuswahl;
+    }
+
+    uhrzeitHinweis.textContent =
+      'Belegte Anfangszeiten sind nicht auswählbar. ' +
+      'Die endgültige Verfügbarkeit wird beim Absenden geprüft.';
+
+    if (typeof buchungsdauerBerechnen === 'function') {
+      buchungsdauerBerechnen();
+    }
+  } catch (fehler) {
+    uhrzeitenAnzeigen();
+    uhrzeitHinweis.textContent =
+      'Verfügbarkeit derzeit nicht abrufbar. ' +
+      'Bitte versuche es später erneut.';
+    uhrzeitAuswahl.disabled = true;
+  } finally {
+    if (date.value === datum &&
+        !uhrzeitHinweis.textContent.includes('nicht abrufbar')) {
+      uhrzeitAuswahl.disabled = false;
+    }
+  }
+}
+
 const teilnehmerEingabe = document.getElementById('buchungs-teilnehmer');
 const dauerAnzeige = document.getElementById('buchungs-dauer');
 const endzeitAnzeige = document.getElementById('buchungs-endzeit');
@@ -102,6 +176,7 @@ function buchungsdauerBerechnen() {
   
 if (teilnehmerEingabe) {
   teilnehmerEingabe.addEventListener('input', buchungsdauerBerechnen);
+    teilnehmerEingabe.addEventListener('input', belegteUhrzeitenLaden);
   buchungsdauerBerechnen();
 }
 if (uhrzeitAuswahl) {
@@ -238,10 +313,11 @@ zurueck.onclick = () => {
     }
 
     knopf.onclick = () => {
-      date.value = datumWert;
-      datumPruefen();
-      kalenderAnzeigen();
-    };
+  date.value = datumWert;
+  datumPruefen();
+  kalenderAnzeigen();
+  belegteUhrzeitenLaden();
+};
 
     tage.append(knopf);
   }
