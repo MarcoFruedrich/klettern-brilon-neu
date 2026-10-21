@@ -784,7 +784,7 @@ preisButton.addEventListener('click', async () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ preise })
+      body: JSON.stringify({ preise, aktiv: aktivSchalter.checked })
     });
 
     alert('Gruppenpreise erfolgreich gespeichert.');
