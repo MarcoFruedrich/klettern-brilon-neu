@@ -795,6 +795,20 @@ preisButton.addEventListener('click', async () => {
   }
 });
 
+  
+const aktivLabel = document.createElement('label');
+const aktivSchalter = document.createElement('input');
+
+aktivSchalter.type = 'checkbox';
+aktivSchalter.checked = angebot.aktiv === true;
+
+aktivLabel.appendChild(aktivSchalter);
+aktivLabel.appendChild(
+  document.createTextNode(' Angebot aktivieren')
+);
+
+eintrag.appendChild(aktivLabel);
+    
 eintrag.appendChild(preisButton);
 
       liste.appendChild(eintrag);
