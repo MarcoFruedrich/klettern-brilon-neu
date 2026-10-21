@@ -146,38 +146,63 @@ const buchungsdetails = [
   `Nachricht: ${data.nachricht || 'Keine'}`
 ].join('\n');
 
-const mailOptionen = {
-  from: process.env.SMTP_USER,
-  to: email,
-  subject: 'Deine Buchungsanfrage – Klettern & Abenteuer Brilon',
-  text:
+
+async function brevoMail(empfaenger, betreff, inhalt) {
+  const antwort = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'api-key': process.env.BREVO_API_KEY
+    },
+    body: JSON.stringify({
+      sender: {
+        name: 'Klettern & Abenteuer Brilon',
+        email: 'vormund.friedrich@gmail.com'
+      },
+      to: [{ email: empfaenger }],
+      subject: betreff,
+      textContent: inhalt
+    })
+  });
+
+  if (!antwort.ok) {
+    throw new Error(
+      'Brevo HTTP ' + antwort.status + ': ' + await antwort.text()
+    );
+  }
+}
+
+Promise.allSettled([
+  brevoMail(
+    email,
+    'Deine Buchungsanfrage – Klettern & Abenteuer Brilon',
     `Hallo ${name},\n\n` +
     `vielen Dank für deine Buchungsanfrage.\n\n` +
     buchungsdetails +
     `\n\nDeine Anfrage ist eingegangen, aber noch nicht verbindlich bestätigt.` +
     `\nDu erhältst eine gesonderte Rückmeldung.\n\n` +
     `Gut Seil!\nKlettern & Abenteuer Brilon`
-};
-
-Promise.allSettled([
-  mailTransporter.sendMail(mailOptionen),
-  mailTransporter.sendMail({
-    from: process.env.SMTP_USER,
-    to: process.env.SMTP_USER,
-    subject: 'Neue Buchungsanfrage – Klettern Brilon',
-    text: `Eine neue Buchungsanfrage ist eingegangen:\n\n${buchungsdetails}\n\nStatus: Offen`
-  })
+  ),
+  brevoMail(
+    'vormund.friedrich@gmail.com',
+    'Neue Buchungsanfrage – Klettern Brilon',
+    `Eine neue Buchungsanfrage ist eingegangen:\n\n` +
+    buchungsdetails +
+    `\n\nKunden-E-Mail: ${email}\nStatus: Offen`
+  )
 ]).then(ergebnisse => {
   ergebnisse.forEach((ergebnis, index) => {
     if (ergebnis.status === 'rejected') {
       console.error(
-        'Buchungs-E-Mail fehlgeschlagen:',
+        'Brevo-E-Mail fehlgeschlagen:',
         index === 0 ? 'Kunde' : 'Betreiber',
         ergebnis.reason
       );
     }
   });
 });
+
 
       return reply(res,201,{success:true,id:ergebnis.id});
     }
