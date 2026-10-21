@@ -761,6 +761,40 @@ for (const [schluessel, bezeichnung] of gruppen) {
 
       eintrag.append(titel, beschreibung, details);
       eintrag.appendChild(preisbereich);
+      
+const preisButton = document.createElement('button');
+preisButton.type = 'button';
+preisButton.className = 'btn';
+preisButton.textContent = 'Preise speichern';
+
+preisButton.addEventListener('click', async () => {
+  const preise = {};
+
+  for (const eingabe of preisbereich.querySelectorAll('input')) {
+    preise[eingabe.dataset.gruppe] = eingabe.value;
+  }
+
+  preisButton.disabled = true;
+
+  try {
+    await api('/api/admin/angebote/' + angebot.id, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ preise })
+    });
+
+    alert('Gruppenpreise erfolgreich gespeichert.');
+  } catch (fehler) {
+    alert('Speichern fehlgeschlagen: ' + fehler.message);
+  } finally {
+    preisButton.disabled = false;
+  }
+});
+
+eintrag.appendChild(preisButton);
+
       liste.appendChild(eintrag);
     }
   } catch (fehler) {
