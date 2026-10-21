@@ -150,7 +150,10 @@ if (gruppe) {
   }
 }
       const data={
-        name,email,datum,angebot,teilnehmer,
+       name,email,datum,angebot,teilnehmer,
+gesamtpreis,
+anzahlung: gesamtpreis === null ? null : Math.round(gesamtpreis * 25) / 100,
+restbetrag: gesamtpreis === null ? null : Math.round(gesamtpreis * 75) / 100,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
         nachricht:safeText(d.nachricht,2000)
