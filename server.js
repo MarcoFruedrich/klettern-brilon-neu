@@ -610,6 +610,19 @@ async function start(){
     await pool.query(
       'CREATE TABLE IF NOT EXISTS brilon_aktionen (id BIGSERIAL PRIMARY KEY,titel TEXT NOT NULL,datum DATE,beschreibung TEXT,created_at TIMESTAMPTZ DEFAULT NOW())'
     );
+    
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS brilon_angebote (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    beschreibung TEXT DEFAULT '',
+    dauer INTEGER,
+    preise JSONB NOT NULL DEFAULT '{}'::jsonb,
+    aktiv BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )
+`);
+
     console.log('PostgreSQL verbunden');
   }else{
     console.warn('DATABASE_URL fehlt: Datenbankfunktionen nicht verfügbar');
