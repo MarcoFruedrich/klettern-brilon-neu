@@ -279,4 +279,20 @@ fetch('/api/sperrzeiten')
     datumPruefen();
   });
 
-const form=document.getElementById('booking');form.addEventListener('submit',async e=>{e.preventDefault();const status=document.getElementById('booking-status');const btn=form.querySelector('button[type=submit]');const data=Object.fromEntries(new FormData(form).entries());status.textContent='Anfrage wird gesendet …';btn.disabled=true;try{const res=await fetch('/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const json=await res.json();if(!res.ok)throw new Error(json.error||'Übertragung fehlgeschlagen');status.textContent='Vielen Dank! Deine Anfrage wurde gespeichert. Wir melden uns persönlich.';form.reset()}catch(err){status.textContent='Anfrage konnte nicht gespeichert werden: '+err.message}finally{btn.disabled=false}});async function specials(){const root=document.getElementById('specials');try{const r=await fetch('/api/aktionen');if(!r.ok)throw Error();const items=await r.json();root.replaceChildren();if(!items.length){const p=document.createElement('p');p.textContent='Neue Sonderangebote werden hier veröffentlicht. Frage gerne nach freien Terminen!';root.append(p)}for(const item of items){const a=document.createElement('article');const h=document.createElement('h3');h.textContent=item.titel;const d=document.createElement('p');d.textContent=item.datum||'Termin nach Vereinbarung';const t=document.createElement('p');t.textContent=item.beschreibung||'';a.append(h,d,t);root.append(a)}}catch{root.textContent='Sonderangebote derzeit nicht abrufbar.'}}specials();
+const form=document.getElementById('booking');form.addEventListener('submit',async e=>{e.preventDefault();const status=document.getElementById('booking-status');const btn=form.querySelector('button[type=submit]');const data=Object.fromEntries(new FormData(form).entries());status.textContent='Anfrage wird gesendet …';btn.disabled=true;try{const res=await fetch('/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const json=await res.json();if(!res.ok)throw new Error(json.error||'Übertragung fehlgeschlagen');status.textContent='✓ BUCHUNGSANFRAGE ERFOLGREICH! Dein gewünschter Termin wurde vorläufig reserviert. Vielen Dank für deine Anfrage bei Klettern & Abenteuer Brilon! Wir melden uns persönlich bei dir.';
+status.style.color='#167c3a';
+status.style.fontWeight='bold';
+status.style.fontSize='1.15rem';
+status.style.padding='18px';
+status.style.border='2px solid #167c3a';
+status.style.borderRadius='10px';
+status.style.backgroundColor='#e8f7ec';
+status.scrollIntoView({behavior:'smooth',block:'center'});form.reset()}catch(err){status.textContent='⚠ Buchung nicht möglich: '+err.message;
+status.style.color='#a61b1b';
+status.style.fontWeight='bold';
+status.style.fontSize='1.15rem';
+status.style.padding='18px';
+status.style.border='2px solid #a61b1b';
+status.style.borderRadius='10px';
+status.style.backgroundColor='#fff0f0';
+status.scrollIntoView({behavior:'smooth',block:'center'})}finally{btn.disabled=false}});async function specials(){const root=document.getElementById('specials');try{const r=await fetch('/api/aktionen');if(!r.ok)throw Error();const items=await r.json();root.replaceChildren();if(!items.length){const p=document.createElement('p');p.textContent='Neue Sonderangebote werden hier veröffentlicht. Frage gerne nach freien Terminen!';root.append(p)}for(const item of items){const a=document.createElement('article');const h=document.createElement('h3');h.textContent=item.titel;const d=document.createElement('p');d.textContent=item.datum||'Termin nach Vereinbarung';const t=document.createElement('p');t.textContent=item.beschreibung||'';a.append(h,d,t);root.append(a)}}catch{root.textContent='Sonderangebote derzeit nicht abrufbar.'}}specials();
