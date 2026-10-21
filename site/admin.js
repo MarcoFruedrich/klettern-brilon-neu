@@ -757,9 +757,10 @@ for (const [schluessel, bezeichnung] of gruppen) {
   preisbereich.appendChild(label);
 }
 
-eintrag.appendChild(preisbereich);
+
 
       eintrag.append(titel, beschreibung, details);
+      eintrag.appendChild(preisbereich);
       liste.appendChild(eintrag);
     }
   } catch (fehler) {
