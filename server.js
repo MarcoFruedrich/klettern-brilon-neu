@@ -125,6 +125,30 @@ async function main(req,res){
          teilnehmer<1||teilnehmer>150||d.datenschutz!=='on')
         return reply(res,400,{error:'Bitte Pflichtfelder korrekt ausfüllen.'});
 
+      let gesamtpreis = null;
+
+const gruppe =
+  teilnehmer >= 5 && teilnehmer <= 10 ? '5-10' :
+  teilnehmer >= 11 && teilnehmer <= 15 ? '11-15' :
+  teilnehmer >= 16 && teilnehmer <= 20 ? '16-20' : null;
+
+if (gruppe) {
+  const preisAbfrage = await pool.query(
+    `SELECT preise FROM brilon_angebote
+     WHERE name = $1 AND aktiv = true
+     LIMIT 1`,
+    [angebot]
+  );
+
+  if (preisAbfrage.rows.length) {
+    const preis = preisAbfrage.rows[0].preise?.[gruppe];
+
+    if (typeof preis === 'number' &&
+        Number.isFinite(preis) && preis >= 0) {
+      gesamtpreis = preis;
+    }
+  }
+}
       const data={
         name,email,datum,angebot,teilnehmer,
         uhrzeit:safeText(d.uhrzeit,5),
