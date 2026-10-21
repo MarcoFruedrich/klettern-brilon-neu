@@ -32,6 +32,8 @@ async function refresh() {
 
     login.hidden = true;
     workspace.hidden = false;
+    
+    await erlebnisangeboteLaden();
 
     const box = document.getElementById('bookings');
     box.replaceChildren();
@@ -802,7 +804,7 @@ eintrag.appendChild(preisButton);
   }
 }
 
-erlebnisangeboteLaden();
+
 
 
 
