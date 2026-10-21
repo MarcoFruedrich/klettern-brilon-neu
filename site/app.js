@@ -62,7 +62,8 @@ async function belegteUhrzeitenLaden() {
 
   try {
     const antwort = await fetch(
-      '/api/belegte-zeiten?datum=' + encodeURIComponent(datum)
+     '/api/belegte-zeiten?datum=' + encodeURIComponent(datum) +
+'&teilnehmer=' + encodeURIComponent(teilnehmer)
     );
 
     if (!antwort.ok) throw new Error('Verfügbarkeit nicht abrufbar');
