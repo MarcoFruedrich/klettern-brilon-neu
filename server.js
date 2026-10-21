@@ -665,34 +665,5 @@ start().catch(e=>{
   process.exit(1);
 });
 
-/* Neues Erlebnisangebot speichern */
 
-const neuesAngebotForm =
-  document.getElementById('neues-angebot-form');
-
-if (neuesAngebotForm) {
-  neuesAngebotForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-
-    const daten = Object.fromEntries(
-      new FormData(neuesAngebotForm).entries()
-    );
-
-    try {
-      await api('/api/admin/angebote', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(daten)
-      });
-
-      neuesAngebotForm.reset();
-
-      alert('Neues Erlebnisangebot wurde gespeichert.');
-    } catch (fehler) {
-      alert('Speichern fehlgeschlagen: ' + fehler.message);
-    }
-  });
-}
 
