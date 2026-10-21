@@ -558,7 +558,17 @@ if (ergebnis.alterStatus !== status && status !== 'offen') {
         return reply(res,200,{success:true});
       }
      
-    
+  
+if (route === '/api/admin/angebote' && req.method === 'GET') {
+  const q = await pool.query(
+    `SELECT id, name, beschreibung, dauer, preise, aktiv
+     FROM brilon_angebote
+     ORDER BY id DESC`
+  );
+
+  return reply(res, 200, q.rows);
+}
+  
 if (route === '/api/admin/angebote' && req.method === 'POST') {
   const d = await body(req);
 
