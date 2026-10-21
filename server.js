@@ -127,6 +127,58 @@ async function main(req,res){
 
       if(ergebnis.konflikt)
         return reply(res,409,{error:ergebnis.konflikt});
+
+      
+const dauer = fenster ? fenster[1] - fenster[0] : null;
+const ende = fenster
+  ? String(Math.floor(fenster[1] / 60)).padStart(2, '0') +
+    ':' + String(fenster[1] % 60).padStart(2, '0')
+  : 'nach Absprache';
+
+const buchungsdetails = [
+  `Name: ${name}`,
+  `Datum: ${datum}`,
+  `Angebot: ${angebot}`,
+  `Teilnehmer: ${teilnehmer}`,
+  `Beginn: ${data.uhrzeit} Uhr`,
+  `Ende: ${ende}${fenster ? ' Uhr' : ''}`,
+  `Telefon: ${data.telefon || 'Nicht angegeben'}`,
+  `Nachricht: ${data.nachricht || 'Keine'}`
+].join('\n');
+
+const mailOptionen = {
+  from: process.env.SMTP_USER,
+  to: email,
+  subject: 'Deine Buchungsanfrage – Klettern & Abenteuer Brilon',
+  text:
+    `Hallo ${name},\n\n` +
+    `vielen Dank für deine Buchungsanfrage.\n\n` +
+    buchungsdetails +
+    `\n\nDeine Anfrage ist eingegangen, aber noch nicht verbindlich bestätigt.` +
+    `\nDu erhältst eine gesonderte Rückmeldung.\n\n` +
+    `Gut Seil!\nKlettern & Abenteuer Brilon`
+};
+
+Promise.allSettled([
+  mailTransporter.sendMail(mailOptionen),
+  mailTransporter.sendMail({
+    from: process.env.SMTP_USER,
+    to: process.env.SMTP_USER,
+    subject: 'Neue Buchungsanfrage – Klettern Brilon',
+    text: `Eine neue Buchungsanfrage ist eingegangen:\n\n${buchungsdetails}\n\nStatus: Offen`
+  })
+]).then(ergebnisse => {
+  ergebnisse.forEach((ergebnis, index) => {
+    if (ergebnis.status === 'rejected') {
+      console.error(
+        'Buchungs-E-Mail fehlgeschlagen:',
+        index === 0 ? 'Kunde' : 'Betreiber',
+        ergebnis.reason
+      );
+    }
+  });
+});
+
       return reply(res,201,{success:true,id:ergebnis.id});
     }
 
