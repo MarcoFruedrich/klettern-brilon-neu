@@ -142,21 +142,39 @@ async function main(req,res){
 
       const buchungen=q.rows.map(r=>buchungsfenster(r.data));
 
+     
+      const teilnehmer = Number(u.searchParams.get('teilnehmer'));
+
+      if (!Number.isInteger(teilnehmer) ||
+          teilnehmer < 1 || teilnehmer > 150) {
+        return reply(res,400,{
+          error:'Bitte eine gültige Teilnehmerzahl angeben.'
+        });
+      }
+
+      const dauer =
+        teilnehmer >= 5 && teilnehmer <= 10 ? 150 :
+        teilnehmer >= 11 && teilnehmer <= 15 ? 180 :
+        teilnehmer >= 16 && teilnehmer <= 20 ? 210 : null;
+
       const zeiten=[];
+
       for(let stunde=9;stunde<=19;stunde++){
         const uhrzeit=String(stunde).padStart(2,'0')+':00';
         const start=stunde*60;
 
-        // Individuelle Angebote werden vorsichtshalber
-        // wie eine ganztägige Reservierung behandelt.
+        const neuesFenster=
+          dauer===null ? null : [start,start+dauer];
+
         const belegt=buchungen.some(fenster=>
-          !fenster||(start>=fenster[0]&&start<fenster[1])
+          ueberschneidung(neuesFenster,fenster)
         );
 
         zeiten.push({uhrzeit,belegt});
       }
 
       return reply(res,200,{datum,zeiten});
+
     }
 
 
