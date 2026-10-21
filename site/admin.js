@@ -700,5 +700,46 @@ if (neuesAngebotForm) {
   });
 }
 
+/* Gespeicherte Erlebnisangebote anzeigen */
+
+async function erlebnisangeboteLaden() {
+  const liste = document.getElementById('angebote-admin-liste');
+  if (!liste) return;
+
+  try {
+    const angebote = await api('/api/admin/angebote');
+
+    liste.innerHTML = '';
+
+    if (!angebote.length) {
+      liste.textContent = 'Noch keine Angebote gespeichert.';
+      return;
+    }
+
+    for (const angebot of angebote) {
+      const eintrag = document.createElement('div');
+      eintrag.className = 'card';
+
+      const titel = document.createElement('h3');
+      titel.textContent = angebot.name;
+
+      const beschreibung = document.createElement('p');
+      beschreibung.textContent = angebot.beschreibung || '';
+
+      const details = document.createElement('p');
+      details.textContent =
+        'Dauer: ' + angebot.dauer + ' Minuten | ' +
+        (angebot.aktiv ? 'Aktiv' : 'Noch nicht freigegeben');
+
+      eintrag.append(titel, beschreibung, details);
+      liste.appendChild(eintrag);
+    }
+  } catch (fehler) {
+    liste.textContent = 'Laden fehlgeschlagen: ' + fehler.message;
+  }
+}
+
+erlebnisangeboteLaden();
+
 
 
