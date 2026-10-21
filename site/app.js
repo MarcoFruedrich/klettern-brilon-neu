@@ -396,4 +396,53 @@ async function angeboteLaden() {
 }
 
 angeboteLaden();
+async function preisanzeigeStarten() {
+  const auswahl = document.getElementById('angebot-auswahl');
+  const teilnehmer = document.getElementById('buchungs-teilnehmer');
+  const anzeige = document.getElementById('angebots-preis');
 
+  if (!auswahl || !teilnehmer || !anzeige) return;
+
+  try {
+    const res = await fetch('/api/angebote');
+    if (!res.ok) throw new Error('Preise nicht erreichbar');
+
+    const angebote = await res.json();
+
+    function preisAktualisieren() {
+      const angebot = angebote.find(a => a.name === auswahl.value);
+      const anzahl = Number(teilnehmer.value);
+
+      anzeige.textContent = '';
+
+      if (!angebot) return;
+
+      let gruppe = '';
+
+      if (anzahl >= 5 && anzahl <= 10) gruppe = '5-10';
+      else if (anzahl <= 15 && anzahl >= 11) gruppe = '11-15';
+      else if (anzahl <= 20 && anzahl >= 16) gruppe = '16-20';
+
+      const preis = angebot.preise?.[gruppe];
+
+      if (preis !== undefined && preis !== null) {
+        anzeige.textContent = 'Gruppenpreis: ' +
+          Number(preis).toLocaleString('de-DE', {
+            style: 'currency',
+            currency: 'EUR'
+          });
+      } else {
+        anzeige.textContent = 'Preis auf Anfrage';
+      }
+    }
+
+    auswahl.addEventListener('change', preisAktualisieren);
+    teilnehmer.addEventListener('input', preisAktualisieren);
+    preisAktualisieren();
+
+  } catch (fehler) {
+    console.error('Preisanzeige:', fehler);
+  }
+}
+
+preisanzeigeStarten();
