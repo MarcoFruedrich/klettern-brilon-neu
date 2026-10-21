@@ -648,4 +648,27 @@ kalenderLaden = async function() {
   }
 };
 
+/* ==========================================
+   ANGEBOTE UND PREISE VERWALTEN
+   ========================================== */
+
+const angeboteAdminListe =
+  document.getElementById('angebote-admin-liste');
+
+if (angeboteAdminListe) {
+  angeboteAdminListe.innerHTML = `
+    <h3>Meine Erlebnisangebote</h3>
+    <p>
+      Hier werden künftig alle Angebote mit
+      individuellen Gruppenpreisen verwaltet.
+    </p>
+    <p>
+      Klettern, Kindergeburtstage, Pusiken,
+      Kistenklettern, Baumklettern und
+      weitere frei anlegbare Angebote.
+    </p>
+  `;
+}
+
+
 
