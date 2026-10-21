@@ -731,6 +731,34 @@ async function erlebnisangeboteLaden() {
         'Dauer: ' + angebot.dauer + ' Minuten | ' +
         (angebot.aktiv ? 'Aktiv' : 'Noch nicht freigegeben');
 
+      
+const preisbereich = document.createElement('div');
+
+const gruppen = [
+  ['5-10', '5–10 Personen'],
+  ['11-15', '11–15 Personen'],
+  ['16-20', '16–20 Personen']
+];
+
+for (const [schluessel, bezeichnung] of gruppen) {
+  const label = document.createElement('label');
+  label.textContent = bezeichnung + ' – Preis in €';
+
+  const eingabe = document.createElement('input');
+  eingabe.type = 'number';
+  eingabe.min = '0';
+  eingabe.step = '0.01';
+  eingabe.placeholder = 'Preis eingeben';
+  eingabe.value = angebot.preise?.[schluessel] ?? '';
+
+  eingabe.dataset.gruppe = schluessel;
+
+  label.appendChild(eingabe);
+  preisbereich.appendChild(label);
+}
+
+eintrag.appendChild(preisbereich);
+
       eintrag.append(titel, beschreibung, details);
       liste.appendChild(eintrag);
     }
