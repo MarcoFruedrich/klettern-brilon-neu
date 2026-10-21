@@ -661,6 +661,24 @@ const q = await pool.query(
     
 
 
+   
+if (route === '/api/angebote' && req.method === 'GET') {
+  if (!pool) {
+    return reply(res, 503, {
+      error: 'Angebote derzeit nicht verfügbar.'
+    });
+  }
+
+  const q = await pool.query(
+    `SELECT id, name, beschreibung, dauer, preise
+     FROM brilon_angebote
+     WHERE aktiv = true
+     ORDER BY name ASC`
+  );
+
+  return reply(res, 200, q.rows);
+}
+
     if(route.startsWith('/api/'))
       
       return reply(res,404,{error:'Nicht gefunden.'});
