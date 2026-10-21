@@ -596,7 +596,58 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
     id: q.rows[0].id
   });
 }
-  
+
+     
+const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
+
+if (preisRoute && req.method === 'PATCH') {
+  const d = await body(req);
+  const preise = d.preise;
+
+  if (!preise || typeof preise !== 'object' ||
+      Array.isArray(preise)) {
+    return reply(res, 400, {
+      error: 'Ungültige Preisangaben.'
+    });
+  }
+
+  const neuePreise = {};
+
+  for (const gruppe of ['5-10', '11-15', '16-20']) {
+    const wert = preise[gruppe];
+
+    if (wert === '' || wert === null || wert === undefined) {
+      continue;
+    }
+
+    const preis = Number(wert);
+
+    if (!Number.isFinite(preis) || preis < 0) {
+      return reply(res, 400, {
+        error: 'Bitte gültige Preise eingeben.'
+      });
+    }
+
+    neuePreise[gruppe] = preis;
+  }
+
+  const q = await pool.query(
+    `UPDATE brilon_angebote
+     SET preise = $1::jsonb
+     WHERE id = $2
+     RETURNING id, preise`,
+    [JSON.stringify(neuePreise), preisRoute[1]]
+  );
+
+  if (!q.rowCount) {
+    return reply(res, 404, {
+      error: 'Angebot nicht gefunden.'
+    });
+  }
+
+  return reply(res, 200, q.rows[0]);
+}
+ 
       return reply(res,404,{error:'Nicht gefunden.'});
     }
 
