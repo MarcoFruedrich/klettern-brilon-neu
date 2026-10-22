@@ -319,7 +319,7 @@ Promise.allSettled([
     if(route==='/api/aktionen'&&req.method==='GET'){
       if(!pool)return reply(res,200,[]);
       const q=await pool.query(
-        "SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,data->>'beschreibung' AS beschreibung FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100"
+        "SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,data->>'beschreibung' AS beschreibung,data->>'preis' AS preis FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100"
       );
       return reply(res,200,q.rows);
     }
@@ -612,7 +612,8 @@ try {
       const uhrzeit=safeText(d.uhrzeit,5)||null;
       const endzeit=safeText(d.endzeit,5)||null;
       const typ=safeText(d.typ,20);
-      const beschreibung=safeText(d.beschreibung,1000);
+      const beschreibung=safeText(d.beschreibung,1000),
+preis=safeText(d.preis,50);
 
       const gueltigesDatum=v=>{
         if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
@@ -720,7 +721,7 @@ try {
           return reply(res,400,{error:'Ungültige Eingabe.'});
         const q=await pool.query(
           'INSERT INTO brilon_aktionen(id,data) VALUES ($1,$2) RETURNING id',
-          [crypto.randomUUID(),JSON.stringify({titel,datum,beschreibung})]
+          [crypto.randomUUID(),JSON.stringify({titel,datum,beschreibung,preis})]
         );
         return reply(res,201,{id:q.rows[0].id});
       }
