@@ -807,8 +807,11 @@ async function erlebnisangeboteLaden() {
       const titel = document.createElement('h3');
       titel.textContent = angebot.name;
 
-      const beschreibung = document.createElement('p');
-      beschreibung.textContent = angebot.beschreibung || '';
+     const beschreibung = document.createElement('textarea');
+beschreibung.value = angebot.beschreibung || '';
+beschreibung.rows = 4;
+beschreibung.placeholder = 'Beschreibung des Angebots eingeben';
+beschreibung.style.width = '100%';
 
       const details = document.createElement('p');
       details.textContent =
