@@ -848,6 +848,79 @@ for (const [schluessel, bezeichnung] of gruppen) {
 
       eintrag.append(titel, beschreibung, details);
       eintrag.appendChild(preisbereich);
+      const bildBereich = document.createElement('div');
+
+const bildVorschau = document.createElement('img');
+bildVorschau.alt = 'Foto zum Angebot ' + angebot.name;
+bildVorschau.style.maxWidth = '300px';
+bildVorschau.style.width = '100%';
+bildVorschau.style.marginTop = '12px';
+bildVorschau.style.borderRadius = '8px';
+
+if (angebot.bild_url) {
+  bildVorschau.src = angebot.bild_url;
+  bildBereich.appendChild(bildVorschau);
+}
+
+const bildAuswahl = document.createElement('input');
+bildAuswahl.type = 'file';
+bildAuswahl.accept = 'image/jpeg,image/png,image/webp';
+bildAuswahl.style.display = 'block';
+bildAuswahl.style.marginTop = '12px';
+
+const bildButton = document.createElement('button');
+bildButton.type = 'button';
+bildButton.className = 'btn';
+bildButton.textContent = 'Bild hochladen';
+
+bildButton.addEventListener('click', async () => {
+  const datei = bildAuswahl.files[0];
+
+  if (!datei) {
+    alert('Bitte zuerst ein Bild auswählen.');
+    return;
+  }
+
+  if (datei.size > 5 * 1024 * 1024) {
+    alert('Das Bild darf maximal 5 MB groß sein.');
+    return;
+  }
+
+  bildButton.disabled = true;
+
+  try {
+    const antwort = await fetch(
+      '/api/admin/angebote/' + angebot.id + '/bild',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': datei.type
+        },
+        body: datei
+      }
+    );
+
+    const ergebnis = await antwort.json();
+
+    if (!antwort.ok) {
+      throw new Error(ergebnis.error || 'Upload fehlgeschlagen.');
+    }
+
+    bildVorschau.src = ergebnis.bild_url;
+    if (!bildVorschau.parentNode) {
+      bildBereich.insertBefore(bildVorschau, bildAuswahl);
+    }
+
+    alert('Bild erfolgreich hochgeladen.');
+  } catch (fehler) {
+    alert('Fehler beim Bildupload: ' + fehler.message);
+  } finally {
+    bildButton.disabled = false;
+  }
+});
+
+bildBereich.append(bildAuswahl, bildButton);
+eintrag.appendChild(bildBereich);
       
 const preisButton = document.createElement('button');
 preisButton.type = 'button';
