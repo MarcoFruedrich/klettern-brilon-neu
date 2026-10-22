@@ -171,6 +171,28 @@ loeschen.onclick = async () => {
      const zahlungSenden = el('button', 'Zahlungsinformationen senden');
 zahlungSenden.type = 'button';
 zahlungSenden.disabled = false;
+  zahlungSenden.onclick = async () => {
+  const bestaetigt = confirm(
+    'Möchtest du die Zahlungsinformationen wirklich an diesen Kunden senden?'
+  );
+
+  if (!bestaetigt) return;
+
+  zahlungSenden.disabled = true;
+  meldung.textContent = 'Zahlungsinformationen werden gesendet ...';
+
+  try {
+    await api('/api/admin/buchungen/' + encodeURIComponent(b.id) + '/zahlung', {
+      method: 'POST'
+    });
+
+    meldung.textContent = 'Zahlungsinformationen erfolgreich versendet.';
+  } catch (fehler) {
+    meldung.textContent = 'Fehler beim Zahlungsversand: ' + fehler.message;
+  } finally {
+    zahlungSenden.disabled = false;
+  }
+};    
 zahlungSenden.title = 'E-Mail-Versand wird noch eingerichtet'; 
     c.append(speichern, zahlungSenden, loeschen, meldung);
       box.append(c);
