@@ -364,6 +364,14 @@ Promise.allSettled([
       if(!['offen','bestaetigt','abgelehnt','storniert'].includes(status))
         return reply(res,400,{error:'Ungültiger Buchungsstatus.'});
 
+      if (
+  zahlungsstatus !== undefined &&
+  !['offen', 'anzahlung', 'vollstaendig'].includes(zahlungsstatus)
+) {
+  return reply(res, 400, {
+    error: 'Ungültiger Zahlungsstatus.'
+  });
+}
       const ergebnis=await reservierungsTransaktion(async client=>{
         
 const alt=await client.query(
