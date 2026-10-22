@@ -952,7 +952,121 @@ if (speicherung.rowCount !== 1) {
     bild_url: data.publicUrl
   });
 }
- 
+ const aktionsBildRoute = route.match(
+  /^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/bild$/
+);
+
+if (aktionsBildRoute && req.method === 'POST') {
+  const aktionsId = aktionsBildRoute[1];
+
+  const erlaubteTypen = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp'
+  };
+
+  const dateityp = (req.headers['content-type'] || '')
+    .split(';')[0].toLowerCase();
+  const endung = erlaubteTypen[dateityp];
+
+  if (!endung) {
+    return reply(res, 400, {
+      error: 'Nur JPG, PNG und WebP erlaubt.'
+    });
+  }
+
+  const teile = [];
+  let groesse = 0;
+
+  for await (const teil of req) {
+    groesse += teil.length;
+
+    if (groesse > 5 * 1024 * 1024) {
+      return reply(res, 413, {
+        error: 'Das Bild darf maximal 5 MB groß sein.'
+      });
+    }
+
+    teile.push(teil);
+  }
+
+  if (!groesse) {
+    return reply(res, 400, {
+      error: 'Keine Bilddatei empfangen.'
+    });
+  }
+
+  const bild = Buffer.concat(teile);
+
+  const gueltig =
+    (endung === 'jpg' && bild.length >= 3 &&
+      bild[0] === 0xff && bild[1] === 0xd8 && bild[2] === 0xff) ||
+    (endung === 'png' && bild.length >= 8 &&
+      bild.subarray(0, 8).equals(
+        Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+      )) ||
+    (endung === 'webp' && bild.length >= 12 &&
+      bild.toString('ascii', 0, 4) === 'RIFF' &&
+      bild.toString('ascii', 8, 12) === 'WEBP');
+
+  if (!gueltig) {
+    return reply(res, 400, {
+      error: 'Ungültige Bilddatei.'
+    });
+  }
+
+  const vorhanden = await pool.query(
+    'SELECT id FROM brilon_aktionen WHERE id = $1',
+    [aktionsId]
+  );
+
+  if (!vorhanden.rowCount) {
+    return reply(res, 404, {
+      error: 'Sonderangebot nicht gefunden.'
+    });
+  }
+
+  const dateiname =
+    'sonderaktionen/' + aktionsId + '/' +
+    crypto.randomUUID() + '.' + endung;
+
+  const { error } = await supabase.storage
+    .from('angebotsbilder')
+    .upload(dateiname, bild, {
+      contentType: dateityp,
+      upsert: false
+    });
+
+  if (error) {
+    console.error('Aktionsbild-Upload fehlgeschlagen:', error);
+    return reply(res, 502, {
+      error: 'Bild konnte nicht gespeichert werden.'
+    });
+  }
+
+  const { data } = supabase.storage
+    .from('angebotsbilder')
+    .getPublicUrl(dateiname);
+
+ const speicherung = await pool.query(
+  `UPDATE brilon_aktionen
+   SET data = jsonb_set(data, '{bild_url}', to_jsonb($1::text))
+   WHERE id = $2
+   RETURNING id`,
+  [data.publicUrl, aktionsId]
+);
+
+if (speicherung.rowCount !== 1) {
+  return reply(res, 500, {
+    error: 'Bildadresse konnte nicht gespeichert werden.'
+  });
+}
+
+  return reply(res, 200, {
+    success: true,
+    bild_url: data.publicUrl
+  });
+}
       return reply(res,404,{error:'Nicht gefunden.'});
     }
 
