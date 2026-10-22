@@ -164,41 +164,38 @@ c.append(zahlungsLabel, zahlungsAuswahl);
       const meldung = el('p');
       meldung.setAttribute('role', 'status');
 
-      speichern.onclick = async () => {
-        speichern.disabled = true;
-        meldung.textContent = 'Speichern läuft ...';
+     speichern.onclick = async () => {
+  speichern.disabled = true;
+  meldung.textContent = 'Speichern läuft ...';
 
-        try {
-          await api('/api/admin/buchungen/' + b.id, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-          body: JSON.stringify({
-  status: auswahl.value,
-  bearbeitungsnotiz: notiz.value,
-  zahlungsstatus: zahlungsAuswahl.value
- })
-});
+  try {
+    const ergebnis = await api('/api/admin/buchungen/' + b.id, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        status: auswahl.value,
+        bearbeitungsnotiz: notiz.value,
+        zahlungsstatus: zahlungsAuswahl.value
+      })
+    });
 
-           
-      b.status = zahlungsAuswahl.value === 'anzahlung' || zahlungsAuswahl.value === 'vollstaendig'
-  ? 'bestaetigt' : auswahl.value;
-auswahl.value = b.status;
-          b.bearbeitungsnotiz = notiz.value;
-          b.data.zahlungsstatus = zahlungsAuswahl.value;
+    b.status = ergebnis.status;
+    b.bearbeitungsnotiz = notiz.value;
+    b.data.zahlungsstatus = zahlungsAuswahl.value;
+    auswahl.value = b.status;
 
-          statusZeile.textContent =
-            'Bearbeitungsstatus: ' + statusNamen[b.status];
+    statusZeile.textContent =
+      'Bearbeitungsstatus: ' + statusNamen[b.status];
 
-          meldung.textContent = 'Änderungen gespeichert.';
-        } catch (err) {
-          meldung.textContent = 'Fehler: ' + err.message;
-        } finally {
-          speichern.disabled = false;
-        }
-      };
-
+    meldung.textContent = 'Änderungen gespeichert.';
+  } catch (err) {
+    meldung.textContent = 'Fehler: ' + err.message;
+  } finally {
+    speichern.disabled = false;
+  }
+};
     
 const loeschen = el('button', 'Buchungsanfrage löschen');
 loeschen.type = 'button';
