@@ -480,6 +480,15 @@ if (
     error: 'Für diese Buchung ist kein gültiger Gesamtpreis hinterlegt.'
   });
 }  
+    const gesamtpreis = kunde.gesamtpreis;
+const anzahlung = Math.round(gesamtpreis * 25) / 100;
+const restbetrag = Math.round((gesamtpreis - anzahlung) * 100) / 100;
+
+const euro = betrag =>
+  betrag.toLocaleString('de-DE', {
+    style: 'currency',
+    currency: 'EUR'
+  });  
   return reply(res, 501, {
     error: 'Zahlungsversand noch nicht eingerichtet.'
   });
