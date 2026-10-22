@@ -319,8 +319,7 @@ Promise.allSettled([
     if(route==='/api/aktionen'&&req.method==='GET'){
       if(!pool)return reply(res,200,[]);
       const q=await pool.query(
-        "SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,data->>'beschreibung' AS beschreibung,data->>'preis' AS preis FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100"
-      );
+"SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,data->>'beschreibung' AS beschreibung,data->>'preis' AS preis,data->>'bild_url' AS bild_url FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100"      );
       return reply(res,200,q.rows);
     }
 
