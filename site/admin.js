@@ -67,8 +67,7 @@ async function refresh() {
       const gesamtpreis = Number(b.data.gesamtpreis);
 const zahlungsstatus = b.data.zahlungsstatus || 'offen';
 
-if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0 &&
-    b.data.gesamtpreis != null) {
+if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
 
   const erhalten =
     zahlungsstatus === 'vollstaendig' ? gesamtpreis :
