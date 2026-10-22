@@ -152,6 +152,9 @@ c.append(zahlungsLabel, zahlungsAuswahl);
 
             })
 });
+      b.status = zahlungsAuswahl.value === 'anzahlung' || zahlungsAuswahl.value === 'vollstaendig'
+  ? 'bestaetigt' : auswahl.value;
+auswahl.value = b.status;
           b.bearbeitungsnotiz = notiz.value;
           b.data.zahlungsstatus = zahlungsAuswahl.value;
 
