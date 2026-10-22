@@ -267,6 +267,83 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
         el('p', (a.datum || '') + ' ' + (a.beschreibung || ''))
       );
 
+      const bildBereich = document.createElement('div');
+
+const bildVorschau = document.createElement('img');
+bildVorschau.alt = 'Foto zu ' + a.titel;
+bildVorschau.style.width = '100%';
+bildVorschau.style.maxWidth = '300px';
+bildVorschau.style.aspectRatio = '4 / 3';
+bildVorschau.style.objectFit = 'cover';
+bildVorschau.style.borderRadius = '8px';
+bildVorschau.style.marginTop = '12px';
+
+if (a.bild_url) {
+  bildVorschau.src = a.bild_url;
+  bildBereich.append(bildVorschau);
+}
+
+const bildAuswahl = document.createElement('input');
+bildAuswahl.type = 'file';
+bildAuswahl.accept = 'image/jpeg,image/png,image/webp';
+bildAuswahl.style.display = 'block';
+bildAuswahl.style.margin = '12px 0';
+
+const bildButton = document.createElement('button');
+bildButton.type = 'button';
+bildButton.className = 'btn';
+bildButton.textContent = 'Bild hochladen';
+
+bildButton.onclick = async () => {
+  const datei = bildAuswahl.files[0];
+
+  if (!datei) {
+    alert('Bitte zuerst ein Bild auswählen.');
+    return;
+  }
+
+  if (datei.size > 5 * 1024 * 1024) {
+    alert('Das Bild darf maximal 5 MB groß sein.');
+    return;
+  }
+
+  bildButton.disabled = true;
+
+  try {
+    const antwort = await fetch(
+      '/api/admin/aktionen/' + encodeURIComponent(a.id) + '/bild',
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': datei.type
+        },
+        body: datei
+      }
+    );
+
+    const ergebnis = await antwort.json();
+
+    if (!antwort.ok) {
+      throw new Error(ergebnis.error || 'Upload fehlgeschlagen.');
+    }
+
+    bildVorschau.src = ergebnis.bild_url;
+
+    if (!bildVorschau.parentNode) {
+      bildBereich.prepend(bildVorschau);
+    }
+
+    alert('Bild erfolgreich hochgeladen.');
+  } catch (fehler) {
+    alert('Fehler beim Bildupload: ' + fehler.message);
+  } finally {
+    bildButton.disabled = false;
+  }
+};
+
+bildBereich.append(bildAuswahl, bildButton);
+c.append(bildBereich);
       const btn = el('button', 'Löschen');
       btn.className = 'danger';
 
