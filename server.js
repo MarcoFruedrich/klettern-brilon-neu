@@ -358,7 +358,7 @@ Promise.allSettled([
       if(!d||typeof d!=='object'||Array.isArray(d))
         return reply(res,400,{error:'Ungültige Eingabe.'});
 
-      const status = d.status,
+      let status = d.status,
       notiz = safeText(d.bearbeitungsnotiz, 2000),
       zahlungsstatus = d.zahlungsstatus;
       if(!['offen','bestaetigt','abgelehnt','storniert'].includes(status))
@@ -382,6 +382,8 @@ const alt=await client.query(
         if(!alt.rowCount)return {fehlt:true};
         
 const alterStatus = alt.rows[0].status;
+
+        if (zahlungsstatus === 'anzahlung' || zahlungsstatus === 'vollstaendig') status = 'bestaetigt';
     const buchungsdaten = alt.rows[0].data;
 
 if (zahlungsstatus !== undefined) {
