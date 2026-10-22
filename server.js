@@ -443,6 +443,20 @@ if (ergebnis.alterStatus !== status && status !== 'offen') {
       return reply(res,200,ergebnis.buchung);
     }
 
+    if (route.match(/^\/api\/admin\/buchungen\/[0-9a-f-]{36}\/zahlung$/)
+    && req.method === 'POST') {
+
+  if (!admin(req, res)) return;
+  if (!pool) {
+    return reply(res, 503, {
+      error: 'Datenbank nicht verfügbar.'
+    });
+  }
+
+  return reply(res, 501, {
+    error: 'Zahlungsversand noch nicht eingerichtet.'
+  });
+}
     if(route==='/api/admin/kalender'&&req.method==='GET'){
       if(!admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
