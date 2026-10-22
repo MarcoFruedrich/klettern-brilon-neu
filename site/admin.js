@@ -150,7 +150,8 @@ c.append(zahlungsLabel, zahlungsAuswahl);
   })
 });
 
-          b.status = auswahl.value;
+            })
+});
           b.bearbeitungsnotiz = notiz.value;
           b.data.zahlungsstatus = zahlungsAuswahl.value;
 
