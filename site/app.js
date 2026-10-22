@@ -421,6 +421,26 @@ anzeige.insertAdjacentElement('afterend', bildAnzeige);
       anzeige.textContent = '';
 
       if (!angebot) return;
+        bildAnzeige.innerHTML = '';
+
+if (angebot.bild_url) {
+  const foto = document.createElement('img');
+  foto.src = angebot.bild_url;
+  foto.alt = angebot.name;
+  foto.style.width = '100%';
+  foto.style.maxWidth = '450px';
+  foto.style.borderRadius = '10px';
+  foto.style.marginBottom = '12px';
+  foto.style.display = 'block';
+
+  bildAnzeige.appendChild(foto);
+}
+
+if (angebot.beschreibung) {
+  const beschreibung = document.createElement('p');
+  beschreibung.textContent = angebot.beschreibung;
+  bildAnzeige.appendChild(beschreibung);
+}
 
       let gruppe = '';
 
