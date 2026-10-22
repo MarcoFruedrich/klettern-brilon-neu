@@ -431,7 +431,11 @@ if (ergebnis.alterStatus !== status && status !== 'offen') {
   const nachrichten = {
     bestaetigt: {
       betreff: 'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
-      text: 'Deine Buchung wurde verbindlich bestätigt.'
+     text: kunde.zahlungsstatus === 'anzahlung'
+  ? `Deine Buchung ist verbindlich bestätigt.\n\nAnzahlung erhalten: ${(kunde.gesamtpreis * 0.25).toFixed(2).replace('.', ',')} €\nRestbetrag vor Ort: ${(kunde.gesamtpreis * 0.75).toFixed(2).replace('.', ',')} €\n\nDen Restbetrag kannst du am Veranstaltungstag bar oder mit Karte bezahlen.`
+  : kunde.zahlungsstatus === 'vollstaendig'
+  ? `Deine Buchung ist verbindlich bestätigt und vollständig bezahlt.\n\nGesamtbetrag: ${kunde.gesamtpreis.toFixed(2).replace('.', ',')} €\nAm Veranstaltungstag ist keine weitere Zahlung erforderlich.`
+  : 'Deine Buchung wurde verbindlich bestätigt.'
     },
     abgelehnt: {
       betreff: 'Rückmeldung zu deiner Buchungsanfrage – Klettern Brilon',
