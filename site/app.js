@@ -400,6 +400,11 @@ async function preisanzeigeStarten() {
   const auswahl = document.getElementById('angebot-auswahl');
   const teilnehmer = document.getElementById('buchungs-teilnehmer');
   const anzeige = document.getElementById('angebots-preis');
+    const bildAnzeige = document.createElement('div');
+bildAnzeige.id = 'angebots-bildanzeige';
+bildAnzeige.style.marginTop = '16px';
+
+anzeige.insertAdjacentElement('afterend', bildAnzeige);
 
   if (!auswahl || !teilnehmer || !anzeige) return;
 
