@@ -170,7 +170,7 @@ loeschen.onclick = async () => {
 
      const zahlungSenden = el('button', 'Zahlungsinformationen senden');
 zahlungSenden.type = 'button';
-zahlungSenden.disabled = true;
+zahlungSenden.disabled = false;
 zahlungSenden.title = 'E-Mail-Versand wird noch eingerichtet'; 
     c.append(speichern, zahlungSenden, loeschen, meldung);
       box.append(c);
