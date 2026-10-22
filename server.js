@@ -933,10 +933,17 @@ if (bildRoute && req.method === 'POST') {
     .from('angebotsbilder')
     .getPublicUrl(dateiname);
 
-  await pool.query(
-    'UPDATE brilon_angebote SET bild_url = $1 WHERE id = $2',
-    [data.publicUrl, angebotId]
-  );
+  const speicherung = await pool.query(
+  'UPDATE brilon_angebote SET bild_url = $1 WHERE id = $2 RETURNING id, bild_url',
+  [data.publicUrl, angebotId]
+);
+
+if (speicherung.rowCount !== 1) {
+  console.error('Bildadresse nicht gespeichert. Angebots-ID:', angebotId);
+  return reply(res, 500, {
+    error: 'Bild hochgeladen, aber Bildadresse nicht gespeichert.'
+  });
+}
 
   return reply(res, 200, {
     success: true,
