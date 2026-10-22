@@ -399,9 +399,16 @@ if (zahlungsstatus !== undefined) {
           if(konflikt)return {konflikt};
         }
 
-        const q=await client.query(
-      
-        );
+       const q = await client.query(
+  `UPDATE brilon_buchungen
+   SET status=$1,
+       bearbeitungsnotiz=$2,
+       data=$3::jsonb,
+       updated_at=NOW()
+   WHERE id=$4
+   RETURNING id,status,data`,
+  [status, notiz, JSON.stringify(buchungsdaten), id]
+);
        
 return {
   buchung: q.rows[0],
