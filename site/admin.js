@@ -193,7 +193,7 @@ zahlungSenden.disabled = false;
     zahlungSenden.disabled = false;
   }
 };    
-zahlungSenden.title = 'E-Mail-Versand wird noch eingerichtet'; 
+zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
     c.append(speichern, zahlungSenden, loeschen, meldung);
       box.append(c);
     }
