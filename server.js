@@ -358,8 +358,9 @@ Promise.allSettled([
       if(!d||typeof d!=='object'||Array.isArray(d))
         return reply(res,400,{error:'Ungültige Eingabe.'});
 
-      const status=d.status,
-            notiz=safeText(d.bearbeitungsnotiz,2000);
+      const status = d.status,
+      notiz = safeText(d.bearbeitungsnotiz, 2000),
+      zahlungsstatus = d.zahlungsstatus;
       if(!['offen','bestaetigt','abgelehnt','storniert'].includes(status))
         return reply(res,400,{error:'Ungültiger Buchungsstatus.'});
 
