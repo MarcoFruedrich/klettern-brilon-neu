@@ -734,7 +734,7 @@ try {
   
 if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
-    `SELECT id, name, beschreibung, dauer, preise, aktiv
+    `SELECT id, name, beschreibung, dauer, preise, aktiv, bild_url
      FROM brilon_angebote
      ORDER BY id DESC`
   );
