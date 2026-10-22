@@ -147,7 +147,8 @@ c.append(zahlungsLabel, zahlungsAuswahl);
   status: auswahl.value,
   bearbeitungsnotiz: notiz.value,
   zahlungsstatus: zahlungsAuswahl.value
-})
+  })
+});
 
           b.status = auswahl.value;
           b.bearbeitungsnotiz = notiz.value;
