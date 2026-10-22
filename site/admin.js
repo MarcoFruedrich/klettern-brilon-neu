@@ -90,6 +90,28 @@ async function refresh() {
       auswahl.value = b.status || 'offen';
       c.append(statusLabel, auswahl);
 
+      const zahlungsLabel = el('label', 'Zahlungsstatus');
+zahlungsLabel.style.display = 'block';
+zahlungsLabel.style.marginTop = '15px';
+
+const zahlungsAuswahl = document.createElement('select');
+zahlungsAuswahl.style.width = '100%';
+zahlungsAuswahl.style.padding = '12px';
+zahlungsAuswahl.style.margin = '8px 0 15px';
+
+[
+  ['offen', 'Noch keine Zahlung erhalten'],
+  ['anzahlung', '25 % Anzahlung erhalten – 75 % vor Ort offen'],
+  ['vollstaendig', '100 % vollständig bezahlt']
+].forEach(([wert, bezeichnung]) => {
+  const option = document.createElement('option');
+  option.value = wert;
+  option.textContent = bezeichnung;
+  zahlungsAuswahl.append(option);
+});
+
+zahlungsAuswahl.value = b.data.zahlungsstatus || 'offen';
+c.append(zahlungsLabel, zahlungsAuswahl);
       const notizLabel = el('label', 'Interne Bearbeitungsnotiz');
       notizLabel.style.display = 'block';
 
