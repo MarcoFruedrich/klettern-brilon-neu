@@ -424,7 +424,11 @@ return {
         return reply(res,409,{error:ergebnis.konflikt});
 
       
-if (ergebnis.alterStatus !== status && status !== 'offen') {
+if (
+  (ergebnis.alterStatus !== status && status !== 'offen') ||
+  (status === 'bestaetigt' && zahlungsstatus !== undefined &&
+   ergebnis.alterZahlungsstatus !== zahlungsstatus)
+) {
   const kunde = ergebnis.kundenDaten;
   const empfaenger = kunde?.email;
 
