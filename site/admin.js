@@ -178,7 +178,7 @@ c.append(zahlungsLabel, zahlungsAuswahl);
   status: auswahl.value,
   bearbeitungsnotiz: notiz.value,
   zahlungsstatus: zahlungsAuswahl.value
-  })
+  }),
 });
 
            
