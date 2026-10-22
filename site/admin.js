@@ -143,11 +143,11 @@ c.append(zahlungsLabel, zahlungsAuswahl);
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              status: auswahl.value,
-              bearbeitungsnotiz: notiz.value
-            })
-          });
+          body: JSON.stringify({
+  status: auswahl.value,
+  bearbeitungsnotiz: notiz.value,
+  zahlungsstatus: zahlungsAuswahl.value
+})
 
           b.status = auswahl.value;
           b.bearbeitungsnotiz = notiz.value;
