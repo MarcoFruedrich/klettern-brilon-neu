@@ -526,9 +526,30 @@ const euro = betrag =>
   'Viele Grüße',
   'Klettern & Abenteuer Brilon'
 ].join('\n'); 
-  return reply(res, 501, {
-    error: 'Zahlungsversand noch nicht eingerichtet.'
+  if (!kunde.email) {
+  return reply(res, 400, {
+    error: 'Für diese Buchung ist keine Kunden-E-Mail hinterlegt.'
   });
+}
+
+try {
+  await brevoMail(
+    kunde.email,
+    'Zahlungsinformationen – Klettern & Abenteuer Brilon',
+    zahlungstext
+  );
+
+  return reply(res, 200, {
+    success: true,
+    message: 'Zahlungsinformationen wurden versendet.'
+  });
+} catch (fehler) {
+  console.error('Zahlungs-E-Mail fehlgeschlagen:', fehler);
+
+  return reply(res, 502, {
+    error: 'Die Zahlungs-E-Mail konnte nicht versendet werden.'
+  });
+}
 }
     if(route==='/api/admin/kalender'&&req.method==='GET'){
       if(!admin(req,res))return;
