@@ -453,6 +453,33 @@ if (ergebnis.alterStatus !== status && status !== 'offen') {
     });
   }
 
+    const buchungsId = route.split('/')[4];
+
+const buchungAbfrage = await pool.query(
+  `SELECT id, data, status
+   FROM brilon_buchungen
+   WHERE id = $1`,
+  [buchungsId]
+);
+
+if (!buchungAbfrage.rows.length) {
+  return reply(res, 404, {
+    error: 'Buchungsanfrage nicht gefunden.'
+  });
+}
+
+const buchung = buchungAbfrage.rows[0];
+const kunde = buchung.data;
+
+if (
+  typeof kunde.gesamtpreis !== 'number' ||
+  !Number.isFinite(kunde.gesamtpreis) ||
+  kunde.gesamtpreis < 0
+) {
+  return reply(res, 400, {
+    error: 'Für diese Buchung ist kein gültiger Gesamtpreis hinterlegt.'
+  });
+}  
   return reply(res, 501, {
     error: 'Zahlungsversand noch nicht eingerichtet.'
   });
