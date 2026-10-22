@@ -966,7 +966,7 @@ if (route === '/api/angebote' && req.method === 'GET') {
   }
 
   const q = await pool.query(
-    `SELECT id, name, beschreibung, dauer, preise
+ `SELECT id, name, beschreibung, dauer, preise, bild_url
      FROM brilon_angebote
      WHERE aktiv = true
      ORDER BY name ASC`
