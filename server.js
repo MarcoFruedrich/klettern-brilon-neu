@@ -714,9 +714,10 @@ preis=safeText(d.preis,50);
 
       if(route==='/api/admin/aktionen'&&req.method==='POST'){
         const d=await body(req),
-              titel=safeText(d.titel,120),
-              datum=safeText(d.datum,10)||null,
-              beschreibung=safeText(d.beschreibung,1000);
+      titel=safeText(d.titel,120),
+      datum=safeText(d.datum,10)||null,
+      beschreibung=safeText(d.beschreibung,1000),
+      preis=safeText(d.preis,50);
         if(!titel||datum&&!/^\d{4}-\d{2}-\d{2}$/.test(datum))
           return reply(res,400,{error:'Ungültige Eingabe.'});
         const q=await pool.query(
