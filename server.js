@@ -490,6 +490,11 @@ const euro = betrag =>
     currency: 'EUR'
   });  
 
+     if (!process.env.BANK_NAME || !process.env.BANK_IBAN) {
+  return reply(res, 503, {
+    error: 'Bankverbindung ist noch nicht vollständig eingerichtet.'
+  });
+} 
      const zahlungstext = [
   `Hallo ${kunde.name || ''},`,
   '',
