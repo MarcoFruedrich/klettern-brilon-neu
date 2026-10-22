@@ -382,6 +382,11 @@ const alt=await client.query(
         if(!alt.rowCount)return {fehlt:true};
         
 const alterStatus = alt.rows[0].status;
+    const buchungsdaten = alt.rows[0].data;
+
+if (zahlungsstatus !== undefined) {
+  buchungsdaten.zahlungsstatus = zahlungsstatus;
+}    
 
 
         if(status==='offen'||status==='bestaetigt'){
