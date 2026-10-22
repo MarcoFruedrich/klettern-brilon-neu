@@ -425,6 +425,9 @@ if (angebot.bild_url) {
   foto.alt = angebot.name;
   foto.style.width = '100%';
   foto.style.maxWidth = '450px';
+    foto.style.aspectRatio = '4 / 3';
+foto.style.objectFit = 'cover';
+foto.style.objectPosition = 'center';
   foto.style.borderRadius = '10px';
   foto.style.marginBottom = '12px';
   foto.style.display = 'block';
