@@ -489,6 +489,38 @@ const euro = betrag =>
     style: 'currency',
     currency: 'EUR'
   });  
+
+     const zahlungstext = [
+  `Hallo ${kunde.name || ''},`,
+  '',
+  'vielen Dank für deine Buchungsanfrage bei Klettern & Abenteuer Brilon.',
+  '',
+  `Angebot: ${kunde.angebot}`,
+  `Datum: ${kunde.datum}`,
+  `Gesamtpreis: ${euro(gesamtpreis)}`,
+  '',
+  'Zahlungsmöglichkeiten:',
+  `1. Anzahlung von 25 %: ${euro(anzahlung)}`,
+  `   Restbetrag vor Ort: ${euro(restbetrag)}`,
+  `2. Vollständige Vorauszahlung: ${euro(gesamtpreis)}`,
+  '',
+  'Bankverbindung:',
+  `Bank: ${process.env.BANK_NAME || ''}`,
+  `IBAN: ${process.env.BANK_IBAN || ''}`,
+  `Verwendungszweck: Buchung ${buchungsId}`,
+  '',
+  'Bitte überweise den gewählten Betrag innerhalb von 48 Stunden.',
+  'Bei kurzfristigen Buchungen bitten wir um sofortige Überweisung.',
+  '',
+  'Bei einer Anzahlung kannst du den Restbetrag',
+  'am Veranstaltungstag bar oder per Karte bezahlen.',
+  '',
+  'Die Buchung wird erst nach Eingang der erforderlichen Zahlung',
+  'und unserer ausdrücklichen Bestätigung verbindlich.',
+  '',
+  'Viele Grüße',
+  'Klettern & Abenteuer Brilon'
+].join('\n'); 
   return reply(res, 501, {
     error: 'Zahlungsversand noch nicht eingerichtet.'
   });
