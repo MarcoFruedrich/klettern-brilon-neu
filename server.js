@@ -415,7 +415,7 @@ return {
   buchung: q.rows[0],
   alterStatus,
   alterZahlungsstatus,
-  kundenDaten: alt.rows[0].data
+  kundenDaten: buchungsdaten
 };
 
       });
