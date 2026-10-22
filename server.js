@@ -398,8 +398,7 @@ if (zahlungsstatus !== undefined) {
         }
 
         const q=await client.query(
-          'UPDATE brilon_buchungen SET status=$1,bearbeitungsnotiz=$2,updated_at=NOW() WHERE id=$3 RETURNING id,status,bearbeitungsnotiz,updated_at',
-          [status,notiz,id]
+      
         );
        
 return {
