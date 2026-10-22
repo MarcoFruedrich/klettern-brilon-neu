@@ -64,6 +64,38 @@ async function refresh() {
           new Date(b.created_at).toLocaleString('de-DE'))
       );
 
+      const gesamtpreis = Number(b.data.gesamtpreis);
+const zahlungsstatus = b.data.zahlungsstatus || 'offen';
+
+if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0 &&
+    b.data.gesamtpreis != null) {
+
+  const erhalten =
+    zahlungsstatus === 'vollstaendig' ? gesamtpreis :
+    zahlungsstatus === 'anzahlung' ? Math.round(gesamtpreis * 25) / 100 :
+    0;
+
+  const restbetrag = Math.round((gesamtpreis - erhalten) * 100) / 100;
+
+  const euro = wert => wert.toLocaleString('de-DE', {
+    style: 'currency',
+    currency: 'EUR'
+  });
+
+  const zahlungsInfo = el('div');
+  zahlungsInfo.style.padding = '12px';
+  zahlungsInfo.style.margin = '12px 0';
+  zahlungsInfo.style.background = '#f1f5f9';
+  zahlungsInfo.style.borderRadius = '8px';
+
+  zahlungsInfo.append(
+    el('p', 'Gesamtpreis: ' + euro(gesamtpreis)),
+    el('p', 'Zahlung erhalten: ' + euro(erhalten)),
+    el('p', 'Offener Restbetrag: ' + euro(restbetrag))
+  );
+
+  c.append(zahlungsInfo);
+}
       const statusZeile = el(
         'p',
         'Bearbeitungsstatus: ' + (statusNamen[b.status] || 'Offen')
