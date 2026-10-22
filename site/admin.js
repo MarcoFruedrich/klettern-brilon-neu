@@ -190,6 +190,7 @@ c.append(zahlungsLabel, zahlungsAuswahl);
       'Bearbeitungsstatus: ' + statusNamen[b.status];
 
     meldung.textContent = 'Änderungen gespeichert.';
+    await refresh();
   } catch (err) {
     meldung.textContent = 'Fehler: ' + err.message;
   } finally {
