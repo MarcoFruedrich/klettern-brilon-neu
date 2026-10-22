@@ -111,3 +111,6 @@
 [hidden] {
   display: none !important;
 }
+foto.style.aspectRatio = '4 / 3';
+foto.style.objectFit = 'cover';
+foto.style.objectPosition = 'center';
