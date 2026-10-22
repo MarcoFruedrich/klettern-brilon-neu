@@ -4,6 +4,12 @@
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 
 const nodemailer = require('nodemailer');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY
+);
 
 const mailTransporter = nodemailer.createTransport({
   service: 'gmail',
