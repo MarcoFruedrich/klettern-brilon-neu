@@ -1035,18 +1035,70 @@ preisButton.addEventListener('click', async () => {
 });
 
   
-const aktivLabel = document.createElement('label');
 const aktivSchalter = document.createElement('input');
-
 aktivSchalter.type = 'checkbox';
 aktivSchalter.checked = angebot.aktiv === true;
+aktivSchalter.style.display = 'none';
 
-aktivLabel.appendChild(aktivSchalter);
-aktivLabel.appendChild(
-  document.createTextNode(' Angebot aktivieren')
-);
+const aktivButton = document.createElement('button');
+aktivButton.type = 'button';
 
-eintrag.appendChild(aktivLabel);
+function aktivButtonAktualisieren() {
+  const aktiv = aktivSchalter.checked;
+
+  aktivButton.textContent = aktiv
+    ? '✓ Aktiviert'
+    : '✕ Deaktiviert';
+
+  aktivButton.style.backgroundColor = aktiv
+    ? '#168447'
+    : '#bd3030';
+
+  aktivButton.style.color = '#ffffff';
+  aktivButton.style.border = 'none';
+  aktivButton.style.borderRadius = '8px';
+  aktivButton.style.padding = '12px 20px';
+  aktivButton.style.fontWeight = 'bold';
+  aktivButton.style.cursor = 'pointer';
+}
+
+aktivButtonAktualisieren();
+
+aktivButton.addEventListener('click', async () => {
+  const neuerStatus = !aktivSchalter.checked;
+  const preise = {};
+
+  for (const eingabe of preisbereich.querySelectorAll('input')) {
+    preise[eingabe.dataset.gruppe] = eingabe.value;
+  }
+
+  aktivButton.disabled = true;
+  aktivButton.textContent = 'Wird gespeichert ...';
+
+  try {
+    await api('/api/admin/angebote/' + angebot.id, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        preise,
+        aktiv: neuerStatus,
+        beschreibung: beschreibung.value
+      })
+    });
+
+    aktivSchalter.checked = neuerStatus;
+    aktivButtonAktualisieren();
+  } catch (fehler) {
+    aktivButtonAktualisieren();
+    alert('Aktivierung fehlgeschlagen: ' + fehler.message);
+  } finally {
+    aktivButton.disabled = false;
+  }
+});
+
+eintrag.appendChild(aktivButton);
     
 eintrag.appendChild(preisButton);
 
