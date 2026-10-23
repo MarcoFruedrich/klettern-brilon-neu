@@ -473,6 +473,14 @@ if (item.preis !== undefined && item.preis !== null && item.preis !== '') {
   preisAnzeige.textContent = 'Preis auf Anfrage';
 }
       a.append(h, d, t, preisAnzeige);
+      const anfrageButton = document.createElement('a');
+anfrageButton.href = '#buchung';
+anfrageButton.className = 'btn';
+anfrageButton.textContent = 'Jetzt anfragen';
+anfrageButton.style.display = 'inline-block';
+anfrageButton.style.marginTop = '12px';
+
+a.append(anfrageButton);
       root.append(a);
     }
   } catch {
