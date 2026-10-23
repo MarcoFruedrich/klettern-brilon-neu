@@ -1,3 +1,4 @@
+
 document.getElementById('year').textContent=new Date().getFullYear();const date=document.querySelector('input[name=datum]');date.min=new Date().toLocaleDateString('en-CA');
 
 const verfuegbarkeit = document.getElementById('datum-verfuegbarkeit');
@@ -7,7 +8,7 @@ const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 
 const buchbareUhrzeiten = [
-    '09:00',
+  '09:00',
   '10:00',
   '11:00',
   '12:00',
@@ -62,8 +63,8 @@ async function belegteUhrzeitenLaden() {
 
   try {
     const antwort = await fetch(
-     '/api/belegte-zeiten?datum=' + encodeURIComponent(datum) +
-'&teilnehmer=' + encodeURIComponent(teilnehmer)
+      '/api/belegte-zeiten?datum=' + encodeURIComponent(datum) +
+      '&teilnehmer=' + encodeURIComponent(teilnehmer)
     );
 
     if (!antwort.ok) throw new Error('Verfügbarkeit nicht abrufbar');
@@ -174,15 +175,17 @@ function buchungsdauerBerechnen() {
     }
   }
 }
-  
+
 if (teilnehmerEingabe) {
   teilnehmerEingabe.addEventListener('input', buchungsdauerBerechnen);
-    teilnehmerEingabe.addEventListener('input', belegteUhrzeitenLaden);
+  teilnehmerEingabe.addEventListener('input', belegteUhrzeitenLaden);
   buchungsdauerBerechnen();
 }
+
 if (uhrzeitAuswahl) {
   uhrzeitAuswahl.addEventListener('change', buchungsdauerBerechnen);
 }
+
 function datumPruefen() {
   const gewaehltesDatum = date.value;
 
@@ -206,7 +209,6 @@ function datumPruefen() {
     ? '⛔ Dieser Tag ist gesperrt. Bitte wähle ein anderes Datum.'
     : '✓ Für diesen Tag kannst du eine Terminanfrage stellen.';
 }
-
 
 const kalenderBereich = document.getElementById('buchungskalender');
 let kalenderMonat = new Date();
@@ -234,24 +236,22 @@ function kalenderAnzeigen() {
   weiter.type = 'button';
   weiter.textContent = '→';
 
-  
-zurueck.onclick = () => {
-  const vorherigerMonat = new Date(
-    kalenderMonat.getFullYear(),
-    kalenderMonat.getMonth() - 1,
-    1
-  );
+  zurueck.onclick = () => {
+    const vorherigerMonat = new Date(
+      kalenderMonat.getFullYear(),
+      kalenderMonat.getMonth() - 1,
+      1
+    );
 
-  const aktuellerMonat = new Date();
-  aktuellerMonat.setDate(1);
-  aktuellerMonat.setHours(0, 0, 0, 0);
+    const aktuellerMonat = new Date();
+    aktuellerMonat.setDate(1);
+    aktuellerMonat.setHours(0, 0, 0, 0);
 
-  if (vorherigerMonat < aktuellerMonat) return;
+    if (vorherigerMonat < aktuellerMonat) return;
 
-  kalenderMonat = vorherigerMonat;
-  kalenderAnzeigen();
-};
-
+    kalenderMonat = vorherigerMonat;
+    kalenderAnzeigen();
+  };
 
   weiter.onclick = () => {
     kalenderMonat.setMonth(kalenderMonat.getMonth() + 1);
@@ -314,11 +314,11 @@ zurueck.onclick = () => {
     }
 
     knopf.onclick = () => {
-  date.value = datumWert;
-  datumPruefen();
-  kalenderAnzeigen();
-  belegteUhrzeitenLaden();
-};
+      date.value = datumWert;
+      datumPruefen();
+      kalenderAnzeigen();
+      belegteUhrzeitenLaden();
+    };
 
     tage.append(knopf);
   }
@@ -327,7 +327,6 @@ zurueck.onclick = () => {
 }
 
 kalenderAnzeigen();
-
 
 date.addEventListener('change', () => {
   if (date.value) {
@@ -338,7 +337,6 @@ date.addEventListener('change', () => {
   datumPruefen();
   kalenderAnzeigen();
 });
-
 
 fetch('/api/sperrzeiten')
   .then(antwort => {
@@ -356,36 +354,119 @@ fetch('/api/sperrzeiten')
     datumPruefen();
   });
 
-const form=document.getElementById('booking');form.addEventListener('submit',async e=>{e.preventDefault();const status=document.getElementById('booking-status');const btn=form.querySelector('button[type=submit]');const data=Object.fromEntries(new FormData(form).entries());status.textContent='Anfrage wird gesendet …';btn.disabled=true;try{const res=await fetch('/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const json=await res.json();if(!res.ok)throw new Error(json.error||'Übertragung fehlgeschlagen');status.textContent='✓ BUCHUNGSANFRAGE ERFOLGREICH! Dein gewünschter Termin wurde vorläufig reserviert. Vielen Dank für deine Anfrage bei Klettern & Abenteuer Brilon! Wir melden uns persönlich bei dir.';
-status.style.color='#167c3a';
-status.style.fontWeight='bold';
-status.style.fontSize='1.15rem';
-status.style.padding='18px';
-status.style.border='2px solid #167c3a';
-status.style.borderRadius='10px';
-status.style.backgroundColor='#e8f7ec';
-status.scrollIntoView({behavior:'smooth',block:'center'});form.reset()}catch(err){status.textContent='⚠ Buchung nicht möglich: '+err.message;
-status.style.color='#a61b1b';
-status.style.fontWeight='bold';
-status.style.fontSize='1.15rem';
-status.style.padding='18px';
-status.style.border='2px solid #a61b1b';
-status.style.borderRadius='10px';
-status.style.backgroundColor='#fff0f0';
-                                                                     
-status.scrollIntoView({behavior:'smooth',block:'center'})}finally{btn.disabled=false}});async function specials(){const root=document.getElementById('specials');try{const r=await fetch('/api/aktionen');if(!r.ok)throw Error();const items=await r.json();root.replaceChildren();if(!items.length){const p=document.createElement('p');p.textContent='Neue Sonderangebote werden hier veröffentlicht. Frage gerne nach freien Terminen!';root.append(p)}for(const item of items){const a=document.createElement('article');if (item.bild_url) {
-if (item.bild_url) {
-    const bild = document.createElement('img');
-  bild.src = item.bild_url;
-  bild.alt = item.titel;
-  bild.loading = 'lazy';
-  bild.style.width = '100%';
-  bild.style.aspectRatio = '4 / 3';
-  bild.style.objectFit = 'cover';
-  bild.style.borderRadius = '10px';
-  bild.style.marginBottom = '12px';
-  a.append(bild);
-}const h=document.createElement('h3');h.textContent=item.titel;const d=document.createElement('p');d.textContent=item.datum||'Termin nach Vereinbarung';const t=document.createElement('p');t.textContent=item.beschreibung||'';a.append(h,d,t);root.append(a)}}catch{root.textContent='Sonderangebote derzeit nicht abrufbar.'}}specials();
+const form = document.getElementById('booking');
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const status = document.getElementById('booking-status');
+  const btn = form.querySelector('button[type=submit]');
+  const data = Object.fromEntries(new FormData(form).entries());
+
+  status.textContent = 'Anfrage wird gesendet …';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/buchungen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const json = await res.json();
+
+    if (!res.ok) {
+      throw new Error(json.error || 'Übertragung fehlgeschlagen');
+    }
+
+    status.textContent =
+      '✓ BUCHUNGSANFRAGE ERFOLGREICH! Dein gewünschter Termin wurde vorläufig reserviert. Vielen Dank für deine Anfrage bei Klettern & Abenteuer Brilon! Wir melden uns persönlich bei dir.';
+
+    status.style.color = '#167c3a';
+    status.style.fontWeight = 'bold';
+    status.style.fontSize = '1.15rem';
+    status.style.padding = '18px';
+    status.style.border = '2px solid #167c3a';
+    status.style.borderRadius = '10px';
+    status.style.backgroundColor = '#e8f7ec';
+
+    status.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
+
+    form.reset();
+  } catch (err) {
+    status.textContent = '⚠ Buchung nicht möglich: ' + err.message;
+    status.style.color = '#a61b1b';
+    status.style.fontWeight = 'bold';
+    status.style.fontSize = '1.15rem';
+    status.style.padding = '18px';
+    status.style.border = '2px solid #a61b1b';
+    status.style.borderRadius = '10px';
+    status.style.backgroundColor = '#fff0f0';
+
+    status.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Tages- und Sonderangebote
+async function specials() {
+  const root = document.getElementById('specials');
+
+  try {
+    const r = await fetch('/api/aktionen');
+    if (!r.ok) throw Error();
+
+    const items = await r.json();
+    root.replaceChildren();
+
+    if (!items.length) {
+      const p = document.createElement('p');
+      p.textContent =
+        'Neue Sonderangebote werden hier veröffentlicht. Frage gerne nach freien Terminen!';
+      root.append(p);
+    }
+
+    for (const item of items) {
+      const a = document.createElement('article');
+
+      if (item.bild_url) {
+        const bild = document.createElement('img');
+        bild.src = item.bild_url;
+        bild.alt = item.titel;
+        bild.loading = 'lazy';
+        bild.style.width = '100%';
+        bild.style.aspectRatio = '4 / 3';
+        bild.style.objectFit = 'cover';
+        bild.style.borderRadius = '10px';
+        bild.style.marginBottom = '12px';
+        a.append(bild);
+      }
+
+      const h = document.createElement('h3');
+      h.textContent = item.titel;
+
+      const d = document.createElement('p');
+      d.textContent = item.datum || 'Termin nach Vereinbarung';
+
+      const t = document.createElement('p');
+      t.textContent = item.beschreibung || '';
+
+      a.append(h, d, t);
+      root.append(a);
+    }
+  } catch {
+    root.textContent = 'Sonderangebote derzeit nicht abrufbar.';
+  }
+}
+
+specials();
 
 async function angeboteLaden() {
   const auswahl = document.getElementById('angebot-auswahl');
@@ -409,11 +490,12 @@ async function angeboteLaden() {
 }
 
 angeboteLaden();
+
 async function preisanzeigeStarten() {
   const auswahl = document.getElementById('angebot-auswahl');
   const teilnehmer = document.getElementById('buchungs-teilnehmer');
   const anzeige = document.getElementById('angebots-preis');
-   const bildAnzeige = document.getElementById('angebots-bildanzeige');
+  const bildAnzeige = document.getElementById('angebots-bildanzeige');
 
   if (!auswahl || !teilnehmer || !anzeige) return;
 
@@ -430,29 +512,29 @@ async function preisanzeigeStarten() {
       anzeige.textContent = '';
 
       if (!angebot) return;
-        bildAnzeige.innerHTML = '';
+      bildAnzeige.innerHTML = '';
 
-if (angebot.bild_url) {
-  const foto = document.createElement('img');
-  foto.src = angebot.bild_url;
-  foto.alt = angebot.name;
-  foto.style.width = '100%';
-  foto.style.maxWidth = '450px';
-    foto.style.aspectRatio = '4 / 3';
-foto.style.objectFit = 'cover';
-foto.style.objectPosition = 'center';
-  foto.style.borderRadius = '10px';
-  foto.style.marginBottom = '12px';
-  foto.style.display = 'block';
+      if (angebot.bild_url) {
+        const foto = document.createElement('img');
+        foto.src = angebot.bild_url;
+        foto.alt = angebot.name;
+        foto.style.width = '100%';
+        foto.style.maxWidth = '450px';
+        foto.style.aspectRatio = '4 / 3';
+        foto.style.objectFit = 'cover';
+        foto.style.objectPosition = 'center';
+        foto.style.borderRadius = '10px';
+        foto.style.marginBottom = '12px';
+        foto.style.display = 'block';
 
-  bildAnzeige.appendChild(foto);
-}
+        bildAnzeige.appendChild(foto);
+      }
 
-if (angebot.beschreibung) {
-  const beschreibung = document.createElement('p');
-  beschreibung.textContent = angebot.beschreibung;
-  bildAnzeige.appendChild(beschreibung);
-}
+      if (angebot.beschreibung) {
+        const beschreibung = document.createElement('p');
+        beschreibung.textContent = angebot.beschreibung;
+        bildAnzeige.appendChild(beschreibung);
+      }
 
       let gruppe = '';
 
