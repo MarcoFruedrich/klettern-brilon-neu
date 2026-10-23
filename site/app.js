@@ -458,7 +458,21 @@ async function specials() {
       const t = document.createElement('p');
       t.textContent = item.beschreibung || '';
 
-      a.append(h, d, t);
+      const preisAnzeige = document.createElement('p');
+
+if (item.preis !== undefined && item.preis !== null && item.preis !== '') {
+  const preis = Number(String(item.preis).replace(',', '.'));
+
+  preisAnzeige.textContent = Number.isFinite(preis)
+    ? 'Preis: ' + preis.toLocaleString('de-DE', {
+        style: 'currency',
+        currency: 'EUR'
+      })
+    : 'Preis auf Anfrage';
+} else {
+  preisAnzeige.textContent = 'Preis auf Anfrage';
+}
+      a.append(h, d, t, preisAnzeige);
       root.append(a);
     }
   } catch {
