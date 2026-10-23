@@ -111,6 +111,487 @@
 [hidden] {
   display: none !important;
 }
-foto.style.aspectRatio = '4 / 3';
-foto.style.objectFit = 'cover';
-foto.style.objectPosition = 'center';
+
+/* Gestaltung der Testversion, angepasst an die aktuelle Buchungstechnik */
+:root{--pine:#163e35;--lime:#d7f37e;--cream:#f9f8f3;--text:#233a33;--sub:#577068}
+body{background:var(--cream);color:var(--text)}a{color:var(--pine)}
+header.site-header{position:sticky;top:0;z-index:20;background:#f9f8f4f2;backdrop-filter:blur(18px);border-bottom:1px solid #dfe5dd;padding:0 max(3%,calc((100vw - 1210px)/2));display:block}
+.header-inner{min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:16px}.site-header .logo{display:flex;align-items:center;gap:11px;color:var(--pine);font-size:17px;line-height:1.08;letter-spacing:-.04em}.site-header .logo span{color:var(--pine)}.site-header .logo small{color:#27664f;letter-spacing:1px;font-size:10px}.logo-mark{width:44px;height:44px;flex:none;border-radius:14px;background:var(--pine);color:var(--lime)!important;display:grid;place-items:center}.logo-mark svg{width:29px;height:29px}.navlinks{display:flex;align-items:center;gap:20px}.navlinks a{color:var(--pine);font-size:14px;font-weight:750}.navlinks .button{color:white;background:var(--pine);padding:11px 15px;border-radius:12px;text-decoration:none}.menu-toggle{display:none}
+main{max-width:none;padding:0}main>section:not(.hero){max-width:1190px;margin:auto;padding:75px 24px;border-bottom:1px solid #e0e9e0}
+.hero{min-height:0;display:block;position:relative;overflow:hidden;background:var(--pine);color:white;border:0;padding:0}.hero:before{content:'';position:absolute;right:-150px;bottom:-300px;width:790px;height:790px;border:1px solid #ffffff18;border-radius:50%;box-shadow:0 0 0 90px #ffffff07,0 0 0 180px #ffffff06;pointer-events:none}.hero-inner{max-width:1210px;margin:auto;padding:74px 26px 68px;display:grid;grid-template-columns:1.07fr .93fr;align-items:center;gap:52px;min-height:660px}.hero h1{font-size:clamp(3.05rem,6.9vw,6.5rem);line-height:1.13;letter-spacing:-.036em;max-width:720px;margin:22px 0}.hero h1 em{color:var(--lime)}.hero .eyebrow{color:var(--lime);font-size:12px;letter-spacing:2px}.hero .lead{color:#d6e8dc;font-size:18px;line-height:1.72;max-width:560px}.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}.hero .button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:13px;padding:13px 21px;min-height:50px;font-weight:800}.button-primary{background:var(--lime);color:#102a26!important}.button-ghost{border:1px solid #ffffff85;color:white!important;background:#ffffff14}.hero-pictures{position:relative;height:505px;display:grid;grid-template-columns:1fr .82fr;grid-template-rows:1.1fr .9fr;gap:13px;transform:rotate(2deg)}.hero-photo{width:100%;height:100%;object-fit:cover;border-radius:23px;border:4px solid #ffffff1f}.hero-photo:first-child{grid-row:1/3}.floating-tag{position:absolute;bottom:10px;left:-45px;border:2px solid #b2db9e;background:var(--lime);color:var(--pine);padding:17px 21px;border-radius:15px;transform:rotate(-6deg);font-weight:900}.floating-tag strong{font-size:24px;display:block;line-height:1.2}.hero-caption{margin-top:27px;color:#b3d8c4;font-size:13px}.hero-caption span{padding:0 9px}
+main>section:not(.hero) .eyebrow{color:#27664f}h2{color:var(--pine)}p{color:var(--sub)}.hero p{color:#d6e8dc}.cards article{background:white;color:var(--text);border:1px solid #e1e8df;border-radius:24px;box-shadow:0 7px 28px #103d2a08}.cards article p{color:var(--sub)}.symbol{color:#27664f}
+.btn{background:var(--lime);color:#102a26!important;border-radius:12px}.btn:hover{background:#c8eb68}.btn.secondary{background:var(--pine);color:white!important}
+.split{gap:40px}#buchung form{background:white;color:var(--text);border:1px solid #dfe5dd;border-radius:24px;box-shadow:0 15px 50px #0c271d17}label{color:var(--text)}input,select,textarea{background:white;color:var(--text);border:1px solid #bdcec2;border-radius:10px}input:focus,select:focus,textarea:focus{outline:2px solid #27664f}.hint{color:var(--sub)}
+.buchungskalender{background:#fafcf8;border:1px solid #dfe5dd;border-radius:16px}.kalender-kopf{color:var(--pine)}.kalender-kopf button{background:var(--pine)}.kalender-wochentag{color:var(--sub)}.kalender-tag{background:#eaf0e9;color:var(--pine);border:1px solid #cbd9cb}.kalender-tag.frei{background:#e2f1d5;border-color:#9cc69b;color:#214d35}.kalender-tag.gesperrt{background:#f6d9da;border-color:#dca9ae;color:#822c35}.kalender-tag.ausgewaehlt{background:var(--pine);border:2px solid var(--lime);color:white}.kalender-tag:not(:disabled):hover{border-color:#27664f}
+footer{max-width:none;background:#0d2b25;color:#ecf8ed;padding:35px max(5%,calc((100vw - 1140px)/2))}footer a{color:#e2f59d}
+@media(max-width:900px){.hero-inner{gap:25px}.hero-pictures{height:440px}.navlinks{gap:10px}.navlinks a{font-size:12px}}
+@media(max-width:750px){.header-inner{min-height:69px}.menu-toggle{display:flex;background:white;color:var(--pine);border:1px solid #d5e1d8;border-radius:11px;width:45px;height:45px;align-items:center;justify-content:center;font-size:24px}.navlinks{display:none;position:absolute;top:69px;left:0;right:0;background:#fcfdf8;padding:18px 23px 25px;flex-direction:column;align-items:stretch;gap:16px}.navlinks.open{display:flex}.navlinks a{font-size:15px}.hero-inner{grid-template-columns:1fr;padding:65px 19px 60px;gap:42px}.hero-pictures{height:420px;max-width:600px;margin-left:15px}.floating-tag{left:-20px}main>section:not(.hero){padding:60px 19px}}
+@media(max-width:490px){.hero h1{font-size:3.25rem}.hero-pictures{height:355px;margin-left:10px}.hero-photo{border-width:2px;border-radius:14px}.floating-tag{padding:10px 12px;font-size:12px}.floating-tag strong{font-size:18px}.hero-actions{display:grid}.hero .button{width:100%}}
+
+
+/* Neues Design – Klettern & Abenteuer Brilon */
+
+:root {
+  --pine: #163e35;
+  --lime: #d7f37e;
+  --cream: #f9f8f3;
+  --text: #233a33;
+  --sub: #577068;
+}
+
+body {
+  background: var(--cream);
+  color: var(--text);
+}
+
+a {
+  color: var(--pine);
+}
+
+header.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #f9f8f4f2;
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid #dfe5dd;
+  padding: 0 max(3%, calc((100vw - 1210px)/2));
+  display: block;
+}
+
+.header-inner {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.site-header .logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--pine);
+  font-size: 17px;
+  line-height: 1.08;
+}
+
+.site-header .logo span {
+  color: var(--pine);
+}
+
+.site-header .logo small {
+  color: #27664f;
+  letter-spacing: 1px;
+  font-size: 10px;
+}
+
+.logo-mark {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 14px;
+  background: var(--pine);
+  color: var(--lime) !important;
+  display: grid;
+  place-items: center;
+}
+
+.logo-mark svg {
+  width: 29px;
+  height: 29px;
+}
+
+.navlinks {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.navlinks a {
+  color: var(--pine);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.navlinks .button {
+  color: white;
+  background: var(--pine);
+  padding: 11px 15px;
+  border-radius: 12px;
+  text-decoration: none;
+}
+
+.menu-toggle {
+  display: none;
+}
+
+main {
+  max-width: none;
+  padding: 0;
+}
+
+main > section:not(.hero) {
+  max-width: 1190px;
+  margin: auto;
+  padding: 75px 24px;
+  border-bottom: 1px solid #e0e9e0;
+}
+
+/* Startbereich */
+
+.hero {
+  min-height: 0;
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: var(--pine);
+  color: white;
+  border: 0;
+  padding: 0;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  right: -150px;
+  bottom: -300px;
+  width: 790px;
+  height: 790px;
+  border: 1px solid #ffffff18;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 90px #ffffff07,
+    0 0 0 180px #ffffff06;
+  pointer-events: none;
+}
+
+.hero-inner {
+  max-width: 1210px;
+  margin: auto;
+  padding: 74px 26px 68px;
+  display: grid;
+  grid-template-columns: 1.07fr .93fr;
+  align-items: center;
+  gap: 52px;
+  min-height: 660px;
+}
+
+.hero h1 {
+  font-size: clamp(3.05rem, 6.9vw, 6.5rem);
+  line-height: 1.13;
+  letter-spacing: -.036em;
+  max-width: 720px;
+  margin: 22px 0;
+}
+
+.hero h1 em {
+  color: var(--lime);
+}
+
+.hero .eyebrow {
+  color: var(--lime);
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+
+.hero .lead {
+  color: #d6e8dc;
+  font-size: 18px;
+  line-height: 1.72;
+  max-width: 560px;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.hero .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border-radius: 13px;
+  padding: 13px 21px;
+  min-height: 50px;
+  font-weight: 800;
+}
+
+.button-primary {
+  background: var(--lime);
+  color: #102a26 !important;
+}
+
+.button-ghost {
+  border: 1px solid #ffffff85;
+  color: white !important;
+  background: #ffffff14;
+}
+
+/* Kletterbilder */
+
+.hero-pictures {
+  position: relative;
+  height: 505px;
+  display: grid;
+  grid-template-columns: 1fr .82fr;
+  grid-template-rows: 1.1fr .9fr;
+  gap: 13px;
+  transform: rotate(2deg);
+}
+
+.hero-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 23px;
+  border: 4px solid #ffffff1f;
+}
+
+.hero-photo:first-child {
+  grid-row: 1 / 3;
+}
+
+.floating-tag {
+  position: absolute;
+  bottom: 10px;
+  left: -45px;
+  border: 2px solid #b2db9e;
+  background: var(--lime);
+  color: var(--pine);
+  padding: 17px 21px;
+  border-radius: 15px;
+  transform: rotate(-6deg);
+  font-weight: 900;
+}
+
+.floating-tag strong {
+  font-size: 24px;
+  display: block;
+  line-height: 1.2;
+}
+
+.hero-caption {
+  margin-top: 27px;
+  color: #b3d8c4;
+  font-size: 13px;
+}
+
+.hero-caption span {
+  padding: 0 9px;
+}
+
+/* Angebote und Buchungsformular */
+
+main > section:not(.hero) .eyebrow {
+  color: #27664f;
+}
+
+h2 {
+  color: var(--pine);
+}
+
+p {
+  color: var(--sub);
+}
+
+.hero p {
+  color: #d6e8dc;
+}
+
+.cards article {
+  background: white;
+  color: var(--text);
+  border: 1px solid #e1e8df;
+  border-radius: 24px;
+  box-shadow: 0 7px 28px #103d2a08;
+}
+
+.cards article p {
+  color: var(--sub);
+}
+
+.btn {
+  background: var(--lime);
+  color: #102a26 !important;
+  border-radius: 12px;
+}
+
+.btn:hover {
+  background: #c8eb68;
+}
+
+.split {
+  gap: 40px;
+}
+
+#buchung form {
+  background: white;
+  color: var(--text);
+  border: 1px solid #dfe5dd;
+  border-radius: 24px;
+  box-shadow: 0 15px 50px #0c271d17;
+}
+
+label {
+  color: var(--text);
+}
+
+input,
+select,
+textarea {
+  background: white;
+  color: var(--text);
+  border: 1px solid #bdcec2;
+  border-radius: 10px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #27664f;
+}
+
+/* Buchungskalender */
+
+.buchungskalender {
+  background: #fafcf8;
+  border: 1px solid #dfe5dd;
+  border-radius: 16px;
+}
+
+.kalender-kopf {
+  color: var(--pine);
+}
+
+.kalender-kopf button {
+  background: var(--pine);
+}
+
+.kalender-wochentag {
+  color: var(--sub);
+}
+
+.kalender-tag {
+  background: #eaf0e9;
+  color: var(--pine);
+  border: 1px solid #cbd9cb;
+}
+
+.kalender-tag.frei {
+  background: #e2f1d5;
+  border-color: #9cc69b;
+  color: #214d35;
+}
+
+.kalender-tag.gesperrt {
+  background: #f6d9da;
+  border-color: #dca9ae;
+  color: #822c35;
+}
+
+.kalender-tag.ausgewaehlt {
+  background: var(--pine);
+  border: 2px solid var(--lime);
+  color: white;
+}
+
+footer {
+  max-width: none;
+  background: #0d2b25;
+  color: #ecf8ed;
+  padding: 35px max(5%, calc((100vw - 1140px)/2));
+}
+
+footer a {
+  color: #e2f59d;
+}
+
+/* Smartphone und Tablet */
+
+@media (max-width: 750px) {
+  .header-inner {
+    min-height: 69px;
+  }
+
+  .menu-toggle {
+    display: flex;
+    background: white;
+    color: var(--pine);
+    border: 1px solid #d5e1d8;
+    border-radius: 11px;
+    width: 45px;
+    height: 45px;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+
+  .navlinks {
+    display: none;
+    position: absolute;
+    top: 69px;
+    left: 0;
+    right: 0;
+    background: #fcfdf8;
+    padding: 18px 23px 25px;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .navlinks.open {
+    display: flex;
+  }
+
+  .hero-inner {
+    grid-template-columns: 1fr;
+    padding: 65px 19px 60px;
+    gap: 42px;
+  }
+
+  .hero-pictures {
+    height: 420px;
+    max-width: 600px;
+    margin-left: 15px;
+  }
+
+  .floating-tag {
+    left: -20px;
+  }
+}
+
+@media (max-width: 490px) {
+  .hero h1 {
+    font-size: 3.25rem;
+  }
+
+  .hero-pictures {
+    height: 355px;
+    margin-left: 10px;
+  }
+
+  .hero-photo {
+    border-width: 2px;
+    border-radius: 14px;
+  }
+
+  .floating-tag {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .floating-tag strong {
+    font-size: 18px;
+  }
+
+  .hero-actions {
+    display: grid;
+  }
+
+  .hero .button {
+    width: 100%;
+  }
+}
