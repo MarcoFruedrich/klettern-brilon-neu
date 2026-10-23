@@ -217,8 +217,11 @@ loeschen.onclick = async () => {
       method: 'DELETE'
     });
 
+  
     c.remove();
+    await kalenderLaden();
   } catch (err) {
+
     meldung.textContent = 'Fehler beim Löschen: ' + err.message;
     loeschen.disabled = false;
   }
