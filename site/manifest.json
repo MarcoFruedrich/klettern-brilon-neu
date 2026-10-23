@@ -1,0 +1,18 @@
+{
+  "name": "Klettern – Brilon Buchungsverwaltung",
+  "short_name": "Klettern – Brilon",
+  "description": "Mobile Buchungsverwaltung für Klettern und Abenteuer Brilon",
+  "start_url": "/mobil.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#163e35",
+  "theme_color": "#163e35",
+  "icons": [
+    {
+      "src": "/klettern-brilon-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
