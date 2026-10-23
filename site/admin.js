@@ -225,6 +225,20 @@ loeschen.onclick = async () => {
 };
 
      const zahlungSenden = el('button', 'Zahlungsinformationen senden');
+      
+function zahlungsButtonAktualisieren() {
+  const gesendet = Boolean(b.zahlungsinfo_gesendet_am);
+
+  zahlungSenden.textContent = gesendet
+    ? '✓ Zahlungsinformationen gesendet'
+    : 'Zahlungsinformationen senden';
+
+  zahlungSenden.style.backgroundColor = gesendet ? '#168447' : '';
+  zahlungSenden.style.color = gesendet ? '#ffffff' : '';
+}
+
+zahlungsButtonAktualisieren();
+
 zahlungSenden.type = 'button';
 zahlungSenden.disabled = false;
   zahlungSenden.onclick = async () => {
@@ -243,6 +257,10 @@ zahlungSenden.disabled = false;
     });
 
     meldung.textContent = 'Zahlungsinformationen erfolgreich versendet.';
+    
+b.zahlungsinfo_gesendet_am = new Date().toISOString();
+zahlungsButtonAktualisieren();
+
   } catch (fehler) {
     meldung.textContent = 'Fehler beim Zahlungsversand: ' + fehler.message;
   } finally {
