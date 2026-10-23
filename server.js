@@ -575,6 +575,14 @@ try {
     'Zahlungsinformationen – Klettern & Abenteuer Brilon',
     zahlungstext
   );
+  
+await pool.query(
+  `UPDATE brilon_buchungen
+   SET zahlungsinfo_gesendet_am = NOW()
+   WHERE id = $1`,
+  [buchungsId]
+);
+
 
   return reply(res, 200, {
     success: true,
@@ -693,7 +701,9 @@ preis=safeText(d.preis,50);
 
       if(route==='/api/admin/buchungen'&&req.method==='GET'){
         const q=await pool.query(
-          'SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at FROM brilon_buchungen ORDER BY created_at DESC LIMIT 250'
+         
+'SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am FROM brilon_buchungen ORDER BY created_at DESC LIMIT 250'
+
         );
         return reply(res,200,q.rows);
       }
@@ -1137,6 +1147,11 @@ async function start(){
     await pool.query(
       'ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ'
     );
+    
+await pool.query(
+  'ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS zahlungsinfo_gesendet_am TIMESTAMPTZ'
+);
+
     await pool.query(
       'CREATE TABLE IF NOT EXISTS brilon_aktionen (id BIGSERIAL PRIMARY KEY,titel TEXT NOT NULL,datum DATE,beschreibung TEXT,created_at TIMESTAMPTZ DEFAULT NOW())'
     );
