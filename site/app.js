@@ -4,6 +4,9 @@ document.getElementById('year').textContent=new Date().getFullYear();const date=
 const verfuegbarkeit = document.getElementById('datum-verfuegbarkeit');
 let sperrzeiten = [];
 let sperrzeitenGeladen = false;
+function datumIstGesperrt(datum){
+  return sperrzeitenGeladen&&window.sperrzeitEnthaelt(datum,sperrzeiten);
+}
 const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 const angebotAuswahl = document.getElementById('angebot-auswahl');
@@ -51,14 +54,31 @@ function uhrzeitenAnzeigen() {
 uhrzeitenAnzeigen();
 
 async function belegteUhrzeitenLaden() {
-  if (!uhrzeitAuswahl || !date.value) return;
+  if (!uhrzeitAuswahl) return;
+  if (!date.value) {
+    uhrzeitenAnzeigen();
+    uhrzeitAuswahl.disabled = true;
+    uhrzeitHinweis.textContent = 'Bitte zuerst einen Termin auswählen.';
+    return;
+  }
 
   const datum = date.value;
+  if(datumIstGesperrt(datum)){
+    uhrzeitenAnzeigen();
+    uhrzeitAuswahl.disabled=true;
+    uhrzeitHinweis.textContent='Dieser Tag ist gesperrt. Bitte wähle ein anderes Datum.';
+    return;
+  }
   const teilnehmer = Number(
     document.getElementById('buchungs-teilnehmer')?.value
   );
   const angebot=angebotAuswahl?.value;
-  if(!angebot)return;
+  if(!angebot){
+    uhrzeitenAnzeigen();
+    uhrzeitAuswahl.disabled=true;
+    uhrzeitHinweis.textContent='Bitte zuerst ein Programm auswählen.';
+    return;
+  }
   const vorherigeAuswahl = uhrzeitAuswahl.value;
 
   uhrzeitHinweis.textContent = 'Freie Uhrzeiten werden geprüft …';
@@ -75,7 +95,7 @@ async function belegteUhrzeitenLaden() {
 
     const daten = await antwort.json();
 
-    if (date.value !== datum) return;
+    if (date.value !== datum || datumIstGesperrt(datum)) return;
 
     // Die bisherige Serverabfrage liefert einzelne belegte Startzeiten.
     // Für eine vollständige Überschneidungsprüfung benötigen wir
@@ -114,7 +134,7 @@ async function belegteUhrzeitenLaden() {
       'Bitte versuche es später erneut.';
     uhrzeitAuswahl.disabled = true;
   } finally {
-    if (date.value === datum &&
+    if (date.value === datum && !datumIstGesperrt(datum) &&
         !uhrzeitHinweis.textContent.includes('nicht abrufbar')) {
       uhrzeitAuswahl.disabled = false;
     }
@@ -188,10 +208,7 @@ function datumPruefen() {
     return;
   }
 
-  const gesperrt = sperrzeiten.some(eintrag =>
-    gewaehltesDatum >= eintrag.datum &&
-    gewaehltesDatum <= eintrag.enddatum
-  );
+  const gesperrt=datumIstGesperrt(gewaehltesDatum);
 
   verfuegbarkeit.textContent = gesperrt
     ? '⛔ Dieser Tag ist gesperrt. Bitte wähle ein anderes Datum.'
@@ -279,11 +296,7 @@ function kalenderAnzeigen() {
       String(monat + 1).padStart(2, '0') + '-' +
       String(tag).padStart(2, '0');
 
-    const gesperrt = sperrzeitenGeladen &&
-      sperrzeiten.some(eintrag =>
-        datumWert >= eintrag.datum &&
-        datumWert <= eintrag.enddatum
-      );
+    const gesperrt=datumIstGesperrt(datumWert);
 
     const knopf = document.createElement('button');
     knopf.type = 'button';
@@ -324,6 +337,7 @@ date.addEventListener('change', () => {
 
   datumPruefen();
   kalenderAnzeigen();
+  belegteUhrzeitenLaden();
 });
 
 fetch('/api/sperrzeiten')
@@ -336,6 +350,7 @@ fetch('/api/sperrzeiten')
     sperrzeitenGeladen = true;
     datumPruefen();
     kalenderAnzeigen();
+    belegteUhrzeitenLaden();
   })
   .catch(() => {
     sperrzeitenGeladen = false;
