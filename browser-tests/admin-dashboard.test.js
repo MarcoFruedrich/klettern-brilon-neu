@@ -10,7 +10,7 @@ const net = require('node:net');
 function fakeAdminApi(page) {
   const state = {
     signedIn: false, csrf: 'a'.repeat(64), mutations: [],
-    tours: [],
+    tours: [], games: [],
     places: [{ id: 1, name: 'Brilon', aktiv: true }],
     programs: [{ id: 11, name: 'Klettertest', beschreibung: 'Testprogramm', dauer: 90,
       preise: {'1-4':100, '5-10':160}, aktiv: false, bild_url: null, kategorie: 'Klettern',
@@ -100,12 +100,33 @@ function fakeAdminApi(page) {
         datum:b.data.datum,angebot:b.data.angebot
       })),anzahl:matches.length,seite,proSeite});
     }
+    if(endpoint==='/api/admin/gps/spiele'&&method==='GET'){
+      const tourId=u.searchParams.get('tourId')||'';
+      const seite=Number(u.searchParams.get('seite')||1),proSeite=30;
+      const results=state.games.filter(g=>!tourId||g.tourId===tourId);
+      return json(200,{spiele:results.slice((seite-1)*proSeite,seite*proSeite).map(g=>({...g})),
+        anzahl:results.length,seite,proSeite});
+    }
+    const revokeRoute=endpoint.match(/^\/api\/admin\/gps\/spiele\/([^/]+)\/sperren$/);
+    if(revokeRoute&&method==='PATCH'){
+      const game=state.games.find(g=>g.id===revokeRoute[1]);
+      if(!game)return json(404,{error:'Nicht gefunden'});
+      game.gesperrtAm=game.gesperrtAm||'2027-01-01T12:05:00Z';
+      game.status='gesperrt';
+      return json(200,{success:true,id:game.id,gesperrtAm:game.gesperrtAm});
+    }
     if(endpoint==='/api/admin/gps/spiele'&&method==='POST'){
       const {tourId,buchungId}=readBody();
       const tour=state.tours.find(t=>t.id===tourId&&t.aktiv&&t.buchbar);
       if(!tour||!state.bookings.some(b=>b.id===buchungId&&b.status==='bestaetigt'&&b.data.angebot===tour.angebotName))
         return json(409,{error:'Tour oder Buchung ist nicht freigegeben.'});
-      return json(201,{id:'test-id',zugangslink:'/gps.html?zugang=TEST-NICHT-ECHT'});
+      const booking=state.bookings.find(b=>b.id===buchungId);
+      state.games.unshift({id:'550e8400-e29b-41d4-a716-'+String(state.games.length+1).padStart(12,'0'),
+        tourId,buchungId,erstelltAm:'2027-01-01T12:00:00Z',gestartetAm:null,
+        abgeschlossenAm:null,gesperrtAm:null,stationIndex:0,
+        spielzeitSekunden:null,tour:tour.titel,buchungsnummer:booking.data.buchungsnummer,
+        name:booking.data.name,datum:booking.data.datum,status:'ausgestellt'});
+      return json(201,{id:state.games[0].id,zugangslink:'/gps.html?zugang=TEST-NICHT-ECHT'});
     }
     if(endpoint==='/api/admin/gps/gaesteliste')return json(200,[]);
     if(endpoint==='/api/admin/kalenderbuchungen'||endpoint==='/api/admin/kalender')return json(200,[]);
@@ -321,6 +342,47 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       doc:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth
     }));
     assert.ok(dimensions.doc<=dimensions.viewport+2);
+    await page.close();
+  });
+
+  await t.test('GPS-Zugänge: Liste, Seitenwechsel und bestätigte dauerhafte Sperrung',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const tourId='550e8400-e29b-41d4-a716-446655440abc';
+    state.tours=[{id:tourId,titel:'CI-Tour',angebotName:'GPS-Test',
+      schwierigkeitsgrad:'leicht',altersgruppe:'Kinder',stationen:[],
+      startpunkt:'Brilon',ziel:'Brilon',aktiv:true,buchbar:true}];
+    state.games=Array.from({length:65},(_,i)=>({
+      id:'550e8400-e29b-41d4-a716-'+String(1000+i).padStart(12,'0'),
+      tourId,buchungId:'550e8400-e29b-41d4-a716-446655440000',
+      erstelltAm:'2027-01-01T12:00:00Z',gestartetAm:null,
+      abgeschlossenAm:null,gesperrtAm:null,stationIndex:0,
+      spielzeitSekunden:null,tour:'CI-Tour',name:'Nur Test',
+      buchungsnummer:'CI-SP-'+String(i+1).padStart(3,'0'),
+      datum:'2027-03-15',status:'ausgestellt'
+    }));
+    const alerts=[];page.on('dialog',async d=>{alerts.push(d.message());await d.accept();});
+    await login(page,root);
+    await page.waitForFunction(()=>document.getElementById('gps-access-status')?.textContent.includes('65 ausgestellte'));
+    assert.equal(await page.locator('#gps-access-list article').count(),30);
+    assert.equal(await page.locator('#gps-access-page-info').textContent(),'Seite 1 / 3');
+    await page.locator('#gps-access-next').click();
+    await page.waitForFunction(()=>document.getElementById('gps-access-page-info')?.textContent==='Seite 2 / 3');
+    assert.equal(await page.locator('#gps-access-list article').count(),30);
+    await page.locator('#gps-access-next').click();
+    await page.waitForFunction(()=>document.getElementById('gps-access-page-info')?.textContent==='Seite 3 / 3');
+    assert.equal(await page.locator('#gps-access-list article').count(),5);
+    const target=state.games[60].id;
+    await page.locator('#gps-access-list article').first().getByRole('button',{name:'Zugang dauerhaft sperren'}).click();
+    await page.waitForFunction(()=>document.querySelector('#gps-access-list')?.textContent.includes('Status: Gesperrt'));
+    assert.equal(state.games[60].id,target);
+    assert.equal(state.games[60].status,'gesperrt');
+    assert.ok(alerts.some(message=>message.includes('dauerhaft sperren')));
+    assert.equal(await page.locator('#gps-access-list article').first().getByRole('button',{name:'Zugang dauerhaft sperren'}).count(),0);
+    assert.ok(state.mutations.some(m=>m.endpoint.endsWith('/sperren')&&m.method==='PATCH'));
+    assert.ok(!JSON.stringify(await page.locator('#gps-access-list').textContent()).includes('TEST-NICHT-ECHT'));
+    const size=await page.evaluate(()=>({body:document.documentElement.scrollWidth,view:document.documentElement.clientWidth}));
+    assert.ok(size.body<=size.view+2,'GPS-Zugangsverwaltung darf auf dem Smartphone nicht überlaufen');
     await page.close();
   });
 
