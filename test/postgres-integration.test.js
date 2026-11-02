@@ -6,6 +6,8 @@ const crypto = require('node:crypto');
 const net = require('node:net');
 const path = require('node:path');
 const { heuteInBerlin } = require('../lib/kalendertag');
+const { totpCode } = require('../lib/totp');
+const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
 const integrationUrl = process.env.PG_INTEGRATION_URL;
 
@@ -31,7 +33,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
       ...process.env, PORT: String(port), DATABASE_URL: integrationUrl,
       DATABASE_SSL_MODE: 'disable', RUN_SCHEMA_MIGRATIONS: 'true',
       BREVO_API_KEY: '', BREVO_SENDER_EMAIL: '', BOOKING_NOTIFY_EMAIL: '',
-      SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_PATH: '', MOCK_PG: ''
+      SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_PATH: '', MOCK_PG: '',
+      ADMIN_USER: 'brilon-ci', ADMIN_PASSWORD: 'local-only-password',
+      ADMIN_TOTP_SECRET_BASE32: totpSecret
     }
   });
   t.after(() => child.kill());
@@ -73,4 +77,56 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     (id,data,status,buchungsnummer) VALUES ($1,'{}'::jsonb,'offen',$2)`,
     [crypto.randomUUID(), saved.rows[0].buchungsnummer]),
   error => error.code === '23505', 'PostgreSQL-Unique-Index muss doppelte Referenzen verhindern');
+
+  // 125 Testbuchungen mit identischem Zeitstempel: Paginierung muss deterministisch bleiben.
+  await pool.query(`
+    INSERT INTO brilon_buchungen(id,data,status,buchungsnummer,created_at)
+    SELECT gen_random_uuid(),
+      jsonb_build_object('name','CI Massentest '||lpad(i::text,3,'0'),
+        'datum',$1::text,'angebot',$2::text,'gesamtpreis',100,
+        'zahlungen','[]'::jsonb,'buchungsnummer','CI-MASS-'||lpad(i::text,3,'0')),
+      CASE WHEN i<=75 THEN 'offen' ELSE 'bestaetigt' END,
+      'CI-MASS-'||lpad(i::text,3,'0'), '2027-01-01T10:00:00Z'::timestamptz
+    FROM generate_series(1,125) AS i`,[day1,programName]);
+
+  const otp=totpCode(totpSecret,Math.floor(Date.now()/30000));
+  const login=await fetch(root+'/api/admin/login',{method:'POST',
+    headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({username:'brilon-ci',password:'local-only-password',totp:otp})});
+  assert.equal(login.status,200,'Der Admin-Zugang muss mit isoliertem PostgreSQL funktionieren');
+  const cookie=login.headers.get('set-cookie')?.split(';',1)[0];
+  assert.ok(cookie,'Geschützte Testabfragen benötigen das Session-Cookie');
+  const query=async params=>{
+    const response=await fetch(root+'/api/admin/buchungen?'+new URLSearchParams(params),
+      {headers:{Cookie:cookie}});
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  const pages=[];
+  for(let pageNumber=1;pageNumber<=3;pageNumber++){
+    const result=await query({seite:String(pageNumber)});
+    assert.equal(result.anzahl,127);
+    assert.equal(result.proSeite,50);
+    pages.push(result.buchungen);
+  }
+  assert.deepEqual(pages.map(rows=>rows.length),[50,50,27],
+    '127 echte Testbuchungen müssen auf drei Seiten verteilt sein');
+  const ids=pages.flat().map(row=>row.id);
+  assert.equal(new Set(ids).size,127,
+    'Bei identischen Erstellungszeiten darf keine Buchung mehrfach erscheinen');
+  const firstPageAgain=await query({seite:'1'});
+  assert.deepEqual(firstPageAgain.buchungen.map(row=>row.id),pages[0].map(row=>row.id),
+    'Bei gleichen Zeitstempeln muss die Reihenfolge reproduzierbar bleiben');
+  const confirmed=await query({seite:'1',status:'bestaetigt'});
+  assert.equal(confirmed.anzahl,50);
+  assert.ok(confirmed.buchungen.every(row=>row.status==='bestaetigt'));
+  const found=await query({seite:'1',suche:'CI Massentest 120'});
+  assert.equal(found.anzahl,1);
+  assert.equal(found.buchungen[0].data.name,'CI Massentest 120');
+  const payments=await fetch(root+'/api/admin/zahlungsuebersicht?seite=3',
+    {headers:{Cookie:cookie}});
+  assert.equal(payments.status,200);
+  const paymentPage=await payments.json();
+  assert.equal(paymentPage.anzahl,127);
+  assert.equal(paymentPage.eintraege.length,27);
 });
