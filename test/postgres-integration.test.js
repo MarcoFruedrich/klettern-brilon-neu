@@ -691,4 +691,56 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     {headers:{Cookie:freshCookie}})).status,401);
   assert.equal((await tryLogin('Aktualisiert-Sicher-2026-!')).status,401);
   assert.equal((await tryLogin('Reaktiviert-Einmal-2026-!')).status,200);
+
+  // Safety overview aggregates distinct blocked/inactive stations, unresolved
+  // minor hints and unconfirmed mail acceptance, without granting permissions.
+  const summaryPath=root+'/api/admin/pruefung/uebersicht';
+  assert.equal((await fetch(summaryPath)).status,401,
+    'The entire safety overview must be restricted to administrators.');
+  assert.equal((await fetch(summaryPath,{headers:{Cookie:staffCookie}})).status,401);
+  const pendingId=crypto.randomUUID();
+  await pool.query(`INSERT INTO brilon_pruef_hinweise
+    (id,station_id,bericht_id,beschreibung,erstellt_von)
+    VALUES($1,$2,$3,$4,$5)`,
+    [pendingId,stationId,hintResult.id,
+      'Kontrolle des Stationsschilds bei der nächsten fachlichen Nachprüfung erforderlich',
+      'Testfachkraft']);
+  const disableExtra=await patchAdmin(stationStop,{
+    begruendung:'Die Station wird bis zur fachlichen Sicherheitsprüfung vorsorglich stillgelegt.'});
+  assert.equal(disableExtra.status,200);
+  const dashboardResponse=await fetch(summaryPath,{headers:{Cookie:cookie}});
+  assert.equal(dashboardResponse.status,200);
+  assert.match(dashboardResponse.headers.get('cache-control')||'',/no-store/i);
+  const overview=await dashboardResponse.json();
+  assert.equal(typeof overview.stand,'string');
+  assert.ok(overview.zaehler.gesperrt>=1);
+  assert.ok(overview.zaehler.stillgelegt>=1);
+  assert.ok(overview.zaehler.hinweise_offen>=1);
+  assert.ok(overview.zaehler.meldungen_ungeklaert>=1);
+  const counts=await pool.query(`SELECT
+    (SELECT COUNT(*)::int FROM brilon_pruef_stationen WHERE gesperrt_am IS NOT NULL) AS gesperrt,
+    (SELECT COUNT(*)::int FROM brilon_pruef_stationen WHERE aktiv=false) AS stillgelegt,
+    (SELECT COUNT(*)::int FROM brilon_pruef_stationen
+      WHERE aktiv=false OR gesperrt_am IS NOT NULL) AS nicht_nutzbar,
+    (SELECT COUNT(*)::int FROM brilon_pruef_hinweise WHERE erledigt_am IS NULL) AS hinweise_offen,
+    (SELECT COUNT(*)::int FROM brilon_pruef_meldungen
+      WHERE status<>'angenommen') AS meldungen_ungeklaert`);
+  assert.deepEqual(overview.zaehler,counts.rows[0],
+    'Overview counters reflect all records, including overlaps exactly once.');
+  const blockedItem=overview.stationen.find(x=>x.id===extraId);
+  assert.ok(blockedItem&&blockedItem.gesperrt_am&&!blockedItem.aktiv);
+  assert.ok(overview.stationen[0].gesperrt_am,
+    'Stations with active safety locks must appear before purely inactive ones.');
+  assert.equal(overview.stationen.filter(x=>x.id===extraId).length,1,
+    'A station both inactive and locked is listed only once.');
+  assert.ok(overview.hinweise.some(x=>x.id===pendingId));
+  assert.equal(overview.hinweise.some(x=>x.id===hint.id),false,
+    'Completed minor hints are not outstanding follow-ups.');
+  assert.ok(overview.meldungen.some(x=>x.bericht_id===receipt.id));
+  assert.equal(JSON.stringify(overview).includes(foto),false,
+    'Never include inspection photo bytes in the admin dashboard.');
+  assert.equal(JSON.stringify(overview).includes(staffData.passwort),false);
+  assert.equal((await stationList()).find(x=>x.id===extraId).aktiv,false,
+    'Reading the overview must not reactivate or release a station.');
+  assert.ok((await stationList()).find(x=>x.id===extraId).gesperrt_am);
 });
