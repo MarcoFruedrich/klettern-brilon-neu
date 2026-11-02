@@ -1460,7 +1460,7 @@ preis=safeText(d.preis,50);
            WHERE g.buchung_id=ANY($1::uuid[]) ORDER BY g.erstellt_am`,[buchungsIds]
         );
         const exportDatensatz={
-          exportformat:'klettern-abenteuer-kundendaten-v1',exportiertAm:new Date().toISOString(),
+          exportformat:'klettern-abenteuer-kundendaten-v2',exportiertAm:new Date().toISOString(),
           kontaktEmail:kontaktEmail||null,
           buchungen:kundenBuchungen.rows.map(row=>{
             const data=row.data||{};

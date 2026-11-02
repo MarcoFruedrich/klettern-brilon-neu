@@ -169,6 +169,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(bookingExportResponse.status,200);
   assert.match(bookingExportResponse.headers.get('content-disposition'),/attachment; filename="buchung-/);
   const bookingExport=await bookingExportResponse.json();
+  assert.equal(bookingExport.exportformat,'klettern-abenteuer-kundendaten-v2');
   assert.equal(bookingExport.kontaktEmail,'max@example.test');
   assert.equal(bookingExport.buchungen.length,2,'Alle Buchungen derselben Kontakt-E-Mail müssen exportiert werden');
   const exportedReferences=bookingExport.buchungen.map(entry=>entry.buchung.referenz);
