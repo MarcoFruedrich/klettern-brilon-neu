@@ -139,6 +139,37 @@ footer{max-width:none;background:#0d2b25;color:#ecf8ed;padding:35px max(5%,calc(
   --sub: #577068;
 }
 
+/* Sichtbarer Tastaturfokus und direkter Sprung zum Hauptinhalt */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--pine);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 2px var(--lime);
+}
+.skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: 12px;
+  left: 12px;
+  transform: translateY(calc(-100% - 20px));
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--pine);
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;
+}
+.skip-link:focus-visible { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 body {
   background: var(--cream);
   color: var(--text);

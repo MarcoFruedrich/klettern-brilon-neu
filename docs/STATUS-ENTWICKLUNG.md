@@ -41,6 +41,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
 - Die Admin-Verwaltung besitzt eine dauerhaft erreichbare Sprungnavigation für Buchungen/Zahlungen, Kalender, Programme, Tagesangebote, Anschlussrabatte und GPS-Touren. Auf schmalen Bildschirmen bleibt die Navigation horizontal wischbar; Kalenderaktionen und Sprungziele berücksichtigen Touch-Größen und Sticky-Kopfzeilen.
 - Das öffentliche Mobilmenü hält `aria-expanded` und die Aktionsbeschriftung beim Öffnen, Schließen und nach Navigation synchron. Escape schließt das Menü und setzt den Fokus auf den Menütaster zurück; drei Tests prüfen die Bedienzustände.
+- Startseite und Verwaltung bieten einen Tastatur-Sprunglink zum fokussierbaren Hauptinhalt. Globale Fokusmarkierungen und `prefers-reduced-motion` sind ergänzt und strukturell getestet.
 - Die GPS-Gästeliste ist jetzt zusätzlich zentral im Admin-Bereich nach Tour filterbar. Der Admin-Endpunkt liefert ausschließlich abgeschlossene Spiele mit expliziter Einwilligung, verlangt eine gültige Sitzung und gibt weder Spielzugang noch interne Spieldaten aus.
 - Admins können einen öffentlichen Gästelisteneintrag nach Bestätigung entfernen. Dabei werden Name und Einwilligung gelöscht; Abschlusszeit und Spielzeit bleiben für den internen Spielstand erhalten. Der HTTP-Test prüft Adminschutz und dass der Name danach auch aus der öffentlichen Gästeliste verschwindet.
 - Admins können alle Buchungen mit derselben Kontakt-E-Mail samt Zahlungs- und verknüpften GPS-Teilnahmedaten als JSON exportieren. Der Abgleich ignoriert Groß-/Kleinschreibung; fehlt die E-Mail, wird nur die ausgewählte Buchung exportiert. Interne Bearbeitungsnotizen, Spielzugänge, Kontrollcodes und Stationskoordinaten bleiben ausgeschlossen; der HTTP-Test prüft Zugriffsschutz, Mehrfachbuchungen und diese Randfälle.
@@ -66,7 +67,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 49 bestanden, 0 fehlgeschlagen.
+- `npm test` – 51 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
@@ -74,6 +75,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check test/booking-http.test.js` – bestanden.
 - `node --check test/admin-navigation.test.js` – bestanden.
 - `node --check site/navigation.js` und `node --check test/site-navigation.test.js` – bestanden.
+- `node --check test/site-accessibility.test.js` – bestanden.
 - `node --check site/zahlungsuebersicht.js` – bestanden.
 - `node --check lib/sicherheitszustand.js` – bestanden.
 - `git diff --check` – bestanden.
@@ -91,7 +93,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 - Der Status der produktiven Schema- und Kalenderdefinitionen ist noch zu ermitteln. Die Tabellen werden für lokale/isolierte Tests nicht automatisch angelegt.
 - Datenschutz- und Löschkonzept sowie verbindliche Bedingungen sind noch zu entwickeln und fachlich zu prüfen. Der Export gruppiert nach exakt übereinstimmender Kontakt-E-Mail; ein abweichender oder falsch eingetragener Kontakt wird dadurch nicht zusammengeführt.
 - Einwilligungszeitpunkt und Textversion werden gespeichert. Ein allgemeines Aufbewahrungs-/Löschkonzept und ein Export über nicht per E-Mail verknüpfte Personendatensätze bleiben offen.
-- Mobile und Desktop-Layouts sowie die gesamte Tastatur- und Screenreader-Bedienung sind noch visuell und manuell zu prüfen. Das öffentliche Mobilmenü ist automatisiert auf Zustandsbeschriftung, Escape-Schließen und Fokus-Rückgabe getestet.
+- Mobile und Desktop-Layouts sowie die gesamte Tastatur- und Screenreader-Bedienung sind noch visuell und manuell zu prüfen. Automatisiert getestet sind Sprunglinks, Fokusregeln, Bewegungsreduktion und das öffentliche Mobilmenü.
 - Die neue Admin-Sprungnavigation wurde strukturell auf gültige Ziele geprüft. Ein visueller Smartphone-/Tablet-/Desktop-Test bleibt offen: lokaler Chromium fehlt, und die bereitgestellte Browserinstanz konnte den temporären Testserver nicht erreichen (`ERR_CONNECTION_REFUSED`).
 - HTML-, JSON- und Fehlerantworten senden einheitliche `nosniff`-, Referrer- und Frame-Schutzheader; statische Seiten behalten zusätzlich die Content-Security-Policy. Der HTTP-Test prüft die Header an Adminseite und Login-Antwort.
 
