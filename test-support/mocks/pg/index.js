@@ -8,6 +8,7 @@ class Pool {
     this.guests = JSON.parse(process.env.MOCK_GUESTBOOK || '[]');
     this.places = JSON.parse(process.env.MOCK_PLACES || '[]');
     this.adminSessions = new Map();
+    this.adminTotpSteps = new Map();
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
   }
 
@@ -20,6 +21,14 @@ class Pool {
     if (/^\s*(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock)/i.test(sql)) return { rows:[], rowCount:0 };
     if (process.env.MOCK_ADMIN_SESSION_FAIL==='1'&&sql.includes('brilon_admin_sessions'))
       throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
+    if (process.env.MOCK_ADMIN_TOTP_FAIL==='1'&&sql.includes('brilon_admin_totp_steps'))
+      throw new Error('Test-double: TOTP-Zählertabelle fehlt');
+    if(sql.includes('INSERT INTO brilon_admin_totp_steps')){
+      const [factorId,step]=params,previous=this.adminTotpSteps.get(factorId);
+      if(previous!==undefined&&previous>=Number(step))return {rows:[],rowCount:0};
+      this.adminTotpSteps.set(factorId,Number(step));
+      return {rows:[{last_step:step}],rowCount:1};
+    }
     if (sql.includes('INSERT INTO brilon_admin_sessions')) {
       this.adminSessions.set(params[0],new Date(params[1]).getTime());
       return {rows:[],rowCount:1};

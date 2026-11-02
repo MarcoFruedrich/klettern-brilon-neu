@@ -4,8 +4,11 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const net = require('node:net');
 const path = require('node:path');
+const {totpCode}=require('../lib/totp');
 
-test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
+const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+
+test('HTTP: TOTP-Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
   const probe = net.createServer();
   await new Promise((resolve, reject) => {
     probe.once('error', reject);
@@ -26,7 +29,8 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
       SUPABASE_SECRET_KEY: '',
       BREVO_API_KEY: '',
       ADMIN_USER: 'test-admin',
-      ADMIN_PASSWORD: 'test-only-password'
+      ADMIN_PASSWORD: 'test-only-password',
+      ADMIN_TOTP_SECRET_BASE32:totpSecret
     }
   });
   t.after(() => child.kill());
@@ -45,15 +49,19 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
     body: JSON.stringify({ username: 'test-admin', password: 'wrong' })
   });
   assert.equal(wrongLogin.status, 401);
+  const missingOtp=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({username:'test-admin',password:'test-only-password'})});
+  assert.equal(missingOtp.status,401,'Benutzername und Passwort reichen ohne Authenticator-Code nicht aus');
   const crossLogin = await fetch(root + '/api/admin/login', {
     method: 'POST', headers: { Origin: 'http://evil.test', 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'test-admin', password: 'test-only-password' })
   });
   assert.equal(crossLogin.status, 403);
 
+  const loginOtp=totpCode(totpSecret,Math.floor(Date.now()/30000));
   const login = await fetch(root + '/api/admin/login', {
     method: 'POST', headers: { Origin: root, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'test-admin', password: 'test-only-password' })
+    body: JSON.stringify({ username: 'test-admin', password: 'test-only-password',totp:loginOtp })
   });
   assert.equal(login.status, 200);
   assert.equal(login.headers.get('x-content-type-options'),'nosniff');
@@ -66,6 +74,9 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
   const cookie = setCookie.split(';', 1)[0];
   const loginData=await login.json();
   assert.match(loginData.csrfToken,/^[a-f0-9]{64}$/);
+  const replayedLogin=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({username:'test-admin',password:'test-only-password',totp:loginOtp})});
+  assert.equal(replayedLogin.status,401,'Ein bereits akzeptierter Authenticator-Code darf nicht erneut verwendet werden');
   const csrfResponse=await fetch(root+'/api/admin/csrf',{headers:{Cookie:cookie}});
   assert.equal(csrfResponse.status,200,'Ein angemeldeter Browser muss das Sitzungstoken nach einem Neuladen erneut abrufen können');
   assert.equal((await csrfResponse.json()).csrfToken,loginData.csrfToken);
@@ -74,6 +85,7 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
   assert.equal(adminPage.headers.get('x-frame-options'),'DENY');
   assert.equal(adminPage.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
   assert.match(adminPage.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+  assert.match(await adminPage.text(),/id="totp-code"/,'Das Admin-Formular muss das zweite Anmeldefeld anzeigen');
 
   const authenticated = await fetch(root + '/api/admin/buchungen', { headers: { Cookie: cookie } });
   assert.equal(authenticated.status, 503, 'Sitzung wurde akzeptiert; nur die absichtlich fehlende DB blockiert');
@@ -116,7 +128,7 @@ test('HTTP: DB-Admin-Login verweigert Sitzungen ohne vorbereitete Tabelle', asyn
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_ADMIN_SESSION_FAIL:'1',
     RUN_SCHEMA_MIGRATIONS:'false',SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',
-    ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password'
+    ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password',ADMIN_TOTP_SECRET_BASE32:totpSecret
   }});
   t.after(()=>child.kill());
   const root=`http://127.0.0.1:${port}`;
@@ -126,8 +138,36 @@ test('HTTP: DB-Admin-Login verweigert Sitzungen ohne vorbereitete Tabelle', asyn
     catch{await new Promise(resolve=>setTimeout(resolve,50));}
   }
   assert.equal(ready,true);
+  const otp=totpCode(totpSecret,Math.floor(Date.now()/30000));
   const login=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
-    body:JSON.stringify({username:'test-admin',password:'test-only-password'})});
+    body:JSON.stringify({username:'test-admin',password:'test-only-password',totp:otp})});
   assert.equal(login.status,503);
   assert.equal(login.headers.get('set-cookie'),null,'Ohne DB-Sitzungsspeicher darf kein Session-Cookie ausgegeben werden');
+});
+
+test('HTTP: DB-Admin-Login verweigert Anmeldung ohne TOTP-Zählertabelle', async t => {
+  const probe=net.createServer();
+  await new Promise((resolve,reject)=>{probe.once('error',reject);probe.listen(0,'127.0.0.1',resolve);});
+  const port=probe.address().port;
+  await new Promise(resolve=>probe.close(resolve));
+  const repo=path.resolve(__dirname,'..');
+  const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:'ignore',env:{
+    ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
+    DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_ADMIN_TOTP_FAIL:'1',RUN_SCHEMA_MIGRATIONS:'false',
+    SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password',
+    ADMIN_TOTP_SECRET_BASE32:totpSecret
+  }});
+  t.after(()=>child.kill());
+  const root=`http://127.0.0.1:${port}`;
+  let ready=false;
+  for(let i=0;i<50;i++){
+    try{await fetch(root+'/admin.html');ready=true;break;}
+    catch{await new Promise(resolve=>setTimeout(resolve,50));}
+  }
+  assert.equal(ready,true);
+  const otp=totpCode(totpSecret,Math.floor(Date.now()/30000));
+  const login=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({username:'test-admin',password:'test-only-password',totp:otp})});
+  assert.equal(login.status,503);
+  assert.equal(login.headers.get('set-cookie'),null,'Ohne persistenten TOTP-Wiederverwendungsschutz darf keine Sitzung entstehen');
 });

@@ -32,9 +32,10 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Für bestätigte Buchungen lassen sich einzelne Spielzugänge ausstellen. Gruppenstände, Start-/Abschlusszeit und Dauer werden gespeichert. Die mobile Spielseite prüft QR-Kennung, Zahlencode und Antwort; spätere Stationskoordinaten werden nie an den Browser ausgeliefert.
 - Die Gästeliste zeigt nur abgeschlossene Spiele mit ausdrücklicher Zustimmung zur Namensveröffentlichung. Ohne Zustimmung wird kein Name gespeichert.
 - GPS-Kontrollcodes werden mit HMAC gehasht; Spielzugänge werden nur gehasht gespeichert. Das Geheimnis `GPS_CODE_SECRET` ist erforderlich.
-- Admin-Schreibanfragen mit Sitzung verlangen zusätzlich einen passenden `Origin`-Header für denselben Host und dasselbe Protokoll; die vorhandenen `HttpOnly`, `Secure`, `SameSite=Strict`-Cookies bleiben bestehen.
+- Admin-Schreibanfragen verlangen sitzungsgebundenen CSRF-Token sowie passenden `Origin`-Header; zusätzlich wird `Sec-Fetch-Site` ausgewertet. Die `HttpOnly`, `Secure`, `SameSite=Strict`-Cookies bleiben bestehen.
 - Rate-Limit-Zustände sind auf 10.000 Schlüssel begrenzt; veraltete Schlüssel werden beim Bereinigen entfernt und die Zahl gespeicherter Versuche pro Schlüssel bleibt beschränkt.
-- Bei aktiver PostgreSQL-Verbindung liegen Admin-Sitzungen jetzt als SHA-256-Tokenhash mit Ablaufzeit in `brilon_admin_sessions`. Jede Admin-Anfrage prüft den Eintrag; Abmelden widerruft ihn. Abgelaufene Einträge werden bereinigt. Die Tabellenerstellung ist migrationsgeschützt und wurde nicht ausgeführt; nur im DB-losen Testmodus bleiben Sitzungen prozesslokal.
+- Bei aktiver PostgreSQL-Verbindung liegen Admin-Sitzungen als SHA-256-Tokenhash mit Ablaufzeit in `brilon_admin_sessions`; akzeptierte TOTP-Zeitschritte werden in `brilon_admin_totp_steps` gespeichert. Jede Admin-Anfrage prüft die Sitzung; Abmelden widerruft sie. Abgelaufene Sitzungen werden bereinigt. Beide Tabellen werden nur über die geschützte Migration angelegt. Im DB-losen Testmodus bleiben Sitzungen und Wiederverwendungszähler prozesslokal.
+- Die Admin-Anmeldung verlangt Benutzername, Passwort und einen sechsstelligen TOTP-Code. Akzeptierte Zeitschritte werden atomar in `brilon_admin_totp_steps` als einmalig verwendet markiert; das Secret bleibt ausschließlich in `ADMIN_TOTP_SECRET_BASE32` außerhalb des Repositories.
 - Ein lokaler HTTP-Test prüft Admin-Anmeldung, Cookie-Flags, geschützte Lesezugriffe und erlaubte/abgewiesene Schreibanfragen mit Datenbank-/Supabase-Stubs; er versendet keine E-Mails.
 - Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
 - Die Admin-Verwaltung besitzt eine dauerhaft erreichbare Sprungnavigation für Buchungen/Zahlungen, Kalender, Programme, Tagesangebote, Anschlussrabatte und GPS-Touren. Auf schmalen Bildschirmen bleibt die Navigation horizontal wischbar; Kalenderaktionen und Sprungziele berücksichtigen Touch-Größen und Sticky-Kopfzeilen.
@@ -62,11 +63,11 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 40 bestanden, 0 fehlgeschlagen.
+- `npm test` – 44 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
-- Admin-Login und Abmelden werden mit Datenbank-Test-Double und im DB-losen Sitzungsmodus geprüft. Wenn die DB-Sitzungstabelle fehlt, wird der Login mit HTTP 503 abgewiesen und es wird kein Cookie ausgegeben.
+- Admin-Login mit TOTP, Code-Wiederverwendung, CSRF und Abmelden werden mit Datenbank-Test-Double sowie im DB-losen Testmodus geprüft. Fehlt eine erforderliche Datenbanktabelle für Sitzungen oder TOTP-Zähler, wird der Login mit HTTP 503 abgewiesen und es wird kein Cookie ausgegeben.
 - `node --check test/booking-http.test.js` – bestanden.
 - `node --check test/admin-navigation.test.js` – bestanden.
 - `node --check site/zahlungsuebersicht.js` – bestanden.
@@ -78,7 +79,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 ## Noch offen
 
 - Der HTTP-End-to-End-Test deckt die Kernstrecke mit einem speicherbasierten PostgreSQL-Test-Double ab. Die echte PostgreSQL-Integration, Datenbank-Constraints/Transaktionsisolation und E-Mail-Zustellung benötigen noch separate Tests in einer isolierten Umgebung mit Mail-Test-Double.
-- Vor DB-gestütztem Admin-Betrieb muss die geschützte Migration für `brilon_admin_sessions` geprüft und freigegeben werden. Admin-Schreibanfragen verlangen nun einen sitzungsgebundenen CSRF-Token und prüfen zusätzlich den exakten Origin sowie `Sec-Fetch-Site`, sofern der Browser den Header sendet. Ein zweiter Faktor bleibt offen.
+- Vor DB-gestütztem Admin-Betrieb müssen die geschützten Migrationen für `brilon_admin_sessions` und `brilon_admin_totp_steps` geprüft und freigegeben werden; sie wurden nicht ausgeführt. Admin-Schreibanfragen verlangen einen sitzungsgebundenen CSRF-Token und prüfen zusätzlich den exakten Origin sowie `Sec-Fetch-Site`, sofern der Browser den Header sendet. Der TOTP-Schlüssel muss außerhalb von Git eingerichtet und sicher verwahrt werden.
 - Buchungsliste und Zahlungsübersicht sind seitenweise vollständig durchsuchbar. Die Kalenderansicht lädt jeweils den ausgewählten Monat.
 - Die kundenseitige Anschlussstrecke ist im HTTP-Test mit einem PostgreSQL-Test-Double abgedeckt. Eine erkannte Überzahlung/Gutschrift wird nicht automatisch ausgezahlt; dafür ist ein kontrollierter Erstattungsprozess erforderlich.
 - QR-Etiketten können erzeugt und gedruckt werden. Ausdrucke müssen vor dem Einsatz an den Stationen praktisch mit mehreren Smartphones gescannt werden. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.
@@ -93,7 +94,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 ## Nutzung der bestehenden Verwaltung
 
 1. Lokal Node.js 20+ und Abhängigkeiten bereitstellen.
-2. Für eine isolierte Entwicklungsdatenbank `DATABASE_URL`, `ADMIN_USER`, `ADMIN_PASSWORD` und ein mindestens 32 Zeichen langes `GPS_CODE_SECRET` konfigurieren. Keine Produktivzugangsdaten verwenden.
+2. Für eine isolierte Entwicklungsdatenbank `DATABASE_URL`, `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_TOTP_SECRET_BASE32` (mindestens 160 zufällige Bit, Base32) und ein mindestens 32 Zeichen langes `GPS_CODE_SECRET` konfigurieren. Keine Produktivzugangsdaten verwenden.
 3. Schemaänderungen bleiben standardmäßig aus. Nur in einer eigens angelegten Testdatenbank und nach Schema-Review `RUN_SCHEMA_MIGRATIONS=true` setzen.
 4. `npm start` starten und `/admin.html` öffnen. Unter „Einstellungen“ Veranstaltungsorte ergänzen; neue Programme können diese anschließend auswählen. Die Zahlungsübersicht zeigt Eingangssummen, offene Beträge und dokumentierte Gutschriften; Einzelbuchungen lassen sich aufklappen. Zahlungseingänge werden zusätzlich direkt in der jeweiligen Buchung erfasst. Unter „Anschlussrabatt“ bestätigte Buchungen desselben Tages wählen, die Vorschau prüfen und erst dann die dauerhafte Anwendung bestätigen. Bestätigungs-E-Mails führen mit den genannten Zugangseinstellungen zur passenden Anschlussseite. Unter GPS eine Tour mit vollständigem Stations-JSON anlegen und pro Tour „QR-Etiketten drucken“ wählen. Die Etiketten enthalten Station und QR-Link, aber keine Kontrollcodes; diese müssen separat vor Ort verwaltet werden. Für bestätigte Buchungen lassen sich Spielzugänge erstellen.
 5. Benachrichtigungen nur mit Test-Mailpostfach und `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` und optional `BOOKING_NOTIFY_EMAIL` testen.

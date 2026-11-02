@@ -11,15 +11,28 @@ werden.
 1. Node.js 20 oder neuer und die Projektabhängigkeiten bereitstellen.
 2. Für einen lokalen Test ausschließlich Zugangsdaten und eine Datenbank aus
    einer isolierten Testumgebung konfigurieren. Keine Produktivzugänge
-   verwenden.
+   verwenden. Zusätzlich `ADMIN_TOTP_SECRET_BASE32` als zufälligen Base32-Schlüssel
+   mit mindestens 160 Bit im Secret-Store der Laufzeitumgebung setzen und in
+   einer Authenticator-App hinterlegen. Ohne gültigen Schlüssel bleibt die
+   Anmeldung gesperrt; den Schlüssel niemals in Git speichern.
 3. Schemaänderungen sind standardmäßig ausgeschaltet. Vor Tests, die eine
    Schemaänderung benötigen, zuerst die Migration prüfen und nur eine eigens
    angelegte Testdatenbank verwenden. Für PostgreSQL-gestützte Admin-Sitzungen
-   muss die kontrollierte Migration die Tabelle `brilon_admin_sessions` anlegen.
+   und den Schutz vor wiederverwendeten Authenticator-Codes muss die
+   kontrollierte Migration die Tabellen `brilon_admin_sessions` und
+   `brilon_admin_totp_steps` anlegen. Die Migration wird nicht automatisch
+   ausgeführt.
 4. `npm start` starten und `/admin.html` öffnen. Bei PostgreSQL muss die
-   Sitzungstabelle über die kontrollierte Migration angelegt sein; andernfalls
-   bleibt der Admin-Login gesperrt. Nach der Anmeldung über „Abmelden“ die
-   Sitzung beenden.
+   Sitzungstabelle und TOTP-Zählertabelle über die kontrollierte Migration
+   angelegt sein; andernfalls bleibt der Admin-Login gesperrt. Zur Anmeldung
+   Benutzername, Passwort und den aktuellen sechsstelligen Authenticator-Code
+   eingeben. Codes sind nur einmal nutzbar. Nach der Anmeldung über „Abmelden“
+   die Sitzung beenden.
+5. Bei Verlust oder Wechsel des Authenticator-Schlüssels muss die Identität
+   administrativ geprüft, ein neuer zufälliger Schlüssel im Secret-Store
+   hinterlegt und der zugehörige alte TOTP-Zähler kontrolliert zurückgesetzt
+   werden. Den alten Schlüssel nicht weiterverwenden und keinen Notfallzugang
+   im Repository hinterlegen.
 
 ## Buchungen und Zahlungen
 

@@ -6,6 +6,9 @@ const { spawn } = require('node:child_process');
 const net = require('node:net');
 const path = require('node:path');
 const { erzeugeZugang } = require('../lib/anschlussangebote');
+const {totpCode}=require('../lib/totp');
+
+const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
 test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Referenzen', async t => {
   const probe=net.createServer();
@@ -49,7 +52,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     ]),
     RUN_SCHEMA_MIGRATIONS:'false',BREVO_API_KEY:'',BREVO_SENDER_EMAIL:'',BOOKING_NOTIFY_EMAIL:'',
     SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',BOOKING_OFFER_SECRET:offerSecret,
-    ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password'
+    ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password',ADMIN_TOTP_SECRET_BASE32:totpSecret
   }});
   let serverErrors='';child.stderr.setEncoding('utf8');child.stderr.on('data',chunk=>{serverErrors+=chunk;});
   t.after(()=>child.kill());
@@ -103,9 +106,13 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const adjacentData=await adjacent.json();
   assert.equal(adjacentData.buchungsnummer,'MUELLER-MAX-150327-02');
 
+  const otp=totpCode(totpSecret,Math.floor(Date.now()/30000));
   const login=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
-    body:JSON.stringify({username:'test-admin',password:'test-only-password'})});
+    body:JSON.stringify({username:'test-admin',password:'test-only-password',totp:otp})});
   assert.equal(login.status,200);
+  const replayedLogin=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({username:'test-admin',password:'test-only-password',totp:otp})});
+  assert.equal(replayedLogin.status,401,'Auch der persistente Datenbankzähler muss einen bereits genutzten Code ablehnen');
   const cookie=login.headers.get('set-cookie').split(';',1)[0];
   const loginData=await login.json();
   const unauthCalendar=await fetch(root+'/api/admin/kalenderbuchungen?monat=2026-01');

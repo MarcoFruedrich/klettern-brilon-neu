@@ -10,6 +10,7 @@ const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpssp
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 const { sameOriginMutation } = require('./lib/sicherheit');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter } = require('./lib/sicherheitszustand');
+const { decodeBase32:totpSecretDecode, verifyTotp } = require('./lib/totp');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 
@@ -21,7 +22,7 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
 
 
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:{ca:process.env.DATABASE_CA_CERT,rejectUnauthorized:true}}):null;
-const sessions=new Map(), rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon'};
+const sessions=new Map(),totpSteps=new Map(),rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon'};
 const securityHeaders={
   'X-Content-Type-Options':'nosniff',
   'X-Frame-Options':'DENY',
@@ -57,6 +58,20 @@ async function brevoMail(empfaenger, betreff, inhalt) {
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
 async function body(req){let data='';for await(const chunk of req){data+=chunk;if(data.length>16000)throw Error('Anfrage zu groß')}try{return JSON.parse(data)}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){return rateLimiter.erlauben(key,max,window)}
+async function totpStepEinmalig(factorId,step){
+  if(pool){
+    const q=await pool.query(
+      `INSERT INTO brilon_admin_totp_steps(factor_id,last_step) VALUES($1,$2)
+       ON CONFLICT(factor_id) DO UPDATE SET last_step=EXCLUDED.last_step
+       WHERE brilon_admin_totp_steps.last_step<EXCLUDED.last_step RETURNING last_step`,[factorId,step]
+    );
+    return q.rowCount===1;
+  }
+  const vorher=totpSteps.get(factorId);
+  if(Number.isSafeInteger(vorher)&&vorher>=step)return false;
+  totpSteps.set(factorId,step);
+  return true;
+}
 function safeText(v,n=200){return typeof v==='string'?v.trim().slice(0,n):''}
 function gueltigesDatum(v){
   if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
@@ -663,6 +678,8 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
             password=process.env.ADMIN_PASSWORD;
       if(!username||!password)
         return reply(res,503,{error:'Admin-Zugang nicht eingerichtet.'});
+      const totpSecret=process.env.ADMIN_TOTP_SECRET_BASE32;
+      try{totpSecretDecode(totpSecret);}catch{return reply(res,503,{error:'Zweiter Faktor ist nicht sicher eingerichtet.'});}
 
       const a=Buffer.from(String(d.username||'')),
             b=Buffer.from(username),
@@ -671,6 +688,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(a.length!==b.length||c.length!==e.length||
          !crypto.timingSafeEqual(a,b)||!crypto.timingSafeEqual(c,e))
         return reply(res,401,{error:'Zugangsdaten nicht korrekt.'});
+
+      const totpStep=verifyTotp(totpSecret,typeof d.totp==='string'?d.totp:'');
+      if(totpStep===null)return reply(res,401,{error:'Zugangsdaten oder Authenticator-Code nicht korrekt.'});
+      try{
+        const factorId=gpsTokenHash(totpSecret);
+        if(!await totpStepEinmalig(factorId,totpStep))
+          return reply(res,401,{error:'Authenticator-Code wurde bereits verwendet.'});
+      }catch{return reply(res,503,{error:'Speicher für den zweiten Faktor ist nicht initialisiert.'});}
 
       const token=crypto.randomBytes(32).toString('hex');
       const ablauf=new Date(Date.now()+8*3600000);
@@ -2002,6 +2027,10 @@ async function start(){
       expires_at TIMESTAMPTZ NOT NULL
     )`);
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_totp_steps (
+      factor_id CHAR(64) PRIMARY KEY,
+      last_step BIGINT NOT NULL
+    )`);
     await pool.query(
       "ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'offen'"
     );
