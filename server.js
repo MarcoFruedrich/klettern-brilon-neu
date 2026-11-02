@@ -609,6 +609,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     }
 
     if(route==='/api/admin/login'&&req.method==='POST'){
+      if(!sameOriginMutation(req))return reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});
       if(!limit('login:'+ip,6))
         return reply(res,429,{error:'Zu viele Versuche.'});
       const d=await body(req),
