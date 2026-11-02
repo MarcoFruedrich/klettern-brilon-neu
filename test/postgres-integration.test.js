@@ -129,4 +129,45 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const paymentPage=await payments.json();
   assert.equal(paymentPage.anzahl,127);
   assert.equal(paymentPage.eintraege.length,27);
+
+  // Mehr als 250 GPS-relevante Buchungen in einer echten isolierten Datenbank.
+  const gpsTourId=crypto.randomUUID();
+  const gpsOffer='GPS CI Ausflug '+crypto.randomUUID();
+  await pool.query(`INSERT INTO brilon_gps_touren(id,data,aktiv)
+    VALUES ($1,$2::jsonb,true)`,[gpsTourId,JSON.stringify({
+    titel:'CI-GPS-Tour',angebotName:gpsOffer,buchbar:true
+  })]);
+  await pool.query(`
+    INSERT INTO brilon_buchungen(id,data,status,buchungsnummer,created_at)
+    SELECT gen_random_uuid(),
+      jsonb_build_object('name','GPS Testgruppe '||lpad(i::text,3,'0'),
+        'datum',$1::text,'angebot',$2::text,
+        'buchungsnummer','GPS-GROSS-'||lpad(i::text,4,'0')),
+      CASE WHEN i<=310 THEN 'bestaetigt' ELSE 'offen' END,
+      'GPS-GROSS-'||lpad(i::text,4,'0'),
+      '2027-01-01T12:00:00Z'::timestamptz
+    FROM generate_series(1,340) AS i`,[day1,gpsOffer]);
+  const gpsQuery=async args=>{
+    const response=await fetch(root+'/api/admin/gps/buchungen?'+new URLSearchParams(args),
+      {headers:{Cookie:cookie}});
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  const gpsIds=[];
+  for(let n=1;n<=11;n++){
+    const page=await gpsQuery({tourId:gpsTourId,seite:String(n)});
+    assert.equal(page.anzahl,310);
+    assert.equal(page.proSeite,30);
+    assert.equal(page.buchungen.length,n===11?10:30);
+    gpsIds.push(...page.buchungen.map(b=>b.id));
+    assert.ok(page.buchungen.every(b=>b.angebot===gpsOffer));
+  }
+  assert.equal(new Set(gpsIds).size,310,'Jede bestätigte GPS-Buchung muss auffindbar sein');
+  const gpsFound=await gpsQuery({tourId:gpsTourId,seite:'1',suche:'GPS-GROSS-0305'});
+  assert.equal(gpsFound.anzahl,1);
+  assert.equal(gpsFound.buchungen[0].buchungsnummer,'GPS-GROSS-0305');
+  const unfiltered=await gpsQuery({seite:'1',suche:'GPS-GROSS-'});
+  assert.equal(unfiltered.anzahl,310,'Offene Buchungen dürfen nicht als GPS-Zugänge erscheinen');
+  const invalid=await fetch(root+'/api/admin/gps/buchungen?tourId=ungueltig',{headers:{Cookie:cookie}});
+  assert.equal(invalid.status,400,'Eine ungültige GPS-Tour muss abgewiesen werden');
 });
