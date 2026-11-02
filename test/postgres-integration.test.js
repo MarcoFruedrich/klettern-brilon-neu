@@ -35,7 +35,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
       BREVO_API_KEY: '', BREVO_SENDER_EMAIL: '', BOOKING_NOTIFY_EMAIL: '',
       SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_PATH: '', MOCK_PG: '',
       ADMIN_USER: 'brilon-ci', ADMIN_PASSWORD: 'local-only-password',
-      ADMIN_TOTP_SECRET_BASE32: totpSecret
+      ADMIN_TOTP_SECRET_BASE32: totpSecret,
+      STATION_CHECK_SECRET: 'ci-only-check-code-secret-000000000000000000000000',
+      PRUEF_MANGEL_EMAIL: ''
     }
   });
   t.after(() => child.kill());
@@ -219,4 +221,65 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({token:secretToken,einwilligung:false})});
   assert.equal(refusedGuest.status,404,'Gesperrter Zugang darf keine Gästelistenfreigabe ändern');
+
+  // Stationsprüfprotokoll: eigene Mitarbeiterkonten, Code und Mangelbericht.
+  const csrf=(await login.clone().json()).csrfToken;
+  const adminPost=(url,data)=>fetch(root+url,{method:'POST',headers:{
+    Origin:root,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf
+  },body:JSON.stringify(data)});
+  const staffData={name:'CI Prüferin',email:'inspektion@example.test',
+    passwort:'CI-Fachkraft-Passwort-2026!'};
+  const employee=await adminPost('/api/admin/pruefung/mitarbeitende',staffData);
+  assert.equal(employee.status,201,'Mitarbeiterkonto soll im Test anlegbar sein');
+  const savedEmployee=await employee.json();
+  assert.ok(savedEmployee.id);
+  assert.ok(!JSON.stringify(savedEmployee).includes('passwort'));
+  const station=await adminPost('/api/admin/pruefung/stationen',{name:'Kletterwand CI'});
+  assert.equal(station.status,201);
+  const stationId=(await station.json()).id;
+  const unauthorizedCode=await fetch(root+'/api/admin/pruefung/code',{method:'POST'});
+  assert.equal(unauthorizedCode.status,401,'Codeanzeige ist nur dem Administrator erlaubt');
+  const issued=await adminPost('/api/admin/pruefung/code',{});
+  assert.equal(issued.status,201);
+  const code=(await issued.json()).code;
+  assert.match(code,/^[0-9]{6}$/);
+  const credentials=await fetch(root+'/api/pruefung/login',{method:'POST',
+    headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({email:staffData.email,passwort:staffData.passwort})});
+  assert.equal(credentials.status,200);
+  const staffCookie=credentials.headers.get('set-cookie')?.split(';',1)[0];
+  assert.ok(staffCookie);
+  const userPost=(endpoint,data)=>fetch(root+endpoint,{method:'POST',
+    headers:{Cookie:staffCookie,Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify(data)});
+  const stations=await fetch(root+'/api/pruefung/stationen',{headers:{Cookie:staffCookie}});
+  assert.equal(stations.status,200);
+  assert.equal((await stations.json()).stationen.some(p=>p.id===stationId),true);
+  const input={programm:'Klettern Klasse CI',beginn:day1+'T10:00',
+    pruefungen:[{stationId,zustand:'mangel',
+      beschreibung:'Karabiner lässt sich nicht ordnungsgemäß schließen'}]};
+  assert.equal((await userPost('/api/pruefung/berichte',input)).status,403,
+    'Ohne Vor-Ort-Code darf kein Prüfprotokoll gespeichert werden');
+  assert.equal((await userPost('/api/pruefung/freischalten',{code})).status,200);
+  const duplicate=await userPost('/api/pruefung/freischalten',{code});
+  assert.equal(duplicate.status,409,'Code darf kein zweites Mal verwendet werden');
+  const weak=await userPost('/api/pruefung/berichte',{...input,
+    pruefungen:[{stationId,zustand:'mangel',beschreibung:'Lose'}]});
+  assert.equal(weak.status,400,'Ein Mangel ohne klare Beschreibung wird nicht gespeichert');
+  const save=await userPost('/api/pruefung/berichte',input);
+  assert.equal(save.status,201);
+  const receipt=await save.json();
+  assert.equal(receipt.hatMangel,true);
+  assert.equal(receipt.benachrichtigung,'nicht_konfiguriert',
+    'Tests dürfen keine realen Mangel-E-Mails versenden');
+  assert.equal((await userPost('/api/pruefung/berichte',input)).status,403,
+    'Jede weitere Prüfung benötigt eine neue Freischaltung');
+  const reportResponse=await fetch(root+'/api/admin/pruefung/berichte',{headers:{Cookie:cookie}});
+  assert.equal(reportResponse.status,200);
+  const reports=await reportResponse.json();
+  const report=reports.find(p=>p.id===receipt.id);
+  assert.ok(report);
+  assert.equal(report.pruefer,staffData.name);
+  assert.equal(report.pruefungen[0].zustand,'mangel');
+  assert.equal(report.hat_mangel,true);
 });
