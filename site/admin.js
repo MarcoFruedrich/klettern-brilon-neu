@@ -378,11 +378,11 @@ zahlungsButtonAktualisieren();
   }
 };    
 zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
-      const exportLink=el('a','Kundendaten & GPS-Spielverlauf exportieren (JSON)');
+      const exportLink=el('a','Alle Buchungen dieser Kontakt-E-Mail exportieren (JSON)');
       exportLink.href='/api/admin/buchungen/'+encodeURIComponent(b.id)+'/export';
       exportLink.className='btn secondary';
       exportLink.setAttribute('download','');
-      exportLink.title='Buchungsdaten und zugehörigen GPS-Spielverlauf ohne Zugangsdaten exportieren';
+      exportLink.title='Alle Buchungen mit derselben Kontakt-E-Mail und zugehörige GPS-Teilnahmedaten exportieren; Zugangsdaten und interne Notizen bleiben ausgeschlossen';
     c.append(speichern, zahlungSenden, exportLink, loeschen, meldung);
       box.append(c);
     }

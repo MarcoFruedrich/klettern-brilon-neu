@@ -103,11 +103,22 @@ class Pool {
       return {rows:item?[{id:item.id,data:item.data,status:item.status,buchungsnummer:item.buchungsnummer,
         created_at:item.created_at||new Date(0),updated_at:item.updated_at||null,zahlungsinfo_gesendet_am:null}]:[],rowCount:item?1:0};
     }
-    if (sql.includes('FROM brilon_gps_spiele g JOIN brilon_gps_touren t')&&sql.includes('WHERE g.buchung_id=$1')) {
-      const rows=this.gpsGames.filter(game=>game.buchung_id==='*'||game.buchung_id===params[0]);
-      return {rows:rows.map(({tour,gestartet_am,abgeschlossen_am,spielzeit_sekunden,station_index,gast_name,
-        gast_einwilligung,einwilligung_am,einwilligung_version})=>({tour,gestartet_am,abgeschlossen_am,
-        spielzeit_sekunden,station_index,gast_name,gast_einwilligung,einwilligung_am,einwilligung_version})),rowCount:rows.length};
+    if (sql.includes("LOWER(BTRIM(data->>'email'))=LOWER($1)")) {
+      const rows=this.bookings.filter(item=>String(item.data.email||'').trim().toLocaleLowerCase('en-US')===
+        String(params[0]).trim().toLocaleLowerCase('en-US')).map(item=>({id:item.id,data:item.data,status:item.status,
+          buchungsnummer:item.buchungsnummer,created_at:item.created_at||new Date(0),updated_at:item.updated_at||null,
+          zahlungsinfo_gesendet_am:null}));
+      return {rows,rowCount:rows.length};
+    }
+    if (sql.includes('FROM brilon_gps_spiele g JOIN brilon_gps_touren t')&&sql.includes('ANY($1::uuid[])')) {
+      const ids=params[0]||[],fallbackId=ids.at(-1);
+      const rows=this.gpsGames.filter(game=>game.buchung_id==='*'?ids.length>0:ids.includes(game.buchung_id))
+        .map(game=>({buchung_id:game.buchung_id==='*'?fallbackId:game.buchung_id,tour:game.tour,
+          gestartet_am:game.gestartet_am,abgeschlossen_am:game.abgeschlossen_am,
+          spielzeit_sekunden:game.spielzeit_sekunden,station_index:game.station_index,gast_name:game.gast_name,
+          gast_einwilligung:game.gast_einwilligung,einwilligung_am:game.einwilligung_am,
+          einwilligung_version:game.einwilligung_version}));
+      return {rows,rowCount:rows.length};
     }
     if (sql.includes('SELECT 1 FROM brilon_buchungen')) {
       const found=this.bookings.some(item=>item.data.anschlussElternId===params[0]&&item.data.angebot===params[1]&&
