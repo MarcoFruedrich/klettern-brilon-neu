@@ -15,6 +15,7 @@ const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben }
 const { decodeBase32:totpSecretDecode, verifyTotp } = require('./lib/totp');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
+const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 
@@ -309,11 +310,15 @@ async function anschlussApi(req,res,url,route,ip){
   return reply(res,404,{error:'Nicht gefunden.'});
 }
 
+const pruefungApi=createPruefungApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
+
 async function main(req,res){
   const u=new URL(req.url,'http://localhost'),
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    if(route.startsWith('/api/pruefung/')||route.startsWith('/api/admin/pruefung/'))
+      return await pruefungApi(req,res,u,route,ip);
     if(route==='/api/anschlussangebote/vorschau'||route==='/api/anschlussangebote/buchen')
       return await anschlussApi(req,res,u,route,ip);
     if(route==='/api/buchungen'&&req.method==='POST'){
@@ -2126,6 +2131,25 @@ await pool.query(`
     await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_am TIMESTAMPTZ');
     await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_version TEXT');
     await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
+    // Stations-Prüfprotokoll: nur bei expliziter Freigabe der Testmigrationen.
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_mitarbeitende (
+      id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,
+      passwort_hash TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationen (
+      id UUID PRIMARY KEY,name TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_sessions (
+      token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
+      ablauf TIMESTAMPTZ NOT NULL,entsperrt_bis TIMESTAMPTZ)`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_sessions_ablauf_idx ON brilon_pruef_sessions(ablauf)');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_codes (
+      id UUID PRIMARY KEY,code_hash CHAR(64) NOT NULL,ablauf TIMESTAMPTZ NOT NULL,
+      verbraucht_am TIMESTAMPTZ,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_berichte (
+      id UUID PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
+      programm TEXT NOT NULL,beginn TEXT NOT NULL,pruefungen JSONB NOT NULL,
+      hat_mangel BOOLEAN NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }
