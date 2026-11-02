@@ -34,6 +34,18 @@ Die Browsertests können in einer lokalen Entwicklungsumgebung mit `npm install 
 Nur beim ausdrücklich gekennzeichneten lokalen Integrationstest kann `DATABASE_SSL_MODE=disable` verwendet werden. Das ist ausschließlich für Loopback-Adressen zulässig; andere Verbindungen bleiben TLS-gesichert. Die Testdatenbank hat keine Verbindung zum Livebetrieb. Die geschützten Schemaänderungen werden ausschließlich in dieser kurzlebigen Testdatenbank ausgeführt.
 
 
+## Digitales Stations-Prüfprotokoll (Entwicklungsstand)
+
+Die bestehende Webseite enthält zusätzlich `/pruefung.html` als mobile Mitarbeiteransicht mit separatem Web-App-Manifest. Unter `/admin.html#stationspruefung` können berechtigte Administratoren Stationen und Mitarbeiter mit persönlichen Zugängen anlegen, einen sechsstelligen Vor-Ort-Code erzeugen und die letzten Prüfberichte einsehen.
+
+Der Code ist nur **120 Sekunden** und **einmalig** nutzbar. Nach der Eingabe kann ein angemeldeter Mitarbeiter ein Prüfprotokoll speichern; die Freigabe wird dabei verbraucht. Der Bericht enthält Mitarbeiterzuordnung, geplanten Programmbeginn, tatsächliche Erfassungszeit, ausgewählte Stationen und deren Prüfergebnisse. Mängel benötigen mindestens zehn Zeichen Beschreibung und bedeuten **keine Betriebsfreigabe**. Falls `PRUEF_MANGEL_EMAIL` und die Test-Mailanbindung konfiguriert sind, wird die verantwortliche Adresse per Mail informiert. Der Rückgabestatus unterscheidet dokumentierte Mängel von erfolgreich zugestellten E-Mails.
+
+Für die Code-Erzeugung muss `STATION_CHECK_SECRET` mit mindestens 32 geheimen Zeichen konfiguriert sein. Der Code wird nur im administrativen Bereich angezeigt; die organisatorische Sicherstellung, dass der Bildschirm tatsächlich nur vor Ort zugänglich ist, ist noch nicht technisch nachgewiesen. Eine zusätzliche Testinstallation oder ein dedizierter Tablet-Modus muss vor Einsatz eingerichtet werden.
+
+**Offene Anforderungen:** optionaler Fotobeleg zu einem Mangel, wiederholbarer Versand fehlgeschlagener Benachrichtigungen, vollständige Mitarbeiter-/Stationsverwaltung (inkl. Deaktivieren von Stationen), nachvollziehbare technische Betriebsfreigabe und Datenschutz-/Löschkonzept. Der aktuelle Stand ersetzt **keine** fachlich vorgeschriebene Inspektion oder versicherungsrechtliche Freigabe. Automatisierte Tests umfassen auch die isolierte PostgreSQL-Anmeldung, einmalige Codeeinlösung, Pflichtbeschreibung und Chromium-Prüfung auf 360, 390 sowie 768 Pixeln. Zuletzt **75 Server- und 15 Browsertests bestanden**.
+
+Die neuen Tabellen werden ausschließlich mit `RUN_SCHEMA_MIGRATIONS=true` in einer isolierten Testdatenbank angelegt. Es erfolgte keine Migration der Live-Datenbank und keine Veröffentlichung.
+
 ## Funktionsstand und Grenzen
 
 Der aktuelle Entwicklungsstand und die Prüfergebnisse stehen in [`docs/STATUS-ENTWICKLUNG.md`](docs/STATUS-ENTWICKLUNG.md). Eine Briloner 15-Stationen-Mustertour ist in [`docs/GPS-MUSTERTOUR-BRILON-ENTWURF.md`](docs/GPS-MUSTERTOUR-BRILON-ENTWURF.md) als örtlich zu prüfender Entwurf dokumentiert.
