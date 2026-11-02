@@ -377,8 +377,14 @@
       </form>
       <p id="pruef-station-status" role="status"></p>
       <div id="pruef-station-list"></div>
-      <h3>Einmaligen Vor-Ort-Code anzeigen</h3>
-      <p class="hint">Diesen Code ausschließlich auf dem fest installierten Tablet vor Ort anzeigen. Er ist zwei Minuten gültig und nur einmal verwendbar. Nach jeder Prüfung wird eine neue Freigabe benötigt.</p>
+      <h3>Werbetablet am Standort koppeln</h3>
+      <p class="hint">Das Tablet öffnet <a href="/tablet.html">die separate Werbe- und Prüfcode-Anzeige</a>. Es erhält niemals eine Admin-Sitzung. Ein neuer Kopplungscode ist zehn Minuten gültig und nur einmal nutzbar. Das Tablet kann hier gesperrt werden.</p>
+      <button id="tablet-pair-generate" type="button" class="btn secondary">Tablet-Kopplungscode erzeugen</button>
+      <p id="tablet-pair-code" role="status" aria-live="polite"></p>
+      <div id="tablet-admin-list"></div>
+      <p id="tablet-admin-status" role="status" aria-live="polite"></p>
+      <h3>Einmaligen Vor-Ort-Code anzeigen (Administrator-Notfalloption)</h3>
+      <p class="hint">Normalerweise fordert die angemeldete Fachkraft den Code über ihr Smartphone an und er erscheint auf dem gekoppelten Tablet. Diese Administrator-Notfalloption zeigt ihn zusätzlich hier an; daher nur in einem geschützten Umfeld verwenden.</p>
       <button class="btn secondary" id="pruef-code-generate" type="button">Neuen Prüfcode anzeigen</button>
       <p id="pruef-code-display" role="status" style="font-size:2rem;letter-spacing:.2rem"></p>
       <h3>Offene Hinweise zur Nachprüfung</h3>
