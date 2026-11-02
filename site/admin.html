@@ -339,6 +339,20 @@
     <button class="btn secondary" type="submit">Einmaligen Spielzugang erstellen</button>
   </form>
   <p id="gps-game-status" role="status"></p>
+
+  <h3>Ausgestellte Spielzugänge verwalten</h3>
+  <p class="hint">Hier sind ausgestellte Spielzugänge mit Bearbeitungsstand sichtbar. Geheime Zugangscodes und Links können nicht erneut angezeigt werden. Eine Sperrung ist dauerhaft und unterbricht auch gestartete Spiele.</p>
+  <label>GPS-Tour filtern
+    <select id="gps-access-tour"><option value="">Alle GPS-Touren</option></select>
+  </label>
+  <button type="button" id="gps-access-refresh" class="btn secondary">Zugänge aktualisieren</button>
+  <p id="gps-access-status" role="status" aria-live="polite"></p>
+  <div id="gps-access-list" class="admin-grid"></div>
+  <nav id="gps-access-pagination" class="calendar-navigation" aria-label="Seiten der GPS-Zugänge" hidden>
+    <button id="gps-access-prev" class="btn secondary" type="button">← Vorherige</button>
+    <span id="gps-access-page-info"></span>
+    <button id="gps-access-next" class="btn secondary" type="button">Weitere →</button>
+  </nav>
 </section>
 
     
