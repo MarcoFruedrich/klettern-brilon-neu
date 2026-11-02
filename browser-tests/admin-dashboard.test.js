@@ -225,9 +225,11 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('135 Buchung(en) gefunden'));
     assert.equal(await page.locator('#bookings .booking').count(),50);
     assert.match(await info.textContent(),/Seite 1 von 3/);
+    await page.locator('#bookings-next').evaluate(node=>node.scrollIntoView({block:'center'}));
     await page.locator('#bookings-next').click();
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('Seite 2 von 3'));
     assert.equal(await page.locator('#bookings .booking').count(),50);
+    await page.locator('#bookings-next').evaluate(node=>node.scrollIntoView({block:'center'}));
     await page.locator('#bookings-next').click();
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('Seite 3 von 3'));
     assert.equal(await page.locator('#bookings .booking').count(),35);
@@ -242,6 +244,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.match(await page.locator('#bookings .booking').first().textContent(),/MASSENTEST-120/);
     await page.waitForFunction(()=>document.getElementById('payment-overview-page-info')?.textContent.includes('Seite 1 / 3'));
     assert.equal(await page.locator('#payment-overview-list .payment-record').count(),50);
+    await page.locator('#payment-overview-next').evaluate(node=>node.scrollIntoView({block:'center'}));
     await page.locator('#payment-overview-next').click();
     await page.waitForFunction(()=>document.getElementById('payment-overview-page-info')?.textContent.includes('Seite 2 / 3'));
     assert.equal(await page.locator('#payment-overview-list .payment-record').count(),50);
