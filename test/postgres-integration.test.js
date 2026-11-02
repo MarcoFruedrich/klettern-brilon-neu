@@ -483,6 +483,20 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const initialDisplay=await kiosk();
   assert.equal(initialDisplay.status,200);
   assert.equal((await initialDisplay.json()).code,null);
+  const beforeChoice=await userPost('/api/pruefung/code-anfordern',{});
+  assert.equal(beforeChoice.status,409,
+    'Gekoppelte Geräte ohne Administrator-Freigabe dürfen keine Prüfcodes auslösen.');
+  const listed=await (await fetch(root+'/api/admin/pruefung/tablets',
+    {headers:{Cookie:cookie}})).json();
+  const selectedId=listed.find(x=>x.name==='Test-Werbetablet').id;
+  const choosePath='/api/admin/pruefung/tablets/'+selectedId+'/pruefdisplay';
+  assert.equal((await fetch(root+choosePath,{method:'PATCH'})).status,401);
+  assert.equal((await fetch(root+choosePath,{method:'PATCH',
+    headers:{Cookie:cookie,Origin:root}})).status,403);
+  const chosen=await fetch(root+choosePath,{method:'PATCH',
+    headers:{Cookie:cookie,Origin:root,'X-CSRF-Token':csrf}});
+  assert.equal(chosen.status,200);
+  assert.equal((await chosen.json()).pruefdisplay,true);
   const requested=await userPost('/api/pruefung/code-anfordern',{});
   assert.equal(requested.status,201);
   const shown=await (await kiosk()).json();
@@ -510,6 +524,54 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     'Bei einer seit über 45 Sekunden fehlenden Tabletmeldung darf kein Prüfcode angefordert werden');
   assert.equal((await kiosk()).status,200,'Beim erneuten Öffnen kann das gekoppelte Tablet wieder melden');
   assert.equal((await tabletList()).find(x=>x.id===tabletId).online,true);
+
+  // Ein zweites gekoppeltes Tablet darf unabhängig von dessen Online-Zustand
+  // den für das gewählte Prüfdisplay ausgestellten Code niemals lesen.
+  const secondPairing=await adminPost('/api/admin/pruefung/tablet/kopplung',{});
+  assert.equal(secondPairing.status,201);
+  const secondPairingCode=(await secondPairing.json()).code;
+  const connectedSecond=await fetch(root+'/api/pruefung/tablet/koppeln',{
+    method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({code:secondPairingCode,name:'Zweites Werbetablet'})});
+  assert.equal(connectedSecond.status,201);
+  const secondCookie=connectedSecond.headers.get('set-cookie').split(';')[0];
+  const secondKiosk=()=>fetch(root+tabletPath,{headers:{Cookie:secondCookie}});
+  assert.equal((await secondKiosk()).status,200);
+  const secondId=(await tabletList()).find(x=>x.name==='Zweites Werbetablet').id;
+
+  const requestedForFirst=await userPost('/api/pruefung/code-anfordern',{});
+  assert.equal(requestedForFirst.status,201);
+  const codeOnlyFirst=(await (await kiosk()).json()).code;
+  assert.match(codeOnlyFirst,/^\d{6}$/);
+  const standby=await (await secondKiosk()).json();
+  assert.equal(standby.code,null,
+    'Gekoppeltes Zweitgerät darf den aktuellen Prüfcode nicht sehen');
+  assert.equal(standby.pruefdisplay,false);
+  assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,1);
+
+  // Die Verwaltung legt das andere Display fest. Alte Codes werden sofort ungültig.
+  const switchUrl='/api/admin/pruefung/tablets/'+secondId+'/pruefdisplay';
+  const switched=await fetch(root+switchUrl,{method:'PATCH',
+    headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
+  assert.equal(switched.status,200);
+  assert.equal((await (await kiosk()).json()).code,null);
+  assert.equal((await (await secondKiosk()).json()).code,null);
+  assert.equal((await userPost('/api/pruefung/freischalten',{code:codeOnlyFirst})).status,409,
+    'Ein beim Tabletwechsel ungültig gemachter Prüfcode darf nicht weiter gelten');
+  assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,1);
+  const requestedForSecond=await userPost('/api/pruefung/code-anfordern',{});
+  assert.equal(requestedForSecond.status,201);
+  assert.equal((await (await kiosk()).json()).code,null);
+  assert.match((await (await secondKiosk()).json()).code,/^\d{6}$/);
+
+  // Sperrung des ausgewählten Tablets macht dessen Code sofort ungültig,
+  // auch wenn ein anderer, nicht ausgewählter Tablet-Zugang aktiv bleibt.
+  const chosenRevocation=await fetch(root+'/api/admin/pruefung/tablets/'+secondId+'/sperren',{
+    method:'PATCH',headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
+  assert.equal(chosenRevocation.status,200);
+  assert.equal((await secondKiosk()).status,401);
+  assert.equal((await userPost('/api/pruefung/code-anfordern',{})).status,409,
+    'Nicht ausgewählte andere Tablets dürfen die Codeanforderung nicht ermöglichen');
   const tabletRevocation=await fetch(root+'/api/admin/pruefung/tablets/'+tabletId+'/sperren',{method:'PATCH',
     headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
   assert.equal(tabletRevocation.status,200);
