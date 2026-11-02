@@ -306,8 +306,9 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.waitForFunction(()=>document.getElementById('gps-booking-page-info')?.textContent.includes('Seite 2 /'));
     assert.equal(await page.locator('#gps-game-form [name="buchungId"] option').count(),31);
     await page.locator('#gps-booking-search').fill('GPS-CI-305');
-    await page.waitForFunction(()=>document.getElementById('gps-booking-results')?.textContent.includes('1 passende'));
+    await page.waitForFunction(()=>document.getElementById('gps-booking-results')?.textContent.startsWith('1 passende'));
     const select=page.locator('#gps-game-form [name="buchungId"]');
+    await page.waitForFunction(()=>document.querySelectorAll('#gps-game-form [name="buchungId"] option').length===2);
     assert.equal(await select.locator('option').count(),2);
     await select.selectOption(state.bookings[304].id);
     await page.locator('#gps-game-form button[type="submit"]').click();
