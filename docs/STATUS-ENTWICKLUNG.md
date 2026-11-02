@@ -36,6 +36,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Rate-Limit-Zustände sind auf 10.000 Schlüssel begrenzt; veraltete Schlüssel werden beim Bereinigen entfernt und die Zahl gespeicherter Versuche pro Schlüssel bleibt beschränkt.
 - Bei aktiver PostgreSQL-Verbindung liegen Admin-Sitzungen als SHA-256-Tokenhash mit Ablaufzeit in `brilon_admin_sessions`; akzeptierte TOTP-Zeitschritte werden in `brilon_admin_totp_steps` gespeichert. Jede Admin-Anfrage prüft die Sitzung; Abmelden widerruft sie. Abgelaufene Sitzungen werden bereinigt. Beide Tabellen werden nur über die geschützte Migration angelegt. Im DB-losen Testmodus bleiben Sitzungen und Wiederverwendungszähler prozesslokal.
 - Die Admin-Anmeldung verlangt Benutzername, Passwort und einen sechsstelligen TOTP-Code. Akzeptierte Zeitschritte werden atomar in `brilon_admin_totp_steps` als einmalig verwendet markiert; das Secret bleibt ausschließlich in `ADMIN_TOTP_SECRET_BASE32` außerhalb des Repositories.
+- Admin-Logins sind zusätzlich auf sechs Versuche je IP und 30 je Konto innerhalb von zehn Minuten begrenzt; der Konto-Schlüssel wird nur gehasht im Rate-Limit-Speicher geführt.
 - Ein lokaler HTTP-Test prüft Admin-Anmeldung, Cookie-Flags, geschützte Lesezugriffe und erlaubte/abgewiesene Schreibanfragen mit Datenbank-/Supabase-Stubs; er versendet keine E-Mails.
 - Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
 - Die Admin-Verwaltung besitzt eine dauerhaft erreichbare Sprungnavigation für Buchungen/Zahlungen, Kalender, Programme, Tagesangebote, Anschlussrabatte und GPS-Touren. Auf schmalen Bildschirmen bleibt die Navigation horizontal wischbar; Kalenderaktionen und Sprungziele berücksichtigen Touch-Größen und Sticky-Kopfzeilen.
@@ -63,7 +64,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 44 bestanden, 0 fehlgeschlagen.
+- `npm test` – 46 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
@@ -74,7 +75,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check lib/sicherheitszustand.js` – bestanden.
 - `git diff --check` – bestanden.
 
-Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. Die reguläre Arbeitskopie enthält keine installierten Node-Abhängigkeiten (`pg` fehlt). Datenbank- und E-Mail-Routen wurden nicht gegen Dienste aufgerufen. Ein Viewport-Test war nicht möglich, weil die Chromium-Browserdatei fehlt.
+Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. Die reguläre Arbeitskopie enthält keine installierten Node-Abhängigkeiten (`pg` fehlt). PostgreSQL, `psql`, Docker und Podman sind in dieser Umgebung nicht vorhanden; Datenbank- und E-Mail-Routen wurden nicht gegen Dienste aufgerufen. Ein Viewport-Test war nicht möglich, weil die Chromium-Browserdatei fehlt.
 
 ## Noch offen
 

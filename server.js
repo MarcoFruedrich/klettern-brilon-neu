@@ -9,7 +9,7 @@ const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, preisBeiAn
 const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpsspiel');
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 const { sameOriginMutation } = require('./lib/sicherheit');
-const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter } = require('./lib/sicherheitszustand');
+const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben } = require('./lib/sicherheitszustand');
 const { decodeBase32:totpSecretDecode, verifyTotp } = require('./lib/totp');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
@@ -671,7 +671,8 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
     if(route==='/api/admin/login'&&req.method==='POST'){
       if(!sameOriginMutation(req))return reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});
-      if(!limit('login:'+ip,6))
+      const kontoId=gpsTokenHash(process.env.ADMIN_USER||'unconfigured');
+      if(!adminLoginErlauben(rateLimiter,ip,kontoId))
         return reply(res,429,{error:'Zu viele Versuche.'});
       const d=await body(req),
             username=process.env.ADMIN_USER,
