@@ -417,6 +417,49 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
       {stationId:extraId,zustand:'mangel',
         beschreibung:'Befestigung der Bouldermatte ist sicherheitsrelevant beschädigt'}]});
   assert.equal(urgent.status,201);
-  assert.equal((await urgent.json()).hatMangel,true);
+  const urgentReceipt=await urgent.json();
+  assert.equal(urgentReceipt.hatMangel,true);
   assert.ok((await stationList()).find(x=>x.id===extraId).gesperrt_am);
+
+  // Permanent queued notification, isolated from hints and protected against duplicate sends.
+  const mailUrl='/api/admin/pruefung/meldungen';
+  assert.equal((await fetch(root+mailUrl)).status,401);
+  const mailList=await fetch(root+mailUrl,{headers:{Cookie:cookie}});
+  assert.equal(mailList.status,200);
+  const mailRecords=await mailList.json();
+  const originalAlert=mailRecords.find(x=>x.bericht_id===receipt.id);
+  const laterAlert=mailRecords.find(x=>x.bericht_id===urgentReceipt.id);
+  assert.ok(originalAlert&&laterAlert,'Sicherheitsmängel erhalten dauerhaft einen Mail-Ausgang');
+  assert.equal(originalAlert.status,'nicht_konfiguriert');
+  assert.equal(laterAlert.status,'nicht_konfiguriert');
+  assert.equal(mailRecords.some(x=>x.bericht_id===hintResult.id),false,
+    'Kleine Hinweise dürfen keine Sicherheitsmangel-E-Mail erzeugen');
+  assert.ok(!JSON.stringify(mailRecords).includes(foto),
+    'Berichtsfotos dürfen nicht als Rohdaten in Mailübersichten erscheinen');
+
+  const retryMail=root+mailUrl+'/'+receipt.id+'/erneut-senden';
+  assert.equal((await fetch(retryMail,{method:'POST'})).status,401);
+  assert.equal((await fetch(retryMail,{method:'POST',
+    headers:{Cookie:cookie,Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({doppelversandGeprueft:true})})).status,403,
+    'Erneuter Versand muss gegen CSRF geschützt sein');
+  assert.equal((await adminPost(mailUrl+'/'+receipt.id+'/erneut-senden',
+    {doppelversandGeprueft:false})).status,400);
+  const retryWithoutMailbox=await adminPost(mailUrl+'/'+receipt.id+'/erneut-senden',
+    {doppelversandGeprueft:true});
+  assert.equal(retryWithoutMailbox.status,200);
+  assert.equal((await retryWithoutMailbox.json()).status,'nicht_konfiguriert',
+    'Kein echter Versand bei fehlender Test-E-Mail-Konfiguration');
+  const mailListAgain=await (await fetch(root+mailUrl,{headers:{Cookie:cookie}})).json();
+  assert.ok(mailListAgain.find(x=>x.bericht_id===receipt.id).versuche>=2);
+  await pool.query("UPDATE brilon_pruef_meldungen SET status='angenommen' WHERE bericht_id=$1",
+    [receipt.id]);
+  assert.equal((await adminPost(mailUrl+'/'+receipt.id+'/erneut-senden',
+    {doppelversandGeprueft:true})).status,409,
+    'Bereits akzeptierte Nachrichten dürfen nicht nochmals verschickt werden');
+  await pool.query("UPDATE brilon_pruef_meldungen SET status='sendet' WHERE bericht_id=$1",
+    [receipt.id]);
+  assert.equal((await adminPost(mailUrl+'/'+receipt.id+'/erneut-senden',
+    {doppelversandGeprueft:true})).status,409,
+    'Ein ungeklärter Versandzustand darf nicht blind erneut gesendet werden');
 });
