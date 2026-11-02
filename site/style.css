@@ -713,3 +713,12 @@ footer a {
   .admin-page .gps-station-question { grid-column:auto; }
   .admin-page .gps-station-actions button { flex:1 1 130px; }
 }
+
+/* Sticky-Verwaltungsnavigation darf Seitenschalter nicht beim Scrollen überdecken. */
+.admin-page { scroll-padding-top: 170px; }
+.admin-page .calendar-navigation button,
+.admin-page #bookings-pagination,
+.admin-page #payment-overview-pagination {
+  scroll-margin-top: 170px;
+  scroll-margin-bottom: 28px;
+}
