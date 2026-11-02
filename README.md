@@ -1,33 +1,30 @@
-# Klettern & Abenteuer Brilon – Neuaufbau
+# Klettern & Abenteuer Brilon
 
-Eigenständige responsive Website mit Terminanfragen, PostgreSQL und geschütztem Verwaltungsbereich.
+Responsive Website, Buchungsanfragen, PostgreSQL-Anbindung und Verwaltungsbereich.
 
 ## Lokal starten
 
-1. Node.js 20+ installieren.
-2. `npm install`
-3. Umgebungsvariablen `DATABASE_URL`, `ADMIN_USER`, `ADMIN_PASSWORD` setzen (siehe `.env.example`).
-4. `npm start`
-5. `http://localhost:3000` öffnen.
+1. Node.js 20+ installieren und `npm install` ausführen.
+2. Eine isolierte Entwicklungsdatenbank einrichten und `.env.example` nach `.env` kopieren. Nur Testzugänge eintragen.
+3. `npm start` starten und `http://localhost:3000` öffnen. Die Verwaltung liegt unter `/admin.html`.
+4. Automatisierte Fachtests mit `npm test` ausführen.
 
-Tests: `npm test` (Node.js Test Runner).
-Schemaänderungen sind standardmäßig deaktiviert. Für eine eigens angelegte, isolierte Entwicklungsdatenbank muss `RUN_SCHEMA_MIGRATIONS=true` ausdrücklich gesetzt werden.
+Schemaänderungen sind standardmäßig deaktiviert. `RUN_SCHEMA_MIGRATIONS=true` darf nur in einer eigens angelegten Testdatenbank und nach Prüfung des Schemas gesetzt werden.
 
-## Render
+## Konfiguration
 
-- Repository auf GitHub hochladen; **alle Dateien aus diesem Ordner in das Repository-Hauptverzeichnis**, nicht den übergeordneten ZIP-Ordner.
-- Web Service: Build Command `npm install`, Start Command `npm start`.
-- Environment: `DATABASE_URL`, `ADMIN_USER`, `ADMIN_PASSWORD` setzen. Render verwendet `PORT` automatisch.
-- Die Tabellen werden beim Start angelegt.
-- Admin: `/admin.html`.
-- Wichtig: Das alte Projekt erst ersetzen, wenn der neue Dienst erfolgreich getestet wurde.
+- Buchungsdatenbank: `DATABASE_URL`
+- Admin: `ADMIN_USER`, `ADMIN_PASSWORD`
+- Mailversand: `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, optional `BOOKING_NOTIFY_EMAIL`
+- Personalisierte Anschlusslinks: `PUBLIC_BASE_URL` (HTTPS) und `BOOKING_OFFER_SECRET` (mindestens 32 Zeichen)
+- GPS-Kontrollcodes: `GPS_CODE_SECRET` (mindestens 32 Zeichen)
 
-## Stand und Einschränkungen
+Für Mailtests nur ein isoliertes Testpostfach und einen Test-Maildienst verwenden. Automatisierte Tests rufen keine Datenbank, Supabase oder E-Mail-Dienste auf.
 
-- Buchungsanfragen sind **keine verbindlichen Buchungen**; keine automatische Verfügbarkeitsprüfung, Bestätigungsmails oder Zahlungen.
-- **PayPal/Kartenzahlung/25 % Anzahlung** sind konzeptionell vorgesehen, aber bewusst noch nicht aktiviert. Dazu sind Zahlungsanbieter-Konten, Webhooks und sichere serverseitige Prüfung erforderlich.
-- Für produktiven Betrieb: Datenschutzhinweise und Impressum rechtlich prüfen, AV-Verträge mit Hosting/Datenbank klären, Löschfristen umsetzen, Backup-Strategie festlegen, E-Mail-Benachrichtigung und Admin-2FA ergänzen.
-- Der Admin nutzt sichere HttpOnly-Cookies; Sitzungen liegen im Arbeitsspeicher und gehen bei Server-Neustart verloren. Für mehrere Instanzen wäre ein persistenter Session-Store nötig.
-- Falls Render-Datenbank TLS-Einstellungen abweichen, PostgreSQL-Konfiguration prüfen. SSL-Zertifikate werden standardmäßig geprüft.
-- Buchungsdaten können im Admin gelesen werden; eine Lösch-/Exportfunktion ist noch nicht eingebaut.
-- Nur Platzhaltertexte und Symbole, keine fremden Bilder.
+## Funktionsstand und Grenzen
+
+Der aktuelle Entwicklungsstand und die Prüfergebnisse stehen in [`docs/STATUS-ENTWICKLUNG.md`](docs/STATUS-ENTWICKLUNG.md). Eine Briloner 15-Stationen-Mustertour ist in [`docs/GPS-MUSTERTOUR-BRILON-ENTWURF.md`](docs/GPS-MUSTERTOUR-BRILON-ENTWURF.md) als örtlich zu prüfender Entwurf dokumentiert.
+
+Es gibt keine Zahlungsanbieterintegration. Zahlungen werden manuell als tatsächliche Zahlungseingänge erfasst. Vor einem produktiven Einsatz sind unter anderem Integrations- und Browserprüfungen, Datenschutz-/Löschkonzept, Sitzungsschutz und eine lokale Prüfung der GPS-Route erforderlich.
+
+Die Arbeit liegt ausschließlich auf `entwicklung/phase-1-buchungen-sonderangebote-gps`. Sie ist nicht veröffentlicht. Keine produktive Migration, Veröffentlichung oder Zusammenführung mit `main` ohne ausdrückliche Freigabe.

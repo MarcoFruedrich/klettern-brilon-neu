@@ -4,6 +4,7 @@
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
+const { zugelasseneAnschlusszeiten, anschlussPreis, erzeugeZugang, pruefeZugang } = require('./lib/anschlussangebote');
 const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, zahlungErgaenzen } = require('./lib/buchungslogik');
 const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpsspiel');
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
@@ -54,6 +55,43 @@ function gueltigesDatum(v){
   return !Number.isNaN(datum.getTime())&&datum.toISOString().slice(0,10)===v;
 }
 function gpsTokenHash(token){return crypto.createHash('sha256').update(String(token)).digest('hex')}
+function anschlussZugang(id){
+  const secret=process.env.BOOKING_OFFER_SECRET;
+  if(!secret||secret.length<32)return null;
+  try{return erzeugeZugang(id,secret)}catch{return null;}
+}
+function anschlussBuchung(token){
+  return pruefeZugang(token,process.env.BOOKING_OFFER_SECRET);
+}
+function anschlussLink(id){
+  const token=anschlussZugang(id),base=process.env.PUBLIC_BASE_URL;
+  if(!token||!base)return null;
+  try{
+    const url=new URL('/anschluss.html',base);
+    if(url.protocol!=='https:')return null;
+    url.hash='zugang='+encodeURIComponent(token);
+    return url.toString();
+  }catch{return null;}
+}
+async function anschlussRabattElternAnwenden(client,zusatz){
+  if(!zusatz.anschlussElternId||!zusatz.anschlussRabattAusstehend)return {angewendet:false};
+  const q=await client.query('SELECT id,data,status FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[zusatz.anschlussElternId]);
+  if(!q.rowCount||q.rows[0].status!=='bestaetigt')return {ungueltig:true};
+  const parent=q.rows[0],data=parent.data;
+  if(!data.anschlussRabatt10){
+    const originalCent=Math.round(Number(data.gesamtpreis)*100),rabattCent=Math.round(originalCent*.1);
+    const stand=preisNachAnschlussrabatt(originalCent,rabattCent,Array.isArray(data.zahlungen)?data.zahlungen:[]);
+    data.preisanpassungen=[...(Array.isArray(data.preisanpassungen)?data.preisanpassungen:[]),
+      {grund:'10 % Anschlussrabatt nach bestätigter Zusatzbuchung',am:new Date().toISOString(),vonCent:originalCent,rabattCent,aufCent:stand.gesamtCent}];
+    data.gesamtpreis=stand.gesamtCent/100;data.restbetrag=stand.offenCent/100;
+    data.zahlungsgutschriftCent=stand.gutschriftCent;data.anschlussRabatt10=true;data.anschlussRabattCent=rabattCent;
+    const saved=await client.query('UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW() WHERE id=$2 RETURNING id,data',[JSON.stringify(data),parent.id]);
+    zusatz.anschlussRabattAusstehend=false;
+    return {angewendet:true,buchung:saved.rows[0]};
+  }
+  zusatz.anschlussRabattAusstehend=false;
+  return {angewendet:false};
+}
 function session(req){const match=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/);const token=match?.[1],exp=sessions.get(token);if(!exp)return false;if(exp<Date.now()){sessions.delete(token);return false}return true}
 function admin(req,res){if(!session(req)){reply(res,401,{error:'Bitte anmelden.'});return false}return true}
 
@@ -113,11 +151,104 @@ async function reservierungsTransaktion(aktion){
   }
 }
 
+async function anschlussApi(req,res,url,route,ip){
+  if(!pool)return reply(res,503,{error:'Anschlussangebote derzeit nicht verfügbar.'});
+  if(['POST'].includes(req.method)&&['/api/anschlussangebote/vorschau','/api/anschlussangebote/buchen'].includes(route)&&!limit('add-on:'+ip,10))
+    return reply(res,429,{error:'Bitte später erneut versuchen.'});
+  const request=['/api/anschlussangebote/vorschau','/api/anschlussangebote/buchen'].includes(route)&&req.method==='POST'?await body(req):null;
+  const token=request?.zugang;
+  const parentId=anschlussBuchung(token);
+  if(!parentId)return reply(res,401,{error:'Der Angebotslink ist ungültig oder abgelaufen.'});
+  const parentQuery=await pool.query('SELECT id,status,data FROM brilon_buchungen WHERE id=$1',[parentId]);
+  if(!parentQuery.rowCount||parentQuery.rows[0].status!=='bestaetigt')
+    return reply(res,409,{error:'Anschlussangebote gibt es erst nach bestätigter Buchung.'});
+  const parent=parentQuery.rows[0],base=parent.data,window=buchungsfenster(base);
+  if(!window||!gueltigesDatum(base.datum)||base.datum<new Date().toISOString().slice(0,10))
+    return reply(res,200,{datum:base.datum,teilnehmer:Number(base.teilnehmer)||0,programme:[]});
+  if(route==='/api/anschlussangebote/vorschau'&&req.method==='POST'){
+    const [programs,bookings,blocked]=await Promise.all([
+      pool.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY name`),
+      pool.query(`SELECT id,data FROM brilon_buchungen WHERE data->>'datum'=$1 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum]),
+      pool.query(`SELECT 1 FROM brilon_kalender WHERE typ='sperrzeit' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date LIMIT 1`,[base.datum])
+    ]);
+    if(blocked.rowCount)return reply(res,200,{datum:base.datum,teilnehmer:Number(base.teilnehmer)||0,programme:[]});
+    const participants=Number(base.teilnehmer);
+    if(!Number.isInteger(participants)||participants<1||participants>150)
+      return reply(res,409,{error:'Die Gruppengröße der bestätigten Buchung ist ungültig.'});
+    const occupied=bookings.rows.filter(b=>b.id!==parentId).map(b=>buchungsfenster(b.data));
+    const suggestions=[];
+    for(const p of programs.rows){
+      if(p.name===base.angebot)continue;
+      const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
+      const price=preisFuerTeilnehmer(p.preise,participants),duration=Number(p.dauer);
+      if((dates.length&&!dates.includes(base.datum))||participants>Number(p.kapazitaet)||price===null||!Number.isInteger(duration)||duration<1)continue;
+      const cap=await pool.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum,p.name]);
+      if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))continue;
+      const times=zugelasseneAnschlusszeiten(window[0],window[1],duration)
+        .filter(t=>!occupied.some(w=>ueberschneidung([t.beginnMinuten,t.endeMinuten],w)))
+        .map(t=>({...t,uhrzeit:String(Math.floor(t.beginnMinuten/60)).padStart(2,'0')+':00'}));
+      if(times.length){const quote=anschlussPreis(price);suggestions.push({id:p.id,name:p.name,beschreibung:p.beschreibung,dauer:duration,
+        originalCent:quote.originalCent,rabattCent:quote.rabattCent,endpreisCent:quote.endpreisCent,zeiten:times});}
+    }
+    return reply(res,200,{datum:base.datum,teilnehmer:participants,programme:suggestions});
+  }
+  if(route==='/api/anschlussangebote/buchen'&&req.method==='POST'){
+    const d=request,requestParentId=anschlussBuchung(d?.zugang),programId=String(d?.programmId||''),time=safeText(d?.uhrzeit,5);
+    if(requestParentId!==parentId||! /^[1-9]\d{0,17}$/.test(programId)||!/^([01]\d|2[0-3]):00$/.test(time))return reply(res,400,{error:'Anschlussauswahl ist ungültig.'});
+    const result=await reservierungsTransaktion(async client=>{
+      const q=await client.query('SELECT id,status,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[parentId]);
+      if(!q.rowCount||q.rows[0].status!=='bestaetigt')return {ungueltig:true};
+      const original=q.rows[0].data,oldWindow=buchungsfenster(original),participants=Number(original.teilnehmer);
+      const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE id=$1 AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
+      if(!pQuery.rowCount)return {programm:false};
+      const p=pQuery.rows[0],duration=Number(p.dauer),start=Number(time.slice(0,2))*60;
+      if(!oldWindow||!Number.isInteger(participants)||participants<1||participants>150||p.name===original.angebot||!Number.isInteger(duration)||participants>Number(p.kapazitaet)||
+         !zugelasseneAnschlusszeiten(oldWindow[0],oldWindow[1],duration).some(t=>t.beginnMinuten===start&&t.endeMinuten<=1440))return {zeit:false};
+      const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
+      if(dates.length&&!dates.includes(original.datum))return {freigabe:false};
+      const price=preisFuerTeilnehmer(p.preise,participants);if(price===null)return {preis:false};
+      const duplicate=await client.query(`SELECT 1 FROM brilon_buchungen WHERE data->>'anschlussElternId'=$1
+        AND data->>'angebot'=$2 AND data->>'uhrzeit'=$3 AND COALESCE(status,'offen') NOT IN ('abgelehnt','storniert') LIMIT 1`,
+        [parentId,p.name,time]);
+      if(duplicate.rowCount)return {duplikat:true};
+      const cap=await client.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[original.datum,p.name]);
+      if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))return {kapazität:false};
+      const conflict=await pruefeBuchungskonflikt(client,original.datum,[start,start+duration],parentId);if(conflict)return {konflikt:conflict};
+      const quote=anschlussPreis(price),id=crypto.randomUUID(),first=safeText(original.vorname,80),last=safeText(original.nachname,80);
+      const baseRef=buchungsreferenz(last,first,original.datum),refs=await client.query('SELECT buchungsnummer FROM brilon_buchungen WHERE buchungsnummer=$1 OR buchungsnummer LIKE $2',[baseRef,baseRef+'-%']);
+      const used=new Set(refs.rows.map(r=>r.buchungsnummer));let serial=1,reference=baseRef;while(used.has(reference)){serial++;reference=buchungsreferenz(last,first,original.datum,serial);}
+      const data={...original,angebot:p.name,uhrzeit:time,dauer,gesamtpreis:quote.endpreisCent/100,
+        anzahlung:Math.round(quote.endpreisCent*0.25)/100,restbetrag:Math.round(quote.endpreisCent*0.75)/100,
+        zahlungen:[],zahlungsgutschriftCent:0,buchungsnummer:reference,anschlussElternId:parentId,anschlussRabatt10:true,
+        anschlussRabattCent:quote.rabattCent,anschlussRabattAusstehend:!original.anschlussRabatt10,
+        preisOhneAnschlussRabattCent:price,preisanpassungen:[{grund:'10 % Anschlussrabatt auf Zusatzprogramm',am:new Date().toISOString(),vonCent:price,rabattCent:quote.rabattCent,aufCent:quote.endpreisCent}]};
+      const saved=await client.query(`INSERT INTO brilon_buchungen(id,data,status,buchungsnummer) VALUES($1,$2::jsonb,'offen',$3) RETURNING id,data`,[id,JSON.stringify(data),reference]);
+      return {buchung:saved.rows[0],quote,programm:p.name};
+    });
+    if(result.ungültig)return reply(res,409,{error:'Die Buchung ist nicht mehr gültig.'});
+    if(result.programm===false)return reply(res,409,{error:'Dieses Programm ist nicht mehr buchbar.'});
+    if(result.zeit===false)return reply(res,409,{error:'Zeit, Kapazität oder Anschluss passen nicht mehr.'});
+    if(result.freigabe===false)return reply(res,409,{error:'Das Programm ist an diesem Tag nicht freigegeben.'});
+    if(result.preis===false)return reply(res,409,{error:'Für diese Gruppengröße fehlt ein Preis.'});
+    if(result.duplikat)return reply(res,409,{error:'Diese Anschlussbuchung wurde bereits angefragt.'});
+    if(result.kapazität===false)return reply(res,409,{error:'Die Kapazität ist inzwischen ausgeschöpft.'});
+    if(result.konflikt)return reply(res,409,{error:result.konflikt});
+    const data=result.buchung.data,details=`Neue Buchungsnummer: ${data.buchungsnummer}\nProgramm: ${result.programm}\nDatum: ${data.datum}\nBeginn: ${data.uhrzeit} Uhr\nPreis nach 10 % Anschlussrabatt: ${(result.quote.endpreisCent/100).toFixed(2).replace('.',',')} €`;
+    const mails=[brevoMail(data.email,'Deine Anschlussanfrage – Klettern & Abenteuer Brilon',`Hallo ${data.name},\n\n${details}\n\nDie Anfrage ist eingegangen und noch nicht verbindlich bestätigt. Der Rabatt auf das bereits bestätigte Programm wird nach Bestätigung dieser Zusatzbuchung berücksichtigt.\n\nGut Seil!\nKlettern & Abenteuer Brilon`)];
+    if(process.env.BOOKING_NOTIFY_EMAIL)mails.push(brevoMail(process.env.BOOKING_NOTIFY_EMAIL,'Neue Anschlussbuchung',details+`\n\nKunde: ${data.name} · ${data.email}`));
+    Promise.allSettled(mails).then(results=>results.forEach(r=>{if(r.status==='rejected')console.error('Anschlussbuchungs-E-Mail konnte nicht versendet werden.');}));
+    return reply(res,201,{success:true,buchungsnummer:data.buchungsnummer,gesamtpreis:data.gesamtpreis,rabattCent:result.quote.rabattCent});
+  }
+  return reply(res,404,{error:'Nicht gefunden.'});
+}
+
 async function main(req,res){
   const u=new URL(req.url,'http://localhost'),
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    if(route==='/api/anschlussangebote/vorschau'||route==='/api/anschlussangebote/buchen')
+      return await anschlussApi(req,res,u,route,ip);
     if(route==='/api/buchungen'&&req.method==='POST'){
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       if(!limit('booking:'+ip,6))return reply(res,429,{error:'Bitte später erneut versuchen.'});
@@ -620,6 +751,9 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         const neuerStand=zahlungsstand(Math.round(Number(data.gesamtpreis)*100),data.zahlungen);
         const neuerStatus=neuerStand.anzahlungErreicht&&q.rows[0].status==='offen'
           ?'bestaetigt':q.rows[0].status;
+        const elternRabatt=neuerStatus==='bestaetigt'
+          ?await anschlussRabattElternAnwenden(client,data):{angewendet:false};
+        if(elternRabatt.ungueltig)return {anschlussElternUngueltig:true};
         const gespeichert=await client.query(
           `UPDATE brilon_buchungen SET data=$1::jsonb,status=$2,updated_at=NOW()
            WHERE id=$3 RETURNING id,data,status`,
@@ -627,9 +761,10 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         );
         return {
           buchung:gespeichert.rows[0],zahlung,stand:neuerStand,
-          bestaetigtJetzt:neuerStatus!==q.rows[0].status
+          bestaetigtJetzt:neuerStatus!==q.rows[0].status,elternRabatt
         };
       });
+      if(ergebnis.anschlussElternUngueltig)return reply(res,409,{error:'Die Ursprungsbuchung ist nicht mehr bestätigt.'});
       if(ergebnis.fehlt)return reply(res,404,{error:'Buchung nicht gefunden.'});
       if(ergebnis.keinPreis)return reply(res,409,{error:'Für diese Buchung ist kein Gesamtpreis hinterlegt.'});
       if(ergebnis.ueberzahlung)return reply(res,409,{
@@ -641,9 +776,12 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         const bestaetigungsText=`Deine Buchung ${data.buchungsnummer || ''} ist verbindlich bestätigt.\n`+
           `Erfasste Zahlung: ${(ergebnis.stand.erhaltenCent/100).toFixed(2).replace('.',',')} €\n`+
           `Offener Restbetrag: ${(ergebnis.stand.offenCent/100).toFixed(2).replace('.',',')} €\n\n`+
-          `Termin: ${data.datum} um ${data.uhrzeit} Uhr`;
+          `Termin: ${data.datum} um ${data.uhrzeit} Uhr`+
+          (ergebnis.elternRabatt?.angewendet?'\nDer 10-%-Anschlussrabatt wurde auch auf deine ursprüngliche Buchung angewendet.':'');
+        const offerLink=anschlussLink(ergebnis.buchung.id);
+        const angeboteText=offerLink?`\n\nPassende Anschlussprogramme mit 10 % Rabatt findest du hier:\n${offerLink}`:'';
         const mails=[brevoMail(data.email,'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
-          `Hallo ${data.name || ''},\n\n${bestaetigungsText}\n\nGut Seil!\nKlettern & Abenteuer Brilon`)];
+          `Hallo ${data.name || ''},\n\n${bestaetigungsText}${angeboteText}\n\nGut Seil!\nKlettern & Abenteuer Brilon`)];
         if(process.env.BOOKING_NOTIFY_EMAIL)mails.push(brevoMail(
           process.env.BOOKING_NOTIFY_EMAIL,'Buchung bestätigt – Zahlungseingang erfasst',
           `${bestaetigungsText}\n\nKundin/Kunde: ${data.name || ''} · ${data.email || ''}`
@@ -691,6 +829,9 @@ const alterStatus = alt.rows[0].status;
           );
           if(konflikt)return {konflikt};
         }
+        const elternRabatt=status==='bestaetigt'
+          ?await anschlussRabattElternAnwenden(client,buchungsdaten):{angewendet:false};
+        if(elternRabatt.ungueltig)return {anschlussElternUngueltig:true};
 
        const q = await client.query(
   `UPDATE brilon_buchungen
@@ -706,7 +847,8 @@ const alterStatus = alt.rows[0].status;
 return {
   buchung: q.rows[0],
   alterStatus,
-  kundenDaten: buchungsdaten
+  kundenDaten: buchungsdaten,
+  elternRabatt
 };
 
       });
@@ -715,6 +857,8 @@ return {
         return reply(res,404,{error:'Buchung nicht gefunden.'});
       if(ergebnis.konflikt)
         return reply(res,409,{error:ergebnis.konflikt});
+      if(ergebnis.anschlussElternUngueltig)
+        return reply(res,409,{error:'Die Ursprungsbuchung ist nicht mehr bestätigt.'});
 
       
 if (
@@ -754,6 +898,9 @@ if (
       `Datum: ${kunde.datum || 'Nicht angegeben'}\n` +
       `Beginn: ${kunde.uhrzeit || 'Nach Absprache'} Uhr\n` +
       `Teilnehmer: ${kunde.teilnehmer || 'Nicht angegeben'}\n\n` +
+      (status==='bestaetigt'&&anschlussLink(ergebnis.buchung.id)
+        ?`Passende Anschlussprogramme mit 10 % Rabatt: ${anschlussLink(ergebnis.buchung.id)}\n\n`:'' )+
+      (ergebnis.elternRabatt?.angewendet?'Der Anschlussrabatt wurde auch auf die ursprüngliche Buchung angewendet.\n\n':'')+
       `Bei Fragen antworte bitte auf diese E-Mail.\n\n` +
       `Gut Seil!\nKlettern & Abenteuer Brilon`;
 

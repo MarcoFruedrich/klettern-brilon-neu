@@ -23,6 +23,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Buchungsprüfungen berücksichtigen Preisstaffel, Programmdauer, freigegebene Tage und Tageskapazität zusätzlich zum Terminkonflikt.
 - Überweisungsinformationen setzen die stabile Buchungsnummer als Verwendungszweck ein.
 - Der Admin kann bestätigte Buchungen eines Tages auswählen, eine 10-%-Vorschau sehen und den Rabatt bewusst anwenden. Es werden nur direkt aneinandergrenzende Zeitfenster rabattiert; jede betroffene Buchung erhält den Rabatt höchstens einmal. Preisrevision, neuer Restbetrag und eine etwaige Überzahlungsgutschrift werden je Buchung gespeichert. Nach Anwendung wird eine Benachrichtigung an betroffene Kunden versucht.
+- Bestätigungs-E-Mails können einen HMAC-signierten, ein Jahr gültigen Link zur kundenseitigen Anschlussseite enthalten. Die Seite listet nur zeitlich direkt passende Programme mit freigegebenem Datum und freier Kapazität. Eine Anschlussanfrage prüft Termin, Sperrzeit und Kapazität in einer Transaktion erneut und legt die Zusatzbuchung mit 10 % Rabatt an. Der Rabatt auf das bestätigte Ausgangsprogramm wird erst beim Bestätigen der Zusatzbuchung angewendet. Dafür sind `PUBLIC_BASE_URL` (HTTPS) und `BOOKING_OFFER_SECRET` erforderlich.
 - E-Mail-Absender und Betreiberempfänger sind nicht mehr fest im Code hinterlegt; sie werden über `BREVO_SENDER_EMAIL` und `BOOKING_NOTIFY_EMAIL` konfiguriert. Der Bildspeicher ist optional und wird ohne Konfiguration sauber abgewiesen.
 - Schemaänderungen werden nur noch ausgeführt, wenn `RUN_SCHEMA_MIGRATIONS=true` gesetzt ist. Kein produktiver Datenbankzugriff oder Schemaänderung wurde in dieser Arbeit ausgeführt.
 - GPS-Touren sind über den Admin anlegbar, bearbeitbar sowie aktivierbar/deaktivierbar. Stationen enthalten Koordinaten, zwei Antworten und gehashte Kontrollcodes.
@@ -40,17 +41,18 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check server.js` – bestanden.
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
-- `npm test` – 21 bestanden, 0 fehlgeschlagen.
+- `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
+- `npm test` – 26 bestanden, 0 fehlgeschlagen.
 - `git diff --check` – bestanden.
 
-Die Datenbank- und E-Mail-Routen wurden nicht gegen Produktivdienste aufgerufen. Es wurden keine UI-Viewport- oder Browsertests ausgeführt.
+Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. Die reguläre Arbeitskopie enthält keine installierten Node-Abhängigkeiten (`pg` fehlt). Datenbank- und E-Mail-Routen wurden nicht gegen Dienste aufgerufen. Ein Viewport-Test war nicht möglich, weil die Chromium-Browserdatei fehlt.
 
 ## Noch offen
 
 - Die Buchungs-API, Datenbanktransaktionen und Mailbenachrichtigungen benötigen Integrationstests mit Test-Doubles für PostgreSQL und Mailtransport.
 - Eine Admin-Sitzung wird im Arbeitsspeicher gehalten. Für mehrere Instanzen/Neustarts fehlt weiterhin ein persistenter Session-Store; zusätzlich sind CSRF-/Origin-Prüfung, Sitzungsrotation und ein zweiter Faktor zu prüfen.
 - Such- und Statusfilter sind clientseitig und begrenzen nicht die geladene Ergebnismenge von 250 Einträgen.
-- Anschlussrabatte können derzeit nachträglich nur auf bereits bestätigte und direkt anschließende Buchungen angewendet werden. Es fehlt die kundenseitige Vorschlags-/Buchungsstrecke für ein weiteres Anschlussprogramm sowie eine Verfügbarkeits-/Kapazitätsprüfung für solche neuen Zusatzbuchungen.
+- Die kundenseitige Anschlussstrecke benötigt noch Integrationstests mit isolierten PostgreSQL- und Mail-Test-Doubles. Eine nach Bestätigung stornierte Zusatzbuchung widerruft aktuell den bereits angewendeten Rabatt auf das Ursprungsprogramm nicht automatisch; das Storno- und Erstattungsverfahren muss fachlich festgelegt und umgesetzt werden.
 - GPS benötigt noch QR-Code-Erzeugung und druckbare Etiketten. Die Verwaltung zeigt dafür stationäre QR-Zieladressen. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.
 - Die 15 Fragen umfassende Mustertour liegt als Entwurf vor. Koordinaten, Routenführung, Zugänglichkeit und praktische Sicherheit müssen vor Veröffentlichung örtlich geprüft werden.
 - Der Status der produktiven Schema- und Kalenderdefinitionen ist noch zu ermitteln. Die Tabellen werden für lokale/isolierte Tests nicht automatisch angelegt.
@@ -62,7 +64,7 @@ Die Datenbank- und E-Mail-Routen wurden nicht gegen Produktivdienste aufgerufen.
 1. Lokal Node.js 20+ und Abhängigkeiten bereitstellen.
 2. Für eine isolierte Entwicklungsdatenbank `DATABASE_URL`, `ADMIN_USER`, `ADMIN_PASSWORD` und ein mindestens 32 Zeichen langes `GPS_CODE_SECRET` konfigurieren. Keine Produktivzugangsdaten verwenden.
 3. Schemaänderungen bleiben standardmäßig aus. Nur in einer eigens angelegten Testdatenbank und nach Schema-Review `RUN_SCHEMA_MIGRATIONS=true` setzen.
-4. `npm start` starten und `/admin.html` öffnen. Zahlungseingänge werden in der Buchungskarte mit tatsächlichem Betrag und Zahlungsart ergänzt. Unter „Anschlussrabatt“ bestätigte Buchungen desselben Tages wählen, die Vorschau prüfen und erst dann die dauerhafte Anwendung bestätigen. Unter GPS eine Tour mit vollständigem Stations-JSON anlegen, die dauerhaften Standort-QR-Codes auf die angezeigten Zieladressen verweisen lassen und für bestätigte Buchungen Spielzugänge erstellen.
+4. `npm start` starten und `/admin.html` öffnen. Zahlungseingänge werden in der Buchungskarte mit tatsächlichem Betrag und Zahlungsart ergänzt. Unter „Anschlussrabatt“ bestätigte Buchungen desselben Tages wählen, die Vorschau prüfen und erst dann die dauerhafte Anwendung bestätigen. Bestätigungs-E-Mails führen mit den genannten Zugangseinstellungen zur passenden Anschlussseite. Unter GPS eine Tour mit vollständigem Stations-JSON anlegen, die dauerhaften Standort-QR-Codes auf die angezeigten Zieladressen verweisen lassen und für bestätigte Buchungen Spielzugänge erstellen.
 5. Benachrichtigungen nur mit Test-Mailpostfach und `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` und optional `BOOKING_NOTIFY_EMAIL` testen.
 
 ## Veröffentlichungsstatus
