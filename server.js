@@ -1172,7 +1172,7 @@ preis=safeText(d.preis,50);
         if(tourId&&!/^[0-9a-f-]{36}$/i.test(tourId))
           return reply(res,400,{error:'Tour-ID ungültig.'});
         const q=await pool.query(
-          `SELECT g.gast_name AS name,to_char(g.abgeschlossen_am,'YYYY-MM-DD') AS datum,
+          `SELECT g.id,g.gast_name AS name,to_char(g.abgeschlossen_am,'YYYY-MM-DD') AS datum,
                   g.spielzeit_sekunden AS dauer_sekunden,t.data->>'titel' AS tour
            FROM brilon_gps_spiele g JOIN brilon_gps_touren t ON t.id=g.tour_id
            WHERE g.gast_einwilligung=true AND g.gast_name IS NOT NULL
@@ -1180,6 +1180,16 @@ preis=safeText(d.preis,50);
            ORDER BY g.abgeschlossen_am DESC LIMIT 500`,[tourId]
         );
         return reply(res,200,q.rows);
+      }
+
+      const guestbookEntry=route.match(/^\/api\/admin\/gps\/gaesteliste\/([0-9a-f-]{36})$/i);
+      if(guestbookEntry&&req.method==='DELETE'){
+        const q=await pool.query(
+          `UPDATE brilon_gps_spiele SET gast_name=NULL,gast_einwilligung=false
+           WHERE id=$1 AND gast_einwilligung=true RETURNING id`,[guestbookEntry[1]]
+        );
+        if(!q.rowCount)return reply(res,404,{error:'Freigegebener Gästelisteneintrag nicht gefunden.'});
+        return reply(res,200,{success:true});
       }
 
       if(route==='/api/admin/gps/touren'&&req.method==='GET'){

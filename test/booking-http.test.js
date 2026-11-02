@@ -20,12 +20,13 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   ];
   const offerSecret='test-only-booking-offer-secret-32-chars';
   const tourId='123e4567-e89b-12d3-a456-426614174000';
+  const guestId='123e4567-e89b-12d3-a456-426614174001';
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),
     MOCK_GUESTBOOK:JSON.stringify([
-      {name:'Freigegebener Teamname',datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:true},
+      {id:guestId,name:'Freigegebener Teamname',datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:true},
       {name:'Nicht öffentlich',datum:'2027-03-15',dauer_sekunden:500,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:false}
     ]),
     RUN_SCHEMA_MIGRATIONS:'false',BREVO_API_KEY:'',BREVO_SENDER_EMAIL:'',BOOKING_NOTIFY_EMAIL:'',
@@ -43,6 +44,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(ready,true,'Server sollte mit dem PostgreSQL-Test-Double starten');
   const guestbookPrivate=await fetch(root+'/api/admin/gps/gaesteliste');
   assert.equal(guestbookPrivate.status,401,'Gästelisten-Verwaltung muss geschützt sein');
+  const guestDeletePrivate=await fetch(root+`/api/admin/gps/gaesteliste/${guestId}`,{method:'DELETE'});
+  assert.equal(guestDeletePrivate.status,401,'Gästelisteneinträge müssen vor unberechtigter Löschung geschützt sein');
   const anfrage=(uhrzeit)=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     vorname:'Max',nachname:'Mueller',email:'max@example.test',datum:'2027-03-15',uhrzeit,
     teilnehmer:4,angebot:'Klettern',datenschutz:'on'
@@ -78,8 +81,15 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(guestbook.status,200);
   const guestEntries=await guestbook.json();
   assert.equal(guestEntries.length,1);
+  assert.equal(guestEntries[0].id,guestId);
   assert.equal(guestEntries[0].name,'Freigegebener Teamname');
   assert.equal(guestEntries[0].tour,'Brilon-Rätseltour');
+  const guestDelete=await fetch(root+`/api/admin/gps/gaesteliste/${guestId}`,{method:'DELETE',headers:adminHeaders});
+  assert.equal(guestDelete.status,200);
+  const guestbookAfterDelete=await fetch(root+'/api/admin/gps/gaesteliste?tour='+tourId,{headers:{Cookie:cookie}});
+  assert.deepEqual(await guestbookAfterDelete.json(),[]);
+  const publicGuestbookAfterDelete=await fetch(root+'/api/gps/gaesteliste?tour='+tourId);
+  assert.deepEqual(await publicGuestbookAfterDelete.json(),[],'Entfernter Name darf nicht mehr öffentlich erscheinen');
   const payment=await fetch(root+`/api/admin/buchungen/${adjacentData.id}/zahlungen`,{method:'POST',headers:adminHeaders,
     body:JSON.stringify({betrag:'25.00',methode:'ueberweisung',notiz:'Lokaler Testeingang'})});
   assert.equal(payment.status,201);

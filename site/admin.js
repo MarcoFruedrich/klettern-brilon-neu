@@ -544,6 +544,16 @@ async function adminGaestelisteLaden(){
       card.append(el('strong',entry.name||'Name nicht angegeben'),
         el('p',`${entry.tour||'GPS-Tour'} · ${entry.datum||'Datum unbekannt'}`),
         el('p',`Benötigte Zeit: ${minutes} Min. ${seconds} Sek.`));
+      const remove=el('button','Öffentlichen Eintrag entfernen');remove.type='button';remove.className='danger';
+      remove.onclick=async()=>{
+        if(!window.confirm(`Den öffentlichen Namenseintrag „${entry.name}“ entfernen? Spielabschluss und Spielzeit bleiben erhalten.`))return;
+        remove.disabled=true;
+        try{
+          await api('/api/admin/gps/gaesteliste/'+encodeURIComponent(entry.id),{method:'DELETE'});
+          await adminGaestelisteLaden();
+        }catch(error){message.textContent='Eintrag konnte nicht entfernt werden: '+error.message;remove.disabled=false;}
+      };
+      card.append(remove);
       list.append(card);
     }
   }catch(error){message.textContent='Gästeliste konnte nicht geladen werden: '+error.message;}
