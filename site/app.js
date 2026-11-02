@@ -1,5 +1,15 @@
 
-document.getElementById('year').textContent=new Date().getFullYear();const date=document.querySelector('input[name=datum]');date.min=new Date().toLocaleDateString('en-CA');
+document.getElementById('year').textContent=new Date().getFullYear();
+const date=document.querySelector('input[name=datum]');
+// Veranstaltungsort Brilon: YYYY-MM-DD unabhängig von Browser-Sprache und Gerätezeitzone.
+function buchungstagInBerlin(zeitpunkt=new Date()){
+  const teile=new Intl.DateTimeFormat('en-GB',{
+    timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(zeitpunkt);
+  const feld=Object.fromEntries(teile.map(teil=>[teil.type,teil.value]));
+  return feld.year+'-'+feld.month+'-'+feld.day;
+}
+if(date)date.min=buchungstagInBerlin();
 
 const verfuegbarkeit = document.getElementById('datum-verfuegbarkeit');
 let sperrzeiten = [];
