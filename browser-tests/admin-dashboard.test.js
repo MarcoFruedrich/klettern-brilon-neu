@@ -540,11 +540,11 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.locator('#tablet-admin-list').getByText(/Keine aktuelle Verbindung/).waitFor();
     assert.match(await page.locator('#tablet-admin-list').textContent(),/01\.01\.2027/);
     state.inspectionTablets[0].online=true;
-    await page.evaluate(()=>document.getElementById('pruef-report-refresh')?.click());
+    await page.locator('#tablet-admin-refresh').click();
     await page.locator('#tablet-admin-list').getByText(/Erreichbar – letztes Lebenszeichen/).waitFor();
     state.inspectionTablets[0].aktiv=false;
     state.inspectionTablets[0].online=false;
-    await page.evaluate(()=>document.getElementById('pruef-report-refresh')?.click());
+    await page.locator('#tablet-admin-refresh').click();
     await page.locator('#tablet-admin-list').getByText('Zugang gesperrt').waitFor();
     assert.equal(await page.locator('#tablet-admin-list').getByRole('button',{name:'Tablet-Zugang sperren'}).count(),0);
     await page.close();
