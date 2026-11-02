@@ -2172,6 +2172,16 @@ await pool.query(`
       erledigt_am TIMESTAMPTZ,erledigt_von TEXT,erledigt_notiz TEXT,
       UNIQUE(bericht_id,station_id))`);
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_hinweise_offen_idx ON brilon_pruef_hinweise(erstellt_am DESC) WHERE erledigt_am IS NULL');
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_meldungen (
+      bericht_id UUID PRIMARY KEY REFERENCES brilon_pruef_berichte(id),
+      status TEXT NOT NULL DEFAULT 'ausstehend'
+        CHECK(status IN ('ausstehend','sendet','angenommen','fehlgeschlagen','nicht_konfiguriert')),
+      versuche INTEGER NOT NULL DEFAULT 0 CHECK(versuche>=0),
+      letzter_versuch TIMESTAMPTZ,angenommen_am TIMESTAMPTZ,
+      letzter_fehler TEXT,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_meldungen_status_idx ON brilon_pruef_meldungen(status,erstellt_am DESC)');
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }
