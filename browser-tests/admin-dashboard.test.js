@@ -191,7 +191,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await search.fill('Beispiel');
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('1 Buchung(en)'));
     const booking=page.locator('#bookings .booking').first();
-    await booking.locator('select').selectOption('bestaetigt');
+    await booking.locator('select:not([name="methode"])').selectOption('bestaetigt');
     await booking.locator('textarea').fill('Test: Rückruf erfolgreich');
     await booking.getByRole('button',{name:'Änderungen speichern'}).click();
     await page.waitForFunction(()=>document.querySelector('#bookings .booking')?.textContent.includes('Bearbeitungsstatus: Bestätigt'));
@@ -201,7 +201,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const placeForm=page.locator('#admin-place-form');
     await placeForm.locator('[name="name"]').fill('Rüthen');
     await placeForm.locator('button[type="submit"]').click();
-    await page.locator('#admin-place-status').getByText('Rüthen', {exact:false}).waitFor();
+    await page.waitForFunction(() => document.getElementById('admin-place-status')?.textContent.includes('Rüthen'));
     assert.equal(state.places.some(ort=>ort.name==='Rüthen'),true);
     assert.equal(await page.locator('#angebot-ort').inputValue(),'Rüthen');
     assert.ok(state.mutations.every(item=>['POST','PATCH','DELETE'].includes(item.method)));
