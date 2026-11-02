@@ -97,8 +97,27 @@
         elt('p',!device.aktiv?'Zugang gesperrt':
           device.online?'Erreichbar – letztes Lebenszeichen innerhalb von 45 Sekunden':
           'Keine aktuelle Verbindung – Codeanforderung nicht möglich'),
+        elt('p',device.pruefdisplay?'Ausgewähltes Prüfdisplay für sechsstellige Codes':
+          'Nur Werbeanzeige – keine Prüfcodes'),
         elt('p','Zuletzt gemeldet: '+lastSeen),
         elt('p','Gekoppelt: '+new Date(device.gekoppelt_am).toLocaleString('de-DE')));
+      if(device.aktiv&&!device.pruefdisplay){
+        const select=elt('button','Als Prüfdisplay auswählen');select.type='button';
+        select.className='btn secondary';
+        select.addEventListener('click',async()=>{
+          if(!confirm('Dieses Tablet als einziges Prüfdisplay festlegen? Noch gültige Prüfcodes werden dadurch ungültig.'))return;
+          select.disabled=true;
+          try{
+            await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id)+'/pruefdisplay',{method:'PATCH'});
+            find('tablet-admin-status').textContent='Prüfdisplay umgestellt. Bisherige Codes sind ungültig.';
+            await refresh();
+          }catch(error){
+            find('tablet-admin-status').textContent='Prüfdisplay konnte nicht umgestellt werden: '+error.message;
+            select.disabled=false;
+          }
+        });
+        block.append(select);
+      }
       if(device.aktiv){
         const button=elt('button','Tablet-Zugang sperren');button.type='button';
         button.className='btn secondary';
