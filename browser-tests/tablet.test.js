@@ -25,7 +25,7 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
   for(const width of [390,1280]){
     await t.test('Tablet bei '+width+' px: Kopplung, Codeanzeige, Verbrauch und Sperrung',async()=>{
       const page=await browser.newPage({viewport:{width,height:780},locale:'de-DE'});
-      let paired=false,enabled=true,code=null;
+      let paired=false,enabled=true,code=null,connectionBroken=false;
       const errors=[];page.on('pageerror',e=>errors.push(e.message));
       await page.route('**/api/angebote',async route=>route.fulfill({status:200,
         contentType:'application/json',body:JSON.stringify([
@@ -41,6 +41,7 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
           paired=true;return send(201,{gekoppelt:true,name:input.name});
         }
         if(!paired||!enabled)return send(401,{error:'Tablet gesperrt'});
+        if(connectionBroken)return send(503,{error:'Netzwerk vorübergehend nicht verfügbar'});
         return send(200,{name:'Testtablet',code,gueltigSekunden:code?120:0});
       });
       await page.goto(root+'/tablet.html');
@@ -95,6 +96,21 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       await page.locator('#tablet-marketing').waitFor({state:'visible'});
       await page.waitForFunction(()=>document.getElementById('tablet-connection').textContent.includes('Gekoppeltes Tablet'));
       assert.equal(await page.locator('#tablet-pairing').isHidden(),true);
+      assert.equal(await page.locator('#tablet-digits').textContent(),'');
+      // Die Werbung soll bei kurzzeitigem Serverausfall sichtbar bleiben,
+      // ein möglicherweise abgelaufener Sicherheitscode dagegen nicht.
+      code='998812';
+      await page.evaluate(()=>checkTablet());
+      await page.waitForFunction(()=>document.getElementById('tablet-digits').textContent==='998812');
+      connectionBroken=true;
+      await page.evaluate(()=>checkTablet());
+      assert.equal(await page.locator('#tablet-digits').textContent(),'');
+      assert.equal(await page.locator('#tablet-marketing').isVisible(),true);
+      assert.match(await page.locator('#tablet-connection').textContent(),/Verbindung unterbrochen/);
+      connectionBroken=false;
+      code=null;
+      await page.evaluate(()=>refreshAfterWake());
+      assert.equal(await page.locator('#tablet-marketing').isVisible(),true);
       assert.equal(await page.locator('#tablet-digits').textContent(),'');
       enabled=false;
       await page.evaluate(()=>checkTablet());
