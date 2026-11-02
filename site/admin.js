@@ -117,7 +117,6 @@ async function zahlungsuebersichtLaden(){
 async function refresh() {
   const aktuelleSequenz=++refreshSequenz;
   try {
-    const alleBuchungen = await api('/api/admin/buchungen');
     const suchtext=(document.getElementById('bookings-search')?.value||'').trim();
     const statusFilter=document.getElementById('bookings-status-filter')?.value||'alle';
     const query=new URLSearchParams({suche:suchtext,status:statusFilter,seite:String(bookingPage)});
@@ -131,7 +130,7 @@ async function refresh() {
     
     await erlebnisangeboteLaden();
     await orteLaden();
-    await gpsTourenLaden(alleBuchungen);
+    await gpsTourenLaden();
     if(aktuelleSequenz!==refreshSequenz)return;
 
     const box = document.getElementById('bookings');
@@ -522,15 +521,78 @@ c.append(bildBereich);
   }
 }
 
-async function gpsTourenLaden(buchungen) {
+let gpsBuchungsSeite=1,gpsBuchungsLauf=0,gpsBuchungsSuchTimer;
+
+async function gpsBuchungenLaden(){
+  const lauf=++gpsBuchungsLauf;
+  const form=document.getElementById('gps-game-form');
+  const tourId=form?.elements.tourId.value||'';
+  const select=form?.elements.buchungId;
+  const status=document.getElementById('gps-booking-results');
+  const pager=document.getElementById('gps-booking-pagination');
+  const info=document.getElementById('gps-booking-page-info');
+  const prev=document.getElementById('gps-booking-prev');
+  const next=document.getElementById('gps-booking-next');
+  if(!select||!status)return;
+  const vorher=select.value;
+  select.replaceChildren();
+  const empty=el('option',tourId?'Buchung auswählen':'Zuerst eine GPS-Tour auswählen');
+  empty.value='';select.append(empty);
+  select.disabled=true;
+  if(pager)pager.hidden=true;
+  if(!tourId){status.textContent='Wähle zuerst eine aktive GPS-Tour.';return;}
+  status.textContent='Bestätigte Buchungen werden geladen …';
+  const query=new URLSearchParams({tourId,seite:String(gpsBuchungsSeite),
+    suche:document.getElementById('gps-booking-search')?.value.trim()||''});
+  try{
+    const daten=await api('/api/admin/gps/buchungen?'+query);
+    if(lauf!==gpsBuchungsLauf)return;
+    const pages=Math.max(1,Math.ceil(daten.anzahl/daten.proSeite));
+    if(gpsBuchungsSeite>pages){gpsBuchungsSeite=pages;return gpsBuchungenLaden();}
+    for(const buchung of daten.buchungen){
+      const option=el('option',[buchung.buchungsnummer||'',buchung.name||'Unbekannt',
+        buchung.datum||''].filter(Boolean).join(' · '));
+      option.value=buchung.id;select.append(option);
+    }
+    if(vorher&&daten.buchungen.some(b=>b.id===vorher))select.value=vorher;
+    select.disabled=!daten.buchungen.length;
+    status.textContent=daten.anzahl
+      ?daten.anzahl+' passende bestätigte Buchung(en) gefunden.'
+      :'Keine passende bestätigte Buchung für diese Tour gefunden.';
+    if(pager)pager.hidden=daten.anzahl<=daten.proSeite;
+    if(info)info.textContent='Seite '+daten.seite+' / '+pages;
+    if(prev)prev.disabled=gpsBuchungsSeite<=1;
+    if(next)next.disabled=gpsBuchungsSeite>=pages;
+  }catch(error){
+    if(lauf!==gpsBuchungsLauf)return;
+    status.textContent='Buchungen konnten nicht geladen werden: '+error.message;
+  }
+}
+
+document.querySelector('#gps-game-form [name="tourId"]')?.addEventListener('change',()=>{
+  gpsBuchungsSeite=1;gpsBuchungenLaden();
+});
+document.getElementById('gps-booking-search')?.addEventListener('input',()=>{
+  clearTimeout(gpsBuchungsSuchTimer);gpsBuchungsSeite=1;
+  gpsBuchungsSuchTimer=setTimeout(gpsBuchungenLaden,250);
+});
+document.getElementById('gps-booking-prev')?.addEventListener('click',()=>{
+  if(gpsBuchungsSeite>1){gpsBuchungsSeite--;gpsBuchungenLaden();}
+});
+document.getElementById('gps-booking-next')?.addEventListener('click',()=>{
+  gpsBuchungsSeite++;gpsBuchungenLaden();
+});
+
+async function gpsTourenLaden() {
   const tourSelect=document.querySelector('#gps-game-form [name="tourId"]');
   const buchungSelect=document.querySelector('#gps-game-form [name="buchungId"]');
   const gaestelistenTour=document.getElementById('admin-guestbook-tour');
   const liste=document.getElementById('gps-tour-list');
   if(!tourSelect||!buchungSelect||!liste)return;
   try{
+    const vorherigeTour=tourSelect.value;
     const tours=await api('/api/admin/gps/touren');
-    liste.replaceChildren();tourSelect.replaceChildren();buchungSelect.replaceChildren();
+    liste.replaceChildren();tourSelect.replaceChildren();
     if(gaestelistenTour){
       const alle=el('option','Alle Touren');alle.value='';gaestelistenTour.replaceChildren(alle);
     }
@@ -550,7 +612,7 @@ async function gpsTourenLaden(buchungen) {
         form.scrollIntoView({behavior:'smooth',block:'start'});
       };
       const toggle=el('button',tour.aktiv?'Deaktivieren':'Aktivieren');toggle.type='button';toggle.className='btn secondary';
-      toggle.onclick=async()=>{await api('/api/admin/gps/touren/'+encodeURIComponent(tour.id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({aktiv:!tour.aktiv})});await gpsTourenLaden(buchungen);};
+      toggle.onclick=async()=>{await api('/api/admin/gps/touren/'+encodeURIComponent(tour.id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({aktiv:!tour.aktiv})});await gpsTourenLaden();};
       const gaeste=el('button','Gästeliste anzeigen');gaeste.type='button';gaeste.className='btn secondary';
       gaeste.onclick=async()=>{
         if(gaestelistenTour)gaestelistenTour.value=tour.id;
@@ -569,11 +631,9 @@ async function gpsTourenLaden(buchungen) {
       if(tour.aktiv&&tour.buchbar){const o=el('option',tour.titel);o.value=tour.id;tourSelect.append(o);}
     }
     const placeholder=el('option','Tour auswählen');placeholder.value='';tourSelect.prepend(placeholder);
-    for(const booking of buchungen.filter(b=>b.status==='bestaetigt')){
-      const o=el('option',`${booking.data.buchungsnummer||''} · ${booking.data.name||'Unbekannt'} · ${booking.data.datum||''}`);
-      o.value=booking.id;buchungSelect.append(o);
-    }
-    const noBooking=el('option','Bestätigte Buchung auswählen');noBooking.value='';buchungSelect.prepend(noBooking);
+    if(vorherigeTour&&Array.from(tourSelect.options).some(o=>o.value===vorherigeTour))
+      tourSelect.value=vorherigeTour;
+    await gpsBuchungenLaden();
   }catch(error){document.getElementById('gps-tour-status').textContent='GPS-Verwaltung nicht verfügbar: '+error.message;}
 }
 
