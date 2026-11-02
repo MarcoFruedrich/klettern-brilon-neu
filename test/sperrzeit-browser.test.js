@@ -22,8 +22,10 @@ test('Öffentlicher Kalender aktualisiert nach Datumseingabe die Verfügbarkeit'
   assert.ok(handler,'Datumsfeld muss einen Änderungs-Handler haben');
   assert.match(handler[1],/belegteUhrzeitenLaden\(\)/);
   assert.match(app,/uhrzeitAuswahl\.disabled\s*=\s*true/);
-  assert.match(app,/date\.value !== datum \|\| datumIstGesperrt\(datum\)/,
-    'Eine verspätete Verfügbarkeitsantwort darf einen inzwischen gesperrten Tag nicht freischalten');
-  assert.match(app,/date\.value === datum && !datumIstGesperrt\(datum\)/,
-    'Abgeschlossene Anfragen dürfen gesperrte Tage nicht wieder aktivieren');
+  assert.match(app,/anfrageId!==verfuegbarkeitsAnfrage \|\| date\.value!==datum/,
+    'Eine ältere Antwort darf neuere Anfragen und geänderte Tage nicht überschreiben');
+  assert.match(app,/datumIstGesperrt\(datum\)\) return;/,
+    'Eine verspätete Antwort darf inzwischen gesperrte Tage nicht freischalten');
+  assert.match(app,/anfrageId===verfuegbarkeitsAnfrage[\s\S]*?!datumIstGesperrt\(datum\)/,
+    'Nur die aktuellste Verfügbarkeitsantwort darf eine Auswahl wieder aktivieren');
 });
