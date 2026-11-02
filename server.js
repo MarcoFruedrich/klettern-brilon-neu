@@ -3,6 +3,7 @@
 'use strict';
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
+const { heuteInBerlin } = require('./lib/kalendertag');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
 const { zugelasseneAnschlusszeiten, anschlussPreis, erzeugeZugang, pruefeZugang } = require('./lib/anschlussangebote');
 const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, preisBeiAnschlussstorno, zahlungErgaenzen } = require('./lib/buchungslogik');
@@ -223,8 +224,11 @@ async function anschlussApi(req,res,url,route,ip){
   if(!parentQuery.rowCount||parentQuery.rows[0].status!=='bestaetigt')
     return reply(res,409,{error:'Anschlussangebote gibt es erst nach bestätigter Buchung.'});
   const parent=parentQuery.rows[0],base=parent.data,window=buchungsfenster(base);
-  if(!window||!gueltigesDatum(base.datum)||base.datum<new Date().toISOString().slice(0,10))
+  if(!window||!gueltigesDatum(base.datum)||base.datum<heuteInBerlin()){
+    if(route==='/api/anschlussangebote/buchen')
+      return reply(res,409,{error:'Für einen vergangenen oder ungültigen Buchungstag sind keine Anschlussbuchungen möglich.'});
     return reply(res,200,{datum:base.datum,teilnehmer:Number(base.teilnehmer)||0,programme:[]});
+  }
   if(route==='/api/anschlussangebote/vorschau'&&req.method==='POST'){
     const [programs,bookings,blocked]=await Promise.all([
       pool.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY name`),
@@ -262,7 +266,7 @@ async function anschlussApi(req,res,url,route,ip){
       const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE id=$1 AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
       if(!pQuery.rowCount)return {programm:false};
       const p=pQuery.rows[0],duration=Number(p.dauer),start=Number(time.slice(0,2))*60;
-      if(!oldWindow||!Number.isInteger(participants)||participants<1||participants>150||p.name===original.angebot||!Number.isInteger(duration)||participants>Number(p.kapazitaet)||
+      if(!oldWindow||!gueltigesDatum(original.datum)||original.datum<heuteInBerlin()||!Number.isInteger(participants)||participants<1||participants>150||p.name===original.angebot||!Number.isInteger(duration)||participants>Number(p.kapazitaet)||
          !zugelasseneAnschlusszeiten(oldWindow[0],oldWindow[1],duration).some(t=>t.beginnMinuten===start&&t.endeMinuten<=1440))return {zeit:false};
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
       if(dates.length&&!dates.includes(original.datum))return {freigabe:false};
@@ -285,7 +289,7 @@ async function anschlussApi(req,res,url,route,ip){
       const saved=await client.query(`INSERT INTO brilon_buchungen(id,data,status,buchungsnummer) VALUES($1,$2::jsonb,'offen',$3) RETURNING id,data`,[id,JSON.stringify(data),reference]);
       return {buchung:saved.rows[0],quote,programm:p.name};
     });
-    if(result.ungültig)return reply(res,409,{error:'Die Buchung ist nicht mehr gültig.'});
+    if(result.ungueltig)return reply(res,409,{error:'Die Buchung ist nicht mehr gültig.'});
     if(result.programm===false)return reply(res,409,{error:'Dieses Programm ist nicht mehr buchbar.'});
     if(result.zeit===false)return reply(res,409,{error:'Zeit, Kapazität oder Anschluss passen nicht mehr.'});
     if(result.freigabe===false)return reply(res,409,{error:'Das Programm ist an diesem Tag nicht freigegeben.'});
@@ -324,7 +328,7 @@ async function main(req,res){
             teilnehmer=Number(d.teilnehmer);
 
       if(!vorname||!nachname||!/^\S+@\S+\.\S+$/.test(email)||
-         !gueltigesDatum(datum)||
+         (!gueltigesDatum(datum)||datum<heuteInBerlin())||
          !angebot||!Number.isInteger(teilnehmer)||
          teilnehmer<1||teilnehmer>150||d.datenschutz!=='on')
         return reply(res,400,{error:'Bitte Pflichtfelder korrekt ausfüllen.'});
