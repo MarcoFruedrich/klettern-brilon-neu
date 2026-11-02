@@ -50,10 +50,41 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       await page.locator('#tablet-marketing').waitFor({state:'visible'});
       await page.waitForFunction(()=>document.getElementById('tablet-offer-title')?.textContent==='Klettern & Abenteuer');
       assert.equal(await page.locator('#tablet-digits').textContent(),'');
+      // Anwendungsstart und Angebotswechsel ohne Neustart des Geräts.
+      const refreshedOffer='Neues Teamprogramm';let offersOffline=false;
+      await page.unroute('**/api/angebote');
+      await page.route('**/api/angebote',async route=>{
+        if(offersOffline)return route.fulfill({status:503,contentType:'application/json',
+          body:JSON.stringify({error:'Testweise offline'})});
+        return route.fulfill({status:200,contentType:'application/json',
+          body:JSON.stringify([{id:'neu',name:refreshedOffer,
+            beschreibung:'Frisch veröffentlichte Programme für Familien.'}])});
+      });
+      await page.evaluate(()=>loadOffers());
+      await page.waitForFunction(()=>document.getElementById('tablet-offer-title').textContent==='Neues Teamprogramm');
+      offersOffline=true;
+      await page.evaluate(()=>loadOffers());
+      assert.equal(await page.locator('#tablet-offer-title').textContent(),refreshedOffer,
+        'Letzte Angebote sollen auch bei einem Serverfehler sichtbar bleiben.');
+      await page.evaluate(()=>cycle());
+      assert.equal(await page.locator('#tablet-offer-title').textContent(),refreshedOffer);
+      offersOffline=false;
+      // Kurzzeitcode hat Vorrang; während des Ablaufens läuft keine Adminoberfläche.
       code='004261';
       await page.evaluate(()=>checkTablet());
       await page.waitForFunction(()=>document.getElementById('tablet-digits')?.textContent==='004261');
       assert.equal(await page.locator('#tablet-marketing').isHidden(),true);
+      assert.equal(await page.locator('#tablet-pairing').isHidden(),true);
+      await page.evaluate(()=>{
+        expiry=Date.now()-1000;
+        countdown();
+      });
+      assert.equal(await page.locator('#tablet-digits').textContent(),'',
+        'Ablauf muss auch ohne Serverantwort die Codeanzeige sofort beenden.');
+      assert.equal(await page.locator('#tablet-marketing').isVisible(),true);
+      code='004261';
+      await page.evaluate(()=>checkTablet());
+      await page.waitForFunction(()=>document.getElementById('tablet-digits').textContent==='004261');
       code=null;
       await page.evaluate(()=>checkTablet());
       assert.equal(await page.locator('#tablet-digits').textContent(),'');
@@ -65,6 +96,13 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       const dims=await page.evaluate(()=>({a:document.documentElement.scrollWidth,b:document.documentElement.clientWidth}));
       assert.ok(dims.a<=dims.b+2,'Tablet view cannot horizontally overflow '+JSON.stringify(dims));
       assert.deepEqual(errors,[]);
+      // Ein Browser-Neustart der Seite zeigt Werbung und holt erneut den Status,
+      // ohne Benutzerinteraktion oder erneute Kopplung.
+      await page.reload();
+      await page.locator('#tablet-marketing').waitFor({state:'visible'});
+      await page.waitForFunction(()=>document.getElementById('tablet-connection').textContent.includes('Gekoppeltes Tablet'));
+      assert.equal(await page.locator('#tablet-pairing').isHidden(),true);
+      assert.equal(await page.locator('#tablet-digits').textContent(),'');
       await page.close();
     });
   }
