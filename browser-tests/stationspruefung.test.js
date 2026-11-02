@@ -63,9 +63,14 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
       });
       await page.goto(root+'/pruefung.html');
       const dimensions=await page.evaluate(()=>({
-        doc:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth
+        doc:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth,
+        overflows:Array.from(document.querySelectorAll('body *')).filter(node=>
+          node.getBoundingClientRect().right>innerWidth+2).slice(0,12).map(node=>({
+            tag:node.tagName,id:node.id,className:node.className,
+            right:Math.round(node.getBoundingClientRect().right)
+          }))
       }));
-      assert.ok(dimensions.doc<=dimensions.viewport+2);
+      assert.ok(dimensions.doc<=dimensions.viewport+2,JSON.stringify(dimensions));
       await page.locator('#staff-login input[name="email"]').fill('test@example.test');
       await page.locator('#staff-login input[name="passwort"]').fill('Personal-Geheimnis-2026');
       await page.locator('#staff-login button').click();
