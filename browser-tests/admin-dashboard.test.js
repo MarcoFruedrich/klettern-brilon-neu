@@ -188,7 +188,11 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const state=fakeAdminApi(page);
     await login(page,root);
     const search=page.locator('#bookings-search');
+    const originalCard=await page.locator('#bookings .booking').first().elementHandle();
     await search.fill('Beispiel');
+    // Die Suchfilter aktualisieren die Liste entprellt nach 250 ms.
+    // Erst nach dem DOM-Austausch darf die neue Buchungskarte editiert werden.
+    await page.waitForFunction(oldCard=>document.querySelector('#bookings .booking')!==oldCard,originalCard);
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('1 Buchung(en)'));
     const booking=page.locator('#bookings .booking').first();
     await booking.locator('select:not([name="methode"])').selectOption('bestaetigt');
