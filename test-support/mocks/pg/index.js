@@ -46,6 +46,15 @@ class Pool {
       return {rows:valid?[{'?column?':1}]:[],rowCount:valid?1:0};
     }
     if (/^\s*SELECT 1\s*;?\s*$/i.test(sql)) return { rows:[{ '?column?':1 }], rowCount:1 };
+    if (/UPDATE brilon_angebote\s+SET preise/.test(sql)) {
+      const [prices,id,active,name,description,category,audience,place,capacity,dates,notes,bookable,published,duration]=params;
+      const offer=this.offers.find(item=>String(item.id)===String(id));
+      if(!offer)return {rows:[],rowCount:0};
+      Object.assign(offer,{preise:JSON.parse(prices),aktiv:active===null?offer.aktiv:active,name,beschreibung:description,
+        kategorie:category,zielgruppe:audience,veranstaltungsort:place,kapazitaet:capacity,
+        verfuegbare_termine:JSON.parse(dates),hinweise:notes,buchbar:bookable,veroeffentlicht:published,dauer:duration});
+      return {rows:[offer],rowCount:1};
+    }
     if (sql.includes('FROM brilon_angebote')) {
       const offers=sql.includes('WHERE id=$1')
         ?this.offers.filter(item=>String(item.id)===String(params[0]))

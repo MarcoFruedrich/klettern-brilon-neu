@@ -18,7 +18,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const repo=path.resolve(__dirname,'..');
   const offers=[
     {id:1,name:'Klettern',preise:{'1-4':100,'5-10':150},kapazitaet:20,aktiv:true,
-      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60},
+      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60,
+      kategorie:'Klettern',zielgruppe:'Alle',veranstaltungsort:'Brilon',hinweise:''},
     {id:2,name:'Bouldern',preise:{'1-4':150,'5-10':200},kapazitaet:20,aktiv:true,
       verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60}
   ];
@@ -181,6 +182,14 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const invalidPaymentPage=await fetch(root+'/api/admin/zahlungsuebersicht?seite=0',{headers:{Cookie:cookie}});
   assert.equal(invalidPaymentPage.status,400);
   const adminHeaders={Cookie:cookie,Origin:root,'X-CSRF-Token':loginData.csrfToken,'Content-Type':'application/json'};
+  const invalidProgramDuration=await fetch(root+'/api/admin/angebote/1',{method:'PATCH',headers:adminHeaders,
+    body:JSON.stringify({preise:{'1-4':100},dauer:1441})});
+  assert.equal(invalidProgramDuration.status,400,'Programmdauer darf beim Bearbeiten nicht über 24 Stunden liegen');
+  const updateProgram=await fetch(root+'/api/admin/angebote/1',{method:'PATCH',headers:adminHeaders,
+    body:JSON.stringify({preise:{'1-4':100},dauer:135})});
+  const updateProgramBody=await updateProgram.text();
+  assert.equal(updateProgram.status,200,updateProgramBody);
+  assert.equal(JSON.parse(updateProgramBody).dauer,135,'Änderungen an der Programmdauer werden zurückgegeben und gespeichert');
   const noEmailExportResponse=await fetch(root+`/api/admin/buchungen/${archivedBookings[1].id}/export`,{headers:{Cookie:cookie}});
   assert.equal(noEmailExportResponse.status,200);
   const noEmailExport=await noEmailExportResponse.json();

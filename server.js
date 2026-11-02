@@ -1614,13 +1614,15 @@ const beschreibung = d.beschreibung===undefined?alt.beschreibung:safeText(d.besc
 const kategorie=d.kategorie===undefined?alt.kategorie:safeText(d.kategorie,60);
 const zielgruppe=d.zielgruppe===undefined?alt.zielgruppe:safeText(d.zielgruppe,120);
 const veranstaltungsort=d.veranstaltungsort===undefined?alt.veranstaltungsort:safeText(d.veranstaltungsort,80);
+const dauer=Number(d.dauer??alt.dauer);
 const kapazitaet=Number(d.kapazitaet??alt.kapazitaet);
 const hinweise=d.hinweise===undefined?alt.hinweise:safeText(d.hinweise,1000);
 const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:alt.verfuegbare_termine;
 const buchbar=typeof d.buchbar==='boolean'?d.buchbar:alt.buchbar;
 const veroeffentlicht=typeof d.veroeffentlicht==='boolean'?d.veroeffentlicht:alt.veroeffentlicht;
-if(!name||!kategorie||!veranstaltungsort||!Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500||termine.some(t=>!gueltigesDatum(t)))
-  return reply(res,400,{error:'Kapazität oder verfügbare Termine sind ungültig.'});
+if(!name||!kategorie||!veranstaltungsort||!Number.isInteger(dauer)||dauer<15||dauer>1440||
+   !Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500||termine.some(t=>!gueltigesDatum(t)))
+  return reply(res,400,{error:'Dauer, Kapazität oder verfügbare Termine sind ungültig.'});
 const place=await pool.query('SELECT id FROM brilon_orte WHERE name=$1 AND aktiv=true',[veranstaltungsort]);
 if(!place.rowCount)return reply(res,400,{error:'Veranstaltungsort ist nicht angelegt.'});
 
@@ -1630,16 +1632,16 @@ const q = await pool.query(
        aktiv = COALESCE($3, aktiv),
        name=$4,beschreibung = $5,
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,kapazitaet=$9,
-       verfuegbare_termine=$10::jsonb,hinweise=$11,buchbar=$12,veroeffentlicht=$13
+       verfuegbare_termine=$10::jsonb,hinweise=$11,buchbar=$12,veroeffentlicht=$13,dauer=$14
    WHERE id = $2
-   RETURNING id,preise,aktiv,name,beschreibung,kategorie,zielgruppe,veranstaltungsort,
+   RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht`,
   [
     JSON.stringify(neuePreise),
     preisRoute[1],
     aktiv,
     name,beschreibung,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
-    JSON.stringify(termine),hinweise,buchbar,veroeffentlicht
+    JSON.stringify(termine),hinweise,buchbar,veroeffentlicht,dauer
   ]
 );
 

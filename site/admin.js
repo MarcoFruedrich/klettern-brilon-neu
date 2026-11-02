@@ -1252,6 +1252,8 @@ beschreibung.style.width = '100%';
       const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
       const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
       const veranstaltungsort=feld('Veranstaltungsort',angebot.veranstaltungsort,'veranstaltungsort');
+      const dauer=feld('Dauer (Minuten)',angebot.dauer,'dauer','number');
+      dauer.min='15';dauer.max='1440';dauer.step='1';
       const kapazitaet=feld('Kapazität',angebot.kapazitaet,'kapazitaet','number');
       kapazitaet.min='1';kapazitaet.max='500';
       const termine=feld('Verfügbare Termine (ein Datum je Zeile)',(angebot.verfuegbare_termine||[]).join('\n'),'verfuegbare_termine','textarea');
@@ -1401,7 +1403,7 @@ preisButton.addEventListener('click', async () => {
   aktiv: aktivSchalter.checked,
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
-        veranstaltungsort:veranstaltungsort.value,kapazitaet:Number(kapazitaet.value),
+        veranstaltungsort:veranstaltungsort.value,dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
         verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),
         hinweise:hinweise.value,buchbar:bookable.checked,veroeffentlicht:publish.checked
 })
