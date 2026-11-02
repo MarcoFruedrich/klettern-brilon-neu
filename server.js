@@ -1545,13 +1545,27 @@ preis=safeText(d.preis,50);
         /^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})$/
       );
       if(buchungLoeschen&&req.method==='DELETE'){
+        if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
         const id=buchungLoeschen[1];
-        const q=await pool.query(
-          'DELETE FROM brilon_buchungen WHERE id=$1 RETURNING id',[id]
-        );
-        if(!q.rowCount)
+        const loeschung=await reservierungsTransaktion(async client=>{
+          const buchung=await client.query('SELECT id,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[id]);
+          if(!buchung.rowCount)return {nichtGefunden:true};
+          const data=buchung.rows[0].data||{};
+          const kindBuchung=await client.query(
+            `SELECT id FROM brilon_buchungen WHERE data->>'anschlussElternId'=$1 LIMIT 1`,[id]
+          );
+          if(data.anschlussElternId||data.anschlussRabattQuelleId||kindBuchung.rowCount)
+            return {anschlussVerknuepft:true};
+          const gps=await client.query('DELETE FROM brilon_gps_spiele WHERE buchung_id=$1',[id]);
+          const entfernt=await client.query('DELETE FROM brilon_buchungen WHERE id=$1 RETURNING id',[id]);
+          return {geloescht:entfernt.rowCount===1,gpsSpieleGeloescht:gps.rowCount};
+        });
+        if(loeschung.nichtGefunden)
           return reply(res,404,{error:'Buchungsanfrage nicht gefunden.'});
-        return reply(res,200,{success:true});
+        if(loeschung.anschlussVerknuepft)
+          return reply(res,409,{error:'Diese Buchung ist mit einem Anschlussrabatt verknüpft. Bitte stornieren, damit Zahlungs- und Rabattverlauf erhalten bleiben.'});
+        if(!loeschung.geloescht)return reply(res,409,{error:'Buchung konnte nicht gelöscht werden.'});
+        return reply(res,200,{success:true,gpsSpieleGeloescht:loeschung.gpsSpieleGeloescht});
       }
 
       if(route==='/api/admin/aktionen'&&req.method==='POST'){

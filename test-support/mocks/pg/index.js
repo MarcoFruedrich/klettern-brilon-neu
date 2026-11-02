@@ -112,6 +112,27 @@ class Pool {
       return {rows:item?[{id:item.id,data:item.data,status:item.status,buchungsnummer:item.buchungsnummer,
         created_at:item.created_at||new Date(0),updated_at:item.updated_at||null,zahlungsinfo_gesendet_am:null}]:[],rowCount:item?1:0};
     }
+    if(sql.includes('SELECT id,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE')){
+      const item=this.bookings.find(entry=>entry.id===params[0]);
+      return {rows:item?[{id:item.id,data:item.data}]:[],rowCount:item?1:0};
+    }
+    if(sql.includes("SELECT id FROM brilon_buchungen WHERE data->>'anschlussElternId'=$1")){
+      const rows=this.bookings.filter(item=>item.data.anschlussElternId===params[0]).map(({id})=>({id}));
+      return {rows,rowCount:rows.length};
+    }
+    if(sql.includes('DELETE FROM brilon_gps_spiele WHERE buchung_id=$1')){
+      const first=this.bookings.find(item=>item.buchungsnummer==='MUELLER-MAX-150327')?.id;
+      const before=this.gpsGames.length;
+      this.gpsGames=this.gpsGames.filter(game=>game.buchung_id!=='first'||first!==params[0]);
+      const removed=this.gpsGames.length<before?before-this.gpsGames.length:0;
+      return {rows:[],rowCount:removed};
+    }
+    if(sql.includes('DELETE FROM brilon_buchungen WHERE id=$1 RETURNING id')){
+      const index=this.bookings.findIndex(item=>item.id===params[0]);
+      if(index<0)return {rows:[],rowCount:0};
+      const [item]=this.bookings.splice(index,1);
+      return {rows:[{id:item.id}],rowCount:1};
+    }
     if (sql.includes("LOWER(BTRIM(data->>'email'))=LOWER($1)")) {
       const rows=this.bookings.filter(item=>String(item.data.email||'').trim().toLocaleLowerCase('en-US')===
         String(params[0]).trim().toLocaleLowerCase('en-US')).map(item=>({id:item.id,data:item.data,status:item.status,
@@ -121,8 +142,10 @@ class Pool {
     }
     if (sql.includes('FROM brilon_gps_spiele g JOIN brilon_gps_touren t')&&sql.includes('ANY($1::uuid[])')) {
       const ids=params[0]||[],fallbackId=ids.at(-1);
-      const rows=this.gpsGames.filter(game=>game.buchung_id==='*'?ids.length>0:ids.includes(game.buchung_id))
-        .map(game=>({buchung_id:game.buchung_id==='*'?fallbackId:game.buchung_id,tour:game.tour,
+      const firstId=this.bookings.find(item=>item.buchungsnummer==='MUELLER-MAX-150327')?.id;
+      const rows=this.gpsGames.filter(game=>game.buchung_id==='*'?ids.length>0:
+        game.buchung_id==='first'?ids.includes(firstId):ids.includes(game.buchung_id))
+        .map(game=>({buchung_id:game.buchung_id==='*'?fallbackId:game.buchung_id==='first'?firstId:game.buchung_id,tour:game.tour,
           gestartet_am:game.gestartet_am,abgeschlossen_am:game.abgeschlossen_am,
           spielzeit_sekunden:game.spielzeit_sekunden,station_index:game.station_index,gast_name:game.gast_name,
           gast_einwilligung:game.gast_einwilligung,einwilligung_am:game.einwilligung_am,

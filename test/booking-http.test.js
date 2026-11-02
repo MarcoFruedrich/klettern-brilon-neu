@@ -40,10 +40,14 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
     MOCK_BOOKINGS:JSON.stringify(archivedBookings),
-    MOCK_GPS_GAMES:JSON.stringify([{buchung_id:'*',tour:'Brilon-Rätseltour',
-      gestartet_am:'2027-03-15T10:00:00.000Z',abgeschlossen_am:'2027-03-15T11:00:00.000Z',
-      spielzeit_sekunden:3600,station_index:15,gast_name:'Nicht freigegebener Name',gast_einwilligung:false,
-      einwilligung_am:null,einwilligung_version:null}]),
+    MOCK_GPS_GAMES:JSON.stringify([
+      {buchung_id:'*',tour:'Brilon-Rätseltour',gestartet_am:'2027-03-15T10:00:00.000Z',
+        abgeschlossen_am:'2027-03-15T11:00:00.000Z',spielzeit_sekunden:3600,station_index:15,
+        gast_name:'Nicht freigegebener Name',gast_einwilligung:false,einwilligung_am:null,einwilligung_version:null},
+      {buchung_id:'first',tour:'Brilon-Rätseltour',gestartet_am:'2027-03-15T09:00:00.000Z',
+        abgeschlossen_am:'2027-03-15T09:30:00.000Z',spielzeit_sekunden:1800,station_index:8,
+        gast_name:null,gast_einwilligung:false,einwilligung_am:null,einwilligung_version:null}
+    ]),
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),
     MOCK_GUESTBOOK:JSON.stringify([
       {id:guestId,name:null,datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,
@@ -195,11 +199,13 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.ok(exportedReferences.includes('ARCHIV-001'),'E-Mail-Adressen dürfen sich nur in Groß-/Kleinschreibung unterscheiden');
   assert.equal(exportedReferences.some(reference=>/^ARCHIV-(?!001$)/.test(reference)),false,'Andere Kontakt-E-Mails dürfen nicht in den Export gelangen');
   const adjacentExport=bookingExport.buchungen.find(entry=>entry.buchung.referenz===adjacentData.buchungsnummer);
+  const firstExport=bookingExport.buchungen.find(entry=>entry.buchung.referenz===firstData.buchungsnummer);
   assert.equal(adjacentExport.kunde.email,'max@example.test');
   assert.equal(adjacentExport.zahlung.zahlungen[0].betragCent,2500);
   assert.equal(adjacentExport.gpsSpiele.length,1);
   assert.equal(adjacentExport.gpsSpiele[0].tour,'Brilon-Rätseltour');
   assert.equal(adjacentExport.gpsSpiele[0].spielzeitSekunden,3600);
+  assert.equal(firstExport.gpsSpiele.length,1,'GPS-Spielverläufe aller zugehörigen Buchungen werden separat zugeordnet');
   assert.equal(adjacentExport.gpsSpiele[0].gaestelistenName,null,'Namen ohne öffentliche Einwilligung werden nicht exportiert');
   assert.equal(JSON.stringify(bookingExport).includes('Nicht freigegebener Name'),false);
   assert.equal('token_hash' in adjacentExport.gpsSpiele[0],false);
@@ -227,6 +233,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const before=await bookingsBefore.json();
   const addonBooking=before.find(item=>item.data.buchungsnummer===addonData.buchungsnummer);
   assert.ok(addonBooking);
+  const linkedBookingDelete=await fetch(root+`/api/admin/buchungen/${addonBooking.id}`,{method:'DELETE',headers:adminHeaders});
+  assert.equal(linkedBookingDelete.status,409,'Anschlussbuchungen dürfen nicht aus dem Rabatt- und Zahlungszusammenhang gelöscht werden');
 
   const addonPayment=await fetch(root+`/api/admin/buchungen/${addonBooking.id}/zahlungen`,{method:'POST',headers:adminHeaders,
     body:JSON.stringify({betrag:'33.75',methode:'ueberweisung',notiz:'Lokaler Testeingang'})});
@@ -252,6 +260,13 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(restoredParent.data.gesamtpreis,100);
   assert.equal(restoredParent.data.restbetrag,75);
   assert.ok(restoredParent.data.preisanpassungen.length>=2);
+  const linkedParentDelete=await fetch(root+`/api/admin/buchungen/${adjacentData.id}`,{method:'DELETE',headers:adminHeaders});
+  assert.equal(linkedParentDelete.status,409,'Elternbuchungen mit Anschlussverlauf müssen erhalten bleiben');
+  const firstDelete=await fetch(root+`/api/admin/buchungen/${firstData.id}`,{method:'DELETE',headers:adminHeaders});
+  assert.equal(firstDelete.status,200);
+  assert.equal((await firstDelete.json()).gpsSpieleGeloescht,1,'Zugehörige GPS-Spieldaten müssen gemeinsam gelöscht werden');
+  const deletedExport=await fetch(root+`/api/admin/buchungen/${firstData.id}/export`,{headers:{Cookie:cookie}});
+  assert.equal(deletedExport.status,404);
   const logout=await fetch(root+'/api/admin/logout',{method:'POST',headers:adminHeaders});
   assert.equal(logout.status,200);
   const afterLogout=await fetch(root+'/api/admin/buchungen',{headers:{Cookie:cookie}});

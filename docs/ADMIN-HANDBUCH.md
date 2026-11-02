@@ -43,6 +43,9 @@ werden.
   genutzt werden.
 - In einer Buchung den Status prüfen beziehungsweise aktualisieren. Die
   unterstützten Status sind offen, bestätigt, abgelehnt und storniert.
+- Das dauerhafte Löschen entfernt auch verknüpfte GPS-Spiele. Buchungen mit
+  Anschlussrabatt-Bezug lassen sich nicht löschen; dort bitte „storniert“
+  verwenden, damit der Rabatt- und Zahlungsverlauf erhalten bleibt.
 - Zahlungseingänge einzeln mit Betrag und Zahlungsart erfassen. Der aktuelle
   Saldo wird aus den Einträgen berechnet. Bei Erreichen der 25-%-Anzahlung wird
   eine offene Buchung automatisch bestätigt; der verbleibende Betrag entspricht
