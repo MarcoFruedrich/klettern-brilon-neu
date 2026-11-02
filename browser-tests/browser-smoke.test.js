@@ -133,7 +133,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.locator('input[name="email"]').fill('browser@example.test');
     await page.locator('input[name="datenschutz"]').check();
     await page.locator('#booking button[type=submit]').click();
-    await page.locator('#booking-status').getByText('BROWSERTEST-NUR-LOKAL', {exact: false}).waitFor();
+    await page.waitForFunction(() => document.getElementById('booking-status')?.textContent?.includes('BROWSERTEST-NUR-LOKAL'));
     assert.deepEqual(pageErrors, [], 'Die Buchungsseite darf keine JavaScript-Laufzeitfehler erzeugen');
     await page.close();
   });
