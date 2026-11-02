@@ -1292,10 +1292,17 @@ preis=safeText(d.preis,50);
       }
 
       if(route==='/api/admin/buchungen'&&req.method==='GET'){
+        const statusFilter=safeText(u.searchParams.get('status'),20)||'alle';
+        const allowedStatus=['alle','offen','bestaetigt','abgelehnt','storniert'];
+        if(!allowedStatus.includes(statusFilter))return reply(res,400,{error:'Ungültiger Statusfilter.'});
+        const suchtext=safeText(u.searchParams.get('suche'),120);
         const q=await pool.query(
-         
-'SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am FROM brilon_buchungen ORDER BY created_at DESC LIMIT 250'
-
+          `SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am
+           FROM brilon_buchungen
+           WHERE ($1::text='alle' OR COALESCE(status,'offen')=$1)
+             AND ($2::text='' OR concat_ws(' ',data->>'name',buchungsnummer,data->>'buchungsnummer',
+               data->>'email',data->>'angebot') ILIKE '%' || $2 || '%')
+           ORDER BY created_at DESC LIMIT 250`,[statusFilter,suchtext]
         );
         return reply(res,200,q.rows);
       }

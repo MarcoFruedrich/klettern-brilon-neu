@@ -57,8 +57,11 @@ class Pool {
       return { rows:item?[{id:item.id,data:item.data,status:item.status}]:[], rowCount:item?1:0 };
     }
     if (sql.includes('SELECT id,data,status,bearbeitungsnotiz')) {
-      const rows=this.bookings.map(item=>({id:item.id,data:item.data,status:item.status,bearbeitungsnotiz:'',
-        created_at:new Date(0),updated_at:new Date(0),zahlungsinfo_gesendet_am:null}));
+      const rows=this.bookings.filter(item=>(params[0]==='alle'||(item.status||'offen')===params[0])&&
+        (!params[1]||[item.data.name,item.data.buchungsnummer,item.buchungsnummer,item.data.email,item.data.angebot]
+          .join(' ').toLocaleLowerCase('de-DE').includes(String(params[1]).toLocaleLowerCase('de-DE'))))
+        .map(item=>({id:item.id,data:item.data,status:item.status,bearbeitungsnotiz:'',
+          created_at:new Date(0),updated_at:new Date(0),zahlungsinfo_gesendet_am:null}));
       return { rows, rowCount:rows.length };
     }
     if (sql.includes('UPDATE brilon_buchungen SET data=$1::jsonb,status=$2')) {

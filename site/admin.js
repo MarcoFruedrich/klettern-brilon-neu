@@ -3,6 +3,7 @@ const login = document.getElementById('login');
 const workspace = document.getElementById('workspace');
 const status = document.getElementById('status');
 let aktuelleZahlungsBuchungen=[];
+let refreshSequenz=0;
 
 async function api(path, options = {}) {
   const r = await fetch(path, {
@@ -79,17 +80,18 @@ function zahlungsuebersichtRendern(buchungen=aktuelleZahlungsBuchungen){
 }
 
 async function refresh() {
+  const aktuelleSequenz=++refreshSequenz;
   try {
     const alleBuchungen = await api('/api/admin/buchungen');
+    const suchtext=(document.getElementById('bookings-search')?.value||'').trim();
+    const statusFilter=document.getElementById('bookings-status-filter')?.value||'alle';
+    let bookings=alleBuchungen;
+    if(suchtext||statusFilter!=='alle'){
+      const query=new URLSearchParams({suche:suchtext,status:statusFilter});
+      bookings=await api('/api/admin/buchungen?'+query.toString());
+    }
+    if(aktuelleSequenz!==refreshSequenz)return;
     zahlungsuebersichtRendern(alleBuchungen);
-    const suchtext = (document.getElementById('bookings-search')?.value || '').trim().toLocaleLowerCase('de-DE');
-    const statusFilter = document.getElementById('bookings-status-filter')?.value || 'alle';
-    const bookings = alleBuchungen.filter(b => {
-      const d=b.data || {};
-      const durchsuchbar=[d.name,d.buchungsnummer,b.buchungsnummer,d.email,d.angebot].join(' ').toLocaleLowerCase('de-DE');
-      return (!suchtext || durchsuchbar.includes(suchtext)) &&
-        (statusFilter==='alle' || (b.status || 'offen')===statusFilter);
-    });
 
     login.hidden = true;
     workspace.hidden = false;
@@ -97,9 +99,12 @@ async function refresh() {
     await erlebnisangeboteLaden();
     await orteLaden();
     await gpsTourenLaden(alleBuchungen);
+    if(aktuelleSequenz!==refreshSequenz)return;
 
     const box = document.getElementById('bookings');
     box.replaceChildren();
+    const resultLabel=document.getElementById('booking-results-summary');
+    if(resultLabel)resultLabel.textContent=`${bookings.length} Buchung(en) angezeigt · Suche und Statusfilter gelten über alle Datensätze · maximal 250 Treffer je Ansicht`;
 
     if (!bookings.length) {
       box.append(el('p', 'Noch keine Buchungsanfragen.'));

@@ -62,6 +62,11 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie').split(';',1)[0];
   const adminHeaders={Cookie:cookie,Origin:root,'Content-Type':'application/json'};
+  const matchingBookings=await fetch(root+'/api/admin/buchungen?suche=max&status=offen',{headers:{Cookie:cookie}});
+  assert.equal(matchingBookings.status,200);
+  assert.equal((await matchingBookings.json()).length,2,'Suche und Statusfilter werden serverseitig kombiniert');
+  const invalidStatus=await fetch(root+'/api/admin/buchungen?status=unbekannt',{headers:{Cookie:cookie}});
+  assert.equal(invalidStatus.status,400);
   const guestbook=await fetch(root+'/api/admin/gps/gaesteliste?tour='+tourId,{headers:{Cookie:cookie}});
   assert.equal(guestbook.status,200);
   const guestEntries=await guestbook.json();
