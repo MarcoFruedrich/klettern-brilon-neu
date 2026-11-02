@@ -1231,7 +1231,7 @@ preis=safeText(d.preis,50);
                'datum',data->'datum','gesamtpreis',data->'gesamtpreis','zahlungen',data->'zahlungen',
                'zahlungsgutschriftCent',data->'zahlungsgutschriftCent'
              ) AS data
-           FROM brilon_buchungen ORDER BY created_at DESC`
+           FROM brilon_buchungen ORDER BY created_at DESC,id DESC`
         );
         const totals=zahlungenSummieren(q.rows);
         const gefiltert=totals.eintraege.filter(e=>{
@@ -1385,7 +1385,7 @@ preis=safeText(d.preis,50);
           const q=await pool.query(
             `SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am
              FROM brilon_buchungen ${where}
-             ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+             ORDER BY created_at DESC,id DESC LIMIT $3 OFFSET $4`,
             [...filterParams,proSeite,(seite-1)*proSeite]
           );
           return reply(res,200,{buchungen:q.rows,anzahl:Number(count.rows[0]?.anzahl||0),seite,proSeite});
@@ -1396,7 +1396,7 @@ preis=safeText(d.preis,50);
            WHERE ($1::text='alle' OR COALESCE(status,'offen')=$1)
              AND ($2::text='' OR concat_ws(' ',data->>'name',buchungsnummer,data->>'buchungsnummer',
                data->>'email',data->>'angebot') ILIKE '%' || $2 || '%')
-           ORDER BY created_at DESC LIMIT 250`,[statusFilter,suchtext]
+           ORDER BY created_at DESC,id DESC LIMIT 250`,[statusFilter,suchtext]
         );
         return reply(res,200,q.rows);
       }
