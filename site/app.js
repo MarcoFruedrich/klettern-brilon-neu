@@ -380,7 +380,7 @@ form.addEventListener('submit', async e => {
     }
 
     status.textContent =
-      '✓ BUCHUNGSANFRAGE ERFOLGREICH! Dein gewünschter Termin wurde vorläufig reserviert. Vielen Dank für deine Anfrage bei Klettern & Abenteuer Brilon! Wir melden uns persönlich bei dir.';
+      '✓ BUCHUNGSANFRAGE ERFOLGREICH! Deine Buchungsnummer: ' + json.buchungsnummer + '. Dein gewünschter Termin wurde vorläufig reserviert. Wir melden uns persönlich bei dir.';
 
     status.style.color = '#167c3a';
     status.style.fontWeight = 'bold';
