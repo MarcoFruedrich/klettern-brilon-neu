@@ -133,9 +133,10 @@ $('station-inspection').addEventListener('submit',async event=>{
       gesperrt?'Prüfung gespeichert, aber weiterhin GESPERRT: '+gesperrt+'.':
       data.hatHinweis?'HINWEIS ERFASST – zur Nachprüfung an die Verwaltung vorgemerkt; keine neue Sperre.':
       'Prüfung ohne gemeldeten Mangel gespeichert.';
-    const mail=data.benachrichtigung==='gesendet'?' Mängelmeldung versendet.':
+    const mail=data.benachrichtigung==='gesendet'?' Mail-Anbieter hat Mängelmeldung angenommen (Zustellung nicht bestätigt).':
       data.benachrichtigung==='fehlgeschlagen'?' ACHTUNG: Mängel-E-Mail fehlgeschlagen! Verantwortliche direkt informieren.':
-      data.benachrichtigung==='nicht_konfiguriert'?' ACHTUNG: Mängelpostfach nicht eingerichtet! Verantwortliche direkt informieren.':'';
+      data.benachrichtigung==='nicht_konfiguriert'?' ACHTUNG: Mängelpostfach nicht eingerichtet! Verantwortliche direkt informieren.':
+      data.benachrichtigung==='versand_ungeklaert'?' ACHTUNG: Versandstatus ungeklärt! Verantwortliche direkt informieren und Verwaltung benachrichtigen.':'';
     notice(status+' Prüfnummer: '+data.id+'.'+mail);
   }catch(e){notice('Bericht nicht gespeichert: '+e.message);}
   finally{submit.disabled=false;}
