@@ -11,7 +11,7 @@ function fakeAdminApi(page) {
   const state = {
     signedIn: false, csrf: 'a'.repeat(64), mutations: [],
     tours: [], games: [],
-    inspectionEvents: [],
+    inspectionEvents: [], inspectionStatusEvents: [], inspectionStaff: [],
     inspectionHints: [],
     inspectionMails: [],
     inspectionTablets: [],
@@ -67,7 +67,26 @@ function fakeAdminApi(page) {
       state.inspectionTablets.forEach(x=>{x.pruefdisplay=x.id===device.id;});
       return json(200,{id:device.id,pruefdisplay:true});
     }
-    if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='GET')return json(200,[]);
+    if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='GET')
+      return json(200,state.inspectionStaff);
+    const staffAction=endpoint.match(/^\/api\/admin\/pruefung\/mitarbeitende\/([^/]+)\/(deaktivieren|reaktivieren|passwort-setzen)$/);
+    if(staffAction&&method==='PATCH'){
+      const user=state.inspectionStaff.find(x=>x.id===staffAction[1]);
+      if(!user)return json(404,{error:'Mitarbeiter nicht vorhanden'});
+      const action=staffAction[2];
+      if(action==='deaktivieren'){
+        if(!user.aktiv)return json(409,{error:'Bereits deaktiviert'});
+        user.aktiv=false;return json(200,{id:user.id,aktiv:false});
+      }
+      const d=readBody();
+      if(!d.passwort||d.passwort.length<12)return json(400,{error:'Passwort zu kurz'});
+      if(action==='reaktivieren'){
+        if(user.aktiv)return json(409,{error:'Bereits aktiv'});
+        user.aktiv=true;return json(200,{id:user.id,aktiv:true,sitzungenWiderrufen:true});
+      }
+      if(!user.aktiv)return json(409,{error:'Mitarbeiter inaktiv'});
+      return json(200,{id:user.id,aktiv:true,sitzungenWiderrufen:true});
+    }
     if(endpoint==='/api/admin/pruefung/berichte'&&method==='GET')return json(200,[]);
     if(endpoint==='/api/admin/pruefung/meldungen'&&method==='GET')
       return json(200,state.inspectionMails);
@@ -93,6 +112,22 @@ function fakeAdminApi(page) {
     }
     if(endpoint==='/api/admin/pruefung/stationen'&&method==='GET')
       return json(200,state.inspectionStations);
+    const statusChange=endpoint.match(/^\/api\/admin\/pruefung\/stationen\/([^/]+)\/(deaktivieren|reaktivieren)$/);
+    if(statusChange&&method==='PATCH'){
+      const station=state.inspectionStations.find(x=>x.id===statusChange[1]),d=readBody();
+      if(!station||d.begruendung?.length<15)return json(400,{error:'Begründung fehlt'});
+      const activate=statusChange[2]==='reaktivieren';
+      if(station.aktiv===activate)return json(409,{error:'Status bereits gesetzt'});
+      station.aktiv=activate;
+      state.inspectionStatusEvents.push({
+        station_id:station.id,art:activate?'reaktiviert':'deaktiviert',
+        begruendung:d.begruendung,verantwortlich:'Testadmin',
+        erstellt_am:'2027-01-01T12:00:00Z'
+      });
+      return json(200,{...station});
+    }
+    const statusHistory=endpoint.match(/^\/api\/admin\/pruefung\/stationen\/([^/]+)\/statusverlauf$/);
+    if(statusHistory&&method==='GET')return json(200,state.inspectionStatusEvents);
     const inspectionRelease=endpoint.match(/^\/api\/admin\/pruefung\/stationen\/([^/]+)\/freigeben$/);
     if(inspectionRelease&&method==='POST'){
       const d=readBody(),station=state.inspectionStations.find(x=>x.id===inspectionRelease[1]);
@@ -608,6 +643,61 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.deepEqual(dialogs,['confirm']);
     assert.equal(state.mutations.filter(x=>x.endpoint.endsWith('/ersetzen')).length,1);
     assert.equal(state.mutations.find(x=>x.endpoint.endsWith('/ersetzen')).body.wechselBestaetigt,true);
+    await page.close();
+  });
+
+  await t.test('Mitarbeiterverwaltung: Deaktivieren, Passwort vergeben und Reaktivieren',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const id='550e8400-e29b-41d4-a716-446655440140';
+    state.inspectionStaff=[{id,name:'CI Fachkraft',email:'ci@example.test',aktiv:true}];
+    page.on('dialog',async d=>d.accept());
+    await login(page,root);
+    const card=page.locator('#pruef-personal-list article').first();
+    await card.getByText('Zugang aktiv').waitFor();
+    await card.getByRole('button',{name:'Zugang deaktivieren'}).click();
+    await page.locator('#pruef-personal-list').getByText('Zugang deaktiviert').waitFor();
+    await page.locator('#pruef-personal-list input[type="password"]').fill('Neues-Protokoll-Passwort-2026!');
+    await page.locator('#pruef-personal-list')
+      .getByRole('button',{name:'Zugang reaktivieren'}).click();
+    await page.locator('#pruef-personal-list').getByText('Zugang aktiv').waitFor();
+    assert.equal(state.inspectionStaff[0].aktiv,true);
+    assert.ok(state.mutations.some(m=>m.endpoint.endsWith('/reaktivieren')&&
+      m.body.passwort==='Neues-Protokoll-Passwort-2026!'));
+    await page.locator('#pruef-personal-list input[type="password"]').fill('Weiteres-Start-Passwort-2026!');
+    await page.locator('#pruef-personal-list')
+      .getByRole('button',{name:'Passwort zurücksetzen'}).click();
+    await page.waitForFunction(()=>document.querySelector('#pruef-personal-list input[type=password]')?.value==='');
+    assert.ok(state.mutations.some(m=>m.endpoint.endsWith('/passwort-setzen')));
+    await page.close();
+  });
+
+  await t.test('Stationsverwaltung: Deaktivierung und Reaktivierung erhält die Mangelsperre',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const dialogs=[];
+    page.on('dialog',async d=>{
+      dialogs.push(d.type());
+      if(d.type()==='prompt')
+        await d.accept('Stilllegung für Reparatur und fachliche Kontrolle erforderlich.');
+      else await d.accept();
+    });
+    await login(page,root);
+    const card=page.locator('#pruef-station-list article').first();
+    await card.getByText('GESPERRT – NICHT BENUTZEN').waitFor();
+    await card.getByRole('button',{name:'Station deaktivieren'}).click();
+    await card.getByText('STATION DEAKTIVIERT – NICHT BENUTZEN').waitFor();
+    assert.equal(state.inspectionStations[0].aktiv,false);
+    assert.ok(state.inspectionStations[0].gesperrt_am);
+    assert.equal(await card.getByRole('button',{name:'Nach fachlicher Prüfung freigeben'}).isDisabled(),true);
+    await card.getByRole('button',{name:'Station reaktivieren'}).click();
+    await card.getByText('GESPERRT – NICHT BENUTZEN').waitFor();
+    assert.equal(state.inspectionStations[0].aktiv,true);
+    assert.ok(state.inspectionStations[0].gesperrt_am);
+    await card.getByRole('button',{name:'Stilllegungs- und Reaktivierungsverlauf'}).click();
+    await card.getByText(/Stilllegung für Reparatur/).first().waitFor();
+    assert.equal(state.inspectionStatusEvents.length,2);
+    assert.deepEqual(dialogs,['prompt','confirm','prompt','confirm']);
     await page.close();
   });
 
