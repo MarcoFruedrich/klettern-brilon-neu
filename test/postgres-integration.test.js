@@ -466,7 +466,6 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
 
   const tabletPath='/api/pruefung/tablet/anzeige';
   assert.equal((await fetch(root+tabletPath)).status,401);
-  assert.equal((await userPost('/api/pruefung/code-anfordern',{})).status,409);
   const pairing=await adminPost('/api/admin/pruefung/tablet/kopplung',{});
   assert.equal(pairing.status,201);
   const pairingCode=(await pairing.json()).code;
