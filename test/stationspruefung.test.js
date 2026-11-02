@@ -55,3 +55,23 @@ test('Mängelfoto: nur kleine JPEG-Belege für defekte Stationen',()=>{
     beschreibung:'Karabiner am oberen Umlenkpunkt beschädigt',foto:jpeg}]};
   assert.equal(programmPruefen(broken,['a'],new Date('2026-11-02T11:00:00Z')).pruefungen[0].foto,jpeg);
 });
+
+test('Nicht sicherheitsrelevanter Hinweis bleibt eine Nachprüfung ohne Stationssperre',()=>{
+  const now=new Date('2026-11-02T10:00:00Z');
+  const reported=programmPruefen({programm:'Kletterangebot',
+    beginn:'2026-11-02T15:00',pruefungen:[
+      {stationId:'a',zustand:'hinweis',beschreibung:'Markierung der Griffnummer etwas verblasst'}
+    ]},['a'],now);
+  assert.equal(reported.hatMangel,false,'Hinweise dürfen keinen Sicherheitsmangel erzeugen');
+  assert.equal(reported.hatHinweis,true);
+  assert.equal(reported.pruefungen[0].zustand,'hinweis');
+  assert.match(reported.pruefungen[0].beschreibung,/Markierung/);
+  assert.throws(()=>programmPruefen({programm:'Test',beginn:'2026-11-02T15:00',
+    pruefungen:[{stationId:'a',zustand:'hinweis',beschreibung:'klein'}]},['a'],now),/Beschreibung/);
+  const mixed=programmPruefen({programm:'Test',beginn:'2026-11-02T15:00',
+    pruefungen:[{stationId:'a',zustand:'hinweis',beschreibung:'Unleserliches Stationsschild'},
+      {stationId:'b',zustand:'mangel',beschreibung:'Unsicherer Karabiner am Tragseil'}]
+  },['a','b'],now);
+  assert.equal(mixed.hatMangel,true);
+  assert.equal(mixed.hatHinweis,true);
+});
