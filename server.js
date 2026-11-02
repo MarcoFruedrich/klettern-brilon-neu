@@ -862,7 +862,9 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(ergebnis.bestaetigtJetzt){
         const data=ergebnis.buchung.data;
         const bestaetigungsText=`Deine Buchung ${data.buchungsnummer || ''} ist verbindlich bestätigt.\n`+
-          `Erfasste Zahlung: ${(ergebnis.stand.erhaltenCent/100).toFixed(2).replace('.',',')} €\n`+
+          `Gesamtpreis: ${(ergebnis.stand.gesamtCent/100).toFixed(2).replace('.',',')} €\n`+
+          `Anzahlung (25 %): ${(ergebnis.stand.anzahlungCent/100).toFixed(2).replace('.',',')} €\n`+
+          `Tatsächlich erfasst: ${(ergebnis.stand.erhaltenCent/100).toFixed(2).replace('.',',')} €\n`+
           `Offener Restbetrag: ${(ergebnis.stand.offenCent/100).toFixed(2).replace('.',',')} €\n\n`+
           `Termin: ${data.datum} um ${data.uhrzeit} Uhr`+
           (ergebnis.elternRabatt?.angewendet?'\nDer 10-%-Anschlussrabatt wurde auch auf deine ursprüngliche Buchung angewendet.':'');

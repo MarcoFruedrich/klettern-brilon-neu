@@ -36,8 +36,11 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const guestId='123e4567-e89b-12d3-a456-426614174001';
   const guestToken='gps-guest-token-for-consent-test-00000001';
   const guestTokenHash=crypto.createHash('sha256').update(guestToken).digest('hex');
-  const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
+  const mailMessages=[];
+  const preload=path.join(repo,'test-support','mocks','brevo-fetch.js');
+  const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe','ipc'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
+    NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
     MOCK_BOOKINGS:JSON.stringify(archivedBookings),
     MOCK_GPS_GAMES:JSON.stringify([
@@ -54,12 +57,22 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
         token_hash:guestTokenHash,abgeschlossen:true,einwilligung:false,einwilligung_am:null},
       {name:'Nicht öffentlich',datum:'2027-03-15',dauer_sekunden:500,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:false}
     ]),
-    RUN_SCHEMA_MIGRATIONS:'false',BREVO_API_KEY:'',BREVO_SENDER_EMAIL:'',BOOKING_NOTIFY_EMAIL:'',
+    RUN_SCHEMA_MIGRATIONS:'false',MOCK_BREVO_EMAILS:'1',BREVO_API_KEY:'test-only-mail-key',
+    BREVO_SENDER_EMAIL:'sender@example.test',BOOKING_NOTIFY_EMAIL:'operator@example.test',
     SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',BOOKING_OFFER_SECRET:offerSecret,
     ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password',ADMIN_TOTP_SECRET_BASE32:totpSecret
   }});
+  child.on('message',message=>{
+    if(message?.type==='mock-brevo-email')mailMessages.push(message.message);
+  });
   let serverErrors='';child.stderr.setEncoding('utf8');child.stderr.on('data',chunk=>{serverErrors+=chunk;});
   t.after(()=>child.kill());
+  const waitForEmails=async(expected)=>{
+    const deadline=Date.now()+1500;
+    while(mailMessages.length<expected&&Date.now()<deadline)
+      await new Promise(resolve=>setTimeout(resolve,10));
+    assert.ok(mailMessages.length>=expected,`Erwartet mindestens ${expected} Test-E-Mails, erhalten ${mailMessages.length}`);
+  };
   const root=`http://127.0.0.1:${port}`;
   let ready=false;
   for(let i=0;i<50;i++){
@@ -103,12 +116,24 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(first.status,201);
   const firstData=await first.json();
   assert.equal(firstData.buchungsnummer,'MUELLER-MAX-150327');
+  await waitForEmails(2);
+  const customerRequest=mailMessages.find(message=>message.to?.[0]?.email==='max@example.test');
+  const operatorRequest=mailMessages.find(message=>message.to?.[0]?.email==='operator@example.test');
+  assert.ok(customerRequest,'Kundenpostfach muss eine Buchungseingangsbestätigung erhalten');
+  assert.ok(operatorRequest,'Betreiberpostfach muss eine neue Buchungsanfrage erhalten');
+  for(const message of [customerRequest,operatorRequest]){
+    assert.match(message.textContent,/MUELLER-MAX-150327/);
+    assert.match(message.textContent,/Gesamtpreis: 100,00 €/);
+    assert.match(message.textContent,/Anzahlung \(25 %\): 25,00 €/);
+    assert.match(message.textContent,/Restbetrag \(75 %\): 75,00 €/);
+  }
   const conflict=await anfrage('10:00');
   assert.equal(conflict.status,409);
   const adjacent=await anfrage('11:00');
   assert.equal(adjacent.status,201);
   const adjacentData=await adjacent.json();
   assert.equal(adjacentData.buchungsnummer,'MUELLER-MAX-150327-02');
+  await waitForEmails(4);
 
   const otp=totpCode(totpSecret,Math.floor(Date.now()/30000));
   const login=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
@@ -186,6 +211,15 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const paid=await payment.json();
   assert.equal(paid.buchung.status,'bestaetigt');
   assert.equal(paid.stand.anzahlungErreicht,true);
+  await waitForEmails(6);
+  const confirmation=mailMessages.find(message=>message.to?.[0]?.email==='max@example.test'&&
+    message.subject==='Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon');
+  assert.ok(confirmation,'Bei erreichter Anzahlung wird eine Kundenbestätigung versendet');
+  assert.match(confirmation.textContent,/MUELLER-MAX-150327-02/);
+  assert.match(confirmation.textContent,/Gesamtpreis: 100,00 €/);
+  assert.match(confirmation.textContent,/Anzahlung \(25 %\): 25,00 €/);
+  assert.match(confirmation.textContent,/Tatsächlich erfasst: 25,00 €/);
+  assert.match(confirmation.textContent,/Offener Restbetrag: 75,00 €/);
   const bookingExportResponse=await fetch(root+`/api/admin/buchungen/${adjacentData.id}/export`,{headers:{Cookie:cookie}});
   assert.equal(bookingExportResponse.status,200);
   assert.match(bookingExportResponse.headers.get('content-disposition'),/attachment; filename="buchung-/);
