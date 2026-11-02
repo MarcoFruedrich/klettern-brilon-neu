@@ -13,6 +13,12 @@ function stationControl(station){
   const fieldset=text('fieldset');
   fieldset.className='booking pruefung-station';fieldset.dataset.id=station.id;
   const legend=text('legend',station.name);fieldset.append(legend);
+  if(station.gesperrt_am){
+    const warning=text('p','STATION GESPERRT – NICHT BENUTZEN. '+
+      (station.sperrgrund||'Nachprüfung und schriftliche Freigabe erforderlich.'));
+    warning.className='pruefung-gefahr';warning.setAttribute('role','alert');
+    fieldset.append(warning);
+  }
   const label=text('label');label.className='check';
   const check=document.createElement('input');check.type='checkbox';check.className='pruefung-aktiv';
   label.append(check,text('span','Station wird verwendet'));fieldset.append(label);
@@ -116,7 +122,10 @@ $('station-inspection').addEventListener('submit',async event=>{
       body:JSON.stringify({programm:form.elements.programm.value,
         beginn:form.elements.beginn.value,pruefungen})});
     form.reset();hideForm();$('onsite-unlock').hidden=false;
-    const status=data.hatMangel?'MANGEL ERFASST – betroffene Station nicht benutzen.':'Prüfung ohne gemeldeten Mangel gespeichert.';
+    const gesperrt=(data.gesperrteStationen||[]).map(x=>x.name).join(', ');
+    const status=data.hatMangel?'MANGEL ERFASST – betroffene Station nicht benutzen.':
+      gesperrt?'Prüfung gespeichert, aber weiterhin GESPERRT: '+gesperrt+'.':
+      'Prüfung ohne gemeldeten Mangel gespeichert.';
     const mail=data.benachrichtigung==='gesendet'?' Mängelmeldung versendet.':
       data.benachrichtigung==='fehlgeschlagen'?' ACHTUNG: Mängel-E-Mail fehlgeschlagen! Verantwortliche direkt informieren.':
       data.benachrichtigung==='nicht_konfiguriert'?' ACHTUNG: Mängelpostfach nicht eingerichtet! Verantwortliche direkt informieren.':'';
