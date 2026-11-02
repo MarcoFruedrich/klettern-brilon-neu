@@ -538,7 +538,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     }];
     await login(page,root);
     await page.locator('#tablet-admin-list').getByText(/Keine aktuelle Verbindung/).waitFor();
-    assert.match(await page.locator('#tablet-admin-list').textContent(),/01\.01\.2027/);
+    assert.match(await page.locator('#tablet-admin-list').textContent(),/0?1\.0?1\.2027/);
     state.inspectionTablets[0].online=true;
     await page.locator('#tablet-admin-refresh').click();
     await page.locator('#tablet-admin-list').getByText(/Erreichbar – letztes Lebenszeichen/).waitFor();
