@@ -1299,6 +1299,48 @@ function anschlussrabattStarten() {
   const kandidatenButton = document.getElementById('anschlussrabatt-kandidaten');
   const kandidatenDatum = document.getElementById('anschlussrabatt-datum');
   const kandidatenListe = document.getElementById('anschlussrabatt-kandidaten-liste');
+  const kandidatenVorschau = document.getElementById('anschlussrabatt-kandidaten-vorschau');
+  const anwendenButton = document.getElementById('anschlussrabatt-anwenden');
+  let geladeneKandidaten = [];
+  const euro = cent => (cent / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+  async function ausgewaehlteBuchungenVorschauen() {
+    const ids = Array.from(kandidatenListe.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);
+    if (anwendenButton) anwendenButton.hidden = ids.length < 2;
+    if (!kandidatenVorschau) return;
+    kandidatenVorschau.replaceChildren();
+    if (ids.length < 2) {
+      kandidatenVorschau.textContent = 'Wähle mindestens zwei bestätigte Buchungen für die Rabattvorschau.';
+      return;
+    }
+    const programme = geladeneKandidaten.filter(k => ids.includes(k.id)).map(k => ({
+      id: k.id,
+      start: new Date(Date.parse(kandidatenDatum.value + 'T00:00:00Z') + k.beginnMinuten * 60000).toISOString(),
+      ende: new Date(Date.parse(kandidatenDatum.value + 'T00:00:00Z') + k.endeMinuten * 60000).toISOString(),
+      preisCent: k.preisCent
+    }));
+    if (programme.some(p => p.preisCent === null)) {
+      kandidatenVorschau.textContent = 'Für mindestens eine Buchung fehlt ein gültiger Preis; sie kann nicht rabattiert werden.';
+      if (anwendenButton) anwendenButton.hidden = true;
+      return;
+    }
+    try {
+      const daten = await api('/api/admin/anschlussrabatt/vorschau', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ programme })
+      });
+      kandidatenVorschau.replaceChildren();
+      for (const position of daten.positionen) {
+        const kandidat = geladeneKandidaten.find(k => k.id === position.id);
+        kandidatenVorschau.append(el('p', (kandidat?.buchungsnummer || kandidat?.angebot || 'Buchung') + ': ' +
+          euro(position.endpreisCent) + ' (Rabatt ' + euro(position.rabattCent) + ')'));
+      }
+      kandidatenVorschau.append(el('strong', 'Rabatt gesamt: ' + euro(daten.rabattGesamtCent)));
+      if (!daten.rabattGesamtCent && anwendenButton) anwendenButton.hidden = true;
+      else if (anwendenButton) anwendenButton.hidden = false;
+    } catch (fehler) {
+      kandidatenVorschau.textContent = 'Vorschau fehlgeschlagen: ' + fehler.message;
+      if (anwendenButton) anwendenButton.hidden = true;
+    }
+  }
   if (kandidatenButton && kandidatenDatum && kandidatenListe) {
     kandidatenButton.addEventListener('click', async () => {
       if (!kandidatenDatum.value) {
@@ -1311,6 +1353,7 @@ function anschlussrabattStarten() {
         const daten = await api('/api/admin/anschlussrabatt/kandidaten?datum=' +
           encodeURIComponent(kandidatenDatum.value));
         kandidatenListe.replaceChildren();
+        geladeneKandidaten = daten.kandidaten;
         if (!daten.kandidaten.length) {
           kandidatenListe.append(el('p', 'Keine bestaetigten Buchungen an diesem Tag.'));
         }
@@ -1318,13 +1361,20 @@ function anschlussrabattStarten() {
           String(Math.floor(minuten / 60)).padStart(2, '0') + ':' +
           String(minuten % 60).padStart(2, '0');
         for (const kandidat of daten.kandidaten) {
-          kandidatenListe.append(el('p',
+          const label = el('label',
             (kandidat.buchungsnummer || 'Ohne Buchungsnummer') + ' | ' +
             (kandidat.angebot || 'Angebot unbekannt') + ' | ' +
             zeit(kandidat.beginnMinuten) + ' bis ' +
-            zeit(kandidat.endeMinuten)));
+            zeit(kandidat.endeMinuten) + ' | ' + euro(kandidat.preisCent || 0));
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = kandidat.id;
+          checkbox.addEventListener('change', ausgewaehlteBuchungenVorschauen);
+          label.prepend(checkbox);
+          kandidatenListe.append(label, document.createElement('br'));
         }
         kandidatenListe.append(el('small', daten.hinweis));
+        await ausgewaehlteBuchungenVorschauen();
       } catch (fehler) {
         kandidatenListe.textContent = 'Fehler: ' + fehler.message;
       } finally {
@@ -1332,6 +1382,24 @@ function anschlussrabattStarten() {
       }
     });
   }
+  if (anwendenButton) anwendenButton.addEventListener('click', async () => {
+    const buchungsIds = Array.from(kandidatenListe.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);
+    if (buchungsIds.length < 2 || !window.confirm('Den angezeigten Anschlussrabatt jetzt dauerhaft auf die ausgewählten bestätigten Buchungen anwenden? Die Buchungsbeträge und Restbeträge werden angepasst und betroffene Kunden erhalten eine Benachrichtigung.')) return;
+    anwendenButton.disabled = true;
+    kandidatenVorschau.textContent = 'Rabatt wird gespeichert ...';
+    try {
+      const daten = await api('/api/admin/anschlussrabatt/anwenden', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buchungsIds })
+      });
+      kandidatenVorschau.textContent = 'Rabatt gespeichert für ' + daten.updates.length + ' Buchungen. Preise, Zahlungen und Restbeträge wurden neu berechnet.';
+      anwendenButton.hidden = true;
+      kandidatenListe.querySelectorAll('input[type="checkbox"]').forEach(input => { input.checked = false; input.disabled = true; });
+    } catch (fehler) {
+      kandidatenVorschau.textContent = 'Rabatt konnte nicht angewendet werden: ' + fehler.message;
+    } finally {
+      anwendenButton.disabled = false;
+    }
+  });
   let zaehler = 0;
 
   function programmHinzufuegen() {

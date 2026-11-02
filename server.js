@@ -4,7 +4,7 @@
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
-const { preisFuerTeilnehmer, zahlungsstand, zahlungErgaenzen } = require('./lib/buchungslogik');
+const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, zahlungErgaenzen } = require('./lib/buchungslogik');
 const { stationFuerSpiel, stationPruefen, gpsSpieldauer, kontrollcodeHash } = require('./lib/gpsspiel');
 
 const { createClient } = require('@supabase/supabase-js');
@@ -521,6 +521,82 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       }catch(fehler){
         return reply(res,400,{error:fehler.message});
       }
+    }
+
+    if(route==='/api/admin/anschlussrabatt/anwenden'&&req.method==='POST'){
+      if(!admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      const d=await body(req),ids=Array.isArray(d?.buchungsIds)?[...new Set(d.buchungsIds)]:[];
+      if(ids.length<2||ids.length>20||ids.some(id=>typeof id!=='string'||! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)))
+        return reply(res,400,{error:'Bitte 2 bis 20 gültige Buchungen auswählen.'});
+      const ergebnis=await reservierungsTransaktion(async client=>{
+        const q=await client.query(
+          `SELECT id,status,data FROM brilon_buchungen WHERE id=ANY($1::uuid[]) FOR UPDATE`,[ids]
+        );
+        if(q.rowCount!==ids.length)return {ungueltig:true};
+        if(q.rows.some(b=>b.status!=='bestaetigt'))return {nichtBestaetigt:true};
+        const datum=q.rows[0].data.datum;
+        if(q.rows.some(b=>b.data.datum!==datum))return {verschiedeneTage:true};
+        if(q.rows.some(b=>b.data.anschlussRabatt10||Number(b.data.anschlussRabattCent)>0))
+          return {bereitsRabattiert:true};
+        const programme=q.rows.map(b=>{
+          const fenster=buchungsfenster(b.data);
+          if(!fenster||!Number.isFinite(Number(b.data.gesamtpreis)))throw new Error('Preis oder Zeitfenster fehlt.');
+          const start=new Date(datum+'T00:00:00Z').getTime()+fenster[0]*60000;
+          const ende=new Date(datum+'T00:00:00Z').getTime()+fenster[1]*60000;
+          return {id:b.id,start:new Date(start).toISOString(),ende:new Date(ende).toISOString(),
+            preisCent:Math.round(Number(b.data.gesamtpreis)*100)};
+        });
+        let positionen;
+        try{positionen=anschlussrabatte(programme);}catch(error){return {ungueltig:true,fehler:error.message};}
+        const nachPosition=new Map(positionen.map(p=>[p.id,p]));
+        const updates=[];
+        for(const buchung of q.rows){
+          const position=nachPosition.get(buchung.id);
+          if(!position?.rabattCent)continue;
+          const data=buchung.data,alterCent=position.originalCent,neuerCent=position.endpreisCent;
+          const payments=Array.isArray(data.zahlungen)?data.zahlungen:[];
+          const stand=preisNachAnschlussrabatt(alterCent,position.rabattCent,payments);
+          const anpassung={grund:'Anschlussrabatt 10 %',am:new Date().toISOString(),vonCent:alterCent,
+            rabattCent:position.rabattCent,aufCent:neuerCent};
+          data.preisanpassungen=[...(Array.isArray(data.preisanpassungen)?data.preisanpassungen:[]),anpassung];
+          data.gesamtpreis=neuerCent/100;
+          data.anschlussRabattCent=position.rabattCent;
+          data.anschlussRabatt10=true;
+          data.restbetrag=stand.offenCent/100;
+          data.zahlungsgutschriftCent=stand.gutschriftCent;
+          const saved=await client.query(
+            'UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW() WHERE id=$2 RETURNING id,buchungsnummer,status,data',
+            [JSON.stringify(data),buchung.id]
+          );
+          updates.push({buchung:saved.rows[0],rabattCent:position.rabattCent,stand});
+        }
+        if(!updates.length)return {keineAnschluesse:true};
+        return {updates};
+      });
+      if(ergebnis.ungueltig)return reply(res,400,{error:ergebnis.fehler||'Ausgewählte Buchungen sind ungültig.'});
+      if(ergebnis.nichtBestaetigt)return reply(res,409,{error:'Nur bestätigte Buchungen können rabattiert werden.'});
+      if(ergebnis.verschiedeneTage)return reply(res,409,{error:'Alle Buchungen müssen am selben Tag stattfinden.'});
+      if(ergebnis.bereitsRabattiert)return reply(res,409,{error:'Mindestens eine Buchung hat bereits einen Anschlussrabatt erhalten.'});
+      if(ergebnis.keineAnschluesse)return reply(res,409,{error:'Keine direkt anschließenden Programmzeiten gefunden.'});
+      for(const item of ergebnis.updates){
+        const data=item.buchung.data;
+        if(data.email)Promise.allSettled([brevoMail(data.email,
+          'Dein Anschlussrabatt – Klettern & Abenteuer Brilon',
+          `Für Buchung ${data.buchungsnummer||''} wurde ein einmaliger Anschlussrabatt von 10 % erfasst.\n`+
+          `Neuer Gesamtpreis: ${Number(data.gesamtpreis).toFixed(2).replace('.',',')} €\n`+
+          `Eingegangen: ${(item.stand.erhaltenCent/100).toFixed(2).replace('.',',')} €\n`+
+          `Noch offen: ${(item.stand.offenCent/100).toFixed(2).replace('.',',')} €\n`+
+          (data.zahlungsgutschriftCent?`Zahlungsgutschrift: ${(data.zahlungsgutschriftCent/100).toFixed(2).replace('.',',')} € – bitte manuell ausgleichen.\n`:'')+
+          `\nBei Fragen melde dich bitte bei uns.`)]).then(results=>results.forEach(r=>{
+            if(r.status==='rejected')console.error('Anschlussrabatt-E-Mail konnte nicht versendet werden.');
+          }));
+      }
+      return reply(res,200,{success:true,updates:ergebnis.updates.map(x=>({
+        id:x.buchung.id,buchungsnummer:x.buchung.buchungsnummer,rabattCent:x.rabattCent,
+        gesamtpreis:x.buchung.data.gesamtpreis,restbetrag:x.stand.offenCent/100,
+        zahlungsgutschriftCent:x.buchung.data.zahlungsgutschriftCent
+      }))});
     }
 
     if(route==='/api/admin/logout'&&req.method==='POST'){

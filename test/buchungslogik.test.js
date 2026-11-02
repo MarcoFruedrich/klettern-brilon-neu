@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { preisFuerTeilnehmer, zahlungsstand, zahlungErgaenzen, statusPruefen, konflikt } = require('../lib/buchungslogik');
+const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, zahlungErgaenzen, statusPruefen, konflikt } = require('../lib/buchungslogik');
 
 test('Preis wird anhand einer passenden Teilnehmerstaffel in Cent berechnet', () => {
   assert.equal(preisFuerTeilnehmer({'5-10': 125.50}, 6), 12550);
@@ -14,6 +14,17 @@ test('Anzahlung und tatsächliche Zahlungseingänge bleiben centgenau', () => {
     gesamtCent: 10001, anzahlungCent: 2500, restNachAnzahlungCent: 7501,
     erhaltenCent: 3500, offenCent: 6501, anzahlungErreicht: true, vollstaendigBezahlt: false
   });
+});
+test('Anschlussrabatt senkt den Restbetrag unter Berücksichtigung bisheriger Zahlungen', () => {
+  assert.deepEqual(preisNachAnschlussrabatt(10000, 1000, [{betragCent:2500}]), {
+    gesamtCent:9000, rabattCent:1000, erhaltenCent:2500, offenCent:6500, gutschriftCent:0
+  });
+});
+test('Anschlussrabatt weist eine Überzahlung als Gutschrift aus', () => {
+  assert.deepEqual(preisNachAnschlussrabatt(10000, 1000, [{betragCent:9500}]), {
+    gesamtCent:9000, rabattCent:1000, erhaltenCent:9500, offenCent:0, gutschriftCent:500
+  });
+  assert.throws(() => preisNachAnschlussrabatt(1000, 1100, []), /Anschlussrabatt/);
 });
 test('Ein Zahlungseingang wird einzeln ergänzt; ungültige und zu hohe Beträge werden abgelehnt', () => {
   const result = zahlungErgaenzen(10000, [{betragCent:2500,methode:'bar'}], 5000, 'ueberweisung');
