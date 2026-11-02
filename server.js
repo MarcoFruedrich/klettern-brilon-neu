@@ -1319,6 +1319,36 @@ preis=safeText(d.preis,50);
         return reply(res,200,{id:q.rows[0].id,aktiv:q.rows[0].aktiv});
       }
 
+      // Suche und Seitenwahl fuer GPS-Zugaenge - unabhaengig von der gekuerzten Admin-Buchungsliste.
+      // Es werden nur die minimalen Angaben zu bestaetigten, tourberechtigten Buchungen geliefert.
+      if(route==='/api/admin/gps/buchungen'&&req.method==='GET'){
+        const seiteText=u.searchParams.get('seite')||'1',seite=Number(seiteText),proSeite=30;
+        const suche=safeText(u.searchParams.get('suche'),120);
+        const tourId=u.searchParams.get('tourId')||'';
+        if(!/^\d+$/.test(seiteText)||!Number.isSafeInteger(seite)||seite<1||seite>100000)
+          return reply(res,400,{error:'Ungültige GPS-Buchungsseite.'});
+        if(tourId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tourId))
+          return reply(res,400,{error:'Ungültige GPS-Tour.'});
+        const params=[suche,tourId||null];
+        const where=`WHERE b.status='bestaetigt'
+          AND ($1::text='' OR concat_ws(' ',b.buchungsnummer,b.data->>'buchungsnummer',
+            b.data->>'name',b.data->>'datum',b.data->>'angebot') ILIKE '%' || $1 || '%')
+          AND ($2::uuid IS NULL OR EXISTS (
+            SELECT 1 FROM brilon_gps_touren t WHERE t.id=$2::uuid
+              AND t.aktiv=true AND t.data->>'buchbar'='true'
+              AND b.data->>'angebot'=t.data->>'angebotName'
+          ))`;
+        const count=await pool.query(`SELECT COUNT(*)::text AS anzahl FROM brilon_buchungen b ${where}`,params);
+        const q=await pool.query(
+          `SELECT b.id,COALESCE(b.buchungsnummer,b.data->>'buchungsnummer') AS buchungsnummer,
+             b.data->>'name' AS name,b.data->>'datum' AS datum,b.data->>'angebot' AS angebot
+           FROM brilon_buchungen b ${where}
+           ORDER BY b.created_at DESC,b.id DESC LIMIT $3 OFFSET $4`,
+          [...params,proSeite,(seite-1)*proSeite]
+        );
+        return reply(res,200,{buchungen:q.rows,anzahl:Number(count.rows[0]?.anzahl||0),seite,proSeite});
+      }
+
       if(route==='/api/admin/gps/spiele'&&req.method==='POST'){
         const d=await body(req),tourId=safeText(d.tourId,36),buchungId=safeText(d.buchungId,36);
         if(!/^[0-9a-f-]{36}$/i.test(tourId)||!/^[0-9a-f-]{36}$/i.test(buchungId))
