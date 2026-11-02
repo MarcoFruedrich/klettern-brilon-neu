@@ -194,8 +194,13 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await booking.locator('select:not([name="methode"])').selectOption('bestaetigt');
     await booking.locator('textarea').fill('Test: Rückruf erfolgreich');
     await booking.getByRole('button',{name:'Änderungen speichern'}).click();
-    await page.waitForFunction(()=>document.querySelector('#bookings .booking')?.textContent.includes('Bearbeitungsstatus: Bestätigt'));
-    assert.equal(state.bookings[0].status,'bestaetigt');
+    for(let attempt=0;attempt<40 && state.bookings[0].status!=='bestaetigt';attempt++)
+      await new Promise(resolve=>setTimeout(resolve,75));
+    assert.equal(state.bookings[0].status,'bestaetigt',
+      'Server-Mock hat die Statusänderung nicht erhalten: '+JSON.stringify({
+        mutations:state.mutations,karte:await booking.textContent(),meldung:await page.locator('#status').textContent()
+      }));
+    await page.waitForFunction(()=>document.querySelector('#bookings .booking')?.textContent.includes('Bearbeitungsstatus: Bestätigt'),null,{timeout:5000});
     assert.equal(state.bookings[0].bearbeitungsnotiz,'Test: Rückruf erfolgreich');
 
     const placeForm=page.locator('#admin-place-form');
