@@ -722,3 +722,11 @@ footer a {
   scroll-margin-top: 170px;
   scroll-margin-bottom: 28px;
 }
+
+/* Auf Smartphones darf die Bereichsnavigation keine Formular- und Blätterschalter verdecken. */
+@media(max-width:600px) {
+  .admin-page .admin-navigation {
+    position: static;
+    top: auto;
+  }
+}
