@@ -378,7 +378,12 @@ zahlungsButtonAktualisieren();
   }
 };    
 zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
-    c.append(speichern, zahlungSenden, loeschen, meldung);
+      const exportLink=el('a','Kundendaten exportieren (JSON)');
+      exportLink.href='/api/admin/buchungen/'+encodeURIComponent(b.id)+'/export';
+      exportLink.className='btn secondary';
+      exportLink.setAttribute('download','');
+      exportLink.title='Personenbezogene Buchungsdaten ohne interne Bearbeitungsnotiz exportieren';
+    c.append(speichern, zahlungSenden, exportLink, loeschen, meldung);
       box.append(c);
     }
 

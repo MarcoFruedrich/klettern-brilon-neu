@@ -79,6 +79,11 @@ class Pool {
           .join(' ').toLocaleLowerCase('de-DE').includes(String(params[1]).toLocaleLowerCase('de-DE'))));
       return {rows:[{anzahl:String(rows.length)}],rowCount:1};
     }
+    if (sql.includes('SELECT id,data,status,created_at,updated_at,zahlungsinfo_gesendet_am')&&sql.includes('WHERE id=$1')) {
+      const item=this.bookings.find(entry=>entry.id===params[0]);
+      return {rows:item?[{id:item.id,data:item.data,status:item.status,buchungsnummer:item.buchungsnummer,
+        created_at:item.created_at||new Date(0),updated_at:item.updated_at||null,zahlungsinfo_gesendet_am:null}]:[],rowCount:item?1:0};
+    }
     if (sql.includes('SELECT 1 FROM brilon_buchungen')) {
       const found=this.bookings.some(item=>item.data.anschlussElternId===params[0]&&item.data.angebot===params[1]&&
         item.data.uhrzeit===params[2]&&!['abgelehnt','storniert'].includes(item.status));

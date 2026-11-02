@@ -79,6 +79,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(guestDeletePrivate.status,401,'Gästelisteneinträge müssen vor unberechtigter Löschung geschützt sein');
   const paymentPrivate=await fetch(root+'/api/admin/zahlungsuebersicht');
   assert.equal(paymentPrivate.status,401,'Zahlungsdetails müssen vor unberechtigtem Zugriff geschützt sein');
+  const exportPrivate=await fetch(root+`/api/admin/buchungen/${guestId}/export`);
+  assert.equal(exportPrivate.status,401,'Kundendatenexport muss geschützt sein');
   const anfrage=(uhrzeit)=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     vorname:'Max',nachname:'Mueller',email:'max@example.test',datum:'2027-03-15',uhrzeit,
     teilnehmer:4,angebot:'Klettern',datenschutz:'on'
@@ -159,6 +161,15 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const paid=await payment.json();
   assert.equal(paid.buchung.status,'bestaetigt');
   assert.equal(paid.stand.anzahlungErreicht,true);
+  const bookingExportResponse=await fetch(root+`/api/admin/buchungen/${adjacentData.id}/export`,{headers:{Cookie:cookie}});
+  assert.equal(bookingExportResponse.status,200);
+  assert.match(bookingExportResponse.headers.get('content-disposition'),/attachment; filename="buchung-/);
+  const bookingExport=await bookingExportResponse.json();
+  assert.equal(bookingExport.kunde.email,'max@example.test');
+  assert.equal(bookingExport.buchung.referenz,adjacentData.buchungsnummer);
+  assert.equal(bookingExport.zahlung.zahlungen[0].betragCent,2500);
+  assert.equal('bearbeitungsnotiz' in bookingExport,false,'Interne Bearbeitungsnotizen gehören nicht in den Export');
+  assert.equal('spielzugang' in bookingExport,false,'GPS-Spielzugänge gehören nicht in den Kundendatenexport');
 
   const token=erzeugeZugang(adjacentData.id,offerSecret);
   const preview=await fetch(root+'/api/anschlussangebote/vorschau',{method:'POST',headers:{'Content-Type':'application/json'},

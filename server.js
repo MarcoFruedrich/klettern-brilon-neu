@@ -1394,6 +1394,34 @@ preis=safeText(d.preis,50);
         return reply(res,200,q.rows);
       }
 
+      const buchungsExport=route.match(/^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})\/export$/);
+      if(buchungsExport&&req.method==='GET'){
+        const q=await pool.query(
+          `SELECT id,data,status,created_at,updated_at,zahlungsinfo_gesendet_am
+           FROM brilon_buchungen WHERE id=$1`,[buchungsExport[1]]
+        );
+        if(!q.rowCount)return reply(res,404,{error:'Buchungsanfrage nicht gefunden.'});
+        const row=q.rows[0],data=row.data||{};
+        const exportDatensatz={
+          exportformat:'klettern-abenteuer-kundendaten-v1',exportiertAm:new Date().toISOString(),
+          kunde:{vorname:data.vorname||null,nachname:data.nachname||null,name:data.name||null,
+            email:data.email||null,telefon:data.telefon||null},
+          buchung:{referenz:row.buchungsnummer||data.buchungsnummer||null,status:row.status||'offen',
+            angebot:data.angebot||null,datum:data.datum||null,uhrzeit:data.uhrzeit||null,
+            teilnehmer:data.teilnehmer??null,dauer:data.dauer??null,nachricht:data.nachricht||null,
+            erstelltAm:row.created_at||null,aktualisiertAm:row.updated_at||null,
+            zahlungsinformationenGesendetAm:row.zahlungsinfo_gesendet_am||null},
+          zahlung:{gesamtpreis:data.gesamtpreis??null,anzahlung:data.anzahlung??null,restbetrag:data.restbetrag??null,
+            zahlungsgutschriftCent:data.zahlungsgutschriftCent??0,
+            zahlungen:(Array.isArray(data.zahlungen)?data.zahlungen:[])
+              .filter(z=>Number.isSafeInteger(z?.betragCent)&&z.betragCent>0)
+              .map(z=>({betragCent:z.betragCent,methode:z.methode||null,erhaltenAm:z.erhaltenAm||null})),
+            preisanpassungen:Array.isArray(data.preisanpassungen)?data.preisanpassungen:[]},
+          datenschutzangabe:data.datenschutz||null
+        };
+        return reply(res,200,exportDatensatz,{'Content-Disposition':`attachment; filename="buchung-${buchungsExport[1]}.json"`});
+      }
+
       const buchungLoeschen=route.match(
         /^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})$/
       );
