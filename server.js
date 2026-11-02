@@ -2,6 +2,7 @@
 // Klettern & Abenteuer Brilon – Node.js / PostgreSQL
 'use strict';
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
+const { buchungsreferenz } = require('./lib/buchungsreferenz');
 
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
@@ -119,7 +120,9 @@ async function main(req,res){
       const d=await body(req);
       if(d.website)return reply(res,201,{success:true});
 
-      const name=safeText(d.name,120),
+      const vorname=safeText(d.vorname,80),
+            nachname=safeText(d.nachname,80),
+            name=(vorname+' '+nachname).trim(),
             email=safeText(d.email,180),
             datum=safeText(d.datum,10),
             angebot=safeText(d.angebot,120),
@@ -156,7 +159,7 @@ if (gruppe) {
   }
 }
       const data={
-       name,email,datum,angebot,teilnehmer,
+       name,vorname,nachname,email,datum,angebot,teilnehmer,
 gesamtpreis,
 anzahlung: gesamtpreis === null ? null : Math.round(gesamtpreis * 25) / 100,
 restbetrag: gesamtpreis === null ? null : Math.round(gesamtpreis * 75) / 100,
@@ -238,7 +241,7 @@ Promise.allSettled([
 });
 
 
-      return reply(res,201,{success:true,id:ergebnis.id});
+      return reply(res,201,{success:true,id:ergebnis.id,buchungsnummer:ergebnis.buchungsnummer});
     }
 
     if(route==='/api/belegte-zeiten'&&req.method==='GET'){
@@ -1151,6 +1154,8 @@ async function start(){
 await pool.query(
   'ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS zahlungsinfo_gesendet_am TIMESTAMPTZ'
 );
+await pool.query('ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS buchungsnummer TEXT');
+await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_buchungen_buchungsnummer_unique ON brilon_buchungen (buchungsnummer)');
 
     await pool.query(
       'CREATE TABLE IF NOT EXISTS brilon_aktionen (id BIGSERIAL PRIMARY KEY,titel TEXT NOT NULL,datum DATE,beschreibung TEXT,created_at TIMESTAMPTZ DEFAULT NOW())'
