@@ -5,14 +5,32 @@ const status = document.getElementById('status');
 let refreshSequenz=0;
 let bookingPage=1;
 let zahlungsPage=1,zahlungsLadeSequenz=0;
+let csrfToken=null;
+
+async function adminCsrfTokenLaden(){
+  if(csrfToken)return csrfToken;
+  const r=await fetch('/api/admin/csrf',{credentials:'same-origin'});
+  const daten=await r.json();
+  if(!r.ok)throw Error(daten.error||'Admin-Sitzung ist abgelaufen.');
+  if(typeof daten.csrfToken!=='string')throw Error('CSRF-Token konnte nicht geladen werden.');
+  csrfToken=daten.csrfToken;
+  return csrfToken;
+}
 
 async function api(path, options = {}) {
+  const method=String(options.method||'GET').toUpperCase();
+  const headers=new Headers(options.headers||{});
+  if(!['GET','HEAD','OPTIONS'].includes(method)&&path!=='/api/admin/login')
+    headers.set('X-CSRF-Token',await adminCsrfTokenLaden());
   const r = await fetch(path, {
     credentials: 'same-origin',
-    ...options
+    ...options,
+    headers
   });
   const j = await r.json();
   if (!r.ok) throw Error(j.error || 'Fehler');
+  if(path==='/api/admin/login')csrfToken=j.csrfToken||null;
+  if(path==='/api/admin/logout')csrfToken=null;
   return j;
 }
 
@@ -449,7 +467,8 @@ bildButton.onclick = async () => {
         method: 'POST',
         credentials: 'same-origin',
         headers: {
-          'Content-Type': datei.type
+          'Content-Type': datei.type,
+          'X-CSRF-Token': await adminCsrfTokenLaden()
         },
         body: datei
       }
@@ -1323,8 +1342,10 @@ bildButton.addEventListener('click', async () => {
       '/api/admin/angebote/' + angebot.id + '/bild',
       {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
-          'Content-Type': datei.type
+          'Content-Type': datei.type,
+          'X-CSRF-Token': await adminCsrfTokenLaden()
         },
         body: datei
       }

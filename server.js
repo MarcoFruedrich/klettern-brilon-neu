@@ -139,11 +139,23 @@ async function session(req){
   if(exp<=jetzt){sessions.delete(token);return {valid:false};}
   return {valid:true};
 }
+function adminCsrfToken(token){
+  return crypto.createHmac('sha256',token).update('brilon-admin-csrf-v1').digest('hex');
+}
+function adminCsrfValid(req){
+  const sessionToken=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/)?.[1];
+  const supplied=req.headers['x-csrf-token'];
+  if(!sessionToken||typeof supplied!=='string'||! /^[a-f0-9]{64}$/i.test(supplied))return false;
+  return crypto.timingSafeEqual(Buffer.from(adminCsrfToken(sessionToken),'hex'),Buffer.from(supplied,'hex'));
+}
 async function admin(req,res){
   const auth=await session(req);
   if(auth.unavailable){reply(res,503,{error:'Admin-Sitzungsspeicher ist nicht verfügbar.'});return false;}
   if(!auth.valid){reply(res,401,{error:'Bitte anmelden.'});return false}
   if(!sameOriginMutation(req)){reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});return false}
+  if(!['GET','HEAD','OPTIONS'].includes(String(req.method||'').toUpperCase())&&!adminCsrfValid(req)){
+    reply(res,403,{error:'CSRF-Prüfung fehlgeschlagen. Bitte Verwaltung neu laden.'});return false;
+  }
   return true;
 }
 
@@ -667,9 +679,15 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         abgelaufeneEintraegeEntfernen(sessions);
         sessions.set(token,ablauf.getTime());
       }
-      return reply(res,200,{success:true},{
+      return reply(res,200,{success:true,csrfToken:adminCsrfToken(token)},{
         'Set-Cookie':`${cookieName}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`
       });
+    }
+
+    if(route==='/api/admin/csrf'&&req.method==='GET'){
+      if(!await admin(req,res))return;
+      const token=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/)?.[1];
+      return reply(res,200,{csrfToken:adminCsrfToken(token)});
     }
 
     // Nur Vorschau: keine Buchung und kein Zahlungssaldo wird veraendert.
@@ -768,7 +786,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
     if(route==='/api/admin/logout'&&req.method==='POST'){
       const match=(req.headers.cookie||'').match(/brilon_session=([a-f0-9]{64})/);
-      if(!sameOriginMutation(req))return reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});
+      if(!await admin(req,res))return;
       if(match){
         if(pool){
           try{await pool.query('DELETE FROM brilon_admin_sessions WHERE token_hash=$1',[gpsTokenHash(match[1])]);}

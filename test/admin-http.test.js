@@ -61,6 +61,11 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
   assert.match(setCookie, /Secure/i);
   assert.match(setCookie, /SameSite=Strict/i);
   const cookie = setCookie.split(';', 1)[0];
+  const loginData=await login.json();
+  assert.match(loginData.csrfToken,/^[a-f0-9]{64}$/);
+  const csrfResponse=await fetch(root+'/api/admin/csrf',{headers:{Cookie:cookie}});
+  assert.equal(csrfResponse.status,200,'Ein angemeldeter Browser muss das Sitzungstoken nach einem Neuladen erneut abrufen können');
+  assert.equal((await csrfResponse.json()).csrfToken,loginData.csrfToken);
 
   const authenticated = await fetch(root + '/api/admin/buchungen', { headers: { Cookie: cookie } });
   assert.equal(authenticated.status, 503, 'Sitzung wurde akzeptiert; nur die absichtlich fehlende DB blockiert');
@@ -76,11 +81,18 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
   const crossSiteFetch = await fetch(route, { method: 'POST', headers: { Cookie: cookie, Origin: root,
     'Sec-Fetch-Site': 'cross-site', 'Content-Type': 'application/json' }, body });
   assert.equal(crossSiteFetch.status, 403, 'Cross-Site-Schreibanfragen müssen auch bei passendem Origin-Scheinwert scheitern');
-  const sameOrigin = await fetch(route, { method: 'POST', headers: { Cookie: cookie, Origin: root, 'Content-Type': 'application/json' }, body });
+  const missingCsrf=await fetch(route,{method:'POST',headers:{Cookie:cookie,Origin:root,'Content-Type':'application/json'},body});
+  assert.equal(missingCsrf.status,403,'Admin-Schreibanfragen ohne CSRF-Token müssen scheitern');
+  const wrongCsrf=await fetch(route,{method:'POST',headers:{Cookie:cookie,Origin:root,'X-CSRF-Token':'0'.repeat(64),
+    'Content-Type':'application/json'},body});
+  assert.equal(wrongCsrf.status,403,'Ungültige CSRF-Token müssen scheitern');
+  const sameOrigin = await fetch(route, { method: 'POST', headers: { Cookie: cookie, Origin: root,
+    'X-CSRF-Token':loginData.csrfToken,'Content-Type': 'application/json' }, body });
   assert.equal(sameOrigin.status, 200);
   const preview = await sameOrigin.json();
   assert.equal(preview.rabattGesamtCent, 200);
-  const logout=await fetch(root+'/api/admin/logout',{method:'POST',headers:{Cookie:cookie,Origin:root}});
+  const logout=await fetch(root+'/api/admin/logout',{method:'POST',headers:{Cookie:cookie,Origin:root,
+    'X-CSRF-Token':loginData.csrfToken}});
   assert.equal(logout.status,200);
   const afterLogout=await fetch(root+'/api/admin/buchungen',{headers:{Cookie:cookie}});
   assert.equal(afterLogout.status,401,'Abmelden muss die Sitzung sofort widerrufen');

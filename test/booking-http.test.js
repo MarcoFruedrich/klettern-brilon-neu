@@ -104,6 +104,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     body:JSON.stringify({username:'test-admin',password:'test-only-password'})});
   assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie').split(';',1)[0];
+  const loginData=await login.json();
   const unauthCalendar=await fetch(root+'/api/admin/kalenderbuchungen?monat=2026-01');
   assert.equal(unauthCalendar.status,401,'Kalenderbuchungen müssen geschützt sein');
   const calendar=await fetch(root+'/api/admin/kalenderbuchungen?monat=2026-01',{headers:{Cookie:cookie}});
@@ -120,7 +121,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(paymentResult.summen.offenCent,515000);
   const invalidPaymentPage=await fetch(root+'/api/admin/zahlungsuebersicht?seite=0',{headers:{Cookie:cookie}});
   assert.equal(invalidPaymentPage.status,400);
-  const adminHeaders={Cookie:cookie,Origin:root,'Content-Type':'application/json'};
+  const adminHeaders={Cookie:cookie,Origin:root,'X-CSRF-Token':loginData.csrfToken,'Content-Type':'application/json'};
   const addPlace=await fetch(root+'/api/admin/orte',{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Sundern'})});
   assert.equal(addPlace.status,201);
   const activePlaces=await fetch(root+'/api/admin/orte',{headers:{Cookie:cookie}});
@@ -234,7 +235,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(restoredParent.data.gesamtpreis,100);
   assert.equal(restoredParent.data.restbetrag,75);
   assert.ok(restoredParent.data.preisanpassungen.length>=2);
-  const logout=await fetch(root+'/api/admin/logout',{method:'POST',headers:{Cookie:cookie,Origin:root}});
+  const logout=await fetch(root+'/api/admin/logout',{method:'POST',headers:adminHeaders});
   assert.equal(logout.status,200);
   const afterLogout=await fetch(root+'/api/admin/buchungen',{headers:{Cookie:cookie}});
   assert.equal(afterLogout.status,401,'Datenbanksitzung muss nach Abmelden widerrufen sein');
