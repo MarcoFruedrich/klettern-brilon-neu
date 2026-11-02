@@ -514,7 +514,9 @@ async function gpsTourenLaden(buchungen) {
         const a=document.createElement('a');a.href=target;a.textContent=station.id+': '+target;a.target='_blank';a.rel='noopener';
         const p=el('p');p.append(a);qr.append(p);
       }
-      card.append(edit,toggle,gaeste,qr);liste.append(card);
+      const print=el('button','QR-Etiketten drucken');print.type='button';print.className='btn secondary';
+      print.onclick=()=>gpsEtikettenDrucken(tour);
+      card.append(edit,toggle,gaeste,qr,print);liste.append(card);
       if(tour.aktiv&&tour.buchbar){const o=el('option',tour.titel);o.value=tour.id;tourSelect.append(o);}
     }
     const placeholder=el('option','Tour auswählen');placeholder.value='';tourSelect.prepend(placeholder);
@@ -524,6 +526,33 @@ async function gpsTourenLaden(buchungen) {
     }
     const noBooking=el('option','Bestätigte Buchung auswählen');noBooking.value='';buchungSelect.prepend(noBooking);
   }catch(error){document.getElementById('gps-tour-status').textContent='GPS-Verwaltung nicht verfügbar: '+error.message;}
+}
+
+function gpsEtikettenDrucken(tour){
+  const printWindow=window.open('','_blank');
+  if(!printWindow){status.textContent='Druckansicht wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben.';return;}
+  printWindow.opener=null;
+  const doc=printWindow.document;doc.open();doc.write('<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GPS-Etiketten</title></head><body></body></html>');doc.close();
+  const style=doc.createElement('style');
+  style.textContent='*{box-sizing:border-box}body{font:16px/1.4 system-ui,sans-serif;color:#173d34;margin:0;padding:20px}.toolbar{position:sticky;top:0;background:#fff;padding:8px 0 16px}.toolbar button{font:inherit;font-weight:700;padding:12px 18px}.sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(75mm,1fr));gap:8mm}.label{border:1px solid #62776d;border-radius:3mm;padding:7mm;text-align:center;break-inside:avoid}.label h2{font-size:17pt;margin:0 0 3mm}.label p{font-size:11pt;margin:2mm 0}.label img{display:block;width:56mm;height:56mm;margin:4mm auto}.hint{font-size:9pt;color:#40564d}@media print{body{padding:0}.toolbar{display:none}.sheet{grid-template-columns:repeat(2,1fr);gap:5mm}.label{min-height:85mm}.label img{width:52mm;height:52mm}}';
+  doc.head.append(style);
+  doc.title=`QR-Etiketten · ${tour.titel}`;
+  const toolbar=doc.createElement('div');toolbar.className='toolbar';
+  const printButton=doc.createElement('button');printButton.type='button';printButton.textContent='Etiketten drucken';printButton.onclick=()=>printWindow.print();toolbar.append(printButton);
+  const heading=doc.createElement('p');heading.textContent=`GPS-Tour: ${tour.titel} · ${tour.stationen.length} Stationsetiketten · Zahlencodes sind nicht enthalten.`;toolbar.append(heading);doc.body.append(toolbar);
+  const sheet=doc.createElement('main');sheet.className='sheet';
+  try{
+    for(const station of tour.stationen){
+      const target=new URL('/gps.html',location.origin);target.searchParams.set('station',station.qrId);
+      const label=doc.createElement('article');label.className='label';
+      const title=doc.createElement('h2');title.textContent=tour.titel;label.append(title);
+      const image=doc.createElement('img');image.alt=`QR-Code für Station ${station.id}`;image.src=window.GPSQrEtiketten.dataUri(target.toString());label.append(image);
+      const name=doc.createElement('p');name.textContent=`Station ${station.id}`;label.append(name);
+      const note=doc.createElement('p');note.className='hint';note.textContent='QR-Code scannen und den vor Ort ausgegebenen Zahlencode eingeben.';label.append(note);
+      sheet.append(label);
+    }
+  }catch(error){printWindow.close();status.textContent='QR-Etiketten konnten nicht erstellt werden: '+error.message;return;}
+  doc.body.append(sheet);
 }
 
 async function adminGaestelisteLaden(){

@@ -39,6 +39,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Die GPS-Gästeliste ist jetzt zusätzlich zentral im Admin-Bereich nach Tour filterbar. Der Admin-Endpunkt liefert ausschließlich abgeschlossene Spiele mit expliziter Einwilligung, verlangt eine gültige Sitzung und gibt weder Spielzugang noch interne Spieldaten aus.
 - Admins können einen öffentlichen Gästelisteneintrag nach Bestätigung entfernen. Dabei werden Name und Einwilligung gelöscht; Abschlusszeit und Spielzeit bleiben für den internen Spielstand erhalten. Der HTTP-Test prüft Adminschutz und dass der Name danach auch aus der öffentlichen Gästeliste verschwindet.
 - Bei öffentlicher Zustimmung wird nun zusätzlich der Einwilligungszeitpunkt gespeichert und nur in der geschützten Admin-Gästeliste angezeigt. Ein Widerruf entfernt auch diesen Zeitpunkt. Die dazugehörige Spaltenmigration ist migrationsgeschützt und wurde nicht ausgeführt.
+- Die GPS-Verwaltung erzeugt QR-Etiketten lokal als SVG aus den festen Stationskennungen und öffnet einen druckbaren Satz pro Tour. Die QR-Grafik enthält nur den Stationslink, keine Koordinaten oder Kontrollcodes. Dafür ist qrcode-generator von Kazuhiko Arase lokal mit MIT-Lizenz beigefügt; es werden keine externen QR-Dienste verwendet.
 - Die Zahlungsübersicht fasst tatsächliche Zahlungseingänge, offene Salden und Gutschriften zusammen. Einzelne Zahlungseinträge lassen sich pro Buchung aufklappen; Summen werden centgenau berechnet. Die Übersicht nutzt wie die Buchungsverwaltung die zuletzt geladenen 250 Buchungen.
 - Buchungssuche und Statusfilter werden nun parametrisiert in PostgreSQL ausgeführt, bevor die Trefferbegrenzung von 250 greift. Dadurch findet die Suche auch ältere Buchungen; parallele Suchanfragen können keine veraltete Ergebnisliste mehr überschreiben.
 - Veranstaltungsorte lassen sich jetzt zentral unter „Einstellungen“ ergänzen und einsehen. Die aktive Ortsliste bleibt mit der Programmauswahl synchron; das Hinzufügen eines Orts ändert keine bestehenden Programme oder Buchungen.
@@ -53,7 +54,8 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 34 bestanden, 0 fehlgeschlagen.
+- `npm test` – 36 bestanden, 0 fehlgeschlagen.
+- QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - `node --check test/booking-http.test.js` – bestanden.
 - `node --check test/admin-navigation.test.js` – bestanden.
@@ -68,7 +70,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 - Eine Admin-Sitzung wird im Arbeitsspeicher gehalten. Für mehrere Instanzen/Neustarts fehlt weiterhin ein persistenter Session-Store; zusätzlich sind CSRF-/Origin-Prüfung, Sitzungsrotation und ein zweiter Faktor zu prüfen.
 - Buchungssuche und Statusfilter durchsuchen die Datenbank, die Trefferanzeige bleibt auf 250 Zeilen begrenzt. Kalender und Zahlungsübersicht beziehen sich weiterhin auf die 250 zuletzt geladenen Buchungen.
 - Die kundenseitige Anschlussstrecke ist im HTTP-Test mit einem PostgreSQL-Test-Double abgedeckt. Eine erkannte Überzahlung/Gutschrift wird nicht automatisch ausgezahlt; dafür ist ein kontrollierter Erstattungsprozess erforderlich.
-- GPS benötigt noch QR-Code-Erzeugung und druckbare Etiketten. Die Verwaltung zeigt dafür stationäre QR-Zieladressen. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.
+- QR-Etiketten können erzeugt und gedruckt werden. Ausdrucke müssen vor dem Einsatz an den Stationen praktisch mit mehreren Smartphones gescannt werden. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.
 - Die 15 Fragen umfassende Mustertour liegt als Entwurf vor. Koordinaten, Routenführung, Zugänglichkeit und praktische Sicherheit müssen vor Veröffentlichung örtlich geprüft werden.
 - Der Status der produktiven Schema- und Kalenderdefinitionen ist noch zu ermitteln. Die Tabellen werden für lokale/isolierte Tests nicht automatisch angelegt.
 - Datenschutz- und Löschkonzept, Auskunft/Export, Versionierung des Einwilligungstexts sowie verbindliche Bedingungen sind noch zu entwickeln und fachlich zu prüfen.
@@ -81,7 +83,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 1. Lokal Node.js 20+ und Abhängigkeiten bereitstellen.
 2. Für eine isolierte Entwicklungsdatenbank `DATABASE_URL`, `ADMIN_USER`, `ADMIN_PASSWORD` und ein mindestens 32 Zeichen langes `GPS_CODE_SECRET` konfigurieren. Keine Produktivzugangsdaten verwenden.
 3. Schemaänderungen bleiben standardmäßig aus. Nur in einer eigens angelegten Testdatenbank und nach Schema-Review `RUN_SCHEMA_MIGRATIONS=true` setzen.
-4. `npm start` starten und `/admin.html` öffnen. Unter „Einstellungen“ Veranstaltungsorte ergänzen; neue Programme können diese anschließend auswählen. Die Zahlungsübersicht zeigt Eingangssummen, offene Beträge und dokumentierte Gutschriften; Einzelbuchungen lassen sich aufklappen. Zahlungseingänge werden zusätzlich direkt in der jeweiligen Buchung erfasst. Unter „Anschlussrabatt“ bestätigte Buchungen desselben Tages wählen, die Vorschau prüfen und erst dann die dauerhafte Anwendung bestätigen. Bestätigungs-E-Mails führen mit den genannten Zugangseinstellungen zur passenden Anschlussseite. Unter GPS eine Tour mit vollständigem Stations-JSON anlegen, die dauerhaften Standort-QR-Codes auf die angezeigten Zieladressen verweisen lassen und für bestätigte Buchungen Spielzugänge erstellen.
+4. `npm start` starten und `/admin.html` öffnen. Unter „Einstellungen“ Veranstaltungsorte ergänzen; neue Programme können diese anschließend auswählen. Die Zahlungsübersicht zeigt Eingangssummen, offene Beträge und dokumentierte Gutschriften; Einzelbuchungen lassen sich aufklappen. Zahlungseingänge werden zusätzlich direkt in der jeweiligen Buchung erfasst. Unter „Anschlussrabatt“ bestätigte Buchungen desselben Tages wählen, die Vorschau prüfen und erst dann die dauerhafte Anwendung bestätigen. Bestätigungs-E-Mails führen mit den genannten Zugangseinstellungen zur passenden Anschlussseite. Unter GPS eine Tour mit vollständigem Stations-JSON anlegen und pro Tour „QR-Etiketten drucken“ wählen. Die Etiketten enthalten Station und QR-Link, aber keine Kontrollcodes; diese müssen separat vor Ort verwaltet werden. Für bestätigte Buchungen lassen sich Spielzugänge erstellen.
 5. Benachrichtigungen nur mit Test-Mailpostfach und `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` und optional `BOOKING_NOTIFY_EMAIL` testen.
 
 ## Veröffentlichungsstatus

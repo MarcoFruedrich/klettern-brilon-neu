@@ -46,6 +46,10 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     catch{await new Promise(resolve=>setTimeout(resolve,50));}
   }
   assert.equal(ready,true,'Server sollte mit dem PostgreSQL-Test-Double starten');
+  const qrLibrary=await fetch(root+'/vendor/qrcode-generator.js');
+  assert.equal(qrLibrary.status,200,'Lokale QR-Bibliothek muss über die Website erreichbar sein');
+  const qrBuilder=await fetch(root+'/qr-etiketten.js');
+  assert.equal(qrBuilder.status,200,'Lokaler QR-Etikettengenerator muss über die Website erreichbar sein');
   const missingGuestName=await fetch(root+'/api/gps/abschluss',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({token:guestToken,einwilligung:true,name:''})});
   assert.equal(missingGuestName.status,400,'Ein öffentlicher Eintrag erfordert einen freiwilligen Namen');
