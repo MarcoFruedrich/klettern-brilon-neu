@@ -2163,6 +2163,16 @@ await pool.query(`
       erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsereignisse_station_idx ON brilon_pruef_stationsereignisse(station_id,erstellt_am DESC)');
+    // Administrative station changes do not alter the historic defect/release log.
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationsstatus (
+      id UUID PRIMARY KEY,
+      station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
+      art TEXT NOT NULL CHECK(art IN ('deaktiviert','reaktiviert')),
+      begruendung TEXT NOT NULL,
+      verantwortlich TEXT NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsstatus_station_idx ON brilon_pruef_stationsstatus(station_id,erstellt_am DESC)');
     await pool.query('ALTER TABLE brilon_pruef_berichte ADD COLUMN IF NOT EXISTS hat_hinweis BOOLEAN NOT NULL DEFAULT false');
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_hinweise(
       id UUID PRIMARY KEY,station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
