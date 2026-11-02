@@ -89,13 +89,6 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       await page.evaluate(()=>checkTablet());
       assert.equal(await page.locator('#tablet-digits').textContent(),'');
       assert.equal(await page.locator('#tablet-marketing').isVisible(),true);
-      enabled=false;
-      await page.evaluate(()=>checkTablet());
-      assert.equal(await page.locator('#tablet-pairing').isVisible(),true);
-      assert.equal(await page.locator('#tablet-digits').textContent(),'');
-      const dims=await page.evaluate(()=>({a:document.documentElement.scrollWidth,b:document.documentElement.clientWidth}));
-      assert.ok(dims.a<=dims.b+2,'Tablet view cannot horizontally overflow '+JSON.stringify(dims));
-      assert.deepEqual(errors,[]);
       // Ein Browser-Neustart der Seite zeigt Werbung und holt erneut den Status,
       // ohne Benutzerinteraktion oder erneute Kopplung.
       await page.reload();
@@ -103,6 +96,13 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       await page.waitForFunction(()=>document.getElementById('tablet-connection').textContent.includes('Gekoppeltes Tablet'));
       assert.equal(await page.locator('#tablet-pairing').isHidden(),true);
       assert.equal(await page.locator('#tablet-digits').textContent(),'');
+      enabled=false;
+      await page.evaluate(()=>checkTablet());
+      assert.equal(await page.locator('#tablet-pairing').isVisible(),true);
+      assert.equal(await page.locator('#tablet-digits').textContent(),'');
+      const dims=await page.evaluate(()=>({a:document.documentElement.scrollWidth,b:document.documentElement.clientWidth}));
+      assert.ok(dims.a<=dims.b+2,'Tablet view cannot horizontally overflow '+JSON.stringify(dims));
+      assert.deepEqual(errors,[]);
       await page.close();
     });
   }
