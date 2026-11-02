@@ -37,7 +37,7 @@ const securityHeaders={
 };
 const brevoMail=createBrevoMailer();
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
-async function body(req,maxBytes=16000){let data='';let total=0;for await(const chunk of req){total+=chunk.length;if(total>maxBytes)throw Error('Anfrage zu groß');data+=chunk.toString('utf8')}try{return JSON.parse(data)}catch{throw Error('Ungültiges JSON')}}
+async function body(req,maxBytes=16000){const chunks=[];let total=0;for await(const chunk of req){total+=chunk.length;if(total>maxBytes)throw Error('Anfrage zu groß');chunks.push(chunk)}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){return rateLimiter.erlauben(key,max,window)}
 async function totpStepEinmalig(factorId,step){
   if(pool){
