@@ -127,6 +127,11 @@
         <p>Unverbindliche Vorschau: Bei direkt aufeinanderfolgenden Programmen
           werden beide Programme um 10 % reduziert. Ein Programm erhaelt
           den Rabatt auch bei zwei Anschluessen nur einmal.</p>
+        <label>Bestehende Buchungen am Datum anzeigen
+          <input id="anschlussrabatt-datum" type="date">
+        </label>
+        <button type="button" id="anschlussrabatt-kandidaten" class="btn secondary">Bestätigte Termine laden</button>
+        <div id="anschlussrabatt-kandidaten-liste" role="status" aria-live="polite"></div>
         <div id="anschlussrabatt-positionen"></div>
         <button type="button" id="anschlussrabatt-hinzufuegen" class="btn secondary">Weiteres Programm</button>
         <button type="button" id="anschlussrabatt-berechnen" class="btn">Rabatt berechnen</button>
