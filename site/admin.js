@@ -583,21 +583,102 @@ document.getElementById('gps-booking-next')?.addEventListener('click',()=>{
   gpsBuchungsSeite++;gpsBuchungenLaden();
 });
 
+let gpsZugangsSeite=1,gpsZugangsSequenz=0;
+async function gpsZugaengeLaden(){
+  const seq=++gpsZugangsSequenz;
+  const list=document.getElementById('gps-access-list');
+  const status=document.getElementById('gps-access-status');
+  const pager=document.getElementById('gps-access-pagination');
+  const prev=document.getElementById('gps-access-prev');
+  const next=document.getElementById('gps-access-next');
+  const info=document.getElementById('gps-access-page-info');
+  if(!list||!status)return;
+  const tourId=document.getElementById('gps-access-tour')?.value||'';
+  const query=new URLSearchParams({seite:String(gpsZugangsSeite)});
+  if(tourId)query.set('tourId',tourId);
+  list.replaceChildren();
+  status.textContent='Spielzugänge werden geladen …';
+  if(pager)pager.hidden=true;
+  try{
+    const result=await api('/api/admin/gps/spiele?'+query);
+    if(seq!==gpsZugangsSequenz)return;
+    const pages=Math.max(1,Math.ceil(result.anzahl/result.proSeite));
+    if(gpsZugangsSeite>pages){gpsZugangsSeite=pages;return gpsZugaengeLaden();}
+    status.textContent=result.anzahl
+      ?result.anzahl+' ausgestellte Spielzugänge gefunden.'
+      :'Noch keine Spielzugänge für diese Auswahl vorhanden.';
+    if(pager)pager.hidden=result.anzahl<=result.proSeite;
+    if(info)info.textContent='Seite '+result.seite+' / '+pages;
+    if(prev)prev.disabled=gpsZugangsSeite<=1;
+    if(next)next.disabled=gpsZugangsSeite>=pages;
+    for(const game of result.spiele){
+      const card=el('article');card.className='booking';
+      const states={ausgestellt:'Ausgestellt',gestartet:'Gestartet',
+        abgeschlossen:'Abgeschlossen',gesperrt:'Gesperrt',
+        nicht_freigegeben:'Derzeit nicht freigegeben'};
+      const date=v=>v?new Date(v).toLocaleString('de-DE'):'—';
+      card.append(el('strong',game.buchungsnummer||game.name||'GPS-Spielzugang'),
+        el('p',[game.tour,game.name,game.datum].filter(Boolean).join(' · ')),
+        el('p','Status: '+(states[game.status]||'Unbekannt')),
+        el('p','Ausgestellt: '+date(game.erstelltAm)+' · Gestartet: '+date(game.gestartetAm)),
+        el('p','Beendet: '+date(game.abgeschlossenAm)+
+          (game.gesperrtAm?' · Gesperrt: '+date(game.gesperrtAm):'')));
+      if(game.status!=='gesperrt'){
+        const revoke=el('button','Zugang dauerhaft sperren');
+        revoke.type='button';revoke.className='btn danger';
+        revoke.addEventListener('click',async()=>{
+          if(!confirm('Diesen Spielzugang dauerhaft sperren? Das unterbricht auch laufende Spiele.'))return;
+          revoke.disabled=true;
+          try{
+            await api('/api/admin/gps/spiele/'+encodeURIComponent(game.id)+'/sperren',
+              {method:'PATCH'});
+            await gpsZugaengeLaden();
+          }catch(error){
+            status.textContent='Sperrung fehlgeschlagen: '+error.message;
+            revoke.disabled=false;
+          }
+        });
+        card.append(revoke);
+      }
+      list.append(card);
+    }
+  }catch(error){
+    if(seq!==gpsZugangsSequenz)return;
+    status.textContent='Spielzugänge konnten nicht geladen werden: '+error.message;
+  }
+}
+document.getElementById('gps-access-tour')?.addEventListener('change',()=>{
+  gpsZugangsSeite=1;gpsZugaengeLaden();
+});
+document.getElementById('gps-access-refresh')?.addEventListener('click',gpsZugaengeLaden);
+document.getElementById('gps-access-prev')?.addEventListener('click',()=>{
+  if(gpsZugangsSeite>1){gpsZugangsSeite--;gpsZugaengeLaden();}
+});
+document.getElementById('gps-access-next')?.addEventListener('click',()=>{
+  gpsZugangsSeite++;gpsZugaengeLaden();
+});
+
 async function gpsTourenLaden() {
   const tourSelect=document.querySelector('#gps-game-form [name="tourId"]');
   const buchungSelect=document.querySelector('#gps-game-form [name="buchungId"]');
   const gaestelistenTour=document.getElementById('admin-guestbook-tour');
+  const zugangsTour=document.getElementById('gps-access-tour');
   const liste=document.getElementById('gps-tour-list');
   if(!tourSelect||!buchungSelect||!liste)return;
   try{
     const vorherigeTour=tourSelect.value;
+    const vorherigerZugangsFilter=zugangsTour?.value||'';
     const tours=await api('/api/admin/gps/touren');
     liste.replaceChildren();tourSelect.replaceChildren();
+    if(zugangsTour){
+      const alle=el('option','Alle GPS-Touren');alle.value='';zugangsTour.replaceChildren(alle);
+    }
     if(gaestelistenTour){
       const alle=el('option','Alle Touren');alle.value='';gaestelistenTour.replaceChildren(alle);
     }
     for(const tour of tours){
       if(gaestelistenTour){const option=el('option',tour.titel);option.value=tour.id;gaestelistenTour.append(option);}
+      if(zugangsTour){const option=el('option',tour.titel);option.value=tour.id;zugangsTour.append(option);}
       const card=el('article');card.className='booking';
       card.append(el('strong',tour.titel),el('p',`${tour.stationen.length} Stationen · ${tour.schwierigkeitsgrad} · ${tour.altersgruppe}`),
         el('p',`${tour.aktiv?'Aktiv':'Deaktiviert'} · ${tour.buchbar?'buchbar':'nicht buchbar'} · ${tour.startpunkt} → ${tour.ziel}`));
@@ -633,7 +714,11 @@ async function gpsTourenLaden() {
     const placeholder=el('option','Tour auswählen');placeholder.value='';tourSelect.prepend(placeholder);
     if(vorherigeTour&&Array.from(tourSelect.options).some(o=>o.value===vorherigeTour))
       tourSelect.value=vorherigeTour;
+    if(zugangsTour&&vorherigerZugangsFilter&&
+      Array.from(zugangsTour.options).some(o=>o.value===vorherigerZugangsFilter))
+      zugangsTour.value=vorherigerZugangsFilter;
     await gpsBuchungenLaden();
+    await gpsZugaengeLaden();
   }catch(error){document.getElementById('gps-tour-status').textContent='GPS-Verwaltung nicht verfügbar: '+error.message;}
 }
 
@@ -809,6 +894,7 @@ document.getElementById('gps-game-form')?.addEventListener('submit',async event=
     const result=await api('/api/admin/gps/spiele',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
     const link=location.origin+result.zugangslink;target.replaceChildren(el('span','Spielzugang (einmalig kopieren): '));
     const anchor=document.createElement('a');anchor.href=link;anchor.textContent=link;anchor.target='_blank';anchor.rel='noopener';target.append(anchor);
+    await gpsZugaengeLaden();
   }catch(error){target.textContent='Fehler: '+error.message;}
 });
 
