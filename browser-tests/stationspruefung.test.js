@@ -76,7 +76,7 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
       await page.locator('#staff-login button').click();
       await page.locator('#onsite-unlock input[name="code"]').waitFor({state:'visible'});
       await page.locator('#onsite-unlock input[name="code"]').fill('123456');
-      await page.locator('#onsite-unlock button').click();
+      await page.locator('#onsite-unlock button[type="submit"], #onsite-unlock button:not([type])').click();
       await page.locator('#station-inspection input[name="programm"]').waitFor({state:'visible'});
       await page.locator('#station-inspection input[name="programm"]').fill('Testkurs');
       await page.locator('#station-inspection input[name="beginn"]').fill('2027-03-15T10:00');
@@ -138,7 +138,7 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
     await page.locator('#staff-login button').click();
     await page.locator('#onsite-unlock input[name="code"]').waitFor({state:'visible'});
     await page.locator('#onsite-unlock input[name="code"]').fill('123456');
-    await page.locator('#onsite-unlock button').click();
+    await page.locator('#onsite-unlock button[type="submit"], #onsite-unlock button:not([type])').click();
     await page.locator('#station-inspection').waitFor({state:'visible'});
     await page.locator('#station-inspection input[name="programm"]').fill('Kletterkurs');
     await page.locator('#station-inspection input[name="beginn"]').fill('2027-03-15T10:00');
