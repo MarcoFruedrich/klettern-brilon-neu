@@ -14,9 +14,12 @@ werden.
    verwenden.
 3. Schemaänderungen sind standardmäßig ausgeschaltet. Vor Tests, die eine
    Schemaänderung benötigen, zuerst die Migration prüfen und nur eine eigens
-   angelegte Testdatenbank verwenden.
-4. `npm start` starten und `/admin.html` öffnen. Nach der Anmeldung über
-   „Abmelden“ die Sitzung beenden.
+   angelegte Testdatenbank verwenden. Für PostgreSQL-gestützte Admin-Sitzungen
+   muss die kontrollierte Migration die Tabelle `brilon_admin_sessions` anlegen.
+4. `npm start` starten und `/admin.html` öffnen. Bei PostgreSQL muss die
+   Sitzungstabelle über die kontrollierte Migration angelegt sein; andernfalls
+   bleibt der Admin-Login gesperrt. Nach der Anmeldung über „Abmelden“ die
+   Sitzung beenden.
 
 ## Buchungen und Zahlungen
 

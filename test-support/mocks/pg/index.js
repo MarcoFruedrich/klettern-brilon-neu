@@ -7,6 +7,7 @@ class Pool {
     this.bookings = JSON.parse(process.env.MOCK_BOOKINGS || '[]');
     this.guests = JSON.parse(process.env.MOCK_GUESTBOOK || '[]');
     this.places = JSON.parse(process.env.MOCK_PLACES || '[]');
+    this.adminSessions = new Map();
   }
 
   async query(sql, params=[]) { return this.run(sql, params); }
@@ -16,6 +17,23 @@ class Pool {
 
   async run(sql, params) {
     if (/^\s*(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock)/i.test(sql)) return { rows:[], rowCount:0 };
+    if (process.env.MOCK_ADMIN_SESSION_FAIL==='1'&&sql.includes('brilon_admin_sessions'))
+      throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
+    if (sql.includes('INSERT INTO brilon_admin_sessions')) {
+      this.adminSessions.set(params[0],new Date(params[1]).getTime());
+      return {rows:[],rowCount:1};
+    }
+    if (sql.includes('DELETE FROM brilon_admin_sessions WHERE expires_at<=NOW()')) {
+      let removed=0;for(const [hash,expiry] of this.adminSessions)if(expiry<=Date.now()){this.adminSessions.delete(hash);removed++;}
+      return {rows:[],rowCount:removed};
+    }
+    if (sql.includes('DELETE FROM brilon_admin_sessions WHERE token_hash=$1')) {
+      const removed=this.adminSessions.delete(params[0]);return {rows:[],rowCount:removed?1:0};
+    }
+    if (sql.includes('SELECT 1 FROM brilon_admin_sessions WHERE token_hash=$1')) {
+      const expiry=this.adminSessions.get(params[0]),valid=Number.isFinite(expiry)&&expiry>Date.now();
+      return {rows:valid?[{'?column?':1}]:[],rowCount:valid?1:0};
+    }
     if (/^\s*SELECT 1\s*;?\s*$/i.test(sql)) return { rows:[{ '?column?':1 }], rowCount:1 };
     if (sql.includes('FROM brilon_angebote')) {
       const offers=sql.includes('WHERE id=$1')

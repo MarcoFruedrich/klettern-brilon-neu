@@ -33,7 +33,8 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Die Gästeliste zeigt nur abgeschlossene Spiele mit ausdrücklicher Zustimmung zur Namensveröffentlichung. Ohne Zustimmung wird kein Name gespeichert.
 - GPS-Kontrollcodes werden mit HMAC gehasht; Spielzugänge werden nur gehasht gespeichert. Das Geheimnis `GPS_CODE_SECRET` ist erforderlich.
 - Admin-Schreibanfragen mit Sitzung verlangen zusätzlich einen passenden `Origin`-Header für denselben Host und dasselbe Protokoll; die vorhandenen `HttpOnly`, `Secure`, `SameSite=Strict`-Cookies bleiben bestehen.
-- Rate-Limit-Zustände sind auf 10.000 Schlüssel begrenzt; veraltete Schlüssel werden beim Bereinigen entfernt und die Zahl gespeicherter Versuche pro Schlüssel bleibt beschränkt. Abgelaufene Admin-Sitzungen werden bei Anmeldung und regelmäßig bei Sitzungsprüfungen bereinigt. Die Sitzungen selbst bleiben prozesslokal.
+- Rate-Limit-Zustände sind auf 10.000 Schlüssel begrenzt; veraltete Schlüssel werden beim Bereinigen entfernt und die Zahl gespeicherter Versuche pro Schlüssel bleibt beschränkt.
+- Bei aktiver PostgreSQL-Verbindung liegen Admin-Sitzungen jetzt als SHA-256-Tokenhash mit Ablaufzeit in `brilon_admin_sessions`. Jede Admin-Anfrage prüft den Eintrag; Abmelden widerruft ihn. Abgelaufene Einträge werden bereinigt. Die Tabellenerstellung ist migrationsgeschützt und wurde nicht ausgeführt; nur im DB-losen Testmodus bleiben Sitzungen prozesslokal.
 - Ein lokaler HTTP-Test prüft Admin-Anmeldung, Cookie-Flags, geschützte Lesezugriffe und erlaubte/abgewiesene Schreibanfragen mit Datenbank-/Supabase-Stubs; er versendet keine E-Mails.
 - Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
 - Die Admin-Verwaltung besitzt eine dauerhaft erreichbare Sprungnavigation für Buchungen/Zahlungen, Kalender, Programme, Tagesangebote, Anschlussrabatte und GPS-Touren. Auf schmalen Bildschirmen bleibt die Navigation horizontal wischbar; Kalenderaktionen und Sprungziele berücksichtigen Touch-Größen und Sticky-Kopfzeilen.
@@ -61,10 +62,11 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 39 bestanden, 0 fehlgeschlagen.
+- `npm test` – 40 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
+- Admin-Login und Abmelden werden mit Datenbank-Test-Double und im DB-losen Sitzungsmodus geprüft. Wenn die DB-Sitzungstabelle fehlt, wird der Login mit HTTP 503 abgewiesen und es wird kein Cookie ausgegeben.
 - `node --check test/booking-http.test.js` – bestanden.
 - `node --check test/admin-navigation.test.js` – bestanden.
 - `node --check site/zahlungsuebersicht.js` – bestanden.
@@ -76,7 +78,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 ## Noch offen
 
 - Der HTTP-End-to-End-Test deckt die Kernstrecke mit einem speicherbasierten PostgreSQL-Test-Double ab. Die echte PostgreSQL-Integration, Datenbank-Constraints/Transaktionsisolation und E-Mail-Zustellung benötigen noch separate Tests in einer isolierten Umgebung mit Mail-Test-Double.
-- Eine Admin-Sitzung wird im Arbeitsspeicher gehalten. Für mehrere Instanzen/Neustarts fehlt weiterhin ein persistenter Session-Store; zusätzlich sind CSRF-/Origin-Prüfung, Sitzungsrotation und ein zweiter Faktor zu prüfen.
+- Vor DB-gestütztem Admin-Betrieb muss die geschützte Migration für `brilon_admin_sessions` geprüft und freigegeben werden. Ein zweiter Faktor und eine zusätzliche CSRF-Prüfung neben der Same-Origin-Prüfung sind noch offen.
 - Buchungsliste und Zahlungsübersicht sind seitenweise vollständig durchsuchbar. Die Kalenderansicht lädt jeweils den ausgewählten Monat.
 - Die kundenseitige Anschlussstrecke ist im HTTP-Test mit einem PostgreSQL-Test-Double abgedeckt. Eine erkannte Überzahlung/Gutschrift wird nicht automatisch ausgezahlt; dafür ist ein kontrollierter Erstattungsprozess erforderlich.
 - QR-Etiketten können erzeugt und gedruckt werden. Ausdrucke müssen vor dem Einsatz an den Stationen praktisch mit mehreren Smartphones gescannt werden. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.

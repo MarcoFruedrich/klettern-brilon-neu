@@ -21,7 +21,7 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
 
 
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:{ca:process.env.DATABASE_CA_CERT,rejectUnauthorized:true}}):null;
-const sessions=new Map(), rateLimiter=erstelleRateLimiter();let sessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon'};
+const sessions=new Map(), rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon'};
 async function brevoMail(empfaenger, betreff, inhalt) {
   if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL)
     throw new Error('E-Mail-Versand ist nicht konfiguriert.');
@@ -118,9 +118,31 @@ async function anschlussRabattElternZuruecknehmen(client,zusatz,zusatzId){
     [JSON.stringify(data),parent.id]);
   return {zurueckgenommen:true,buchung:saved.rows[0],stand};
 }
-function session(req){const jetzt=Date.now();if(++sessionChecks%128===0)abgelaufeneEintraegeEntfernen(sessions,jetzt);const match=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/);const token=match?.[1],exp=sessions.get(token);if(!exp)return false;if(exp<=jetzt){sessions.delete(token);return false}return true}
-function admin(req,res){
-  if(!session(req)){reply(res,401,{error:'Bitte anmelden.'});return false}
+async function session(req){
+  const jetzt=Date.now();
+  const match=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/);
+  const token=match?.[1];
+  if(!token)return {valid:false};
+  if(pool){
+    try{
+      if(++persistentSessionChecks%128===0)
+        await pool.query('DELETE FROM brilon_admin_sessions WHERE expires_at<=NOW()');
+      const q=await pool.query(
+        'SELECT 1 FROM brilon_admin_sessions WHERE token_hash=$1 AND expires_at>NOW()',[gpsTokenHash(token)]
+      );
+      return {valid:q.rowCount>0};
+    }catch{return {unavailable:true};}
+  }
+  if(++sessionChecks%128===0)abgelaufeneEintraegeEntfernen(sessions,jetzt);
+  const exp=sessions.get(token);
+  if(!exp)return {valid:false};
+  if(exp<=jetzt){sessions.delete(token);return {valid:false};}
+  return {valid:true};
+}
+async function admin(req,res){
+  const auth=await session(req);
+  if(auth.unavailable){reply(res,503,{error:'Admin-Sitzungsspeicher ist nicht verfügbar.'});return false;}
+  if(!auth.valid){reply(res,401,{error:'Bitte anmelden.'});return false}
   if(!sameOriginMutation(req)){reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});return false}
   return true;
 }
@@ -633,9 +655,18 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
          !crypto.timingSafeEqual(a,b)||!crypto.timingSafeEqual(c,e))
         return reply(res,401,{error:'Zugangsdaten nicht korrekt.'});
 
-      abgelaufeneEintraegeEntfernen(sessions);
       const token=crypto.randomBytes(32).toString('hex');
-      sessions.set(token,Date.now()+8*3600000);
+      const ablauf=new Date(Date.now()+8*3600000);
+      if(pool){
+        try{
+          await pool.query('DELETE FROM brilon_admin_sessions WHERE expires_at<=NOW()');
+          await pool.query('INSERT INTO brilon_admin_sessions(token_hash,expires_at) VALUES($1,$2)',
+            [gpsTokenHash(token),ablauf]);
+        }catch{return reply(res,503,{error:'Admin-Sitzungsspeicher ist nicht initialisiert.'});}
+      }else{
+        abgelaufeneEintraegeEntfernen(sessions);
+        sessions.set(token,ablauf.getTime());
+      }
       return reply(res,200,{success:true},{
         'Set-Cookie':`${cookieName}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`
       });
@@ -643,7 +674,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
     // Nur Vorschau: keine Buchung und kein Zahlungssaldo wird veraendert.
     if(route==='/api/admin/anschlussrabatt/vorschau'&&req.method==='POST'){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       const d=await body(req);
       if(!d||!Array.isArray(d.programme)||d.programme.length<2||d.programme.length>20)
         return reply(res,400,{error:'Bitte 2 bis 20 Programme angeben.'});
@@ -660,7 +691,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     }
 
     if(route==='/api/admin/anschlussrabatt/anwenden'&&req.method==='POST'){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       const d=await body(req),ids=Array.isArray(d?.buchungsIds)?[...new Set(d.buchungsIds)]:[];
       if(ids.length<2||ids.length>20||ids.some(id=>typeof id!=='string'||! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)))
@@ -737,7 +768,13 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
     if(route==='/api/admin/logout'&&req.method==='POST'){
       const match=(req.headers.cookie||'').match(/brilon_session=([a-f0-9]{64})/);
-      if(match)sessions.delete(match[1]);
+      if(!sameOriginMutation(req))return reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});
+      if(match){
+        if(pool){
+          try{await pool.query('DELETE FROM brilon_admin_sessions WHERE token_hash=$1',[gpsTokenHash(match[1])]);}
+          catch{return reply(res,503,{error:'Admin-Sitzung konnte nicht beendet werden.'});}
+        }else sessions.delete(match[1]);
+      }
       return reply(res,200,{success:true},{
         'Set-Cookie':`${cookieName}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`
       });
@@ -745,7 +782,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
     const zahlungenRoute = route.match(/^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})\/zahlungen$/);
     if(zahlungenRoute&&req.method==='POST'){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       const d=await body(req);
       const betragText=typeof d.betrag==='string'?d.betrag:String(d.betrag??'');
@@ -830,7 +867,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     }
 
     if(route.match(/^\/api\/admin\/buchungen\/[0-9a-f-]{36}$/)&&req.method==='PATCH'){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 
       const id=route.split('/').pop(),d=await body(req);
@@ -959,7 +996,7 @@ if (
     if (route.match(/^\/api\/admin\/buchungen\/[0-9a-f-]{36}\/zahlung$/)
     && req.method === 'POST') {
 
-  if (!admin(req, res)) return;
+  if (!await admin(req, res)) return;
   if (!pool) {
     return reply(res, 503, {
       error: 'Datenbank nicht verfügbar.'
@@ -1073,7 +1110,7 @@ await pool.query(
 }
 }
     if(route==='/api/admin/kalender'&&req.method==='GET'){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       const q=await pool.query(
         'SELECT id,titel,datum::text AS datum,enddatum::text AS enddatum,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,typ,beschreibung FROM brilon_kalender ORDER BY datum,uhrzeit NULLS LAST LIMIT 1000'
@@ -1082,7 +1119,7 @@ await pool.query(
     }
 
     if(route==='/api/admin/kalender'&&req.method==='POST'){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 
       const d=await body(req);
@@ -1120,7 +1157,7 @@ preis=safeText(d.preis,50);
     }
 
     if(/^\/api\/admin\/kalender\/[0-9a-fA-F-]{36}$/.test(route)&&req.method==='DELETE'){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 
       const id=route.split('/').pop();
@@ -1133,7 +1170,7 @@ preis=safeText(d.preis,50);
     }
 
     if(/^\/api\/admin\/kalender\/[0-9a-fA-F-]{36}$/.test(route)&&req.method==='PATCH'){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 
       const id=route.split('/').pop();
@@ -1172,7 +1209,7 @@ preis=safeText(d.preis,50);
     }
 
     if(route.startsWith('/api/admin/')){
-      if(!admin(req,res))return;
+      if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 
       if(route==='/api/admin/gps/gaesteliste'&&req.method==='GET'){
@@ -1902,6 +1939,12 @@ async function start(){
     await pool.query(
       'CREATE TABLE IF NOT EXISTS brilon_buchungen (id UUID PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())'
     );
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (
+      token_hash CHAR(64) PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    )`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
     await pool.query(
       "ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'offen'"
     );

@@ -215,4 +215,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(restoredParent.data.gesamtpreis,100);
   assert.equal(restoredParent.data.restbetrag,75);
   assert.ok(restoredParent.data.preisanpassungen.length>=2);
+  const logout=await fetch(root+'/api/admin/logout',{method:'POST',headers:{Cookie:cookie,Origin:root}});
+  assert.equal(logout.status,200);
+  const afterLogout=await fetch(root+'/api/admin/buchungen',{headers:{Cookie:cookie}});
+  assert.equal(afterLogout.status,401,'Datenbanksitzung muss nach Abmelden widerrufen sein');
 });
