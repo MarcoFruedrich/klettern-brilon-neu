@@ -11,6 +11,10 @@ function fakeAdminApi(page) {
   const state = {
     signedIn: false, csrf: 'a'.repeat(64), mutations: [],
     tours: [], games: [],
+    inspectionEvents: [],
+    inspectionStations: [{id:'550e8400-e29b-41d4-a716-446655440099',
+      name:'Kletterwand Test',aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
+      sperrgrund:'Defekte Sicherheitsverbindung an der Wand'}],
     places: [{ id: 1, name: 'Brilon', aktiv: true }],
     programs: [{ id: 11, name: 'Klettertest', beschreibung: 'Testprogramm', dauer: 90,
       preise: {'1-4':100, '5-10':160}, aktiv: false, bild_url: null, kategorie: 'Klettern',
@@ -43,6 +47,23 @@ function fakeAdminApi(page) {
       state.mutations.push({endpoint,method,body:method==='DELETE'?null:readBody()});
     }
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
+    if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='GET')return json(200,[]);
+    if(endpoint==='/api/admin/pruefung/berichte'&&method==='GET')return json(200,[]);
+    if(endpoint==='/api/admin/pruefung/stationen'&&method==='GET')
+      return json(200,state.inspectionStations);
+    const inspectionRelease=endpoint.match(/^\/api\/admin\/pruefung\/stationen\/([^/]+)\/freigeben$/);
+    if(inspectionRelease&&method==='POST'){
+      const d=readBody(),station=state.inspectionStations.find(x=>x.id===inspectionRelease[1]);
+      if(!station||!station.gesperrt_am)return json(409,{error:'Station nicht gesperrt'});
+      if(!d.nachkontrolleBestaetigt||d.freigabeDurch?.length<3||d.begruendung?.length<20)
+        return json(400,{error:'Nachkontrolle fehlt'});
+      station.gesperrt_am=null;station.sperrgrund=null;
+      state.inspectionEvents.push({art:'freigabe',notiz:d.begruendung,verantwortlich:d.freigabeDurch,
+        erstellt_am:'2027-01-01T14:00:00Z'});
+      return json(200,{id:station.id,name:station.name,gesperrt:false});
+    }
+    const historyRoute=endpoint.match(/^\/api\/admin\/pruefung\/stationen\/([^/]+)\/ereignisse$/);
+    if(historyRoute&&method==='GET')return json(200,state.inspectionEvents);
     if(endpoint==='/api/admin/buchungen'&&method==='GET'){
       if(!u.searchParams.has('seite'))return json(200,state.bookings.slice(0,250));
       const search=(u.searchParams.get('suche')||'').toLowerCase();
@@ -383,6 +404,36 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.ok(!JSON.stringify(await page.locator('#gps-access-list').textContent()).includes('TEST-NICHT-ECHT'));
     const size=await page.evaluate(()=>({body:document.documentElement.scrollWidth,view:document.documentElement.clientWidth}));
     assert.ok(size.body<=size.view+2,'GPS-Zugangsverwaltung darf auf dem Smartphone nicht überlaufen');
+    await page.close();
+  });
+
+  await t.test('Gesperrte Station: Smartphone-Warnung, dokumentierte Freigabe und Verlauf',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const dialogs=[];
+    page.on('dialog',async d=>{
+      dialogs.push(d.type());
+      if(d.type()==='prompt'){
+        const answer=dialogs.filter(x=>x==='prompt').length===1?
+          'CI Fachprüferin':'Defekten Karabiner ersetzt, danach fachlich geprüft und kontrolliert.';
+        await d.accept(answer);
+      }else await d.accept();
+    });
+    await login(page,root);
+    await page.locator('#pruef-station-list article').getByText('GESPERRT – NICHT BENUTZEN').waitFor();
+    const release=page.locator('#pruef-station-list article')
+      .getByRole('button',{name:'Nach fachlicher Prüfung freigeben'});
+    await release.click();
+    await page.waitForFunction(()=>document.querySelector('#pruef-station-list')?.textContent.includes('Nicht gesperrt'));
+    assert.equal(state.inspectionStations[0].gesperrt_am,null);
+    assert.equal(state.inspectionEvents.length,1);
+    assert.ok(state.mutations.some(m=>m.endpoint.endsWith('/freigeben')&&
+      m.body.nachkontrolleBestaetigt===true&&m.body.freigabeDurch==='CI Fachprüferin'));
+    assert.deepEqual(dialogs,['prompt','prompt','confirm']);
+    await page.locator('#pruef-station-list article')
+      .getByRole('button',{name:'Prüf- und Freigabeverlauf anzeigen'}).click();
+    await page.locator('#pruef-station-list').getByText(/fachlich geprüft und kontrolliert/).waitFor();
+    assert.equal(await release.count(),0,'Freigabe darf nicht mehrfach angefordert werden');
     await page.close();
   });
 
