@@ -598,3 +598,64 @@ footer a {
 .admin-booking-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:12px;margin:16px 0}
 .payment-entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px;padding:14px;background:#edf3ee;border-radius:10px}
 @media(max-width:600px){.admin-booking-filters{grid-template-columns:1fr}.payment-entry{grid-template-columns:1fr}}
+
+/* Verwaltungsnavigation und Touch-Bedienung auf kleinen Bildschirmen */
+.admin-page > header { min-height: 64px; padding: 10px max(4%,calc((100vw - 850px)/2)); }
+.admin-page .admin-navigation {
+  position: sticky;
+  top: 70px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 28px;
+  padding: 8px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  background: #f9f8f3f2;
+  border: 1px solid #dfe5dd;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px #163e3510;
+  scrollbar-width: thin;
+}
+.admin-page .admin-navigation a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 13px;
+  border-radius: 10px;
+  color: var(--pine);
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.admin-page .admin-navigation a:hover,
+.admin-page .admin-navigation a:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 1px;
+  background: #eaf0e9;
+}
+.admin-page .admin-anchor,
+.admin-page #calendar-section,
+.admin-page #anschlussrabatt-section,
+.admin-page #angebote-verwaltung,
+.admin-page #gps-verwaltung {
+  scroll-margin-top: 145px;
+}
+.admin-page .calendar-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.admin-page .calendar-navigation button { min-height: 44px; }
+@media(max-width:600px) {
+  .admin-page .admin-navigation { top: 64px; margin: 14px -12px 24px; border-radius: 0; }
+  .admin-page .calendar-navigation { justify-content: center; }
+  .admin-page .calendar-navigation strong { flex: 1 0 100%; order: -1; text-align: center; }
+  .admin-page .calendar-navigation button { flex: 1 1 140px; }
+  .admin-page .booking { padding: 12px; }
+}

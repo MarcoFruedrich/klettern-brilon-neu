@@ -7,7 +7,7 @@
   <title>Verwaltung | Klettern Brilon</title>
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body class="admin-page">
   <header>
     <a class="logo" href="/">
       🧗 Klettern <span>& Abenteuer</span>
@@ -34,7 +34,16 @@
     <div id="workspace" hidden>
       <button id="logout" class="btn secondary">Abmelden</button>
 
-      <h2>Buchungsanfragen</h2>
+      <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
+        <a href="#bookings-section">Buchungen</a>
+        <a href="#calendar-section">Kalender</a>
+        <a href="#angebote-verwaltung">Programme</a>
+        <a href="#special-offers-section">Tagesangebote</a>
+        <a href="#anschlussrabatt-section">Anschlussrabatte</a>
+        <a href="#gps-verwaltung">GPS-Touren</a>
+      </nav>
+
+      <h2 id="bookings-section" class="admin-anchor">Buchungen &amp; Zahlungen</h2>
       <div class="admin-booking-filters">
         <label>Suche nach Name, Nummer, E-Mail oder Angebot
           <input id="bookings-search" type="search" autocomplete="off">
@@ -154,7 +163,7 @@
         <div id="anschlussrabatt-ergebnis" role="status" aria-live="polite"></div>
       </section>
 
-      <h2>Sonderangebote verwalten</h2>
+      <h2 id="special-offers-section" class="admin-anchor">Sonder- und Tagesangebote verwalten</h2>
       <form id="special-form">
         <label>Titel
           <input name="titel" maxlength="120" required>
