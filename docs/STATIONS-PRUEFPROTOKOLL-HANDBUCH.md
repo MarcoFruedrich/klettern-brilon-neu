@@ -60,6 +60,16 @@ Die zuständige Person prüft den Hinweis, dokumentiert Prüfername und Ergebnis
 
 **Bei jeder Unsicherheit über die sichere Benutzbarkeit ist stattdessen „Sicherheitsmangel“ zu wählen.** Dieser löst die automatische Sperrung weiterhin aus. Ein Hinweis ist keine Bestätigung der technischen Sicherheit.
 
+## Mitarbeiterzugänge und Stationen verwalten
+
+In der geschützten Verwaltung kann ein Mitarbeiterzugang mit **„Zugang deaktivieren“** umgehend gesperrt werden. Damit werden alle noch aktiven Sitzungen dieses Mitarbeiters widerrufen; die Person kann sich nicht mehr anmelden oder eine Prüfung durchführen. Die vorhandenen und früher unterzeichneten Prüfberichte bleiben unverändert erhalten.
+
+Für eine **Reaktivierung** muss die Verwaltung ein frisches persönliches Passwort (mindestens zwölf Zeichen) vergeben. Das alte Passwort wird nicht wieder gültig. Bei noch aktiven Mitarbeiterkonten steht außerdem **„Passwort zurücksetzen“** zur Verfügung; auch dieser Vorgang beendet alle bestehenden Sitzungen. Persönliche Passwörter gehören nicht in E-Mails oder frei zugängliche Dokumente.
+
+Jede Station kann mit **„Station deaktivieren“** vorübergehend aus dem mobilen Prüfangebot entfernt werden. Dabei ist ein nachvollziehbarer Grund mit mindestens 15 Zeichen erforderlich; Status und verantwortliche Verwaltungskennung werden im **Stilllegungs- und Reaktivierungsverlauf** dokumentiert. Die Stilllegung löscht weder Sicherheitsmängel noch alte Prüfberichte. Mit **„Station reaktivieren“** darf die Verwaltung die Station wieder im Formular verfügbar machen, muss aber einen neuen Grund angeben. **Eine vorhandene Mängelsperre bleibt ausdrücklich bestehen.** Zur tatsächlichen Sicherheitsfreigabe ist weiterhin eine fachliche Nachprüfung und getrennte dokumentierte Freigabe erforderlich.
+
+**Sicherheitsgrenze:** Deaktivierte Stationen dürfen nicht verwendet werden. Auch eine reaktivierte, noch wegen Sicherheitsmängeln gesperrte Station darf trotz Anzeige im Prüfformular nicht benutzt werden. Die administrative Wiederaufnahme ist keine technische Abnahme.
+
 ## Automatische Stationssperrung und fachliche Freigabe
 
 Jede als **Mangel** gespeicherte Stationsprüfung sperrt die betroffene Station automatisch in der Datenbank und dokumentiert ein Ereignis mit Bericht, Prüfperson und Beschreibung. Die Sperrung bleibt bestehen, auch wenn ein späterer Prüfbericht für dieselbe Station „in Ordnung“ vermerkt.
