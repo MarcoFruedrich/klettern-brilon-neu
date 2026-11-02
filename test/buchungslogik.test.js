@@ -6,6 +6,8 @@ const { preisFuerTeilnehmer, zahlungsstand, zahlungErgaenzen, statusPruefen, kon
 test('Preis wird anhand einer passenden Teilnehmerstaffel in Cent berechnet', () => {
   assert.equal(preisFuerTeilnehmer({'5-10': 125.50}, 6), 12550);
   assert.equal(preisFuerTeilnehmer({'5-10': 125.50}, 4), null);
+  assert.equal(preisFuerTeilnehmer({'1-4': 80,'21-150':300}, 4), 8000);
+  assert.equal(preisFuerTeilnehmer({'21-150':300}, 150), 30000);
 });
 test('Anzahlung und tatsächliche Zahlungseingänge bleiben centgenau', () => {
   assert.deepEqual(zahlungsstand(10001, [{betragCent: 2500}, {betragCent: 1000}]), {

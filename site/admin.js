@@ -42,6 +42,7 @@ async function refresh() {
     workspace.hidden = false;
     
     await erlebnisangeboteLaden();
+    await orteLaden();
     await gpsTourenLaden(alleBuchungen);
 
     const box = document.getElementById('bookings');
@@ -970,6 +971,9 @@ if (neuesAngebotForm) {
     const daten = Object.fromEntries(
       new FormData(neuesAngebotForm).entries()
     );
+    daten.verfuegbare_termine=(daten.verfuegbare_termine||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    daten.buchbar=neuesAngebotForm.elements.buchbar.checked;
+    daten.veroeffentlicht=neuesAngebotForm.elements.veroeffentlicht.checked;
 
     try {
       await api('/api/admin/angebote', {
@@ -981,12 +985,28 @@ if (neuesAngebotForm) {
       });
 
       neuesAngebotForm.reset();
-      alert('Neues Erlebnisangebot wurde gespeichert.');
+      await refresh();
+      status.textContent='Neues Erlebnisangebot wurde gespeichert.';
     } catch (fehler) {
       alert('Speichern fehlgeschlagen: ' + fehler.message);
     }
   });
 }
+
+async function orteLaden(){
+  const select=document.getElementById('angebot-ort');if(!select)return;
+  try{
+    const orte=await api('/api/admin/orte');select.replaceChildren();
+    for(const ort of orte){const o=el('option',ort.name);o.value=ort.name;select.append(o);}
+  }catch(error){status.textContent='Veranstaltungsorte konnten nicht geladen werden: '+error.message;}
+}
+
+document.getElementById('ort-hinzufuegen')?.addEventListener('click',async()=>{
+  const input=document.getElementById('neuer-ort-name');
+  try{const ort=await api('/api/admin/orte',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:input.value})});
+    await orteLaden();document.getElementById('angebot-ort').value=ort.name;input.value='';status.textContent='Veranstaltungsort hinzugefügt.';
+  }catch(error){status.textContent='Ort konnte nicht gespeichert werden: '+error.message;}
+});
 
 /* Gespeicherte Erlebnisangebote anzeigen */
 
@@ -1004,7 +1024,7 @@ async function erlebnisangeboteLaden() {
       return;
     }
 
-    for (const angebot of angebote) {
+    for (const angebot of angebote.filter(a=>!a.name.startsWith('GPS-Schatzsuche:'))) {
       const eintrag = document.createElement('div');
       eintrag.className = 'card';
 
@@ -1017,18 +1037,41 @@ beschreibung.rows = 4;
 beschreibung.placeholder = 'Beschreibung des Angebots eingeben';
 beschreibung.style.width = '100%';
 
+      const metadaten=document.createElement('div');
+      const feld=(labelText,value,name,type='text')=>{
+        const label=document.createElement('label');label.textContent=labelText;
+        const input=type==='textarea'?document.createElement('textarea'):document.createElement('input');
+        input.name=name;input.value=value??'';label.append(input);metadaten.append(label);return input;
+      };
+      const programmName=feld('Programmname',angebot.name,'name');
+      const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
+      const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
+      const veranstaltungsort=feld('Veranstaltungsort',angebot.veranstaltungsort,'veranstaltungsort');
+      const kapazitaet=feld('Kapazität',angebot.kapazitaet,'kapazitaet','number');
+      kapazitaet.min='1';kapazitaet.max='500';
+      const termine=feld('Verfügbare Termine (ein Datum je Zeile)',(angebot.verfuegbare_termine||[]).join('\n'),'verfuegbare_termine','textarea');
+      const hinweise=feld('Besondere Hinweise',angebot.hinweise,'hinweise','textarea');
+      const bookable=document.createElement('input');bookable.type='checkbox';bookable.checked=angebot.buchbar===true;
+      const publish=document.createElement('input');publish.type='checkbox';publish.checked=angebot.veroeffentlicht===true;
+      const check=(labelText,input)=>{const l=document.createElement('label');l.className='check';const s=el('span',labelText);l.append(input,s);metadaten.append(l);};
+      check('Buchbar',bookable);check('Auf Website veröffentlichen',publish);
+
       const details = document.createElement('p');
       details.textContent =
         'Dauer: ' + angebot.dauer + ' Minuten | ' +
-        (angebot.aktiv ? 'Aktiv' : 'Noch nicht freigegeben');
+        (angebot.aktiv ? 'Aktiv' : 'Deaktiviert') + ' · ' +
+        (angebot.buchbar ? 'buchbar' : 'nicht buchbar') + ' · ' +
+        (angebot.veroeffentlicht ? 'veröffentlicht' : 'nicht veröffentlicht');
 
       
 const preisbereich = document.createElement('div');
 
 const gruppen = [
+  ['1-4', '1–4 Personen'],
   ['5-10', '5–10 Personen'],
   ['11-15', '11–15 Personen'],
-  ['16-20', '16–20 Personen']
+  ['16-20', '16–20 Personen'],
+  ['21-150', '21–150 Personen']
 ];
 
 for (const [schluessel, bezeichnung] of gruppen) {
@@ -1050,7 +1093,7 @@ for (const [schluessel, bezeichnung] of gruppen) {
 
 
 
-      eintrag.append(titel, beschreibung, details);
+      eintrag.append(titel, beschreibung, details,metadaten);
       eintrag.appendChild(preisbereich);
       const bildBereich = document.createElement('div');
 
@@ -1129,7 +1172,7 @@ eintrag.appendChild(bildBereich);
 const preisButton = document.createElement('button');
 preisButton.type = 'button';
 preisButton.className = 'btn';
-preisButton.textContent = 'Preise speichern';
+preisButton.textContent = 'Programm speichern';
 
 preisButton.addEventListener('click', async () => {
   const preise = {};
@@ -1149,11 +1192,16 @@ preisButton.addEventListener('click', async () => {
       body: JSON.stringify({
   preise,
   aktiv: aktivSchalter.checked,
-  beschreibung: beschreibung.value
+        beschreibung: beschreibung.value,
+        name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
+        veranstaltungsort:veranstaltungsort.value,kapazitaet:Number(kapazitaet.value),
+        verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),
+        hinweise:hinweise.value,buchbar:bookable.checked,veroeffentlicht:publish.checked
 })
     });
 
     alert('Gruppenpreise erfolgreich gespeichert.');
+    await erlebnisangeboteLaden();
   } catch (fehler) {
     alert('Speichern fehlgeschlagen: ' + fehler.message);
   } finally {

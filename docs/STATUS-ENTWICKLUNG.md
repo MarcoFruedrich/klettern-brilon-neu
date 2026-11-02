@@ -19,6 +19,8 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Buchungsstatus, Zeitfenster, Teilnehmerpreisstaffeln, Centbeträge und Zahlungssalden sind als reine Funktionen prüfbar.
 - Admins können tatsächliche Zahlungseingänge mit Betrag, Zahlungsart und Erfassungszeitpunkt einzeln buchen. Überzahlungen und ungültige Zahlungsarten werden abgelehnt. Sobald die reale Summe 25 % erreicht, wird eine offene Buchung bestätigt. Die Zahlungen liegen in der vorhandenen JSONB-Buchungszeile; es ist keine neue Tabellenmigration nötig.
 - Die Verwaltungsansicht zeigt eingegangene Beträge, den offenen Rest und den Status der Anzahlung. Die Liste kann nach Status und Text gefiltert werden.
+- Die Programmverwaltung unterstützt Kategorien, Zielgruppen, Bilder, Dauer, Kapazität, Preisstaffeln von 1–150 Teilnehmenden, verfügbare Tage, Hinweise, Buchbarkeit und Veröffentlichung. Orte sind verwaltbar; Brilon, Rüthen, Soest und Sundern werden als Startorte angelegt.
+- Buchungsprüfungen berücksichtigen Preisstaffel, Programmdauer, freigegebene Tage und Tageskapazität zusätzlich zum Terminkonflikt.
 - Überweisungsinformationen setzen die stabile Buchungsnummer als Verwendungszweck ein.
 - E-Mail-Absender und Betreiberempfänger sind nicht mehr fest im Code hinterlegt; sie werden über `BREVO_SENDER_EMAIL` und `BOOKING_NOTIFY_EMAIL` konfiguriert. Der Bildspeicher ist optional und wird ohne Konfiguration sauber abgewiesen.
 - Schemaänderungen werden nur noch ausgeführt, wenn `RUN_SCHEMA_MIGRATIONS=true` gesetzt ist. Kein produktiver Datenbankzugriff oder Schemaänderung wurde in dieser Arbeit ausgeführt.
@@ -45,10 +47,9 @@ Die Datenbank- und E-Mail-Routen wurden nicht gegen Produktivdienste aufgerufen.
 - Die Buchungs-API, Datenbanktransaktionen und Mailbenachrichtigungen benötigen Integrationstests mit Test-Doubles für PostgreSQL und Mailtransport.
 - Eine Admin-Sitzung wird im Arbeitsspeicher gehalten. Für mehrere Instanzen/Neustarts fehlt weiterhin ein persistenter Session-Store; zusätzlich sind CSRF-/Origin-Prüfung, Sitzungsrotation und ein zweiter Faktor zu prüfen.
 - Such- und Statusfilter sind clientseitig und begrenzen nicht die geladene Ergebnismenge von 250 Einträgen.
-- Der Programmstamm braucht Kategorien, Zielgruppen, Veranstaltungsorte, Kapazitäten, Termine, Hinweise, Buchbarkeit/Veröffentlichungsstatus und erweiterbare Ortsverwaltung.
 - Anschlussangebote benötigen Verfügbarkeits-/Kapazitätsprüfung, Vorschau mit kontrollierter Freigabe, nachvollziehbare Preisrevisionen und korrekte Neubewertung bereits geleisteter Zahlungen.
 - GPS benötigt noch QR-Code-Erzeugung und druckbare Etiketten. Die Verwaltung zeigt dafür stationäre QR-Zieladressen. Beim Bearbeiten einer Tour müssen neue Kontrollcodes für alle Stationen eingetragen werden.
-- Die Brilon-Mustertour mit 15 Stationen fehlt. Historische Fakten, genaue Koordinaten, Zugänglichkeit und praktische Sicherheit müssen vor Veröffentlichung örtlich geprüft werden.
+- Die 15 Fragen umfassende Mustertour liegt als Entwurf vor. Koordinaten, Routenführung, Zugänglichkeit und praktische Sicherheit müssen vor Veröffentlichung örtlich geprüft werden.
 - Der Status der produktiven Schema- und Kalenderdefinitionen ist noch zu ermitteln. Die Tabellen werden für lokale/isolierte Tests nicht automatisch angelegt.
 - Datenschutz- und Löschkonzept, Auskunft/Export, Einwilligungsnachweis für öffentliche Gästeliste sowie verbindliche Bedingungen sind noch zu entwickeln und fachlich zu prüfen.
 - Mobile und Desktop-Bedienung, Tastaturbedienbarkeit und Screenreader-Verhalten sind noch visuell und automatisiert zu testen.

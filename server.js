@@ -96,7 +96,9 @@ function minuten(v){
 }
 function buchungsfenster(data){
   const n=Number(data.teilnehmer),start=minuten(data.uhrzeit);
-  const dauer=n>=5&&n<=10?150:n>=11&&n<=15?180:n>=16&&n<=20?210:null;
+  const gespeicherteDauer=Number(data.dauer);
+  const dauer=Number.isInteger(gespeicherteDauer)&&gespeicherteDauer>0?gespeicherteDauer:
+    n<=4?90:n<=10?150:n<=15?180:n<=20?210:240;
   // Alte Buchungen ohne Startzeit oder individuelle Angebote belegen vorsichtshalber den ganzen Tag.
   return start===null||dauer===null?null:[start,start+dauer];
 }
@@ -169,14 +171,20 @@ async function main(req,res){
 
       let gesamtpreis = null;
       const preisAbfrage = await pool.query(
-        `SELECT preise FROM brilon_angebote
-         WHERE name = $1 AND aktiv = true
+        `SELECT preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht
+         FROM brilon_angebote
+         WHERE name = $1 AND aktiv=true AND buchbar=true AND veroeffentlicht=true
          LIMIT 1`,[angebot]
       );
-      if(preisAbfrage.rows.length){
-        const preisCent=preisFuerTeilnehmer(preisAbfrage.rows[0].preise,teilnehmer);
-        if(preisCent!==null)gesamtpreis=preisCent/100;
-      }
+      if(!preisAbfrage.rows.length)return reply(res,409,{error:'Dieses Programm ist derzeit nicht buchbar.'});
+      const programm=preisAbfrage.rows[0];
+      const verfuegbareTermine=Array.isArray(programm.verfuegbare_termine)?programm.verfuegbare_termine:[];
+      if(verfuegbareTermine.length&&!verfuegbareTermine.includes(datum))
+        return reply(res,409,{error:'Für dieses Programm ist an dem Datum kein Termin freigegeben.'});
+      if(teilnehmer>Number(programm.kapazitaet))return reply(res,409,{error:'Die Gruppengröße überschreitet die maximale Kapazität.'});
+      const preisCent=preisFuerTeilnehmer(programm.preise,teilnehmer);
+      if(preisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
+      gesamtpreis=preisCent/100;
       const data={
        name,vorname,nachname,email,datum,angebot,teilnehmer,
 gesamtpreis,
@@ -184,7 +192,7 @@ anzahlung: gesamtpreis === null ? null : Math.round(gesamtpreis * 25) / 100,
 restbetrag: gesamtpreis === null ? null : Math.round(gesamtpreis * 75) / 100,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
-        nachricht:safeText(d.nachricht,2000)
+       nachricht:safeText(d.nachricht,2000),dauer:programm.dauer
       };
 
       if(!/^(09|1[0-9]):00$/.test(data.uhrzeit))
@@ -193,7 +201,15 @@ restbetrag: gesamtpreis === null ? null : Math.round(gesamtpreis * 75) / 100,
         });
 
       const fenster=buchungsfenster(data);
+      if(!fenster||fenster[1]>1440)return reply(res,400,{error:'Die Programmdauer passt nicht in den gewählten Veranstaltungstag.'});
       const ergebnis=await reservierungsTransaktion(async client=>{
+        const kapazitaet=await client.query(
+          `SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS gebucht
+           FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2
+             AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[datum,angebot]
+        );
+        if(Number(kapazitaet.rows[0].gebucht)+teilnehmer>Number(programm.kapazitaet))
+          return {konflikt:'Die Kapazität für dieses Programm ist am gewählten Tag ausgeschöpft.'};
         const konflikt=await pruefeBuchungskonflikt(client,datum,fenster);
         if(konflikt)return {konflikt};
 
@@ -313,10 +329,13 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         });
       }
 
-      const dauer =
-        teilnehmer >= 5 && teilnehmer <= 10 ? 150 :
-        teilnehmer >= 11 && teilnehmer <= 15 ? 180 :
-        teilnehmer >= 16 && teilnehmer <= 20 ? 210 : null;
+      const angebot=safeText(u.searchParams.get('angebot'),120);
+      const programm=await pool.query(
+        `SELECT dauer FROM brilon_angebote WHERE name=$1 AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
+      );
+      if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
+      const dauer=Number(programm.rows[0].dauer)||
+        (teilnehmer<=4?90:teilnehmer<=10?150:teilnehmer<=15?180:teilnehmer<=20?210:240);
 
       const zeiten=[];
 
@@ -940,7 +959,7 @@ preis=safeText(d.preis,50);
             `INSERT INTO brilon_angebote(name,beschreibung,dauer,preise,aktiv)
              VALUES($1,$2,$3,$4::jsonb,$5) RETURNING id`,
             [data.angebotName,data.beschreibung,data.dauer,
-              JSON.stringify({'5-10':data.preis,'11-15':data.preis,'16-20':data.preis}),aktiv]
+              JSON.stringify({'1-4':data.preis,'5-10':data.preis,'11-15':data.preis,'16-20':data.preis,'21-150':data.preis}),aktiv]
           );
           await client.query('INSERT INTO brilon_gps_touren(id,angebot_id,data,aktiv) VALUES($1,$2,$3::jsonb,$4)',
             [id,offer.rows[0].id,JSON.stringify(data),aktiv]);
@@ -976,7 +995,7 @@ preis=safeText(d.preis,50);
         if(aktuell.rows[0].angebot_id)await pool.query(
           `UPDATE brilon_angebote SET name=$1,beschreibung=$2,dauer=$3,preise=$4::jsonb,aktiv=$5 WHERE id=$6`,
           [data.angebotName,data.beschreibung,data.dauer,
-            JSON.stringify({'5-10':data.preis,'11-15':data.preis,'16-20':data.preis}),
+            JSON.stringify({'1-4':data.preis,'5-10':data.preis,'11-15':data.preis,'16-20':data.preis,'21-150':data.preis}),
             q.rows[0].aktiv&&data.buchbar,aktuell.rows[0].angebot_id]
         );
         return reply(res,200,{id:q.rows[0].id,aktiv:q.rows[0].aktiv});
@@ -1075,9 +1094,23 @@ preis=safeText(d.preis,50);
       }
      
   
+if(route==='/api/admin/orte'&&req.method==='GET'){
+  const q=await pool.query('SELECT id,name,aktiv FROM brilon_orte WHERE aktiv=true ORDER BY name');
+  return reply(res,200,q.rows);
+}
+if(route==='/api/admin/orte'&&req.method==='POST'){
+  const d=await body(req),name=safeText(d.name,80);
+  if(!name)return reply(res,400,{error:'Ort ist erforderlich.'});
+  const q=await pool.query(
+    `INSERT INTO brilon_orte(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET aktiv=true RETURNING id,name,aktiv`,[name]
+  );
+  return reply(res,201,q.rows[0]);
+}
+
 if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
-    `SELECT id, name, beschreibung, dauer, preise, aktiv, bild_url
+    `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
+            veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht
      FROM brilon_angebote
      ORDER BY id DESC`
   );
@@ -1091,20 +1124,32 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const name = safeText(d.name, 120);
   const beschreibung = safeText(d.beschreibung, 1000);
   const dauer = Number(d.dauer);
+  const kategorie=safeText(d.kategorie,60)||'Klettern';
+  const zielgruppe=safeText(d.zielgruppe,120);
+  const veranstaltungsort=safeText(d.veranstaltungsort,80)||'Brilon';
+  const kapazitaet=Number(d.kapazitaet||20);
+  const hinweise=safeText(d.hinweise,1000);
+  const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:[];
 
   if (!name || !Number.isInteger(dauer) ||
-      dauer < 15 || dauer > 1440) {
+      dauer < 15 || dauer > 1440 || !Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500||
+      termine.some(t=>!gueltigesDatum(t))) {
     return reply(res, 400, {
-      error: 'Bitte Namen und gültige Dauer eingeben.'
+      error: 'Bitte Name, Dauer, Kapazität und gültige Termine eingeben.'
     });
   }
 
+  const place=await pool.query('SELECT id FROM brilon_orte WHERE name=$1 AND aktiv=true',[veranstaltungsort]);
+  if(!place.rowCount)return reply(res,400,{error:'Veranstaltungsort ist nicht angelegt.'});
+
   const q = await pool.query(
     `INSERT INTO brilon_angebote
-      (name, beschreibung, dauer, preise, aktiv)
-     VALUES ($1, $2, $3, $4, $5)
+      (name,beschreibung,dauer,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
+       verfuegbare_termine,hinweise,buchbar,veroeffentlicht)
+     VALUES ($1,$2,$3,'{}',false,$4,$5,$6,$7,$8::jsonb,$9,$10,$11)
      RETURNING id`,
-    [name, beschreibung, dauer, '{}', false]
+    [name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
+      JSON.stringify(termine),hinweise,d.buchbar===true,d.veroeffentlicht===true]
   );
 
   return reply(res, 201, {
@@ -1118,6 +1163,11 @@ const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
 
 if (preisRoute && req.method === 'PATCH') {
   const d = await body(req);
+  const bisher=await pool.query(
+    `SELECT * FROM brilon_angebote WHERE id=$1`,[preisRoute[1]]
+  );
+  if(!bisher.rowCount)return reply(res,404,{error:'Angebot nicht gefunden.'});
+  const alt=bisher.rows[0];
   const preise = d.preise;
 
   if (!preise || typeof preise !== 'object' ||
@@ -1129,7 +1179,7 @@ if (preisRoute && req.method === 'PATCH') {
 
   const neuePreise = {};
 
-  for (const gruppe of ['5-10', '11-15', '16-20']) {
+  for (const gruppe of ['1-4','5-10','11-15','16-20','21-150']) {
     const wert = preise[gruppe];
 
     if (wert === '' || wert === null || wert === undefined) {
@@ -1148,24 +1198,38 @@ if (preisRoute && req.method === 'PATCH') {
   }
 
   
-const aktiv = typeof d.aktiv === 'boolean'
-  ? d.aktiv
-  : null;
-
-const beschreibung = safeText(d.beschreibung, 1000);
+const aktiv = typeof d.aktiv === 'boolean' ? d.aktiv : null;
+const name=d.name===undefined?alt.name:safeText(d.name,120);
+const beschreibung = d.beschreibung===undefined?alt.beschreibung:safeText(d.beschreibung,1000);
+const kategorie=d.kategorie===undefined?alt.kategorie:safeText(d.kategorie,60);
+const zielgruppe=d.zielgruppe===undefined?alt.zielgruppe:safeText(d.zielgruppe,120);
+const veranstaltungsort=d.veranstaltungsort===undefined?alt.veranstaltungsort:safeText(d.veranstaltungsort,80);
+const kapazitaet=Number(d.kapazitaet??alt.kapazitaet);
+const hinweise=d.hinweise===undefined?alt.hinweise:safeText(d.hinweise,1000);
+const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:alt.verfuegbare_termine;
+const buchbar=typeof d.buchbar==='boolean'?d.buchbar:alt.buchbar;
+const veroeffentlicht=typeof d.veroeffentlicht==='boolean'?d.veroeffentlicht:alt.veroeffentlicht;
+if(!name||!kategorie||!veranstaltungsort||!Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500||termine.some(t=>!gueltigesDatum(t)))
+  return reply(res,400,{error:'Kapazität oder verfügbare Termine sind ungültig.'});
+const place=await pool.query('SELECT id FROM brilon_orte WHERE name=$1 AND aktiv=true',[veranstaltungsort]);
+if(!place.rowCount)return reply(res,400,{error:'Veranstaltungsort ist nicht angelegt.'});
 
 const q = await pool.query(
   `UPDATE brilon_angebote
    SET preise = $1::jsonb,
        aktiv = COALESCE($3, aktiv),
-       beschreibung = $4
+       name=$4,beschreibung = $5,
+       kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,kapazitaet=$9,
+       verfuegbare_termine=$10::jsonb,hinweise=$11,buchbar=$12,veroeffentlicht=$13
    WHERE id = $2
-   RETURNING id, preise, aktiv, beschreibung`,
+   RETURNING id,preise,aktiv,name,beschreibung,kategorie,zielgruppe,veranstaltungsort,
+             kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht`,
   [
     JSON.stringify(neuePreise),
     preisRoute[1],
     aktiv,
-    beschreibung
+    name,beschreibung,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
+    JSON.stringify(termine),hinweise,buchbar,veroeffentlicht
   ]
 );
 
@@ -1425,9 +1489,10 @@ if (route === '/api/angebote' && req.method === 'GET') {
   }
 
   const q = await pool.query(
- `SELECT id, name, beschreibung, dauer, preise, bild_url
+ `SELECT id,name,beschreibung,dauer,preise,bild_url,kategorie,zielgruppe,
+        veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise
      FROM brilon_angebote
-     WHERE aktiv = true
+     WHERE aktiv=true AND buchbar=true AND veroeffentlicht=true
      ORDER BY name ASC`
   );
 
@@ -1490,9 +1555,12 @@ await pool.query(
 await pool.query('ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS buchungsnummer TEXT');
 await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_buchungen_buchungsnummer_unique ON brilon_buchungen (buchungsnummer)');
 
-    await pool.query(
-      'CREATE TABLE IF NOT EXISTS brilon_aktionen (id BIGSERIAL PRIMARY KEY,titel TEXT NOT NULL,datum DATE,beschreibung TEXT,created_at TIMESTAMPTZ DEFAULT NOW())'
-    );
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_aktionen(
+      id UUID PRIMARY KEY,data JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kalender(
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),titel TEXT NOT NULL,datum DATE NOT NULL,
+      enddatum DATE,uhrzeit TIME,endzeit TIME,typ TEXT NOT NULL CHECK(typ IN ('termin','sperrzeit')),
+      beschreibung TEXT NOT NULL DEFAULT '',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     
 await pool.query(`
   CREATE TABLE IF NOT EXISTS brilon_angebote (
@@ -1505,6 +1573,20 @@ await pool.query(`
     created_at TIMESTAMPTZ DEFAULT NOW()
   )
 `);
+    await pool.query(`ALTER TABLE brilon_angebote
+      ADD COLUMN IF NOT EXISTS bild_url TEXT,
+      ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
+      ADD COLUMN IF NOT EXISTS zielgruppe TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS veranstaltungsort TEXT NOT NULL DEFAULT 'Brilon',
+      ADD COLUMN IF NOT EXISTS kapazitaet INTEGER NOT NULL DEFAULT 20,
+      ADD COLUMN IF NOT EXISTS verfuegbare_termine JSONB NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS hinweise TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS buchbar BOOLEAN NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS veroeffentlicht BOOLEAN NOT NULL DEFAULT true`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_orte(
+      id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon'),('Rüthen'),('Soest'),('Sundern') ON CONFLICT(name) DO NOTHING`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS brilon_gps_touren (
         id UUID PRIMARY KEY,

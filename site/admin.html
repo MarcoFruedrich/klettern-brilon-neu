@@ -201,6 +201,16 @@
     <input name="dauer" type="number"
       min="15" placeholder="z. B. 90">
   </label>
+  <label>Kategorie<input name="kategorie" maxlength="60" placeholder="Klettern"></label>
+  <label>Zielgruppe<input name="zielgruppe" maxlength="120" placeholder="Familien, Schulklassen"></label>
+  <label>Veranstaltungsort<select name="veranstaltungsort" id="angebot-ort" required></select></label>
+  <label>Neuen Veranstaltungsort hinzufügen<input id="neuer-ort-name" maxlength="80" placeholder="z. B. Sundern"></label>
+  <button type="button" id="ort-hinzufuegen" class="btn secondary">Ort zur Auswahl hinzufügen</button>
+  <label>Kapazität (Teilnehmende)<input name="kapazitaet" type="number" min="1" max="500" value="20" required></label>
+  <label>Verfügbare Termine (ein Datum pro Zeile; leer = offen)<textarea name="verfuegbare_termine" rows="3" placeholder="2026-12-01"></textarea></label>
+  <label>Besondere Hinweise<textarea name="hinweise" rows="2" maxlength="1000"></textarea></label>
+  <label class="check"><input name="buchbar" type="checkbox" checked><span>Buchbar</span></label>
+  <label class="check"><input name="veroeffentlicht" type="checkbox"><span>Auf der Website veröffentlichen</span></label>
 
   <button type="submit" class="btn">
     Neues Angebot hinzufügen

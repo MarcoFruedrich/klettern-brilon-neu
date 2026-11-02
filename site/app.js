@@ -6,6 +6,13 @@ let sperrzeiten = [];
 let sperrzeitenGeladen = false;
 const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
+const angebotAuswahl = document.getElementById('angebot-auswahl');
+let angeboteCache=[];
+function dauerFuer(teilnehmer,angebotName){
+  const programm=angeboteCache.find(a=>a.name===angebotName);
+  return Number(programm?.dauer)||
+    (teilnehmer<=4?90:teilnehmer<=10?150:teilnehmer<=15?180:teilnehmer<=20?210:240);
+}
 
 const buchbareUhrzeiten = [
   '09:00',
@@ -50,12 +57,8 @@ async function belegteUhrzeitenLaden() {
   const teilnehmer = Number(
     document.getElementById('buchungs-teilnehmer')?.value
   );
-
-  const dauer =
-    teilnehmer >= 5 && teilnehmer <= 10 ? 150 :
-    teilnehmer >= 11 && teilnehmer <= 15 ? 180 :
-    teilnehmer >= 16 && teilnehmer <= 20 ? 210 : null;
-
+  const angebot=angebotAuswahl?.value;
+  if(!angebot)return;
   const vorherigeAuswahl = uhrzeitAuswahl.value;
 
   uhrzeitHinweis.textContent = 'Freie Uhrzeiten werden geprüft …';
@@ -64,7 +67,8 @@ async function belegteUhrzeitenLaden() {
   try {
     const antwort = await fetch(
       '/api/belegte-zeiten?datum=' + encodeURIComponent(datum) +
-      '&teilnehmer=' + encodeURIComponent(teilnehmer)
+      '&teilnehmer=' + encodeURIComponent(teilnehmer) +
+      '&angebot=' + encodeURIComponent(angebot)
     );
 
     if (!antwort.ok) throw new Error('Verfügbarkeit nicht abrufbar');
@@ -125,30 +129,14 @@ function buchungsdauerBerechnen() {
   if (!teilnehmerEingabe || !dauerAnzeige) return;
 
   const anzahl = Number(teilnehmerEingabe.value);
-  let dauer = null;
+  const dauer=dauerFuer(anzahl,angebotAuswahl?.value);
 
-  if (anzahl >= 5 && anzahl <= 10) {
-    dauer = 150;
-  } else if (anzahl >= 11 && anzahl <= 15) {
-    dauer = 180;
-  } else if (anzahl >= 16 && anzahl <= 20) {
-    dauer = 210;
-  }
-
-  if (dauer === null) {
-    dauerAnzeige.textContent =
-      'Individuelle Anfrage – Dauer nach Absprache';
-
-    if (endzeitAnzeige) endzeitAnzeige.textContent = '';
-    return;
-  }
-
+  const dauerMinuten = dauer % 60;
   const stunden = Math.floor(dauer / 60);
-  const minuten = dauer % 60;
 
   dauerAnzeige.textContent =
     'Voraussichtliche Dauer: ' +
-    stunden + (minuten ? ',5' : '') + ' Stunden';
+    (stunden ? stunden + ' Std. ' : '') + (dauerMinuten ? dauerMinuten + ' Min.' : '');
 
   if (endzeitAnzeige) {
     const startzeit = uhrzeitAuswahl?.value;
@@ -499,6 +487,7 @@ async function angeboteLaden() {
     if (!res.ok) throw new Error('Angebote nicht erreichbar');
 
     const angebote = await res.json();
+    angeboteCache=angebote;
 
     for (const angebot of angebote) {
       const option = document.createElement('option');
@@ -506,6 +495,10 @@ async function angeboteLaden() {
       option.textContent = angebot.name;
       auswahl.appendChild(option);
     }
+    auswahl.addEventListener('change',()=>{
+      buchungsdauerBerechnen();
+      belegteUhrzeitenLaden();
+    });
   } catch (fehler) {
     console.error('Erlebnisangebote konnten nicht geladen werden:', fehler);
   }
@@ -529,7 +522,6 @@ async function preisanzeigeStarten() {
 
     function preisAktualisieren() {
       const angebot = angebote.find(a => a.name === auswahl.value);
-      const anzahl = Number(teilnehmer.value);
 
       anzeige.textContent = '';
 
@@ -558,16 +550,32 @@ async function preisanzeigeStarten() {
         bildAnzeige.appendChild(beschreibung);
       }
 
+      const meta=[angebot.kategorie,angebot.zielgruppe,
+        angebot.veranstaltungsort,angebot.dauer ? angebot.dauer+' Minuten' : '']
+        .filter(Boolean).join(' · ');
+      if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
+      if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
+      teilnehmer.max=String(Math.min(150,Number(angebot.kapazitaet)||150));
+      if(Number(teilnehmer.value)>Number(teilnehmer.max)){teilnehmer.value=teilnehmer.max;}
+      const anzahl = Number(teilnehmer.value);
+      const termine=Array.isArray(angebot.verfuegbare_termine)?angebot.verfuegbare_termine:[];
+      date.setCustomValidity(termine.length&&!termine.includes(date.value)
+        ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
+      date.onchange=()=>date.setCustomValidity(termine.length&&!termine.includes(date.value)
+        ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
+
       let gruppe = '';
 
-      if (anzahl >= 5 && anzahl <= 10) gruppe = '5-10';
+      if (anzahl >= 1 && anzahl <= 4) gruppe = '1-4';
+      else if (anzahl >= 5 && anzahl <= 10) gruppe = '5-10';
       else if (anzahl <= 15 && anzahl >= 11) gruppe = '11-15';
       else if (anzahl <= 20 && anzahl >= 16) gruppe = '16-20';
+      else if (anzahl <= 150 && anzahl >= 21) gruppe = '21-150';
 
       const preis = angebot.preise?.[gruppe];
 
       if (preis !== undefined && preis !== null) {
-        anzeige.textContent = 'Gruppenpreis: ' +
+        anzeige.textContent = (termine.length?'Freigegebene Termine: '+termine.map(t=>new Date(t+'T12:00:00').toLocaleDateString('de-DE')).join(', ')+' · ':'')+'Gruppenpreis: ' +
           Number(preis).toLocaleString('de-DE', {
             style: 'currency',
             currency: 'EUR'
