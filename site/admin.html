@@ -122,6 +122,17 @@
 <h3>Meine eingetragenen Termine und Sperrzeiten</h3>
 <div id="calendar-entries" class="admin-grid"></div>
 
+      <section id="anschlussrabatt-section" class="booking">
+        <h2>Anschlussrabatt berechnen</h2>
+        <p>Unverbindliche Vorschau: Bei direkt aufeinanderfolgenden Programmen
+          werden beide Programme um 10 % reduziert. Ein Programm erhaelt
+          den Rabatt auch bei zwei Anschluessen nur einmal.</p>
+        <div id="anschlussrabatt-positionen"></div>
+        <button type="button" id="anschlussrabatt-hinzufuegen" class="btn secondary">Weiteres Programm</button>
+        <button type="button" id="anschlussrabatt-berechnen" class="btn">Rabatt berechnen</button>
+        <div id="anschlussrabatt-ergebnis" role="status" aria-live="polite"></div>
+      </section>
+
       <h2>Sonderangebote verwalten</h2>
       <form id="special-form">
         <label>Titel
