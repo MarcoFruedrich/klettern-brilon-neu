@@ -4,6 +4,7 @@ const workspace = document.getElementById('workspace');
 const status = document.getElementById('status');
 let aktuelleZahlungsBuchungen=[];
 let refreshSequenz=0;
+let bookingPage=1;
 
 async function api(path, options = {}) {
   const r = await fetch(path, {
@@ -85,11 +86,9 @@ async function refresh() {
     const alleBuchungen = await api('/api/admin/buchungen');
     const suchtext=(document.getElementById('bookings-search')?.value||'').trim();
     const statusFilter=document.getElementById('bookings-status-filter')?.value||'alle';
-    let bookings=alleBuchungen;
-    if(suchtext||statusFilter!=='alle'){
-      const query=new URLSearchParams({suche:suchtext,status:statusFilter});
-      bookings=await api('/api/admin/buchungen?'+query.toString());
-    }
+    const query=new URLSearchParams({suche:suchtext,status:statusFilter,seite:String(bookingPage)});
+    const bookingResult=await api('/api/admin/buchungen?'+query.toString());
+    const bookings=bookingResult.buchungen;
     if(aktuelleSequenz!==refreshSequenz)return;
     zahlungsuebersichtRendern(alleBuchungen);
 
@@ -104,7 +103,17 @@ async function refresh() {
     const box = document.getElementById('bookings');
     box.replaceChildren();
     const resultLabel=document.getElementById('booking-results-summary');
-    if(resultLabel)resultLabel.textContent=`${bookings.length} Buchung(en) angezeigt · Suche und Statusfilter gelten über alle Datensätze · maximal 250 Treffer je Ansicht`;
+    const seiten= Math.max(1,Math.ceil(bookingResult.anzahl/bookingResult.proSeite));
+    if(bookingPage>seiten){bookingPage=seiten;await refresh();return;}
+    if(resultLabel)resultLabel.textContent=`${bookingResult.anzahl} Buchung(en) gefunden · Seite ${bookingResult.seite} von ${seiten}`;
+    const pagination=document.getElementById('bookings-pagination');
+    const previous=document.getElementById('bookings-prev');
+    const next=document.getElementById('bookings-next');
+    const pageInfo=document.getElementById('bookings-page-info');
+    if(pagination)pagination.hidden=bookingResult.anzahl<=bookingResult.proSeite;
+    if(previous)previous.disabled=bookingPage<=1;
+    if(next)next.disabled=bookingPage>=seiten;
+    if(pageInfo)pageInfo.textContent=`Seite ${bookingPage} / ${seiten}`;
 
     if (!bookings.length) {
       box.append(el('p', 'Noch keine Buchungsanfragen.'));
@@ -620,9 +629,12 @@ document.getElementById('gps-game-form')?.addEventListener('submit',async event=
 let bookingFilterTimer;
 document.getElementById('bookings-search')?.addEventListener('input', () => {
   clearTimeout(bookingFilterTimer);
+  bookingPage=1;
   bookingFilterTimer=setTimeout(refresh,250);
 });
-document.getElementById('bookings-status-filter')?.addEventListener('change', () => refresh());
+document.getElementById('bookings-status-filter')?.addEventListener('change', () => {bookingPage=1;refresh();});
+document.getElementById('bookings-prev')?.addEventListener('click',()=>{if(bookingPage>1){bookingPage--;refresh();}});
+document.getElementById('bookings-next')?.addEventListener('click',()=>{bookingPage++;refresh();});
 document.getElementById('payment-overview-filter')?.addEventListener('change', () => zahlungsuebersichtRendern());
 
 login.onsubmit = async e => {

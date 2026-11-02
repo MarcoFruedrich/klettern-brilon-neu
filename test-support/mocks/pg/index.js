@@ -4,6 +4,7 @@ class Pool {
     if (process.env.MOCK_PG !== '1') throw new Error('Der HTTP-Test darf keine echte Datenbank öffnen.');
     this.offers = JSON.parse(process.env.MOCK_OFFERS || '[]');
     this.bookings = [];
+    this.bookings = JSON.parse(process.env.MOCK_BOOKINGS || '[]');
     this.guests = JSON.parse(process.env.MOCK_GUESTBOOK || '[]');
     this.places = JSON.parse(process.env.MOCK_PLACES || '[]');
   }
@@ -59,6 +60,12 @@ class Pool {
       const count=this.bookings.filter(item=>item.data.anschlussElternId===params[0]&&item.id!==params[1]&&item.status==='bestaetigt').length;
       return { rows:[{anzahl:count}], rowCount:1 };
     }
+    if (sql.includes('COUNT(*)::text AS anzahl FROM brilon_buchungen')) {
+      const rows=this.bookings.filter(item=>(params[0]==='alle'||(item.status||'offen')===params[0])&&
+        (!params[1]||[item.data.name,item.data.buchungsnummer,item.buchungsnummer,item.data.email,item.data.angebot]
+          .join(' ').toLocaleLowerCase('de-DE').includes(String(params[1]).toLocaleLowerCase('de-DE'))));
+      return {rows:[{anzahl:String(rows.length)}],rowCount:1};
+    }
     if (sql.includes('SELECT 1 FROM brilon_buchungen')) {
       const found=this.bookings.some(item=>item.data.anschlussElternId===params[0]&&item.data.angebot===params[1]&&
         item.data.uhrzeit===params[2]&&!['abgelehnt','storniert'].includes(item.status));
@@ -85,11 +92,13 @@ class Pool {
       return { rows:item?[{id:item.id,data:item.data,status:item.status}]:[], rowCount:item?1:0 };
     }
     if (sql.includes('SELECT id,data,status,bearbeitungsnotiz')) {
-      const rows=this.bookings.filter(item=>(params[0]==='alle'||(item.status||'offen')===params[0])&&
+      let rows=this.bookings.filter(item=>(params[0]==='alle'||(item.status||'offen')===params[0])&&
         (!params[1]||[item.data.name,item.data.buchungsnummer,item.buchungsnummer,item.data.email,item.data.angebot]
           .join(' ').toLocaleLowerCase('de-DE').includes(String(params[1]).toLocaleLowerCase('de-DE'))))
         .map(item=>({id:item.id,data:item.data,status:item.status,bearbeitungsnotiz:'',
           created_at:new Date(0),updated_at:new Date(0),zahlungsinfo_gesendet_am:null}));
+      if(sql.includes('LIMIT $3 OFFSET $4'))rows=rows.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))
+        .slice(params[3],params[3]+params[2]);
       return { rows, rowCount:rows.length };
     }
     if (sql.includes('UPDATE brilon_buchungen SET data=$1::jsonb,status=$2')) {

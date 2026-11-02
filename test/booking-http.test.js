@@ -19,6 +19,11 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     {id:2,name:'Bouldern',preise:{'1-4':150,'5-10':200},kapazitaet:20,aktiv:true,
       verfuegbare_termine:['2027-03-15'],buchbar:true,veroeffentlicht:true,dauer:60}
   ];
+  const archivedBookings=Array.from({length:55},(_,i)=>({
+    id:`archive-${i+1}`,status:'offen',buchungsnummer:`ARCHIV-${String(i+1).padStart(3,'0')}`,
+    data:{name:`Archiv Gruppe ${i+1}`,email:`archiv${i+1}@example.test`,angebot:'Archivprogramm',datum:'2026-01-01'},
+    created_at:new Date(i*1000).toISOString()
+  }));
   const offerSecret='test-only-booking-offer-secret-32-chars';
   const tourId='123e4567-e89b-12d3-a456-426614174000';
   const guestId='123e4567-e89b-12d3-a456-426614174001';
@@ -27,6 +32,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
+    MOCK_BOOKINGS:JSON.stringify(archivedBookings),
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),
     MOCK_GUESTBOOK:JSON.stringify([
       {id:guestId,name:null,datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,
@@ -92,6 +98,18 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const matchingBookings=await fetch(root+'/api/admin/buchungen?suche=max&status=offen',{headers:{Cookie:cookie}});
   assert.equal(matchingBookings.status,200);
   assert.equal((await matchingBookings.json()).length,2,'Suche und Statusfilter werden serverseitig kombiniert');
+  const archivePage1=await fetch(root+'/api/admin/buchungen?suche=Archiv&status=offen&seite=1',{headers:{Cookie:cookie}});
+  assert.equal(archivePage1.status,200);
+  const archiveResult1=await archivePage1.json();
+  assert.equal(archiveResult1.anzahl,55);
+  assert.equal(archiveResult1.buchungen.length,50);
+  assert.equal(archiveResult1.seite,1);
+  const archivePage2=await fetch(root+'/api/admin/buchungen?suche=Archiv&status=offen&seite=2',{headers:{Cookie:cookie}});
+  const archiveResult2=await archivePage2.json();
+  assert.equal(archiveResult2.buchungen.length,5);
+  assert.equal(archiveResult2.seite,2);
+  const invalidPage=await fetch(root+'/api/admin/buchungen?seite=0',{headers:{Cookie:cookie}});
+  assert.equal(invalidPage.status,400,'Ungültige Seitennummern werden abgelehnt');
   const invalidStatus=await fetch(root+'/api/admin/buchungen?status=unbekannt',{headers:{Cookie:cookie}});
   assert.equal(invalidStatus.status,400);
   const guestbook=await fetch(root+'/api/admin/gps/gaesteliste?tour='+tourId,{headers:{Cookie:cookie}});

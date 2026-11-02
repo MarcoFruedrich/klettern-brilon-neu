@@ -21,8 +21,8 @@ werden.
 ## Buchungen und Zahlungen
 
 - In „Buchungen & Zahlungen“ nach Name, Buchungsnummer, E-Mail oder Angebot
-  suchen und nach Buchungsstatus filtern. Die Ergebnisliste ist auf 250
-  Buchungen begrenzt; die Suche wird in der Datenbank ausgeführt.
+  suchen und nach Buchungsstatus filtern. Die Liste zeigt 50 Treffer je Seite;
+  die Seitensteuerung führt durch alle Treffer und zeigt die Gesamtzahl an.
 - Buchungsnummern bleiben stabil und können als Überweisungsverwendungszweck
   genutzt werden.
 - In einer Buchung den Status prüfen beziehungsweise aktualisieren. Die
@@ -31,7 +31,8 @@ werden.
   Saldo wird aus den Einträgen berechnet. Bei Erreichen der 25-%-Anzahlung wird
   eine offene Buchung automatisch bestätigt; der verbleibende Betrag entspricht
   dem Restbetrag.
-- „Zahlungsübersicht“ zeigt Eingänge, offene Beträge und Gutschriften. Eine
+- „Zahlungsübersicht“ zeigt Eingänge, offene Beträge und Gutschriften für die
+  250 zuletzt geladenen Buchungen. Eine
   Gutschrift wird nicht automatisch ausgezahlt; Erstattungen müssen kontrolliert
   und separat abgewickelt werden.
 

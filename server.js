@@ -1310,6 +1310,23 @@ preis=safeText(d.preis,50);
         const allowedStatus=['alle','offen','bestaetigt','abgelehnt','storniert'];
         if(!allowedStatus.includes(statusFilter))return reply(res,400,{error:'Ungültiger Statusfilter.'});
         const suchtext=safeText(u.searchParams.get('suche'),120);
+        if(u.searchParams.has('seite')){
+          const seiteText=u.searchParams.get('seite'),seite=Number(seiteText),proSeite=50;
+          if(!/^\d+$/.test(seiteText)||!Number.isSafeInteger(seite)||seite<1||seite>100000)
+            return reply(res,400,{error:'Ungültige Buchungsseite.'});
+          const filterParams=[statusFilter,suchtext];
+          const where=`WHERE ($1::text='alle' OR COALESCE(status,'offen')=$1)
+             AND ($2::text='' OR concat_ws(' ',data->>'name',buchungsnummer,data->>'buchungsnummer',
+               data->>'email',data->>'angebot') ILIKE '%' || $2 || '%')`;
+          const count=await pool.query(`SELECT COUNT(*)::text AS anzahl FROM brilon_buchungen ${where}`,filterParams);
+          const q=await pool.query(
+            `SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am
+             FROM brilon_buchungen ${where}
+             ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+            [...filterParams,proSeite,(seite-1)*proSeite]
+          );
+          return reply(res,200,{buchungen:q.rows,anzahl:Number(count.rows[0]?.anzahl||0),seite,proSeite});
+        }
         const q=await pool.query(
           `SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am
            FROM brilon_buchungen
