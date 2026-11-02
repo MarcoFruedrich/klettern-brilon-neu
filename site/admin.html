@@ -324,7 +324,18 @@
   <h3>Spielzugang erstellen</h3>
   <form id="gps-game-form">
     <label>Aktive GPS-Tour<select name="tourId" required></select></label>
+    <label>Bestätigte Buchung suchen
+      <input id="gps-booking-search" type="search" maxlength="120" autocomplete="off"
+        placeholder="Name oder Buchungsnummer">
+    </label>
+    <p class="hint">Die Suche berücksichtigt alle bestätigten Buchungen zur ausgewählten GPS-Tour, auch ältere Termine.</p>
     <label>Bestätigte Buchung<select name="buchungId" required></select></label>
+    <p id="gps-booking-results" role="status" aria-live="polite"></p>
+    <nav id="gps-booking-pagination" class="calendar-navigation" aria-label="GPS-Buchungsseiten" hidden>
+      <button id="gps-booking-prev" type="button" class="btn secondary">← Vorherige</button>
+      <span id="gps-booking-page-info" aria-live="polite"></span>
+      <button id="gps-booking-next" type="button" class="btn secondary">Weitere →</button>
+    </nav>
     <button class="btn secondary" type="submit">Einmaligen Spielzugang erstellen</button>
   </form>
   <p id="gps-game-status" role="status"></p>
