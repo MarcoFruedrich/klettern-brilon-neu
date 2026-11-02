@@ -2150,6 +2150,19 @@ await pool.query(`
       id UUID PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
       programm TEXT NOT NULL,beginn TEXT NOT NULL,pruefungen JSONB NOT NULL,
       hat_mangel BOOLEAN NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    // Sperren bleiben bis zu einer gesondert protokollierten fachlichen Freigabe bestehen.
+    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
+    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS sperrgrund TEXT');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationsereignisse (
+      id UUID PRIMARY KEY,
+      station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
+      bericht_id UUID REFERENCES brilon_pruef_berichte(id),
+      art TEXT NOT NULL CHECK(art IN ('mangel','freigabe')),
+      notiz TEXT NOT NULL,
+      verantwortlich TEXT NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsereignisse_station_idx ON brilon_pruef_stationsereignisse(station_id,erstellt_am DESC)');
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }
