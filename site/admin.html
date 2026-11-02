@@ -360,6 +360,14 @@
     <section id="stationspruefung" class="booking admin-anchor">
       <h2>Stationsprüfungen – Verwaltung</h2>
       <p>Für die dokumentierte Kontrolle vor jedem Programm. <a href="/pruefung.html">Prüfformular für Mitarbeitende öffnen</a>.</p>
+      <section id="pruef-uebersicht" aria-label="Sicherheitsübersicht der Kletterstationen">
+        <h3>Aktuelle Sicherheitsübersicht</h3>
+        <p class="hint">Sicherheitsmängel und stillgelegte Stationen haben Vorrang. Kleinere Hinweise werden separat zur Nachprüfung angezeigt. Die Übersicht ersetzt keine vorgeschriebene Kontrolle vor jeder Nutzung.</p>
+        <button id="pruef-uebersicht-refresh" type="button" class="btn secondary">Sicherheitsübersicht aktualisieren</button>
+        <p id="pruef-uebersicht-status" role="status" aria-live="polite">Noch keine Sicherheitsdaten geladen.</p>
+        <div id="pruef-uebersicht-zaehler"></div>
+        <div id="pruef-uebersicht-inhalt"></div>
+      </section>
       <form id="pruef-personal-form">
         <h3>Mitarbeiterzugang anlegen</h3>
         <label>Name<input name="name" maxlength="120" required></label>
