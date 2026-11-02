@@ -14,6 +14,9 @@ function fakeAdminApi(page) {
     inspectionEvents: [], inspectionStatusEvents: [], inspectionStaff: [],
     inspectionHints: [],
     inspectionMails: [],
+    inspectionOverview: {zaehler:{gesperrt:0,stillgelegt:0,nicht_nutzbar:0,
+      hinweise_offen:0,meldungen_ungeklaert:0},stationen:[],hinweise:[],meldungen:[],
+      stand:'2027-01-01T16:00:00Z'},
     inspectionTablets: [],
     inspectionStations: [{id:'550e8400-e29b-41d4-a716-446655440099',
       name:'Kletterwand Test',aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
@@ -50,6 +53,8 @@ function fakeAdminApi(page) {
       state.mutations.push({endpoint,method,body:method==='DELETE'?null:readBody()});
     }
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
+    if(endpoint==='/api/admin/pruefung/uebersicht'&&method==='GET')
+      return json(200,state.inspectionOverview);
     if(endpoint==='/api/admin/pruefung/tablets'&&method==='GET')
       return json(200,state.inspectionTablets);
     const replacement=endpoint.match(/^\/api\/admin\/pruefung\/tablets\/([^/]+)\/ersetzen$/);
@@ -698,6 +703,48 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await card.getByText(/Stilllegung für Reparatur/).first().waitFor();
     assert.equal(state.inspectionStatusEvents.length,2);
     assert.deepEqual(dialogs,['prompt','confirm','prompt','confirm']);
+    await page.close();
+  });
+
+  await t.test('Sicherheitsübersicht priorisiert Mangelsperren, offene Hinweise und Meldungen',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    state.inspectionOverview={
+      zaehler:{gesperrt:1,stillgelegt:1,nicht_nutzbar:2,
+        hinweise_offen:1,meldungen_ungeklaert:1},
+      stationen:[
+        {id:'550e8400-e29b-41d4-a716-446655440010',name:'Kletterwand West',
+          aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
+          sperrgrund:'Defekte Sicherung am Tragseil',offene_hinweise:1},
+        {id:'550e8400-e29b-41d4-a716-446655440011',name:'Wartungsleiter',
+          aktiv:false,gesperrt_am:null,sperrgrund:null,offene_hinweise:0}
+      ],
+      hinweise:[{id:'550e8400-e29b-41d4-a716-446655440099',
+        station:'Kletterwand West',aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
+        beschreibung:'Abgenutzte Beschriftung zur Nachprüfung'}],
+      meldungen:[{bericht_id:'550e8400-e29b-41d4-a716-446655440088',
+        programm:'Kletterkurs Vormittag',status:'fehlgeschlagen',versuche:1}],
+      stand:'2027-01-01T16:00:00Z'
+    };
+    await login(page,root);
+    const summary=page.locator('#pruef-uebersicht');
+    await summary.getByText('Sicherheitsgesperrte Stationen: 1').waitFor();
+    assert.match(await summary.textContent(),/Stillgelegte Stationen: 1/);
+    assert.match(await summary.textContent(),/Offene kleine Hinweise: 1/);
+    assert.match(await summary.textContent(),/Nicht bestätigte Mängel-E-Mails: 1/);
+    const text=await summary.locator('#pruef-uebersicht-inhalt').textContent();
+    assert.ok(text.indexOf('NICHT BENUTZEN – SICHERHEITSMANGEL')<
+      text.indexOf('NICHT BENUTZEN – STATION STILLGELEGT'));
+    assert.match(text,/Abgenutzte Beschriftung zur Nachprüfung/);
+    assert.match(text,/Defekte Sicherung am Tragseil/);
+    assert.match(text,/Mailstatus: fehlgeschlagen/);
+    assert.match(text,/keine automatische Stationssperre|bereits sicherheitsgesperrt/i);
+    await summary.getByRole('button',{name:'Sicherheitsübersicht aktualisieren'}).click();
+    await summary.getByText('Sicherheitsgesperrte Stationen: 1').waitFor();
+    await summary.getByRole('button',{name:'Hinweis und Nachprüfung öffnen'}).click();
+    assert.equal(await page.locator('#pruef-hinweis-list').getAttribute('tabindex'),'-1');
+    assert.equal(state.mutations.filter(m=>m.endpoint.includes('/pruefung/')).length,0,
+      'The dashboard must be read-only.');
     await page.close();
   });
 
