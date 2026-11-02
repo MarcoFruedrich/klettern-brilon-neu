@@ -30,6 +30,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Für bestätigte Buchungen lassen sich einzelne Spielzugänge ausstellen. Gruppenstände, Start-/Abschlusszeit und Dauer werden gespeichert. Die mobile Spielseite prüft QR-Kennung, Zahlencode und Antwort; spätere Stationskoordinaten werden nie an den Browser ausgeliefert.
 - Die Gästeliste zeigt nur abgeschlossene Spiele mit ausdrücklicher Zustimmung zur Namensveröffentlichung. Ohne Zustimmung wird kein Name gespeichert.
 - GPS-Kontrollcodes werden mit HMAC gehasht; Spielzugänge werden nur gehasht gespeichert. Das Geheimnis `GPS_CODE_SECRET` ist erforderlich.
+- Beim Bearbeiten einer GPS-Tour bleiben Kontrollcode-Hashes für Stations-ID und QR-Kennung unverändert erhalten. Geänderte QR-Kennungen sowie neue Stationen erfordern einen neuen gültigen Zahlencode; die Admin-Antwort enthält weiterhin weder Code noch Hash.
 - Unmögliche Kalendertage werden beim Erstellen einer Anfrage als Eingabefehler zurückgewiesen.
 
 ## Prüfergebnisse
@@ -38,7 +39,8 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 
 - `node --check server.js` – bestanden.
 - `node --check site/admin.js` – bestanden.
-- `npm test` – 19 bestanden, 0 fehlgeschlagen.
+- `node --check lib/gpstour.js` – bestanden.
+- `npm test` – 21 bestanden, 0 fehlgeschlagen.
 - `git diff --check` – bestanden.
 
 Die Datenbank- und E-Mail-Routen wurden nicht gegen Produktivdienste aufgerufen. Es wurden keine UI-Viewport- oder Browsertests ausgeführt.
@@ -49,7 +51,7 @@ Die Datenbank- und E-Mail-Routen wurden nicht gegen Produktivdienste aufgerufen.
 - Eine Admin-Sitzung wird im Arbeitsspeicher gehalten. Für mehrere Instanzen/Neustarts fehlt weiterhin ein persistenter Session-Store; zusätzlich sind CSRF-/Origin-Prüfung, Sitzungsrotation und ein zweiter Faktor zu prüfen.
 - Such- und Statusfilter sind clientseitig und begrenzen nicht die geladene Ergebnismenge von 250 Einträgen.
 - Anschlussrabatte können derzeit nachträglich nur auf bereits bestätigte und direkt anschließende Buchungen angewendet werden. Es fehlt die kundenseitige Vorschlags-/Buchungsstrecke für ein weiteres Anschlussprogramm sowie eine Verfügbarkeits-/Kapazitätsprüfung für solche neuen Zusatzbuchungen.
-- GPS benötigt noch QR-Code-Erzeugung und druckbare Etiketten. Die Verwaltung zeigt dafür stationäre QR-Zieladressen. Beim Bearbeiten einer Tour müssen neue Kontrollcodes für alle Stationen eingetragen werden.
+- GPS benötigt noch QR-Code-Erzeugung und druckbare Etiketten. Die Verwaltung zeigt dafür stationäre QR-Zieladressen. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.
 - Die 15 Fragen umfassende Mustertour liegt als Entwurf vor. Koordinaten, Routenführung, Zugänglichkeit und praktische Sicherheit müssen vor Veröffentlichung örtlich geprüft werden.
 - Der Status der produktiven Schema- und Kalenderdefinitionen ist noch zu ermitteln. Die Tabellen werden für lokale/isolierte Tests nicht automatisch angelegt.
 - Datenschutz- und Löschkonzept, Auskunft/Export, Einwilligungsnachweis für öffentliche Gästeliste sowie verbindliche Bedingungen sind noch zu entwickeln und fachlich zu prüfen.

@@ -5,7 +5,8 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
 const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, zahlungErgaenzen } = require('./lib/buchungslogik');
-const { stationFuerSpiel, stationPruefen, gpsSpieldauer, kontrollcodeHash } = require('./lib/gpsspiel');
+const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpsspiel');
+const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -53,38 +54,6 @@ function gueltigesDatum(v){
   return !Number.isNaN(datum.getTime())&&datum.toISOString().slice(0,10)===v;
 }
 function gpsTokenHash(token){return crypto.createHash('sha256').update(String(token)).digest('hex')}
-function gpsTourSpeichern(d,alter=null){
-  if(!process.env.GPS_CODE_SECRET||process.env.GPS_CODE_SECRET.length<32)
-    throw new Error('GPS_CODE_SECRET muss mindestens 32 Zeichen lang sein.');
-  const titel=safeText(d.titel,120),beschreibung=safeText(d.beschreibung,2000);
-  const schwierigkeitsgrad=safeText(d.schwierigkeitsgrad,30),altersgruppe=safeText(d.altersgruppe,80);
-  const startpunkt=safeText(d.startpunkt,160),ziel=safeText(d.ziel,160);
-  const dauer=Number(d.dauer),preis=Number(d.preis);
-  if(!titel||!startpunkt||!ziel||!Number.isInteger(dauer)||dauer<15||dauer>1440||
-     !Number.isFinite(preis)||preis<0||!Array.isArray(d.stationen)||d.stationen.length<1||d.stationen.length>60)
-    throw new Error('Tourdaten oder Stationsanzahl sind ungültig.');
-  const ids=new Set(),qrIds=new Set();
-  const stationen=d.stationen.map((s,index)=>{
-    const id=safeText(s.id,80)||'station-'+(index+1);
-    const qrId=safeText(s.qrId,120),frage=safeText(s.frage,500),kontrollcode=safeText(s.kontrollcode,8);
-    const antworten=Array.isArray(s.antworten)?s.antworten.map(a=>safeText(a,160)):[];
-    const latitude=Number(s.latitude),longitude=Number(s.longitude),loesungIndex=Number(s.loesungIndex);
-    if(ids.has(id)||qrIds.has(qrId)||!qrId||!frage||!/^\d{4,8}$/.test(kontrollcode)||
-       antworten.length!==2||antworten.some(a=>!a)||![0,1].includes(loesungIndex)||
-       !Number.isFinite(latitude)||latitude< -90||latitude>90||
-       !Number.isFinite(longitude)||longitude< -180||longitude>180)
-      throw new Error('Station '+(index+1)+' ist unvollständig oder ungültig.');
-    ids.add(id);
-    qrIds.add(qrId);
-    return {id,qrId,frage,antworten,loesungIndex,latitude,longitude,
-      kontrollcodeHash:kontrollcodeHash(kontrollcode,process.env.GPS_CODE_SECRET)};
-  });
-  return {titel,angebotName:'GPS-Schatzsuche: '+titel,beschreibung,schwierigkeitsgrad,altersgruppe,startpunkt,ziel,dauer,preis,
-    buchbar:d.buchbar===true,stationen};
-}
-function gpsTourAdminAnsicht(data){
-  return {...data,stationen:data.stationen.map(({kontrollcodeHash:_hash,...station})=>station)};
-}
 function session(req){const match=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/);const token=match?.[1],exp=sessions.get(token);if(!exp)return false;if(exp<Date.now()){sessions.delete(token);return false}return true}
 function admin(req,res){if(!session(req)){reply(res,401,{error:'Bitte anmelden.'});return false}return true}
 
@@ -1026,7 +995,7 @@ preis=safeText(d.preis,50);
       if(route==='/api/admin/gps/touren'&&req.method==='POST'){
         const d=await body(req);
         let data;
-        try{data=gpsTourSpeichern(d);}catch(error){return reply(res,400,{error:error.message});}
+        try{data=gpsTourSpeichern(d,null,process.env.GPS_CODE_SECRET);}catch(error){return reply(res,400,{error:error.message});}
         const id=crypto.randomUUID(),aktiv=d.aktiv===true&&data.buchbar;
         const client=await pool.connect();
         try{
@@ -1062,7 +1031,7 @@ preis=safeText(d.preis,50);
         const aktuell=await pool.query('SELECT data,angebot_id FROM brilon_gps_touren WHERE id=$1',[tourRoute[1]]);
         if(!aktuell.rowCount)return reply(res,404,{error:'GPS-Tour nicht gefunden.'});
         let data;
-        try{data=gpsTourSpeichern(d);}catch(error){return reply(res,400,{error:error.message});}
+        try{data=gpsTourSpeichern(d,aktuell.rows[0].data,process.env.GPS_CODE_SECRET);}catch(error){return reply(res,400,{error:error.message});}
         const aktiv=typeof d.aktiv==='boolean'?d.aktiv:null;
         const q=await pool.query(
           'UPDATE brilon_gps_touren SET data=$1::jsonb,aktiv=COALESCE($2,aktiv),aktualisiert_am=NOW() WHERE id=$3 RETURNING id,aktiv',
