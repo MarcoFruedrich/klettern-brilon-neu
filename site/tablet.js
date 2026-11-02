@@ -73,6 +73,8 @@ function cycle(){
   renderOffer();
 }
 async function checkTablet(){
+  // Hidden browser tabs must not keep reporting the physically visible display as online.
+  if(document.hidden||!navigator.onLine)return;
   // Only one server poll may update the code at a time.
   if(polling)return;
   polling=true;
