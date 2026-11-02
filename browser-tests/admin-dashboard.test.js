@@ -52,6 +52,13 @@ function fakeAdminApi(page) {
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
     if(endpoint==='/api/admin/pruefung/tablets'&&method==='GET')
       return json(200,state.inspectionTablets);
+    const chooseTablet=endpoint.match(/^\/api\/admin\/pruefung\/tablets\/([^/]+)\/pruefdisplay$/);
+    if(chooseTablet&&method==='PATCH'){
+      const device=state.inspectionTablets.find(x=>x.id===chooseTablet[1]&&x.aktiv);
+      if(!device)return json(409,{error:'Tablet nicht aktiv'});
+      state.inspectionTablets.forEach(x=>{x.pruefdisplay=x.id===device.id;});
+      return json(200,{id:device.id,pruefdisplay:true});
+    }
     if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='GET')return json(200,[]);
     if(endpoint==='/api/admin/pruefung/berichte'&&method==='GET')return json(200,[]);
     if(endpoint==='/api/admin/pruefung/meldungen'&&method==='GET')
@@ -547,6 +554,31 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.locator('#tablet-admin-refresh').click();
     await page.locator('#tablet-admin-list').getByText('Zugang gesperrt').waitFor();
     assert.equal(await page.locator('#tablet-admin-list').getByRole('button',{name:'Tablet-Zugang sperren'}).count(),0);
+    await page.close();
+  });
+
+  await t.test('Verwaltung bestimmt genau ein Prüfdisplay; andere Tablets bleiben Werbeanzeigen',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const first='550e8400-e29b-41d4-a716-446655441010',second='550e8400-e29b-41d4-a716-446655441011';
+    state.inspectionTablets=[
+      {id:first,name:'Fenster-Display',aktiv:true,online:true,pruefdisplay:true,
+        gekoppelt_am:'2027-01-01T12:00:00Z',zuletzt_gesehen_am:'2027-01-01T12:05:00Z'},
+      {id:second,name:'Ersatz-Werbetablet',aktiv:true,online:true,pruefdisplay:false,
+        gekoppelt_am:'2027-01-01T12:00:00Z',zuletzt_gesehen_am:'2027-01-01T12:05:00Z'}
+    ];
+    const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.type());await dialog.accept();});
+    await login(page,root);
+    const standby=page.locator('#tablet-admin-list article').filter({hasText:'Ersatz-Werbetablet'});
+    await standby.getByText('Nur Werbeanzeige – keine Prüfcodes').waitFor();
+    await standby.getByRole('button',{name:'Als Prüfdisplay auswählen'}).click();
+    await page.waitForFunction(()=>Array.from(document.querySelectorAll('#tablet-admin-list article'))
+      .some(a=>a.textContent.includes('Ersatz-Werbetablet')&&a.textContent.includes('Ausgewähltes Prüfdisplay')));
+    assert.deepEqual(dialogs,['confirm']);
+    assert.equal(state.inspectionTablets.filter(x=>x.pruefdisplay).length,1);
+    assert.equal(state.inspectionTablets.find(x=>x.id===second).pruefdisplay,true);
+    assert.equal(state.inspectionTablets.find(x=>x.id===first).pruefdisplay,false);
+    assert.equal(state.mutations.filter(m=>m.endpoint.endsWith('/pruefdisplay')).length,1);
     await page.close();
   });
 
