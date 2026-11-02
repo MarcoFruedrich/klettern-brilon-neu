@@ -538,8 +538,22 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const secondKiosk=()=>fetch(root+tabletPath,{headers:{Cookie:secondCookie}});
   assert.equal((await secondKiosk()).status,200);
   const secondId=(await tabletList()).find(x=>x.name==='Zweites Werbetablet').id;
+  // A second independently authenticated employee exercises subsequent requests
+  // without bypassing the production three-requests-per-ten-minutes rate limit.
+  const extraStaff={name:'CI Zweitprüfer',email:'zweitpruefer@example.test',
+    passwort:'Zweites-Prueferpasswort-2026!'};
+  const extraAccount=await adminPost('/api/admin/pruefung/mitarbeitende',extraStaff);
+  assert.equal(extraAccount.status,201);
+  const extraLogin=await fetch(root+'/api/pruefung/login',{method:'POST',
+    headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({email:extraStaff.email,passwort:extraStaff.passwort})});
+  assert.equal(extraLogin.status,200);
+  const extraCookie=extraLogin.headers.get('set-cookie').split(';')[0];
+  const extraPost=(endpoint,data)=>fetch(root+endpoint,{method:'POST',
+    headers:{Cookie:extraCookie,Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify(data)});
 
-  const requestedForFirst=await userPost('/api/pruefung/code-anfordern',{});
+  const requestedForFirst=await extraPost('/api/pruefung/code-anfordern',{});
   assert.equal(requestedForFirst.status,201);
   const codeOnlyFirst=(await (await kiosk()).json()).code;
   assert.match(codeOnlyFirst,/^\d{6}$/);
@@ -559,7 +573,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await userPost('/api/pruefung/freischalten',{code:codeOnlyFirst})).status,409,
     'Ein beim Tabletwechsel ungültig gemachter Prüfcode darf nicht weiter gelten');
   assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,1);
-  const requestedForSecond=await userPost('/api/pruefung/code-anfordern',{});
+  const requestedForSecond=await extraPost('/api/pruefung/code-anfordern',{});
   assert.equal(requestedForSecond.status,201);
   assert.equal((await (await kiosk()).json()).code,null);
   assert.match((await (await secondKiosk()).json()).code,/^\d{6}$/);
@@ -570,7 +584,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     method:'PATCH',headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
   assert.equal(chosenRevocation.status,200);
   assert.equal((await secondKiosk()).status,401);
-  assert.equal((await userPost('/api/pruefung/code-anfordern',{})).status,409,
+  assert.equal((await extraPost('/api/pruefung/code-anfordern',{})).status,409,
     'Nicht ausgewählte andere Tablets dürfen die Codeanforderung nicht ermöglichen');
   const tabletRevocation=await fetch(root+'/api/admin/pruefung/tablets/'+tabletId+'/sperren',{method:'PATCH',
     headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
