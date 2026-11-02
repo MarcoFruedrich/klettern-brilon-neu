@@ -128,7 +128,7 @@ async function main(req,res){
             angebot=safeText(d.angebot,120),
             teilnehmer=Number(d.teilnehmer);
 
-      if(!name||!/^\S+@\S+\.\S+$/.test(email)||
+      if(!vorname||!nachname||!/^\S+@\S+\.\S+$/.test(email)||
          !/^\d{4}-\d{2}-\d{2}$/.test(datum)||
          !angebot||!Number.isInteger(teilnehmer)||
          teilnehmer<1||teilnehmer>150||d.datenschutz!=='on')
@@ -179,11 +179,23 @@ restbetrag: gesamtpreis === null ? null : Math.round(gesamtpreis * 75) / 100,
         if(konflikt)return {konflikt};
 
         const id=crypto.randomUUID();
+        const basis=buchungsreferenz(nachname,vorname,datum);
+        const vorhanden=await client.query(
+          `SELECT buchungsnummer FROM brilon_buchungen WHERE buchungsnummer=$1 OR buchungsnummer LIKE $2`,
+          [basis,basis+'-%']
+        );
+        const belegte=new Set(vorhanden.rows.map(r=>r.buchungsnummer));
+        let laufnummer=1, buchungsnummer=basis;
+        while(belegte.has(buchungsnummer)) {
+          laufnummer++;
+          buchungsnummer=buchungsreferenz(nachname,vorname,datum,laufnummer);
+        }
+        data.buchungsnummer=buchungsnummer;
         await client.query(
           'INSERT INTO brilon_buchungen (id,data,status) VALUES ($1,$2,$3)',
           [id,JSON.stringify(data),'offen']
         );
-        return {id};
+        return {id,buchungsnummer:data.buchungsnummer};
       });
 
       if(ergebnis.konflikt)
@@ -197,6 +209,7 @@ const ende = fenster
   : 'nach Absprache';
 
 const buchungsdetails = [
+  `Buchungsnummer: ${ergebnis.buchungsnummer}`,
   `Name: ${name}`,
   `Datum: ${datum}`,
   `Angebot: ${angebot}`,
