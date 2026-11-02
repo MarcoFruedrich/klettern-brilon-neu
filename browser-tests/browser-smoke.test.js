@@ -106,6 +106,71 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.close();
   });
 
+  await t.test('Sonderaktion startet passende unverbindliche Anfrage ohne falsche Preiszusage',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await fakePublicApi(page);
+    await page.route('**/api/aktionen',route=>route.fulfill({status:200,
+      contentType:'application/json',body:JSON.stringify([
+        {id:'aktion-1',titel:'Klettertest',datum:'2027-03-15',
+          beschreibung:'Angebot zum Klettern',preis:'80'},
+        {id:'aktion-2',titel:'Familien-Spezial',datum:'2027-04-20',
+          beschreibung:'Unabhängiges Sonderangebot',preis:'50'}
+      ])}));
+    await page.goto(root+'/');
+    await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor({state:'attached'});
+    await page.locator('#booking textarea[name="nachricht"]').fill('Bitte mit Getränkepause planen.');
+    await page.locator('#specials article').first().getByText('Diese Aktion anfragen').click();
+    await page.waitForFunction(()=>document.querySelector('#selected-special')?.textContent.includes('Klettertest'));
+    assert.equal(await page.locator('#angebot-auswahl').inputValue(),'Klettertest');
+    assert.equal(await page.locator('input[name="datum"]').inputValue(),'2027-03-15');
+    assert.match(await page.locator('textarea[name="nachricht"]').inputValue(),
+      /^Anfrage zur Sonderaktion: Klettertest \(Termin: 2027-03-15\)\nBitte mit Getränkepause planen\./);
+    assert.match(await page.locator('#selected-special').textContent(),/Preis und Verfügbarkeit/);
+    assert.equal(await page.locator('#booking-status').textContent(),'');
+    await page.locator('#specials article').nth(1).getByText('Diese Aktion anfragen').click();
+    assert.equal(await page.locator('#angebot-auswahl').inputValue(),'',
+      'Eine nicht verknüpfte Sonderaktion darf kein altes Programm übernehmen');
+    assert.match(await page.locator('textarea[name="nachricht"]').inputValue(),
+      /^Anfrage zur Sonderaktion: Familien-Spezial \(Termin: 2027-04-20\)\nBitte mit Getränkepause planen\./);
+    assert.equal((await page.locator('textarea[name="nachricht"]').inputValue())
+      .split('Anfrage zur Sonderaktion:').length,2,
+      'Nicht mehrere alte Sonderaktions-Vermerke anhängen');
+    assert.deepEqual(errors,[]);
+    await page.close();
+  });
+
+  await t.test('Verspätete Verfügbarkeitsantwort darf nicht die aktuelle Programmauswahl überschreiben',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    await fakePublicApi(page);
+    let pendingResolve,firstRequest=false;
+    await page.route('**/api/belegte-zeiten?*',async route=>{
+      const url=new URL(route.request().url());
+      if(url.searchParams.get('teilnehmer')==='6'&&!firstRequest){
+        firstRequest=true;
+        await new Promise(resolve=>{pendingResolve=resolve;});
+        return route.fulfill({status:200,contentType:'application/json',
+          body:JSON.stringify({zeiten:[{uhrzeit:'09:00',belegt:true}]})});
+      }
+      return route.fulfill({status:200,contentType:'application/json',
+        body:JSON.stringify({zeiten:[{uhrzeit:'09:00',belegt:false}]})});
+    });
+    await page.goto(root+'/');
+    await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor({state:'attached'});
+    await page.locator('#angebot-auswahl').selectOption('Klettertest');
+    await page.locator('input[name="datum"]').fill('2027-03-15');
+    await page.locator('input[name="datum"]').dispatchEvent('change');
+    await page.waitForFunction(()=>document.getElementById('uhrzeit-hinweis')?.textContent.includes('geprüft'));
+    await page.locator('#buchungs-teilnehmer').fill('4');
+    await page.waitForFunction(()=>!document.getElementById('buchungs-uhrzeit')?.disabled &&
+      document.getElementById('buchungs-uhrzeit').options.length>1);
+    pendingResolve?.();
+    await page.waitForTimeout(100);
+    assert.equal(await page.locator('#buchungs-uhrzeit option[value="09:00"]').isDisabled(),false);
+    assert.equal(await page.locator('#buchungs-uhrzeit').isEnabled(),true);
+    await page.close();
+  });
+
   await t.test('Buchungsformular: Preis, belegte Uhrzeit, Testbestätigung', async () => {
     const page = await browser.newPage({viewport: {width: 390, height: 844}, locale: 'de-DE'});
     const pageErrors = [];
