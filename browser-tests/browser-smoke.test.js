@@ -116,7 +116,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     const minimum = await date.getAttribute('min');
     assert.match(minimum || '', /^\d{4}-\d{2}-\d{2}$/,
       'Das native Datumsfeld benötigt ein gültiges ISO-Mindestdatum');
-    await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor();
+    await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor({state: 'attached'});
     await page.locator('#angebot-auswahl').selectOption('Klettertest');
     await page.locator('#buchungs-teilnehmer').fill('6');
     await date.fill('2027-03-15');
