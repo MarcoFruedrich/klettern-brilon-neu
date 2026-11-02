@@ -26,9 +26,12 @@ function stationControl(station){
   const resultLabel=text('label','Prüfergebnis');
   const state=document.createElement('select');state.className='pruefung-zustand';
   state.append(Object.assign(text('option','In Ordnung'),{value:'ok'}),
-    Object.assign(text('option','Mangel festgestellt – Station nicht benutzen'),{value:'mangel'}));
+    Object.assign(text('option','Hinweis / kleiner Mangel – prüfen lassen, keine automatische Sperre'),{value:'hinweis'}),
+    Object.assign(text('option','Sicherheitsmangel – Station sofort sperren'),{value:'mangel'}));
   resultLabel.append(state);group.append(resultLabel);
-  const defectLabel=text('label','Mangelbeschreibung (mindestens zehn Zeichen)');
+  const classification=text('p','Bei unsicherer Sicherheitseinschätzung immer „Sicherheitsmangel“ wählen. Hinweise dürfen nur nicht sicherheitsrelevante Auffälligkeiten betreffen.');
+  classification.className='hint';group.append(classification);
+  const defectLabel=text('label','Beschreibung des Hinweises oder Mangels (mindestens zehn Zeichen)');
   const description=document.createElement('textarea');
   description.className='pruefung-beschreibung';
   description.maxLength=2000;description.rows=3;description.hidden=true;
@@ -41,7 +44,7 @@ function stationControl(station){
   fieldset.append(group);
   check.addEventListener('change',()=>{group.hidden=!check.checked;});
   state.addEventListener('change',()=>{
-    const defect=state.value==='mangel';
+    const defect=state.value!=='ok';
     description.hidden=!defect;description.required=defect;
     fotoLabel.hidden=!defect;
     if(!defect){description.value='';foto.value='';}
@@ -117,7 +120,7 @@ $('station-inspection').addEventListener('submit',async event=>{
     const pruefungen=await Promise.all(selected.map(async e=>({
       stationId:e.dataset.id,zustand:e.querySelector('.pruefung-zustand').value,
       beschreibung:e.querySelector('.pruefung-beschreibung').value,
-      foto:e.querySelector('.pruefung-zustand').value==='mangel'?
+      foto:e.querySelector('.pruefung-zustand').value!=='ok'?
         await fotoAlsJPEG(e.querySelector('.pruefung-foto').files[0]):null
     })));
     const data=await request('/api/pruefung/berichte',{method:'POST',
@@ -126,8 +129,9 @@ $('station-inspection').addEventListener('submit',async event=>{
         beginn:form.elements.beginn.value,pruefungen})});
     form.reset();hideForm();$('onsite-unlock').hidden=false;
     const gesperrt=(data.gesperrteStationen||[]).map(x=>x.name).join(', ');
-    const status=data.hatMangel?'MANGEL ERFASST – betroffene Station nicht benutzen.':
+    const status=data.hatMangel?'SICHERHEITSMANGEL ERFASST – betroffene Station nicht benutzen.':
       gesperrt?'Prüfung gespeichert, aber weiterhin GESPERRT: '+gesperrt+'.':
+      data.hatHinweis?'HINWEIS ERFASST – zur Nachprüfung an die Verwaltung vorgemerkt; keine neue Sperre.':
       'Prüfung ohne gemeldeten Mangel gespeichert.';
     const mail=data.benachrichtigung==='gesendet'?' Mängelmeldung versendet.':
       data.benachrichtigung==='fehlgeschlagen'?' ACHTUNG: Mängel-E-Mail fehlgeschlagen! Verantwortliche direkt informieren.':
