@@ -60,6 +60,19 @@ Die zuständige Person prüft den Hinweis, dokumentiert Prüfername und Ergebnis
 
 **Bei jeder Unsicherheit über die sichere Benutzbarkeit ist stattdessen „Sicherheitsmangel“ zu wählen.** Dieser löst die automatische Sperrung weiterhin aus. Ein Hinweis ist keine Bestätigung der technischen Sicherheit.
 
+## Sicherheitsübersicht und offene Nachkontrollen
+
+Nach der Admin-Anmeldung steht **„Aktuelle Sicherheitsübersicht“** am Beginn der Stationsprüfverwaltung. Mit **„Sicherheitsübersicht aktualisieren“** werden die aktuellen Daten erneut eingelesen. Die Übersicht ist **nur lesend** und unterscheidet klar zwischen:
+
+- **Sicherheitsmängeln / Stationssperren:** „NICHT BENUTZEN“. Betroffene Stationen stehen in der Aufgabenübersicht zuerst, einschließlich des dokumentierten Sperrgrundes. Eine Freigabe ist ausschließlich im bestehenden Verfahren mit fachlicher Nachprüfung und ausführlicher Dokumentation möglich.
+- **Administrativen Stilllegungen:** „NICHT BENUTZEN“. Eine Stilllegung allein ist keine Mängelsperre; eine Station kann zugleich beide Sperrgründe haben. In der Liste erscheint sie nur einmal. Auch eine Reaktivierung beseitigt eine fachliche Mängelsperre nicht.
+- **Kleineren offenen Hinweisen:** Sie werden nachverfolgt, ohne allein eine automatische Sperre auszulösen. In der Hinweisverwaltung kann der Eintrag erst nach dokumentierter Nachprüfung als erledigt gekennzeichnet werden. Ist die Station gleichzeitig gesperrt, wird dies ausdrücklich angezeigt.
+- **Nicht bestätigt versendeten Sicherheitsmeldungen:** Hierzu zählen fehlgeschlagene, noch nicht konfigurierte und ungeklärte E-Mail-Versandzustände. Die jeweilige Meldung muss im Mängel-Mailausgang geprüft werden. Ein angenommenes E-Mail-Schreiben ist keine Zustellgarantie.
+
+Jeder Eintrag hat eine Schaltfläche, die zum jeweiligen Verwaltungsbereich führt. Die Übersicht selbst kann **keinen Bericht schließen, keine Sperre aufheben und keine E-Mail erneut senden**. Die Gesamtzahlen werden vollständig berechnet; für längere Listen werden zunächst höchstens 100 Stationen, 100 Hinweise und 50 Mängelbenachrichtigungen angezeigt.
+
+**Wichtig:** Dies ist eine Übersicht offener Vorgänge, kein automatischer Wartungsplan und keine Bestätigung der sicheren Benutzbarkeit. Vor jedem Kletterprogramm müssen alle tatsächlich verwendeten Stationen weiterhin auf die fachlich vorgeschriebene Weise geprüft werden. Für kalendarische Prüfintervalle, Prüffristen und Verantwortlichkeiten ist zunächst ein gesondertes fachlich freigegebenes Wartungs- und Prüfschema erforderlich.
+
 ## Mitarbeiterzugänge und Stationen verwalten
 
 In der geschützten Verwaltung kann ein Mitarbeiterzugang mit **„Zugang deaktivieren“** umgehend gesperrt werden. Damit werden alle noch aktiven Sitzungen dieses Mitarbeiters widerrufen; die Person kann sich nicht mehr anmelden oder eine Prüfung durchführen. Die vorhandenen und früher unterzeichneten Prüfberichte bleiben unverändert erhalten.
