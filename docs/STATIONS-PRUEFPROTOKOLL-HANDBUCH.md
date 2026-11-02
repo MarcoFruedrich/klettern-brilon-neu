@@ -23,7 +23,7 @@
 
 **Technische Grenzen:** Das Tablet hat keine Adminsitzung. Sein Geräteschlüssel liegt als `HttpOnly`-, `Secure`- und `SameSite=Strict`-Cookie vor und wird nicht in JavaScript gespeichert. Die zugehörige Berechtigung läuft spätestens nach 30 Tagen ab und ist widerrufbar. Der angeforderte Prüfcode wird nur verschlüsselt in PostgreSQL vorgehalten und mit einem serverseitigen Geheimnis entschlüsselt. Die Fachkraft kann ihn nicht auf ihrem eigenen Telefon abrufen. Ein ungültiger oder mehrfach verwendeter Code wird abgewiesen.
 
-**Vor dem realen Einsatz:** Den Android-Kioskmodus bzw. den Einzel-App-Modus durch die Geräteverwaltung einrichten, das Tablet physisch gegen Zugriff absichern, Kopplung unter Aufsicht durchführen und den Ablauf bei WLAN-Ausfall testen. Eine Browserseite allein verhindert weder das Verlassen der App noch die Nutzung des Tablets an einem anderen Standort. Die physische Anwesenheit wird durch dieses Verfahren nicht unabhängig bewiesen.
+**Festgelegte Zugangssituation:** Das Tablet ist ausschließlich für die Verwaltung physisch erreichbar und bedienbar. Mitarbeitende bedienen das Tablet **nicht**; sie können den kurz angezeigten Code lediglich ablesen. Gäste können Werbung sehen, jedoch keinerlei Eingaben am Tablet vornehmen. Daher ist eine zusätzliche Android-Kiosksperre gegen unbefugte Touch-Bedienung nicht zwingend, sofern die Abschirmung in der Praxis gewährleistet ist. Die Verwaltung übernimmt die Erstkopplung, Betriebssystem-Einstellungen und nötige Gerätesperrungen. Vor echtem Einsatz sollten Befestigung, Sichtbarkeit der Anzeige, WLAN-Ausfall und automatischer Wiederanlauf geprüft werden. Die physische Anwesenheit wird durch den Code nicht unabhängig bewiesen.
 
 ## Hinweise und kleinere Mängel ohne automatische Sperre
 
@@ -51,7 +51,7 @@ Unter **Stationsprüfungen → Mängelmeldungen – E-Mail-Versand** sieht die b
 
 ## Sicherheits- und Datenschutzgrenzen
 
-- Der eigenständige Tablet-Modus mit Gerätetausch/Sperrung ist implementiert. Eine physische Installation und eine echte Android-Kiosk-/Einzel-App-Konfiguration sind noch nicht durchgeführt; ohne diese organisatorischen Schutzmaßnahmen darf das Tablet nicht unbeaufsichtigt betrieben werden.
+- Der eigenständige Tablet-Modus mit Gerätetausch/Sperrung ist implementiert. Laut vorgesehenem Betrieb kann nur die Verwaltung das Tablet physisch erreichen und bedienen. Entscheidend ist, diese unzugängliche Anbringung vor Ort tatsächlich sicherzustellen; eine Kiosk-/Einzel-App-Sperre gegen Besucher ist unter dieser Voraussetzung optional. Die physische Installation wurde im Entwicklungsprojekt nicht geprüft.
 - Ein eingegebener Vor-Ort-Code beweist die physische Anwesenheit nicht unabhängig. Er dient der zusätzlichen Hürde, ebenso wie die widerrufbare Kopplung des Tablets.
 - Fotos sind im privaten Bericht gespeichert; eine gesonderte Aufbewahrungsfrist, Ersetzungs-/Löschregelung, Bildinhaltsprüfung und vollständige Datenschutzinformation fehlen.
 - Die Auswahl der verwendeten Stationen liegt bei der prüfenden Fachkraft. Das System kann nicht selbst erkennen, ob eine Station ausgelassen wurde.
