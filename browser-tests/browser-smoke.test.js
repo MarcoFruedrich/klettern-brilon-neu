@@ -112,8 +112,8 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await fakePublicApi(page);
     await page.route('**/api/aktionen',route=>route.fulfill({status:200,
       contentType:'application/json',body:JSON.stringify([
-        {id:'aktion-1',titel:'Klettertest',datum:'2027-03-15',
-          beschreibung:'Angebot zum Klettern',preis:'80'},
+        {id:'aktion-1',titel:'Spezial-Kletteraktion',datum:'2027-03-15',
+          beschreibung:'Angebot zum Klettern',preis:'80',programm_id:1},
         {id:'aktion-2',titel:'Familien-Spezial',datum:'2027-04-20',
           beschreibung:'Unabhängiges Sonderangebot',preis:'50'}
       ])}));
@@ -121,11 +121,11 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor({state:'attached'});
     await page.locator('#booking textarea[name="nachricht"]').fill('Bitte mit Getränkepause planen.');
     await page.locator('#specials article').first().getByText('Diese Aktion anfragen').click();
-    await page.waitForFunction(()=>document.querySelector('#selected-special')?.textContent.includes('Klettertest'));
+    await page.waitForFunction(()=>document.querySelector('#selected-special')?.textContent.includes('Spezial-Kletteraktion'));
     assert.equal(await page.locator('#angebot-auswahl').inputValue(),'Klettertest');
     assert.equal(await page.locator('input[name="datum"]').inputValue(),'2027-03-15');
     assert.match(await page.locator('textarea[name="nachricht"]').inputValue(),
-      /^Anfrage zur Sonderaktion: Klettertest \(Termin: 2027-03-15\)\nBitte mit Getränkepause planen\./);
+      /^Anfrage zur Sonderaktion: Spezial-Kletteraktion \(Termin: 2027-03-15\)\nBitte mit Getränkepause planen\./);
     assert.match(await page.locator('#selected-special').textContent(),/Preis und Verfügbarkeit/);
     assert.equal(await page.locator('#booking-status').textContent(),'');
     await page.locator('#specials article').nth(1).getByText('Diese Aktion anfragen').click();
@@ -136,6 +136,16 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     assert.equal((await page.locator('textarea[name="nachricht"]').inputValue())
       .split('Anfrage zur Sonderaktion:').length,2,
       'Nicht mehrere alte Sonderaktions-Vermerke anhängen');
+    // A title alone must never silently link to a programme.
+    await page.route('**/api/aktionen',route=>route.fulfill({status:200,
+      contentType:'application/json',body:JSON.stringify([
+        {id:'aktion-3',titel:'Klettertest',datum:'2027-03-15',
+          beschreibung:'Gleicher Titel, aber explizit nicht verknüpft',preis:'80'}
+      ])}));
+    await page.evaluate(()=>specials());
+    await page.locator('#specials article').first().getByText('Diese Aktion anfragen').click();
+    assert.equal(await page.locator('#angebot-auswahl').inputValue(),'',
+      'An identical title without an explicit programme ID may not select a product');
     assert.deepEqual(errors,[]);
     await page.close();
   });
