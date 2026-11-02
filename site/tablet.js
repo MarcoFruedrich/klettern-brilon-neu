@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id);
 const safeText=value=>typeof value==='string'?value:'';
 const POLL_MS=3000,OFFER_REFRESH_MS=5*60*1000,API_TIMEOUT_MS=7000;
 let expiry=0,selected=-1,offers=[],activeOffer='',polling=false,loadingOffers=false;
-let displayCode='',wakeLock=null;
+let displayCode='',wakeLock=null,displayGeneration=0;
 
 async function api(url,options={}){
   const controller=new AbortController();
@@ -76,14 +76,21 @@ async function checkTablet(){
   // Only one server poll may update the code at a time.
   if(polling)return;
   polling=true;
+  const checkGeneration=displayGeneration;
+  const requestedAt=Date.now();
   try{
     const display=await api('/api/pruefung/tablet/anzeige');
+    // Ignore late responses from a previous visibility / connectivity state.
+    if(document.hidden||checkGeneration!==displayGeneration)return;
     showScreen();
     $('tablet-connection').textContent='Gekoppeltes Tablet: '+safeText(display.name);
     const seconds=Number(display.gueltigSekunden);
     if(typeof display.code==='string'&&/^\d{6}$/.test(display.code)&&
       Number.isFinite(seconds)&&seconds>0&&seconds<=120){
-      const deadline=Date.now()+seconds*1000;
+      // The remaining lifetime came from the server; include the request latency
+      // conservatively so a slow response never prolongs the onsite code.
+      const deadline=requestedAt+seconds*1000;
+      if(deadline<=Date.now()){hideCode();return;}
       // Repeated polls may shorten, but must not prolong an existing code.
       expiry=display.code===displayCode&&expiry?Math.min(expiry,deadline):deadline;
       displayCode=display.code;
@@ -92,6 +99,7 @@ async function checkTablet(){
       countdown();
     }else hideCode();
   }catch(error){
+    if(checkGeneration!==displayGeneration)return;
     hideCode();
     if(error.status===401){
       showPairing('Tablet nicht gekoppelt oder wurde gesperrt. Bitte Verwaltung kontaktieren.');
@@ -121,6 +129,7 @@ async function keepAwake(){
   }
 }
 async function refreshAfterWake(){
+  displayGeneration++;
   hideCode(); // Do not show a code before the current server state is verified.
   await Promise.all([checkTablet(),loadOffers()]);
   keepAwake();
@@ -142,12 +151,13 @@ $('tablet-pair-form').addEventListener('submit',async event=>{
   }finally{button.disabled=false;}
 });
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden)hideCode();
+  if(document.hidden){displayGeneration++;hideCode();}
   else refreshAfterWake();
 });
 window.addEventListener('pageshow',event=>{if(event.persisted)refreshAfterWake();});
 window.addEventListener('online',refreshAfterWake);
 window.addEventListener('offline',()=>{
+  displayGeneration++;
   hideCode();$('tablet-connection').textContent='Offline – Werbung läuft weiter, kein Prüfcode.';
 });
 setInterval(countdown,500);
