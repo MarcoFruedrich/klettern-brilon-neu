@@ -25,6 +25,9 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
       gesamtpreis:100,zahlungen:[{betragCent:1000,erhaltenAm:'2026-01-02T00:00:00Z',methode:'ueberweisung'}]},
     created_at:new Date(i*1000).toISOString()
   }));
+  archivedBookings[0].data.email='MAX@EXAMPLE.TEST';
+  archivedBookings[1].id='123e4567-e89b-12d3-a456-426614174099';
+  archivedBookings[1].data.email=null;
   const offerSecret='test-only-booking-offer-secret-32-chars';
   const tourId='123e4567-e89b-12d3-a456-426614174000';
   const guestId='123e4567-e89b-12d3-a456-426614174001';
@@ -122,6 +125,12 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const invalidPaymentPage=await fetch(root+'/api/admin/zahlungsuebersicht?seite=0',{headers:{Cookie:cookie}});
   assert.equal(invalidPaymentPage.status,400);
   const adminHeaders={Cookie:cookie,Origin:root,'X-CSRF-Token':loginData.csrfToken,'Content-Type':'application/json'};
+  const noEmailExportResponse=await fetch(root+`/api/admin/buchungen/${archivedBookings[1].id}/export`,{headers:{Cookie:cookie}});
+  assert.equal(noEmailExportResponse.status,200);
+  const noEmailExport=await noEmailExportResponse.json();
+  assert.equal(noEmailExport.kontaktEmail,null);
+  assert.equal(noEmailExport.buchungen.length,1,'Ohne Kontakt-E-Mail bleibt der Export auf die ausgewählte Buchung beschränkt');
+  assert.equal(noEmailExport.buchungen[0].buchung.referenz,'ARCHIV-002');
   const addPlace=await fetch(root+'/api/admin/orte',{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Sundern'})});
   assert.equal(addPlace.status,201);
   const activePlaces=await fetch(root+'/api/admin/orte',{headers:{Cookie:cookie}});
@@ -130,7 +139,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(invalidPlace.status,400);
   const matchingBookings=await fetch(root+'/api/admin/buchungen?suche=max&status=offen',{headers:{Cookie:cookie}});
   assert.equal(matchingBookings.status,200);
-  assert.equal((await matchingBookings.json()).length,2,'Suche und Statusfilter werden serverseitig kombiniert');
+  assert.equal((await matchingBookings.json()).length,3,'Suche und Statusfilter werden serverseitig kombiniert und E-Mail-Schreibweise ignoriert');
   const archivePage1=await fetch(root+'/api/admin/buchungen?suche=Archiv&status=offen&seite=1',{headers:{Cookie:cookie}});
   assert.equal(archivePage1.status,200);
   const archiveResult1=await archivePage1.json();
@@ -172,11 +181,12 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const bookingExport=await bookingExportResponse.json();
   assert.equal(bookingExport.exportformat,'klettern-abenteuer-kundendaten-v2');
   assert.equal(bookingExport.kontaktEmail,'max@example.test');
-  assert.equal(bookingExport.buchungen.length,2,'Alle Buchungen derselben Kontakt-E-Mail müssen exportiert werden');
+  assert.equal(bookingExport.buchungen.length,3,'Alle Buchungen derselben Kontakt-E-Mail müssen exportiert werden');
   const exportedReferences=bookingExport.buchungen.map(entry=>entry.buchung.referenz);
   assert.ok(exportedReferences.includes(firstData.buchungsnummer));
   assert.ok(exportedReferences.includes(adjacentData.buchungsnummer));
-  assert.equal(exportedReferences.some(reference=>reference.startsWith('ARCHIV-')),false,'Andere Kontakt-E-Mails dürfen nicht in den Export gelangen');
+  assert.ok(exportedReferences.includes('ARCHIV-001'),'E-Mail-Adressen dürfen sich nur in Groß-/Kleinschreibung unterscheiden');
+  assert.equal(exportedReferences.some(reference=>/^ARCHIV-(?!001$)/.test(reference)),false,'Andere Kontakt-E-Mails dürfen nicht in den Export gelangen');
   const adjacentExport=bookingExport.buchungen.find(entry=>entry.buchung.referenz===adjacentData.buchungsnummer);
   assert.equal(adjacentExport.kunde.email,'max@example.test');
   assert.equal(adjacentExport.zahlung.zahlungen[0].betragCent,2500);
