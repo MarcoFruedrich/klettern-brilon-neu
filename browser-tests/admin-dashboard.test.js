@@ -14,6 +14,7 @@ function fakeAdminApi(page) {
     inspectionEvents: [],
     inspectionHints: [],
     inspectionMails: [],
+    inspectionTablets: [],
     inspectionStations: [{id:'550e8400-e29b-41d4-a716-446655440099',
       name:'Kletterwand Test',aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
       sperrgrund:'Defekte Sicherheitsverbindung an der Wand'}],
@@ -49,6 +50,8 @@ function fakeAdminApi(page) {
       state.mutations.push({endpoint,method,body:method==='DELETE'?null:readBody()});
     }
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
+    if(endpoint==='/api/admin/pruefung/tablets'&&method==='GET')
+      return json(200,state.inspectionTablets);
     if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='GET')return json(200,[]);
     if(endpoint==='/api/admin/pruefung/berichte'&&method==='GET')return json(200,[]);
     if(endpoint==='/api/admin/pruefung/meldungen'&&method==='GET')
@@ -522,6 +525,28 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       .getByRole('button',{name:'Mängelmeldung erneut senden'}).count(),0);
     assert.equal(state.mutations.filter(x=>x.endpoint.endsWith('/erneut-senden')).length,1);
     assert.equal(state.mutations.find(x=>x.endpoint.endsWith('/erneut-senden')).body.doppelversandGeprueft,true);
+    await page.close();
+  });
+
+  await t.test('Tabletverwaltung zeigt Online-Status und letzten Kontakt statt bloßer Kopplung',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const id='550e8400-e29b-41d4-a716-446655441234';
+    state.inspectionTablets=[{
+      id,name:'Fenster-Tablet',aktiv:true,online:false,
+      gekoppelt_am:'2027-01-01T12:00:00Z',zuletzt_gesehen_am:'2027-01-01T12:05:00Z'
+    }];
+    await login(page,root);
+    await page.locator('#tablet-admin-list').getByText(/Keine aktuelle Verbindung/).waitFor();
+    assert.match(await page.locator('#tablet-admin-list').textContent(),/01\.01\.2027/);
+    state.inspectionTablets[0].online=true;
+    await page.evaluate(()=>document.getElementById('pruef-report-refresh')?.click());
+    await page.locator('#tablet-admin-list').getByText(/Erreichbar – letztes Lebenszeichen/).waitFor();
+    state.inspectionTablets[0].aktiv=false;
+    state.inspectionTablets[0].online=false;
+    await page.evaluate(()=>document.getElementById('pruef-report-refresh')?.click());
+    await page.locator('#tablet-admin-list').getByText('Zugang gesperrt').waitFor();
+    assert.equal(await page.locator('#tablet-admin-list').getByRole('button',{name:'Tablet-Zugang sperren'}).count(),0);
     await page.close();
   });
 
