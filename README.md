@@ -19,7 +19,14 @@ Schemaänderungen sind standardmäßig deaktiviert. `RUN_SCHEMA_MIGRATIONS=true`
 - Personalisierte Anschlusslinks: `PUBLIC_BASE_URL` (HTTPS) und `BOOKING_OFFER_SECRET` (mindestens 32 Zeichen)
 - GPS-Kontrollcodes: `GPS_CODE_SECRET` (mindestens 32 Zeichen)
 
-Für Mailtests nur ein isoliertes Testpostfach und einen Test-Maildienst verwenden. Automatisierte Tests rufen keine Datenbank, Supabase oder E-Mail-Dienste auf.
+Für Mailtests nur ein isoliertes Testpostfach und einen Test-Maildienst verwenden. Die gewöhnlichen Unit- und HTTP-Tests verwenden ausschließlich lokale Test-Doubles und keine produktiven Datenbank-, Supabase- oder E-Mail-Dienste.
+
+## Automatisierte Entwicklungstests
+
+Der Workflow `.github/workflows/entwicklung-tests.yml` läuft nur für `entwicklung/phase-1-buchungen-sonderangebote-gps`. Er startet Node.js 22 und einen isolierten PostgreSQL-16-Dienst (`brilon_test`), führt `npm test` aus und prüft insbesondere parallele Buchungen, Zeitfenster, Tageskapazitäten und eindeutige Buchungsnummern. Der erste vollständige Lauf war mit **72 bestandenen Tests** erfolgreich.
+
+Nur beim ausdrücklich gekennzeichneten lokalen Integrationstest kann `DATABASE_SSL_MODE=disable` verwendet werden. Das ist ausschließlich für Loopback-Adressen zulässig; andere Verbindungen bleiben TLS-gesichert. Die Testdatenbank hat keine Verbindung zum Livebetrieb. Die geschützten Schemaänderungen werden ausschließlich in dieser kurzlebigen Testdatenbank ausgeführt.
+
 
 ## Funktionsstand und Grenzen
 
