@@ -6,6 +6,7 @@ class Pool {
     this.bookings = [];
     this.bookings = JSON.parse(process.env.MOCK_BOOKINGS || '[]');
     this.guests = JSON.parse(process.env.MOCK_GUESTBOOK || '[]');
+    this.calendar = JSON.parse(process.env.MOCK_CALENDAR || '[]');
     this.places = JSON.parse(process.env.MOCK_PLACES || '[]');
     this.adminSessions = new Map();
     this.adminTotpSteps = new Map();
@@ -73,7 +74,21 @@ class Pool {
       if(place)place.aktiv=true;else{place={id:this.places.length+1,name,aktiv:true};this.places.push(place);}
       return {rows:[place],rowCount:1};
     }
-    if (sql.includes('FROM brilon_kalender')) return { rows:[], rowCount:0 };
+    if (sql.includes('FROM brilon_kalender')) {
+      if(sql.includes("typ='sperrzeit'")&&sql.includes('COALESCE(enddatum,datum) >= $1::date')){
+        const rows=this.calendar.filter(item=>item.typ==='sperrzeit'&&item.datum<=params[0]&&
+          (item.enddatum||item.datum)>=params[0]).slice(0,1).map(({id})=>({id:id??1}));
+        return {rows,rowCount:rows.length};
+      }
+      if(sql.includes('COALESCE(enddatum,datum)::text AS enddatum')){
+        const rows=this.calendar.filter(item=>item.typ==='sperrzeit').map(item=>({
+          datum:item.datum,enddatum:item.enddatum||item.datum
+        }));
+        return {rows,rowCount:rows.length};
+      }
+      if(sql.includes('titel,datum::text AS datum'))return {rows:this.calendar,rowCount:this.calendar.length};
+      return {rows:[],rowCount:0};
+    }
     if (sql.includes('jsonb_build_object')&&sql.includes('FROM brilon_buchungen')) {
       const rows=this.bookings.map(item=>({id:item.id,status:item.status,buchungsnummer:item.buchungsnummer,
         data:{buchungsnummer:item.data.buchungsnummer,name:item.data.name,angebot:item.data.angebot,datum:item.data.datum,

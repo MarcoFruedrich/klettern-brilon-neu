@@ -18,9 +18,9 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const repo=path.resolve(__dirname,'..');
   const offers=[
     {id:1,name:'Klettern',preise:{'1-4':100,'5-10':150},kapazitaet:20,aktiv:true,
-      verfuegbare_termine:['2027-03-15'],buchbar:true,veroeffentlicht:true,dauer:60},
+      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60},
     {id:2,name:'Bouldern',preise:{'1-4':150,'5-10':200},kapazitaet:20,aktiv:true,
-      verfuegbare_termine:['2027-03-15'],buchbar:true,veroeffentlicht:true,dauer:60}
+      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60}
   ];
   const archivedBookings=Array.from({length:55},(_,i)=>({
     id:`archive-${i+1}`,status:'offen',buchungsnummer:`ARCHIV-${String(i+1).padStart(3,'0')}`,
@@ -43,6 +43,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
     MOCK_BOOKINGS:JSON.stringify(archivedBookings),
+    MOCK_CALENDAR:JSON.stringify([{id:'123e4567-e89b-12d3-a456-426614174002',titel:'Test-Sperrzeit',
+      datum:'2027-03-16',enddatum:'2027-03-17',typ:'sperrzeit'}]),
     MOCK_GPS_GAMES:JSON.stringify([
       {buchung_id:'*',tour:'Brilon-Rätseltour',gestartet_am:'2027-03-15T10:00:00.000Z',
         abgeschlossen_am:'2027-03-15T11:00:00.000Z',spielzeit_sekunden:3600,station_index:15,
@@ -108,10 +110,18 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(paymentPrivate.status,401,'Zahlungsdetails müssen vor unberechtigtem Zugriff geschützt sein');
   const exportPrivate=await fetch(root+`/api/admin/buchungen/${guestId}/export`);
   assert.equal(exportPrivate.status,401,'Kundendatenexport muss geschützt sein');
-  const anfrage=(uhrzeit)=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    vorname:'Max',nachname:'Mueller',email:'max@example.test',datum:'2027-03-15',uhrzeit,
+  const anfrage=(uhrzeit,datum='2027-03-15')=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    vorname:'Max',nachname:'Mueller',email:'max@example.test',datum,uhrzeit,
     teilnehmer:4,angebot:'Klettern',datenschutz:'on'
   })});
+  const blockedDates=await fetch(root+'/api/sperrzeiten');
+  assert.equal(blockedDates.status,200);
+  assert.deepEqual(await blockedDates.json(),[{datum:'2027-03-16',enddatum:'2027-03-17'}]);
+  const blockedStart=await anfrage('10:00','2027-03-16');
+  assert.equal(blockedStart.status,409,'Der erste Tag eines mehrtägigen Sperrzeitraums darf nicht gebucht werden');
+  assert.match((await blockedStart.json()).error,/gesperrt/);
+  const blockedEnd=await anfrage('10:00','2027-03-17');
+  assert.equal(blockedEnd.status,409,'Auch der letzte Tag des Sperrzeitraums muss gesperrt bleiben');
   const first=await anfrage('10:00');
   assert.equal(first.status,201);
   const firstData=await first.json();
