@@ -470,7 +470,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const pairing=await adminPost('/api/admin/pruefung/tablet/kopplung',{});
   assert.equal(pairing.status,201);
   const pairingCode=(await pairing.json()).code;
-  assert.match(pairingCode,/^\\d{8}$/);
+  assert.match(pairingCode,/^\d{8}$/);
   const connect=code=>fetch(root+'/api/pruefung/tablet/koppeln',{
     method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({code,name:'Test-Werbetablet'})});
@@ -482,7 +482,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const requested=await userPost('/api/pruefung/code-anfordern',{});
   assert.equal(requested.status,201);
   const shown=await (await kiosk()).json();
-  assert.match(shown.code,/^\\d{6}$/);
+  assert.match(shown.code,/^\d{6}$/);
   const crypt=await pool.query('SELECT code_verschluesselt FROM brilon_pruef_codes WHERE verbraucht_am IS NULL ORDER BY ablauf DESC LIMIT 1');
   assert.ok(crypt.rows[0].code_verschluesselt);
   assert.ok(!crypt.rows[0].code_verschluesselt.includes(shown.code));
