@@ -746,3 +746,29 @@ footer a {
 
 .pruef-page h2 { font-size:clamp(22px,6vw,32px); overflow-wrap:anywhere; min-width:0; }
 .pruef-page form > * { min-width:0; max-width:100%; }
+
+/* Angebotswerbung auf einem fest installierten Tablet, ohne Admin-Bedienoberfläche. */
+.tablet-page{margin:0;background:#10221f;color:#fff;min-height:100vh;overflow-x:hidden}
+.tablet-page #tablet-root{width:100%;min-height:100vh}
+.tablet-page #tablet-screen{width:100%;min-height:100vh;display:flex;flex-direction:column}
+.tablet-page #tablet-screen[hidden],.tablet-page #tablet-pairing[hidden],
+.tablet-page #tablet-code[hidden],.tablet-page #tablet-marketing[hidden]{display:none!important}
+.tablet-page .tablet-center{max-width:540px;margin:8vh auto;padding:28px 20px;text-align:center}
+.tablet-page .tablet-center form{display:grid;gap:16px;text-align:left}
+.tablet-page .tablet-center input{max-width:100%;box-sizing:border-box}
+.tablet-page .tablet-top{display:flex;align-items:center;justify-content:space-between;
+padding:24px 40px;gap:16px;font-size:clamp(18px,3vw,32px)}
+.tablet-page .tablet-offer{padding:5vw 6vw;max-width:1200px;margin:auto;text-align:center}
+.tablet-page .tablet-offer h1{font-size:clamp(36px,7vw,90px);line-height:1.08;color:#fff;overflow-wrap:anywhere}
+.tablet-page .tablet-offer p{font-size:clamp(20px,3vw,40px);line-height:1.35;overflow-wrap:anywhere}
+.tablet-page #tablet-marketing{display:flex;flex:1;flex-direction:column}
+.tablet-page .tablet-bottom{text-align:center;font-size:clamp(16px,2.2vw,26px);padding:20px}
+.tablet-page #tablet-code{flex:1;align-items:center;justify-content:center;
+padding:24px;text-align:center;display:flex;flex-direction:column;background:#173c36}
+.tablet-page #tablet-code h2{font-size:clamp(24px,3.8vw,46px);color:#fff}
+.tablet-page #tablet-code p{font-size:clamp(18px,2.2vw,28px)}
+.tablet-page #tablet-digits{font-size:clamp(70px,13vw,190px);letter-spacing:.12em;
+line-height:1.25;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tablet-page .tablet-connection{text-align:right;font-size:14px;padding:10px 28px;opacity:.8}
+@media(max-width:600px){.tablet-page .tablet-top{padding:16px;flex-direction:column}
+.tablet-page #tablet-digits{font-size:clamp(45px,12vw,72px);letter-spacing:.06em}}
