@@ -13,7 +13,7 @@ test('HTTP: parallele Anfragen überschreiten weder Zeitfenster noch Tageskapazi
   await new Promise(resolve=>probe.close(resolve));
   const repo=path.resolve(__dirname,'..');
   const offers=[{id:1,name:'Klettern',preise:{'1-4':75},kapazitaet:5,aktiv:true,
-    verfuegbare_termine:['2027-03-15','2027-03-16'],buchbar:true,veroeffentlicht:true,dauer:60}];
+    verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60}];
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(repo,'test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),MOCK_BOOKINGS:'[]',
@@ -30,9 +30,9 @@ test('HTTP: parallele Anfragen überschreiten weder Zeitfenster noch Tageskapazi
   }
   assert.equal(ready,true,`Testserver startet nicht: ${serverErrors}`);
 
-  const request=(name,date,time)=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},
+  const request=(name,date,time,participants=3)=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({vorname:name,nachname:'Team',email:name.toLowerCase()+'@example.test',datum:date,uhrzeit:time,
-      teilnehmer:3,angebot:'Klettern',datenschutz:'on'})});
+      teilnehmer:participants,angebot:'Klettern',datenschutz:'on'})});
   const capacityResults=await Promise.all([request('Alpha','2027-03-15','10:00'),request('Beta','2027-03-15','11:00')]);
   assert.deepEqual(capacityResults.map(response=>response.status).sort(),[201,409],
     'Bei gleichzeitigen, nicht überlappenden Anfragen darf die Kapazität von fünf Personen nicht überschritten werden');
@@ -40,4 +40,11 @@ test('HTTP: parallele Anfragen überschreiten weder Zeitfenster noch Tageskapazi
   const overlapResults=await Promise.all([request('Gamma','2027-03-16','10:00'),request('Delta','2027-03-16','10:00')]);
   assert.deepEqual(overlapResults.map(response=>response.status).sort(),[201,409],
     'Bei gleichzeitigem Zugriff kann dasselbe Zeitfenster nur einmal reserviert werden');
+
+  const referenceResults=await Promise.all([request('Echo','2027-03-17','10:00',2),request('Echo','2027-03-17','11:00',2)]);
+  assert.deepEqual(referenceResults.map(response=>response.status),[201,201],
+    'Zwei freie Anschlusszeiten dürfen trotz desselben Namens angenommen werden');
+  const references=await Promise.all(referenceResults.map(response=>response.json().then(data=>data.buchungsnummer)));
+  assert.equal(new Set(references).size,2,'Parallele Buchungen dürfen keine Referenz doppelt vergeben');
+  assert.deepEqual(references.sort(),['TEAM-ECHO-170327','TEAM-ECHO-170327-02']);
 });
