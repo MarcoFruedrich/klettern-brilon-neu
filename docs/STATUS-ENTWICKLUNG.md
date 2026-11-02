@@ -39,6 +39,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Admin-Logins sind zusätzlich auf sechs Versuche je IP und 30 je Konto innerhalb von zehn Minuten begrenzt; der Konto-Schlüssel wird nur gehasht im Rate-Limit-Speicher geführt.
 - Ein lokaler HTTP-Test prüft Admin-Anmeldung, Cookie-Flags, geschützte Lesezugriffe und erlaubte/abgewiesene Schreibanfragen mit Datenbank-/Supabase-Stubs; er versendet keine E-Mails.
 - Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
+- Der Brevo-Versand ist in eine injizierbare Mailer-Funktion ausgelagert. Vier Tests prüfen Empfänger, Nachrichtentext, Absender, fehlende Konfiguration und Fehlerantworten ausschließlich mit einem Fetch-Test-Double; dabei erfolgt kein externer Aufruf.
 - Die Admin-Verwaltung besitzt eine dauerhaft erreichbare Sprungnavigation für Buchungen/Zahlungen, Kalender, Programme, Tagesangebote, Anschlussrabatte und GPS-Touren. Auf schmalen Bildschirmen bleibt die Navigation horizontal wischbar; Kalenderaktionen und Sprungziele berücksichtigen Touch-Größen und Sticky-Kopfzeilen.
 - Das öffentliche Mobilmenü hält `aria-expanded` und die Aktionsbeschriftung beim Öffnen, Schließen und nach Navigation synchron. Escape schließt das Menü und setzt den Fokus auf den Menütaster zurück; drei Tests prüfen die Bedienzustände.
 - Startseite und Verwaltung bieten einen Tastatur-Sprunglink zum fokussierbaren Hauptinhalt. Globale Fokusmarkierungen und `prefers-reduced-motion` sind ergänzt und strukturell getestet.
@@ -67,7 +68,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 51 bestanden, 0 fehlgeschlagen.
+- `npm test` – 55 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
@@ -76,6 +77,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check test/admin-navigation.test.js` – bestanden.
 - `node --check site/navigation.js` und `node --check test/site-navigation.test.js` – bestanden.
 - `node --check test/site-accessibility.test.js` – bestanden.
+- `node --check lib/brevo-mail.js` und `node --check test/brevo-mail.test.js` – bestanden.
 - `node --check site/zahlungsuebersicht.js` – bestanden.
 - `node --check lib/sicherheitszustand.js` – bestanden.
 - `git diff --check` – bestanden.

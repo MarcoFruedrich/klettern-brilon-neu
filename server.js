@@ -12,6 +12,7 @@ const { sameOriginMutation } = require('./lib/sicherheit');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben } = require('./lib/sicherheitszustand');
 const { decodeBase32:totpSecretDecode, verifyTotp } = require('./lib/totp');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
+const { createBrevoMailer } = require('./lib/brevo-mail');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 
 const { createClient } = require('@supabase/supabase-js');
@@ -28,33 +29,7 @@ const securityHeaders={
   'X-Frame-Options':'DENY',
   'Referrer-Policy':'strict-origin-when-cross-origin'
 };
-async function brevoMail(empfaenger, betreff, inhalt) {
-  if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL)
-    throw new Error('E-Mail-Versand ist nicht konfiguriert.');
-  const antwort = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: {
-      'accept': 'application/json',
-      'content-type': 'application/json',
-      'api-key': process.env.BREVO_API_KEY
-    },
-    body: JSON.stringify({
-      sender: {
-        name: 'Klettern & Abenteuer Brilon',
-        email: process.env.BREVO_SENDER_EMAIL
-      },
-      to: [{ email: empfaenger }],
-      subject: betreff,
-      textContent: inhalt
-    })
-  });
-
-  if (!antwort.ok) {
-    throw new Error(
-      'Brevo HTTP ' + antwort.status + ': ' + await antwort.text()
-    );
-  }
-}
+const brevoMail=createBrevoMailer();
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
 async function body(req){let data='';for await(const chunk of req){data+=chunk;if(data.length>16000)throw Error('Anfrage zu groß')}try{return JSON.parse(data)}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){return rateLimiter.erlauben(key,max,window)}
