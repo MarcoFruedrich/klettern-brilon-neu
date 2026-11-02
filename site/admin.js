@@ -544,9 +544,9 @@ async function gpsTourenLaden(buchungen) {
         const form=document.getElementById('gps-tour-form');form.elements.id.value=tour.id;
         for(const key of ['titel','beschreibung','schwierigkeitsgrad','altersgruppe','startpunkt','ziel','dauer','preis'])form.elements[key].value=tour[key]??'';
         form.elements.buchbar.checked=tour.buchbar;form.elements.aktiv.checked=tour.aktiv;
-        form.elements.stationen.value=JSON.stringify(tour.stationen.map(s=>({...s,kontrollcode:''})),null,2);
+        gpsStationenRendern(tour.stationen);
         form.querySelector('button[type="submit"]').textContent='GPS-Tour speichern';
-        document.getElementById('gps-tour-status').textContent='Beim Speichern müssen neue Kontrollcodes für alle Stationen eingetragen werden.';
+        document.getElementById('gps-tour-status').textContent='Vorhandene Kontrollcodes bleiben erhalten, wenn Stations-ID und QR-Kennung gleich bleiben. Für neue Stationen oder geänderte Stations-IDs beziehungsweise QR-Kennungen einen neuen 4- bis 8-stelligen Code eingeben.';
         form.scrollIntoView({behavior:'smooth',block:'start'});
       };
       const toggle=el('button',tour.aktiv?'Deaktivieren':'Aktivieren');toggle.type='button';toggle.className='btn secondary';
@@ -575,6 +575,91 @@ async function gpsTourenLaden(buchungen) {
     }
     const noBooking=el('option','Bestätigte Buchung auswählen');noBooking.value='';buchungSelect.prepend(noBooking);
   }catch(error){document.getElementById('gps-tour-status').textContent='GPS-Verwaltung nicht verfügbar: '+error.message;}
+}
+
+function gpsStationenBeschriften(){
+  const container=document.getElementById('gps-stations');
+  if(!container)return;
+  Array.from(container.querySelectorAll('.gps-station-editor')).forEach((station,index)=>{
+    const legend=station.querySelector('legend');
+    if(legend)legend.textContent=`Station ${index+1}`;
+    const up=station.querySelector('[data-station-action="up"]');
+    const down=station.querySelector('[data-station-action="down"]');
+    if(up)up.disabled=index===0;
+    if(down)down.disabled=index===container.children.length-1;
+  });
+}
+
+function gpsStationenRendern(stationen=[]){
+  const container=document.getElementById('gps-stations');
+  if(!container)return;
+  container.replaceChildren();
+  for(const [index,station] of stationen.entries()){
+    const card=document.createElement('fieldset');card.className='gps-station-editor';
+    const legend=document.createElement('legend');legend.textContent=`Station ${index+1}`;card.append(legend);
+    const fields=document.createElement('div');fields.className='gps-station-fields';
+    const input=(labelText,key,value,type='text',options={})=>{
+      const label=document.createElement('label');label.textContent=labelText;
+      const control=document.createElement('input');control.type=type;control.dataset.stationField=key;
+      control.value=value??'';control.required=options.required===true;
+      if(options.maxLength!==undefined)control.maxLength=options.maxLength;
+      if(options.min!==undefined)control.min=String(options.min);
+      if(options.max!==undefined)control.max=String(options.max);
+      if(options.step!==undefined)control.step=String(options.step);
+      if(options.pattern)control.pattern=options.pattern;
+      if(options.inputmode)control.inputMode=options.inputmode;
+      label.append(control);fields.append(label);return control;
+    };
+    input('Stations-ID','id',station.id||`station-${index+1}`,'text',{required:true,maxLength:80});
+    input('QR-Kennung','qrId',station.qrId||`BRILON-${String(index+1).padStart(3,'0')}`,'text',{required:true,maxLength:120});
+    const question=input('Frage','frage',station.frage,'text',{required:true,maxLength:500});
+    question.className='gps-station-question';
+    input('Antwort 1','answer0',station.antworten?.[0],'text',{required:true,maxLength:160});
+    input('Antwort 2','answer1',station.antworten?.[1],'text',{required:true,maxLength:160});
+    const correctLabel=document.createElement('label');correctLabel.textContent='Richtige Antwort';
+    const correct=document.createElement('select');correct.dataset.stationField='loesungIndex';
+    for(const [value,title] of [[0,'Antwort 1'],[1,'Antwort 2']]){
+      const option=document.createElement('option');option.value=String(value);option.textContent=title;correct.append(option);
+    }
+    correct.value=String(Number(station.loesungIndex)===1?1:0);correctLabel.append(correct);fields.append(correctLabel);
+    input('Breitengrad','latitude',station.latitude,'number',{required:true,min:-90,max:90,step:'any'});
+    input('Längengrad','longitude',station.longitude,'number',{required:true,min:-180,max:180,step:'any'});
+    const code=input('Neuer Kontrollcode (4–8 Ziffern)','kontrollcode',station.kontrollcode,'text',{maxLength:8,pattern:'[0-9]{4,8}',inputmode:'numeric'});
+    code.autocomplete='new-password';code.placeholder='Bei unveränderter Station leer lassen';
+    const actions=document.createElement('div');actions.className='gps-station-actions';
+    const button=(label,action)=>{const b=document.createElement('button');b.type='button';b.className='btn secondary';b.textContent=label;b.dataset.stationAction=action;actions.append(b);return b;};
+    button('Nach oben','up').addEventListener('click',()=>{const previous=card.previousElementSibling;if(previous)container.insertBefore(card,previous);gpsStationenBeschriften();});
+    button('Nach unten','down').addEventListener('click',()=>{const next=card.nextElementSibling;if(next)container.insertBefore(next,card);gpsStationenBeschriften();});
+    button('Station entfernen','remove').addEventListener('click',()=>{card.remove();gpsStationenBeschriften();});
+    card.append(fields,actions);container.append(card);
+  }
+  gpsStationenBeschriften();
+}
+
+document.getElementById('gps-station-add')?.addEventListener('click',()=>{
+  const container=document.getElementById('gps-stations');
+  const cards=Array.from(container?.querySelectorAll('.gps-station-editor')||[]);
+  const existing=cards.map(card=>{
+    const fields=Object.fromEntries(Array.from(card.querySelectorAll('[data-station-field]'))
+      .map(field=>[field.dataset.stationField,field.value]));
+    return {...fields,antworten:[fields.answer0,fields.answer1]};
+  });
+  let next=1;
+  while(existing.some(station=>station.id===`station-${next}`||station.qrId===`BRILON-${String(next).padStart(3,'0')}`))next++;
+  gpsStationenRendern([...existing,{id:`station-${next}`,qrId:`BRILON-${String(next).padStart(3,'0')}`,antworten:[],loesungIndex:0}]);
+});
+
+function gpsStationenFormWert(){
+  const cards=Array.from(document.querySelectorAll('#gps-stations .gps-station-editor'));
+  if(!cards.length)throw new Error('Füge mindestens eine Station hinzu.');
+  return cards.map((card,index)=>{
+    const value=key=>card.querySelector(`[data-station-field="${key}"]`)?.value.trim()??'';
+    const code=value('kontrollcode');
+    if(code&&!/^\d{4,8}$/.test(code))throw new Error(`Station ${index+1}: Der Kontrollcode muss 4 bis 8 Ziffern enthalten.`);
+    return {id:value('id'),qrId:value('qrId'),frage:value('frage'),
+      antworten:[value('answer0'),value('answer1')],loesungIndex:Number(value('loesungIndex')),
+      latitude:Number(value('latitude')),longitude:Number(value('longitude')),kontrollcode:code};
+  });
 }
 
 function gpsEtikettenDrucken(tour){
@@ -648,12 +733,12 @@ document.getElementById('gps-tour-form')?.addEventListener('submit',async event=
   event.preventDefault();const form=event.currentTarget;const statusGps=document.getElementById('gps-tour-status');
   try{
     const fields=Object.fromEntries(new FormData(form));
-    let stationen;try{stationen=JSON.parse(fields.stationen);}catch{throw new Error('Stations-JSON ist ungültig.');}
+    const stationen=gpsStationenFormWert();
     const id=fields.id;delete fields.id;
     const result=await api(id?'/api/admin/gps/touren/'+encodeURIComponent(id):'/api/admin/gps/touren',{method:id?'PATCH':'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({...fields,stationen,buchbar:form.elements.buchbar.checked,aktiv:form.elements.aktiv.checked})});
     statusGps.textContent=id?'GPS-Tour aktualisiert.':'Tour angelegt: '+result.id;form.reset();
-    form.querySelector('button[type="submit"]').textContent='GPS-Tour anlegen';await refresh();
+    gpsStationenRendern([]);form.querySelector('button[type="submit"]').textContent='GPS-Tour anlegen';await refresh();
   }catch(error){statusGps.textContent='Fehler: '+error.message;}
 });
 

@@ -29,6 +29,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - E-Mail-Absender und Betreiberempfänger sind nicht mehr fest im Code hinterlegt; sie werden über `BREVO_SENDER_EMAIL` und `BOOKING_NOTIFY_EMAIL` konfiguriert. Der Bildspeicher ist optional und wird ohne Konfiguration sauber abgewiesen.
 - Schemaänderungen werden nur noch ausgeführt, wenn `RUN_SCHEMA_MIGRATIONS=true` gesetzt ist. Kein produktiver Datenbankzugriff oder Schemaänderung wurde in dieser Arbeit ausgeführt.
 - GPS-Touren sind über den Admin anlegbar, bearbeitbar sowie aktivierbar/deaktivierbar. Stationen enthalten Koordinaten, zwei Antworten und gehashte Kontrollcodes.
+- Die GPS-Verwaltung bearbeitet Stationen jetzt in einzeln sortierbaren Karten statt als JSON-Text. Ein neuer Zahlencode ist nur für neue Stationen oder geänderte Stations-IDs beziehungsweise QR-Kennungen nötig; ein Strukturtest deckt die Eingabefelder ab.
 - Eine GPS-Tour erzeugt ein passendes buchbares Programm mit Gruppenpreis. Spielzugänge lassen sich nur für bestätigte Buchungen desselben Programms ausstellen.
 - Für bestätigte Buchungen lassen sich einzelne Spielzugänge ausstellen. Gruppenstände, Start-/Abschlusszeit und Dauer werden gespeichert. Die mobile Spielseite prüft QR-Kennung, Zahlencode und Antwort; spätere Stationskoordinaten werden nie an den Browser ausgeliefert.
 - Die Gästeliste zeigt nur abgeschlossene Spiele mit ausdrücklicher Zustimmung zur Namensveröffentlichung. Ohne Zustimmung wird kein Name gespeichert.
@@ -54,7 +55,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Bei öffentlicher Zustimmung wird der Einwilligungszeitpunkt gespeichert und nur in der geschützten Admin-Gästeliste angezeigt. Ein Widerruf entfernt auch diesen Zeitpunkt. Die Spaltenmigration ist geschützt und wurde nicht ausgeführt.
 - Die GPS-Gästeliste speichert jetzt auch die Kennung der angezeigten Einwilligungstextversion. Der Server weist veraltete Versionen zurück; der Admin sieht Kennung und Zeitpunkt. Wortlaut und Änderungsablauf stehen in `GPS-GAESTELISTEN-EINWILLIGUNG.md`. Die Spaltenmigrationen bleiben geschützt und wurden nicht ausgeführt.
 - Die GPS-Verwaltung erzeugt QR-Etiketten lokal als SVG aus den festen Stationskennungen und öffnet einen druckbaren Satz pro Tour. Die QR-Grafik enthält nur den Stationslink, keine Koordinaten oder Kontrollcodes. Dafür ist qrcode-generator von Kazuhiko Arase lokal mit MIT-Lizenz beigefügt; es werden keine externen QR-Dienste verwendet.
-- Die Bedienungsanleitung im Admin-Handbuch beschreibt die vorhandenen Buchungs-, Zahlungs-, Kalender-, Programm-, Rabatt- und GPS-Abläufe einschließlich des Stations-JSON-Formats und sicherer Zugangsausgabe.
+- Die Bedienungsanleitung im Admin-Handbuch beschreibt die vorhandenen Buchungs-, Zahlungs-, Kalender-, Programm-, Rabatt- und GPS-Abläufe einschließlich Stationskarten, Codeverwaltung und sicherer Zugangsausgabe.
 - Die Zahlungsübersicht zeigt jetzt 50 gefilterte Buchungen je Seite. Ihre centgenauen Eingangs-, Rest- und Gutschriftssummen werden über alle Buchungen berechnet; einzelne Zahlungseinträge lassen sich aufklappen.
 - Der HTTP-Test prüft die geschützte Zahlungsübersicht mit 55 Archivbuchungen, Seite 2, Teilzahlungsfilter, korrekten Gesamtsummen und ungültigen Seitennummern.
 - Buchungssuche und Statusfilter laufen parametrisiert in PostgreSQL. Die Buchungsliste zeigt 50 Treffer pro Seite, meldet die Gesamtzahl und bietet Vor-/Zurück-Navigation; alle passenden Datensätze sind erreichbar. Parallele Suchanfragen können keine veraltete Ergebnisliste mehr überschreiben.
@@ -72,7 +73,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 62 bestanden, 0 fehlgeschlagen.
+- `npm test` – 63 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.

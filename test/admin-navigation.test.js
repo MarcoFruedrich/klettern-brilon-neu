@@ -14,3 +14,15 @@ test('Admin-Sprungnavigation verweist auf vorhandene Verwaltungsbereiche',()=>{
   assert.equal(new Set(targets).size,targets.length,'Sprungziele sollen eindeutig sein');
   for(const target of targets)assert.ok(ids.has(target),`Sprungziel #${target} fehlt`);
 });
+
+test('GPS-Touren nutzen Stationskarten mit Reihenfolge statt eines JSON-Textfelds',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'..','site','admin.html'),'utf8');
+  const js=fs.readFileSync(path.join(__dirname,'..','site','admin.js'),'utf8');
+  assert.match(html,/id="gps-station-add"/);
+  assert.match(html,/id="gps-stations"/);
+  assert.doesNotMatch(html,/<textarea[^>]*name="stationen"/);
+  for(const field of ['Stations-ID','QR-Kennung','Frage','Antwort 1','Antwort 2','Richtige Antwort','Breitengrad','Längengrad'])
+    assert.ok(js.includes(`'${field}'`),`Stationsfeld ${field} fehlt`);
+  assert.match(js,/gpsStationenFormWert\(\)/);
+  assert.match(js,/Vorhandene Kontrollcodes bleiben erhalten/);
+});

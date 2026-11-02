@@ -100,30 +100,19 @@ Zusatzbuchung bestätigt wird.
 - Eine Tour benötigt Titel, Schwierigkeitsgrad, Altersgruppe, Startpunkt, Ziel,
   Dauer, Gruppenpreis und Stationsdaten. „Buchbar“ und „Aktivieren“ getrennt
   setzen: Nur aktive und buchbare Touren sind für den Spielablauf freigegeben.
-- Stationsdaten werden als JSON-Liste eingetragen. Jede Station benötigt eine
-  eindeutige `id` und `qrId`, einen `kontrollcode`, eine Frage, genau zwei
-  Antworttexte, `loesungIndex` (`0` oder `1`) sowie gültige `latitude`- und
-  `longitude`-Werte. Beispiel:
-
-  ```json
-  [
-    {
-      "id": "s1",
-      "qrId": "BRILON-001",
-      "kontrollcode": "4821",
-      "frage": "Welche Form hat das Dach des alten Rathauses?",
-      "antworten": ["Spitzbogen", "Zwiebelform"],
-      "loesungIndex": 0,
-      "latitude": 51.394,
-      "longitude": 8.571
-    }
-  ]
-  ```
+- Stationen werden einzeln über „Station hinzufügen“ eingetragen. Jede Karte
+  enthält eine eindeutige Stations-ID und QR-Kennung, Frage, zwei Antworttexte,
+  richtige Antwort, Breitengrad, Längengrad und Kontrollcode. Mit „Nach oben“
+  und „Nach unten“ wird die Spielreihenfolge festgelegt. Beispielwerte für die
+  erste Station: ID `s1`, QR-Kennung `BRILON-001`, Code `4821`, Frage „Welche
+  Form hat das Dach des alten Rathauses?“, Antworten „Spitzbogen“ und
+  „Zwiebelform“, Antwort 1 richtig, Koordinaten `51.394` und `8.571`.
 
 - Kontrollcodes werden serverseitig als HMAC gespeichert und nicht in der
   Admin-Antwort zurückgegeben. Beim Bearbeiten bleibt ein vorhandener Code
-  erhalten, wenn Stations-ID und QR-Kennung gleich bleiben. Bei einer neuen
-  Station oder geänderter QR-Kennung muss ein neuer Code eingegeben werden.
+  erhalten, wenn Stations-ID und QR-Kennung gleich bleiben; das Codefeld kann
+  dann leer bleiben. Bei einer neuen Station oder geänderter Stations-ID oder
+  QR-Kennung muss ein neuer 4- bis 8-stelliger Code eingegeben werden.
 - Nach dem Speichern „QR-Etiketten drucken“ für die Tour wählen. Die lokalen
   QR-Grafiken enthalten den Spiel-Link mit Stationskennung, aber keine
   Koordinaten oder Kontrollcodes. Den Zahlencode separat verwahren und vor Ort

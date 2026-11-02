@@ -697,3 +697,19 @@ footer a {
   .admin-page .calendar-navigation button { flex: 1 1 140px; }
   .admin-page .booking { padding: 12px; }
 }
+
+.admin-page .gps-station-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:22px; }
+.admin-page .gps-stations { display:grid; gap:14px; }
+.admin-page .gps-station-editor { min-width:0; margin:0; padding:16px; border:1px solid #bdcec2; border-radius:14px; }
+.admin-page .gps-station-editor legend { padding:0 8px; color:var(--pine); font-weight:800; }
+.admin-page .gps-station-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:10px 14px; }
+.admin-page .gps-station-fields label { min-width:0; }
+.admin-page .gps-station-fields input,
+.admin-page .gps-station-fields select { width:100%; min-width:0; }
+.admin-page .gps-station-question { grid-column:span 2; }
+.admin-page .gps-station-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.admin-page .gps-station-actions button { min-height:44px; }
+@media(max-width:600px) {
+  .admin-page .gps-station-question { grid-column:auto; }
+  .admin-page .gps-station-actions button { flex:1 1 130px; }
+}
