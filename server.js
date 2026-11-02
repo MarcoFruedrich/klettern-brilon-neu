@@ -2020,7 +2020,7 @@ if (route === '/api/angebote' && req.method === 'GET') {
       res.writeHead(200,{
         'Content-Type':mime[path.extname(target)]||'application/octet-stream',
         ...securityHeaders,
-        'Content-Security-Policy':"default-src 'self'; img-src 'self' https://fssjruvxkdqeltjdrlfo.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'none'"
+        'Content-Security-Policy':"default-src 'self'; img-src 'self' blob: https://fssjruvxkdqeltjdrlfo.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'none'"
       });
       res.end(req.method==='HEAD'?undefined:data);
     });
