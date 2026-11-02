@@ -85,7 +85,7 @@ Unit-/HTTP-Tests liefen mit isolierten Datenbank-Test-Doubles; zusätzlich wurde
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – **72 bestanden, 0 fehlgeschlagen** (Node.js 22 mit isoliertem PostgreSQL 16, zuletzt im Lauf 41528114360). Zusätzlich **11 Chromium-Tests bestanden, 0 fehlgeschlagen** im separaten Browser-Job desselben Laufs. Die Unit-/HTTP-Tests werden ausdrücklich nur aus `test/*.test.js` geladen; Browsertests liegen separat.
+- `npm test` – **75 bestanden, 0 fehlgeschlagen** (Node.js 22 mit isoliertem PostgreSQL 16, Lauf 41530439271). Zusätzlich **15 Chromium-Tests bestanden, 0 fehlgeschlagen** im separaten Browser-Job desselben Laufs. Die Unit-/HTTP-Tests und Browsertests laufen in getrennten Jobs. Die Unit-/HTTP-Tests werden ausdrücklich nur aus `test/*.test.js` geladen; Browsertests liegen separat.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
@@ -101,7 +101,17 @@ Unit-/HTTP-Tests liefen mit isolierten Datenbank-Test-Doubles; zusätzlich wurde
 - `node --check lib/sicherheitszustand.js` – bestanden.
 - `git diff --check` – bestanden.
 
-Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. In GitHub Actions wurde eine isolierte PostgreSQL-16-Datenbank erfolgreich getestet; echte E-Mail-Dienste wurden nicht kontaktiert. Im getrennten Chromium-Job konnten jetzt **alle elf Browsertests (0 Fehler)** erfolgreich ausgeführt werden: keine horizontalen Seitenüberläufe auf Startseite, Verwaltung, GPS- und Anschlussseite bei 360/390/768/1280 px; Mobilmenü inklusive Escape/Fokus; öffentliches Buchungsformular mit Gruppenpreis, belegtem Zeitfenster und ausschließlich simulierter Testbestätigung. Der native Datumseingang nutzt nun die `Europe/Berlin`-Ortszeit in ISO-Format unabhängig von Browser-Lokalisierung.
+Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. In GitHub Actions wurde eine isolierte PostgreSQL-16-Datenbank erfolgreich getestet; echte E-Mail-Dienste wurden nicht kontaktiert. Im getrennten Chromium-Job konnten jetzt **alle fünfzehn Browsertests (0 Fehler)** erfolgreich ausgeführt werden: keine horizontalen Seitenüberläufe auf Startseite, Verwaltung, GPS- und Anschlussseite bei 360/390/768/1280 px; Mobilmenü inklusive Escape/Fokus; öffentliches Buchungsformular mit Gruppenpreis, belegtem Zeitfenster und ausschließlich simulierter Testbestätigung. Der native Datumseingang nutzt nun die `Europe/Berlin`-Ortszeit in ISO-Format unabhängig von Browser-Lokalisierung.
+
+## Stationsprüfprotokoll – Phase 1
+
+- Mitarbeiterkonten mit individuellem scrypt-Passwort-Hash und separater vierstündiger Sitzung erstellt; Administratoren können den Zugang jederzeit deaktivieren. Keine Klartextpasswörter im Datensatz oder in der Adminliste.
+- Stationsstammdaten können in der Verwaltung angelegt und für die mobilen Prüfungen genutzt werden.
+- Ein sechsstelliger Prüfcode wird auf ausdrückliche Admin-Anforderung angezeigt, serverseitig nur als HMAC gespeichert und nach zwei Minuten oder einmaliger Einlösung ungültig. Er entsperrt die jeweilige Mitarbeiter-Sitzung 15 Minuten; danach kann genau ein Bericht erstellt werden. Rate-Limits erschweren Code-Raten.
+- Pro Bericht sind Programm, geplanter Beginn und alle tatsächlich verwendeten Stationen mit Zustand `ok` oder `mangel` einzutragen. Die Prüfung muss vor dem geplanten Programmbeginn liegen. Ein Mangel erzwingt eine verständliche Beschreibung, ist im Bericht nicht als freigegeben dargestellt und erzeugt bei eingerichteter Test-Mailzustellung eine Nachricht an das feste Mängelpostfach. Bei Versandfehlern weist die Oberfläche gesondert darauf hin.
+- Neue API-Routen: `/api/pruefung/login`, `/api/pruefung/stationen`, `/api/pruefung/freischalten`, `/api/pruefung/berichte`, `/api/pruefung/abmelden` sowie die entsprechenden geschützten Admin-Routen für Personal, Stationen, Vor-Ort-Code und Berichte.
+- PostgreSQL-Prüfung des Gesamtprozesses einschließlich Code-Wiederverwendung, unzureichender Mängelbeschreibung und sicherem Berichtsspeichern bestanden. Chromium-Prüfung des mobilen Formulars bei 360, 390 und 768 Pixeln bestanden.
+- Noch offen: Fotobelege und ihre geschützte Speicherung, fachliche Stationssperre und Wiederfreigabe, zuverlässiger erneuter Versand bei nicht zugestellten Mängelbenachrichtigungen, betrieblich abgesicherter Tablet-Modus und Datenschutzhinweise. Die organisatorisch behauptete Anwesenheit vor Ort wird durch den Code allein nicht technisch bewiesen. Nur in der isolierten PostgreSQL-Testdatenbank wurden neue Prüftabellen erstellt; produktive Migrationen sind weiterhin nicht freigegeben.
 
 ## Noch offen
 
