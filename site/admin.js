@@ -1145,6 +1145,42 @@ function anschlussrabattStarten() {
   const hinzufuegen = document.getElementById('anschlussrabatt-hinzufuegen');
   const berechnen = document.getElementById('anschlussrabatt-berechnen');
   if (!liste || !ergebnis || !hinzufuegen || !berechnen) return;
+  const kandidatenButton = document.getElementById('anschlussrabatt-kandidaten');
+  const kandidatenDatum = document.getElementById('anschlussrabatt-datum');
+  const kandidatenListe = document.getElementById('anschlussrabatt-kandidaten-liste');
+  if (kandidatenButton && kandidatenDatum && kandidatenListe) {
+    kandidatenButton.addEventListener('click', async () => {
+      if (!kandidatenDatum.value) {
+        kandidatenListe.textContent = 'Bitte zuerst ein Datum waehlen.';
+        return;
+      }
+      kandidatenButton.disabled = true;
+      kandidatenListe.textContent = 'Bestaetigte Buchungen werden geladen ...';
+      try {
+        const daten = await api('/api/admin/anschlussrabatt/kandidaten?datum=' +
+          encodeURIComponent(kandidatenDatum.value));
+        kandidatenListe.replaceChildren();
+        if (!daten.kandidaten.length) {
+          kandidatenListe.append(el('p', 'Keine bestaetigten Buchungen an diesem Tag.'));
+        }
+        const zeit = minuten => minuten === null ? 'unbekannt' :
+          String(Math.floor(minuten / 60)).padStart(2, '0') + ':' +
+          String(minuten % 60).padStart(2, '0');
+        for (const kandidat of daten.kandidaten) {
+          kandidatenListe.append(el('p',
+            (kandidat.buchungsnummer || 'Ohne Buchungsnummer') + ' | ' +
+            (kandidat.angebot || 'Angebot unbekannt') + ' | ' +
+            zeit(kandidat.beginnMinuten) + ' bis ' +
+            zeit(kandidat.endeMinuten)));
+        }
+        kandidatenListe.append(el('small', daten.hinweis));
+      } catch (fehler) {
+        kandidatenListe.textContent = 'Fehler: ' + fehler.message;
+      } finally {
+        kandidatenButton.disabled = false;
+      }
+    });
+  }
   let zaehler = 0;
 
   function programmHinzufuegen() {
