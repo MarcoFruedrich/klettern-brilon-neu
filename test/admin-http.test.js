@@ -73,6 +73,9 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
   assert.equal(withoutOrigin.status, 403);
   const crossOrigin = await fetch(route, { method: 'POST', headers: { Cookie: cookie, Origin: 'http://evil.test', 'Content-Type': 'application/json' }, body });
   assert.equal(crossOrigin.status, 403);
+  const crossSiteFetch = await fetch(route, { method: 'POST', headers: { Cookie: cookie, Origin: root,
+    'Sec-Fetch-Site': 'cross-site', 'Content-Type': 'application/json' }, body });
+  assert.equal(crossSiteFetch.status, 403, 'Cross-Site-Schreibanfragen müssen auch bei passendem Origin-Scheinwert scheitern');
   const sameOrigin = await fetch(route, { method: 'POST', headers: { Cookie: cookie, Origin: root, 'Content-Type': 'application/json' }, body });
   assert.equal(sameOrigin.status, 200);
   const preview = await sameOrigin.json();

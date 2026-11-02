@@ -78,7 +78,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 ## Noch offen
 
 - Der HTTP-End-to-End-Test deckt die Kernstrecke mit einem speicherbasierten PostgreSQL-Test-Double ab. Die echte PostgreSQL-Integration, Datenbank-Constraints/Transaktionsisolation und E-Mail-Zustellung benötigen noch separate Tests in einer isolierten Umgebung mit Mail-Test-Double.
-- Vor DB-gestütztem Admin-Betrieb muss die geschützte Migration für `brilon_admin_sessions` geprüft und freigegeben werden. Ein zweiter Faktor und eine zusätzliche CSRF-Prüfung neben der Same-Origin-Prüfung sind noch offen.
+- Vor DB-gestütztem Admin-Betrieb muss die geschützte Migration für `brilon_admin_sessions` geprüft und freigegeben werden. Admin-Schreibanfragen prüfen jetzt zusätzlich zum exakten Origin auch `Sec-Fetch-Site`, sofern der Browser den Header sendet; ein zweiter Faktor und ein synchronisiertes CSRF-Token bleiben offen.
 - Buchungsliste und Zahlungsübersicht sind seitenweise vollständig durchsuchbar. Die Kalenderansicht lädt jeweils den ausgewählten Monat.
 - Die kundenseitige Anschlussstrecke ist im HTTP-Test mit einem PostgreSQL-Test-Double abgedeckt. Eine erkannte Überzahlung/Gutschrift wird nicht automatisch ausgezahlt; dafür ist ein kontrollierter Erstattungsprozess erforderlich.
 - QR-Etiketten können erzeugt und gedruckt werden. Ausdrucke müssen vor dem Einsatz an den Stationen praktisch mit mehreren Smartphones gescannt werden. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.
