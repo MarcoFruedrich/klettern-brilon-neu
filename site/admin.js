@@ -2,6 +2,7 @@
 const login = document.getElementById('login');
 const workspace = document.getElementById('workspace');
 const status = document.getElementById('status');
+let aktuelleZahlungsBuchungen=[];
 
 async function api(path, options = {}) {
   const r = await fetch(path, {
@@ -26,9 +27,61 @@ const statusNamen = {
   storniert: 'Storniert'
 };
 
+function euroCent(cent){
+  return (cent/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+}
+
+function zahlungsuebersichtRendern(buchungen=aktuelleZahlungsBuchungen){
+  aktuelleZahlungsBuchungen=buchungen;
+  const summary=document.getElementById('payment-overview-summary');
+  const list=document.getElementById('payment-overview-list');
+  if(!summary||!list||!window.BuchungsZahlungen)return;
+  const totals=window.BuchungsZahlungen.summiere(buchungen);
+  summary.replaceChildren();
+  for(const [label,value] of [
+    ['Tatsächlich eingegangen',euroCent(totals.eingegangenCent)],
+    ['Offene Restbeträge',euroCent(totals.offenCent)],
+    ['Erfasste Zahlungseingänge',String(totals.zahlungseingaenge)],
+    ['Dokumentierte Gutschriften',euroCent(totals.gutschriftCent)]
+  ]){
+    const card=el('article');card.className='booking payment-total';
+    card.append(el('small',label),el('strong',value));summary.append(card);
+  }
+  const filter=document.getElementById('payment-overview-filter')?.value||'alle';
+  const entries=totals.eintraege.filter(entry=>{
+    if(filter==='offen')return entry.offenCent>0;
+    if(filter==='teilzahlung')return entry.eingegangenCent>0&&entry.offenCent>0;
+    if(filter==='vollstaendig')return entry.gesamtpreisCent!==null&&entry.gesamtpreisCent>0&&entry.eingegangenCent>=entry.gesamtpreisCent;
+    if(filter==='gutschrift')return entry.gutschriftCent>0;
+    return true;
+  });
+  list.replaceChildren();
+  if(!entries.length){list.append(el('p','Für diesen Filter gibt es keine Buchungen.'));return;}
+  const methoden={ueberweisung:'Überweisung',bar:'Bar',karte:'Karte',sonstiges:'Sonstiges'};
+  for(const entry of entries){
+    const card=el('article');card.className='booking payment-record';
+    const title=entry.buchungsnummer?`${entry.buchungsnummer} · ${entry.name}`:entry.name;
+    card.append(el('strong',title),el('p',`${entry.angebot} · ${entry.datum||'ohne Datum'} · ${statusNamen[entry.status]||entry.status}`));
+    card.append(el('p',`Gesamtpreis: ${entry.gesamtpreisCent===null?'nicht hinterlegt':euroCent(entry.gesamtpreisCent)} · Eingegangen: ${euroCent(entry.eingegangenCent)} · Offen: ${euroCent(entry.offenCent)}`));
+    if(entry.gutschriftCent)card.append(el('p',`Gutschrift: ${euroCent(entry.gutschriftCent)} · Auszahlung manuell`));
+    if(entry.zahlungen.length){
+      const detail=el('details');detail.append(el('summary',`${entry.zahlungen.length} Zahlungseingang/-eingänge anzeigen`));
+      for(const payment of entry.zahlungen){
+        const date=payment.erhaltenAm?new Date(payment.erhaltenAm):null;
+        const dateText=date&&!Number.isNaN(date.getTime())?date.toLocaleString('de-DE'):'Zeitpunkt nicht hinterlegt';
+        const amount=Number.isSafeInteger(payment.betragCent)&&payment.betragCent>0?euroCent(payment.betragCent):'Betrag ungültig';
+        detail.append(el('p',`${dateText} · ${amount} · ${methoden[payment.methode]||'Zahlungsart unbekannt'}${payment.notiz?' · '+payment.notiz:''}`));
+      }
+      card.append(detail);
+    }else card.append(el('p','Noch kein tatsächlicher Zahlungseingang erfasst.'));
+    list.append(card);
+  }
+}
+
 async function refresh() {
   try {
     const alleBuchungen = await api('/api/admin/buchungen');
+    zahlungsuebersichtRendern(alleBuchungen);
     const suchtext = (document.getElementById('bookings-search')?.value || '').trim().toLocaleLowerCase('de-DE');
     const statusFilter = document.getElementById('bookings-status-filter')?.value || 'alle';
     const bookings = alleBuchungen.filter(b => {
@@ -522,6 +575,7 @@ document.getElementById('bookings-search')?.addEventListener('input', () => {
   bookingFilterTimer=setTimeout(refresh,250);
 });
 document.getElementById('bookings-status-filter')?.addEventListener('change', () => refresh());
+document.getElementById('payment-overview-filter')?.addEventListener('change', () => zahlungsuebersichtRendern());
 
 login.onsubmit = async e => {
   e.preventDefault();

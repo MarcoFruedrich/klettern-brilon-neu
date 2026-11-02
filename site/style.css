@@ -652,6 +652,13 @@ footer a {
   gap: 10px;
 }
 .admin-page .calendar-navigation button { min-height: 44px; }
+.admin-page .payment-summary-grid { grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); margin: 14px 0 20px; }
+.admin-page .payment-total { display: grid; gap: 6px; min-height: 88px; background: #fff; }
+.admin-page .payment-total strong { color: var(--pine); font-size: 20px; }
+.admin-page .payment-overview-filter { max-width: 380px; margin: 12px 0; }
+.admin-page .payment-record details { margin-top: 10px; }
+.admin-page .payment-record summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--pine); font-weight: 700; }
+.admin-page .payment-record details p { overflow-wrap: anywhere; }
 @media(max-width:600px) {
   .admin-page .admin-navigation { top: 64px; margin: 14px -12px 24px; border-radius: 0; }
   .admin-page .calendar-navigation { justify-content: center; }

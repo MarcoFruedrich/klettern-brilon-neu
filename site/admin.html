@@ -36,6 +36,7 @@
 
       <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
         <a href="#bookings-section">Buchungen</a>
+        <a href="#payment-overview-section">Zahlungsübersicht</a>
         <a href="#calendar-section">Kalender</a>
         <a href="#angebote-verwaltung">Programme</a>
         <a href="#special-offers-section">Tagesangebote</a>
@@ -43,6 +44,22 @@
         <a href="#admin-guestbook-section">Gästeliste</a>
         <a href="#gps-verwaltung">GPS-Touren</a>
       </nav>
+
+      <section id="payment-overview-section" class="booking admin-anchor">
+        <h2>Zahlungsübersicht</h2>
+        <p>Übersicht der erfassten Zahlungseingänge und offenen Beträge für die zuletzt geladenen Buchungen. Gutschriften werden getrennt ausgewiesen; Auszahlungen bleiben manuell zu bearbeiten.</p>
+        <div id="payment-overview-summary" class="admin-grid payment-summary-grid" aria-live="polite"></div>
+        <label class="payment-overview-filter">Einträge filtern
+          <select id="payment-overview-filter">
+            <option value="alle">Alle Buchungen</option>
+            <option value="offen">Mit offenem Betrag</option>
+            <option value="teilzahlung">Teilzahlung erfasst</option>
+            <option value="vollstaendig">Vollständig bezahlt</option>
+            <option value="gutschrift">Mit Gutschrift</option>
+          </select>
+        </label>
+        <div id="payment-overview-list" class="admin-grid"></div>
+      </section>
 
       <h2 id="bookings-section" class="admin-anchor">Buchungen &amp; Zahlungen</h2>
       <div class="admin-booking-filters">
@@ -288,6 +305,7 @@
       </div>
   </main>
 
+  <script src="/zahlungsuebersicht.js"></script>
   <script src="/admin.js"></script>
 </body>
 </html>
