@@ -38,11 +38,12 @@ werden.
   Einträge pro Seite. Einzelne Zahlungseingänge lassen sich aufklappen. Eine
   Gutschrift wird nicht automatisch ausgezahlt; Erstattungen müssen kontrolliert
   und separat abgewickelt werden.
-- Pro Buchung lässt sich „Kundendaten exportieren (JSON)“ auswählen. Der Export
-  enthält Kontaktdaten, Buchungsangaben, Status und Zahlungseingänge. Interne
-  Bearbeitungsnotizen und GPS-Spielzugänge werden nicht exportiert. Exportdateien
-  enthalten personenbezogene Daten und müssen entsprechend geschützt abgelegt
-  und weitergegeben werden.
+- Pro Buchung lässt sich „Kundendaten & GPS-Spielverlauf exportieren (JSON)“
+  auswählen. Der Export enthält Kontaktdaten, Buchungsangaben, Status,
+  Zahlungseingänge und verknüpfte GPS-Teilnahmedaten. Interne Bearbeitungsnotizen,
+  Spielzugänge, Kontrollcodes und Stationskoordinaten werden nicht exportiert.
+  Exportdateien enthalten personenbezogene Daten und müssen entsprechend
+  geschützt abgelegt und weitergegeben werden.
 
 ## Kalender, Sperrzeiten und Programme
 

@@ -34,6 +34,10 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
     MOCK_BOOKINGS:JSON.stringify(archivedBookings),
+    MOCK_GPS_GAMES:JSON.stringify([{buchung_id:'*',tour:'Brilon-Rätseltour',
+      gestartet_am:'2027-03-15T10:00:00.000Z',abgeschlossen_am:'2027-03-15T11:00:00.000Z',
+      spielzeit_sekunden:3600,station_index:15,gast_name:'Nicht freigegebener Name',gast_einwilligung:false,
+      einwilligung_am:null,einwilligung_version:null}]),
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),
     MOCK_GUESTBOOK:JSON.stringify([
       {id:guestId,name:null,datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,
@@ -168,6 +172,14 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(bookingExport.kunde.email,'max@example.test');
   assert.equal(bookingExport.buchung.referenz,adjacentData.buchungsnummer);
   assert.equal(bookingExport.zahlung.zahlungen[0].betragCent,2500);
+  assert.equal(bookingExport.gpsSpiele.length,1);
+  assert.equal(bookingExport.gpsSpiele[0].tour,'Brilon-Rätseltour');
+  assert.equal(bookingExport.gpsSpiele[0].spielzeitSekunden,3600);
+  assert.equal(bookingExport.gpsSpiele[0].gaestelistenName,null,'Namen ohne öffentliche Einwilligung werden nicht exportiert');
+  assert.equal(JSON.stringify(bookingExport).includes('Nicht freigegebener Name'),false);
+  assert.equal('token_hash' in bookingExport.gpsSpiele[0],false);
+  assert.equal('kontrollcode' in bookingExport.gpsSpiele[0],false);
+  assert.equal('latitude' in bookingExport.gpsSpiele[0],false);
   assert.equal('bearbeitungsnotiz' in bookingExport,false,'Interne Bearbeitungsnotizen gehören nicht in den Export');
   assert.equal('spielzugang' in bookingExport,false,'GPS-Spielzugänge gehören nicht in den Kundendatenexport');
 

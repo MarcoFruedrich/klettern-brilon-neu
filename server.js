@@ -1439,6 +1439,16 @@ preis=safeText(d.preis,50);
         );
         if(!q.rowCount)return reply(res,404,{error:'Buchungsanfrage nicht gefunden.'});
         const row=q.rows[0],data=row.data||{};
+        const gps=await pool.query(
+          `SELECT t.data->>'titel' AS tour,g.gestartet_am AS gestartet_am,
+                  g.abgeschlossen_am AS abgeschlossen_am,g.spielzeit_sekunden AS spielzeit_sekunden,
+                  g.station_index AS station_index,g.gast_name AS gast_name,
+                  g.gast_einwilligung AS gast_einwilligung,
+                  g.gast_einwilligung_am AS einwilligung_am,
+                  g.gast_einwilligung_version AS einwilligung_version
+           FROM brilon_gps_spiele g JOIN brilon_gps_touren t ON t.id=g.tour_id
+           WHERE g.buchung_id=$1 ORDER BY g.erstellt_am`,[row.id]
+        );
         const exportDatensatz={
           exportformat:'klettern-abenteuer-kundendaten-v1',exportiertAm:new Date().toISOString(),
           kunde:{vorname:data.vorname||null,nachname:data.nachname||null,name:data.name||null,
@@ -1454,7 +1464,13 @@ preis=safeText(d.preis,50);
               .filter(z=>Number.isSafeInteger(z?.betragCent)&&z.betragCent>0)
               .map(z=>({betragCent:z.betragCent,methode:z.methode||null,erhaltenAm:z.erhaltenAm||null})),
             preisanpassungen:Array.isArray(data.preisanpassungen)?data.preisanpassungen:[]},
-          datenschutzangabe:data.datenschutz||null
+          datenschutzangabe:data.datenschutz||null,
+          gpsSpiele:gps.rows.map(spiel=>({tour:spiel.tour||null,gestartetAm:spiel.gestartet_am||null,
+            abgeschlossenAm:spiel.abgeschlossen_am||null,spielzeitSekunden:spiel.spielzeit_sekunden??null,
+            erreichteStation:spiel.station_index??null,
+            gaestelistenName:spiel.gast_einwilligung===true?spiel.gast_name||null:null,
+            oeffentlicheEinwilligung:spiel.gast_einwilligung===true,
+            einwilligungAm:spiel.einwilligung_am||null,einwilligungVersion:spiel.einwilligung_version||null}))
         };
         return reply(res,200,exportDatensatz,{'Content-Disposition':`attachment; filename="buchung-${buchungsExport[1]}.json"`});
       }

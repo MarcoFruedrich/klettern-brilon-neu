@@ -378,11 +378,11 @@ zahlungsButtonAktualisieren();
   }
 };    
 zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
-      const exportLink=el('a','Kundendaten exportieren (JSON)');
+      const exportLink=el('a','Kundendaten & GPS-Spielverlauf exportieren (JSON)');
       exportLink.href='/api/admin/buchungen/'+encodeURIComponent(b.id)+'/export';
       exportLink.className='btn secondary';
       exportLink.setAttribute('download','');
-      exportLink.title='Personenbezogene Buchungsdaten ohne interne Bearbeitungsnotiz exportieren';
+      exportLink.title='Buchungsdaten und zugehörigen GPS-Spielverlauf ohne Zugangsdaten exportieren';
     c.append(speichern, zahlungSenden, exportLink, loeschen, meldung);
       box.append(c);
     }
