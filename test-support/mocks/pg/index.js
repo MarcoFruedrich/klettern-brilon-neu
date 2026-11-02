@@ -47,6 +47,12 @@ class Pool {
       const offer={id:this.nextOfferId++,name,beschreibung,dauer,preise:JSON.parse(rawPrices),aktiv};
       this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
     }
+    if(/INSERT INTO brilon_angebote\s*\(name,beschreibung,dauer,preise,aktiv,kategorie/.test(sql)){
+      const [name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,kapazitaet,rawDates,hinweise,buchbar,veroeffentlicht]=params;
+      const offer={id:this.nextOfferId++,name,beschreibung,dauer,preise:{},aktiv:false,kategorie,zielgruppe,
+        veranstaltungsort,kapazitaet,verfuegbare_termine:JSON.parse(rawDates),hinweise,buchbar,veroeffentlicht};
+      this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
+    }
     if(sql.includes('INSERT INTO brilon_gps_touren(id,angebot_id,data,aktiv)')){
       const [id,angebot_id,raw,aktiv]=params;
       const tour={id,angebot_id,data:JSON.parse(raw),aktiv,erstellt_am:new Date().toISOString(),aktualisiert_am:null};
@@ -115,9 +121,11 @@ class Pool {
       return {rows:[offer],rowCount:1};
     }
     if (sql.includes('FROM brilon_angebote')) {
-      const offers=sql.includes('WHERE id=$1')
+      let offers=sql.includes('WHERE id=$1')
         ?this.offers.filter(item=>String(item.id)===String(params[0]))
         :params[0]?this.offers.filter(item=>item.name===params[0]):this.offers;
+      if(sql.includes('WHERE aktiv=true AND buchbar=true AND veroeffentlicht=true'))
+        offers=offers.filter(item=>item.aktiv===true&&item.buchbar===true&&item.veroeffentlicht===true);
       return { rows:offers, rowCount:offers.length };
     }
     if (sql.includes('FROM brilon_orte')) {

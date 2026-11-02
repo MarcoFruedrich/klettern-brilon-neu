@@ -43,6 +43,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, mehrtägige Sperrzeiten, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Der Verfügbarkeits-Endpunkt prüft belegte Zeitfenster einschließlich direkt anschließender freier Startzeiten; beide Randtage einer Sperrzeit bleiben gesperrt. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
 - Ein Parallel-HTTP-Test sendet gleichzeitige Buchungsanfragen und prüft, dass weder ein Zeitfenster doppelt belegt noch die Tageskapazität überschritten wird. Zwei parallele Buchungen mit identischem Namen und Datum erhalten außerdem unterschiedliche Referenznummern. Das PostgreSQL-Test-Double bildet dazu die im Server verwendete Advisory-Sperre transaktionsbezogen nach; reale PostgreSQL-Isolation bleibt separat zu prüfen.
 - Ein separater GPS-HTTP-Test prüft den Adminschutz, Anlegen und Bearbeiten von Touren, Codeerhalt bei unveränderter Station, erforderliche Codeerneuerung bei QR-Wechsel, sichere Antworten ohne Kontrollcode/Hash und Deaktivierung; alle Datenbankzugriffe laufen über ein isoliertes Test-Double.
+- Ein Programm-HTTP-Test prüft den Adminschutz, das Anlegen zunächst deaktivierter Programme, Bearbeiten einschließlich Dauer sowie Deaktivieren und Reaktivieren. Öffentlich erscheinen nur aktive, buchbare und veröffentlichte Programme.
 - Der öffentliche Kalender verwendet dieselbe inklusive Datumsbereichslogik für Sperrzeitanzeige und manuelle Datumseingabe. Gesperrte Tage deaktivieren die Uhrzeitauswahl; Änderungen am nativen Datumsfeld laden die belegten Zeiten neu.
 - Der Brevo-Versand ist in eine injizierbare Mailer-Funktion ausgelagert. Vier Tests prüfen Empfänger, Nachrichtentext, Absender, fehlende Konfiguration und Fehlerantworten ausschließlich mit einem Fetch-Test-Double; dabei erfolgt kein externer Aufruf.
 - Der HTTP-End-to-End-Test fängt Buchungseingang, Anzahlung-Bestätigung und Stornierung über einen lokalen IPC-Mail-Test-Double ab. Er prüft Kunden- und Betreiberpostfach sowie Referenz, Gesamtpreis, 25-%-Anzahlung und Restbetrag; ausgehender Netzwerkverkehr ist in diesem Test blockiert.
@@ -76,7 +77,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 65 bestanden, 0 fehlgeschlagen.
+- `npm test` – 66 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
