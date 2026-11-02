@@ -42,6 +42,7 @@ async function refresh() {
     workspace.hidden = false;
     
     await erlebnisangeboteLaden();
+    await gpsTourenLaden(alleBuchungen);
 
     const box = document.getElementById('bookings');
     box.replaceChildren();
@@ -79,6 +80,10 @@ async function refresh() {
 
 if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
   const zahlungen = Array.isArray(b.data.zahlungen) ? b.data.zahlungen : [];
+  if (b.data.zahlungsstatus && zahlungen.length === 0) {
+    const altHinweis=el('p','Altes Zahlungskennzeichen vorhanden, aber ohne einzelnen Zahlungseintrag. Bitte tatsächlichen Eingang prüfen.');
+    altHinweis.className='payment-warning';c.append(altHinweis);
+  }
   const erhaltenCent = zahlungen.reduce((summe, z) => summe + Number(z.betragCent || 0), 0);
   const gesamtCent = Math.round(gesamtpreis * 100);
   const restbetragCent = Math.max(0, gesamtCent - erhaltenCent);
@@ -409,7 +414,87 @@ c.append(bildBereich);
   }
 }
 
-document.getElementById('bookings-search')?.addEventListener('input', () => refresh());
+async function gpsTourenLaden(buchungen) {
+  const tourSelect=document.querySelector('#gps-game-form [name="tourId"]');
+  const buchungSelect=document.querySelector('#gps-game-form [name="buchungId"]');
+  const liste=document.getElementById('gps-tour-list');
+  if(!tourSelect||!buchungSelect||!liste)return;
+  try{
+    const tours=await api('/api/admin/gps/touren');
+    liste.replaceChildren();tourSelect.replaceChildren();buchungSelect.replaceChildren();
+    for(const tour of tours){
+      const card=el('article');card.className='booking';
+      card.append(el('strong',tour.titel),el('p',`${tour.stationen.length} Stationen · ${tour.schwierigkeitsgrad} · ${tour.altersgruppe}`),
+        el('p',`${tour.aktiv?'Aktiv':'Deaktiviert'} · ${tour.buchbar?'buchbar':'nicht buchbar'} · ${tour.startpunkt} → ${tour.ziel}`));
+      const edit=el('button','Bearbeiten / Kontrollcodes erneuern');edit.type='button';edit.className='btn secondary';
+      edit.onclick=()=>{
+        const form=document.getElementById('gps-tour-form');form.elements.id.value=tour.id;
+        for(const key of ['titel','beschreibung','schwierigkeitsgrad','altersgruppe','startpunkt','ziel','dauer','preis'])form.elements[key].value=tour[key]??'';
+        form.elements.buchbar.checked=tour.buchbar;form.elements.aktiv.checked=tour.aktiv;
+        form.elements.stationen.value=JSON.stringify(tour.stationen.map(s=>({...s,kontrollcode:''})),null,2);
+        form.querySelector('button[type="submit"]').textContent='GPS-Tour speichern';
+        document.getElementById('gps-tour-status').textContent='Beim Speichern müssen neue Kontrollcodes für alle Stationen eingetragen werden.';
+        form.scrollIntoView({behavior:'smooth',block:'start'});
+      };
+      const toggle=el('button',tour.aktiv?'Deaktivieren':'Aktivieren');toggle.type='button';toggle.className='btn secondary';
+      toggle.onclick=async()=>{await api('/api/admin/gps/touren/'+encodeURIComponent(tour.id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({aktiv:!tour.aktiv})});await gpsTourenLaden(buchungen);};
+      const gaeste=el('button','Gästeliste anzeigen');gaeste.type='button';gaeste.className='btn secondary';
+      gaeste.onclick=async()=>{
+        try{const entries=await api('/api/gps/gaesteliste?tour='+encodeURIComponent(tour.id));
+          card.querySelector('.gps-guests')?.remove();
+          const guests=el('div');guests.className='gps-guests';
+          guests.append(el('h4','Öffentliche Teilnahmen'));
+          if(!entries.length)guests.append(el('p','Noch keine freigegebenen Einträge.'));
+          for(const entry of entries)guests.append(el('p',`${entry.name} · ${entry.datum} · ${Math.floor(entry.dauer_sekunden/60)} Min.`));
+          card.append(guests);
+        }catch(error){status.textContent=error.message;}
+      };
+      const qr=el('details');const summary=el('summary','QR-Zieladressen anzeigen');qr.append(summary);
+      for(const station of tour.stationen){
+        const target=location.origin+'/gps.html?station='+encodeURIComponent(station.qrId);
+        const a=document.createElement('a');a.href=target;a.textContent=station.id+': '+target;a.target='_blank';a.rel='noopener';
+        const p=el('p');p.append(a);qr.append(p);
+      }
+      card.append(edit,toggle,gaeste,qr);liste.append(card);
+      if(tour.aktiv&&tour.buchbar){const o=el('option',tour.titel);o.value=tour.id;tourSelect.append(o);}
+    }
+    const placeholder=el('option','Tour auswählen');placeholder.value='';tourSelect.prepend(placeholder);
+    for(const booking of buchungen.filter(b=>b.status==='bestaetigt')){
+      const o=el('option',`${booking.data.buchungsnummer||''} · ${booking.data.name||'Unbekannt'} · ${booking.data.datum||''}`);
+      o.value=booking.id;buchungSelect.append(o);
+    }
+    const noBooking=el('option','Bestätigte Buchung auswählen');noBooking.value='';buchungSelect.prepend(noBooking);
+  }catch(error){document.getElementById('gps-tour-status').textContent='GPS-Verwaltung nicht verfügbar: '+error.message;}
+}
+
+document.getElementById('gps-tour-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget;const statusGps=document.getElementById('gps-tour-status');
+  try{
+    const fields=Object.fromEntries(new FormData(form));
+    let stationen;try{stationen=JSON.parse(fields.stationen);}catch{throw new Error('Stations-JSON ist ungültig.');}
+    const id=fields.id;delete fields.id;
+    const result=await api(id?'/api/admin/gps/touren/'+encodeURIComponent(id):'/api/admin/gps/touren',{method:id?'PATCH':'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...fields,stationen,buchbar:form.elements.buchbar.checked,aktiv:form.elements.aktiv.checked})});
+    statusGps.textContent=id?'GPS-Tour aktualisiert.':'Tour angelegt: '+result.id;form.reset();
+    form.querySelector('button[type="submit"]').textContent='GPS-Tour anlegen';await refresh();
+  }catch(error){statusGps.textContent='Fehler: '+error.message;}
+});
+
+document.getElementById('gps-game-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();const values=Object.fromEntries(new FormData(event.currentTarget));
+  const target=document.getElementById('gps-game-status');
+  try{
+    const result=await api('/api/admin/gps/spiele',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
+    const link=location.origin+result.zugangslink;target.replaceChildren(el('span','Spielzugang (einmalig kopieren): '));
+    const anchor=document.createElement('a');anchor.href=link;anchor.textContent=link;anchor.target='_blank';anchor.rel='noopener';target.append(anchor);
+  }catch(error){target.textContent='Fehler: '+error.message;}
+});
+
+let bookingFilterTimer;
+document.getElementById('bookings-search')?.addEventListener('input', () => {
+  clearTimeout(bookingFilterTimer);
+  bookingFilterTimer=setTimeout(refresh,250);
+});
 document.getElementById('bookings-status-filter')?.addEventListener('change', () => refresh());
 
 login.onsubmit = async e => {

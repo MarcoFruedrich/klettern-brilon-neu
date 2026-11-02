@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#183b2d">
+  <title>GPS-Schatzsuche | Klettern &amp; Abenteuer</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .gps-wrap{max-width:720px;margin:7vh auto;padding:24px}
+    .gps-card{background:#fff;color:#193126;border-radius:20px;padding:clamp(22px,5vw,40px);box-shadow:0 20px 55px #10251b20}
+    .gps-card p{color:#52645a}.gps-card h1{font-size:clamp(30px,7vw,48px);color:#183b2d;letter-spacing:-1px}
+    .gps-choice{display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid #c9d6cb;border-radius:12px;margin:10px 0;color:#193126}
+    .gps-choice input{width:auto;margin-top:6px}.gps-choice span{color:#193126}
+    .gps-actions{display:grid;gap:12px;margin-top:20px}.gps-status{min-height:28px;font-weight:700;color:#183b2d!important}
+    .gps-card button{width:100%}.gps-privacy{font-size:14px}
+  </style>
+</head>
+<body>
+  <main class="gps-wrap">
+    <a href="/" class="logo">🧗 Klettern <span>&amp; Abenteuer</span></a>
+    <section class="gps-card" aria-labelledby="gps-title">
+      <p class="eyebrow">GPS-SCHATZSUCHE</p>
+      <h1 id="gps-title">Dein nächster Hinweis</h1>
+      <p id="gps-tour"></p>
+      <div id="gps-game" hidden>
+        <p id="gps-counter"></p>
+        <h2 id="gps-question"></h2>
+        <form id="gps-answer">
+          <div id="gps-choices"></div>
+          <label>Kontrollcode vom Standort
+            <input id="gps-code" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="off" required>
+          </label>
+          <div class="gps-actions"><button class="btn" type="submit">Station prüfen</button></div>
+        </form>
+      </div>
+      <div id="gps-complete" hidden>
+        <h2>Geschafft!</h2>
+        <p id="gps-time"></p>
+        <form id="gps-guest">
+          <label class="gps-choice"><input id="gps-consent" type="checkbox"><span>Ich stimme zu, dass der von mir angegebene Name, das Datum und die benötigte Zeit öffentlich in der Gästeliste erscheinen. Die Teilnahme ist auch ohne Einwilligung möglich.</span></label>
+          <label>Name oder Gruppenname (optional)<input id="gps-name" maxlength="80"></label>
+          <button class="btn secondary" type="submit">Teilnahme speichern</button>
+        </form>
+        <p class="gps-privacy">Ohne Zustimmung wird kein öffentlicher Eintrag erstellt.</p>
+      </div>
+      <p class="gps-status" id="gps-status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <script>
+    const query=new URLSearchParams(location.search);
+    const incoming=query.get('zugang');
+    if(incoming)sessionStorage.setItem('gps-zugang',incoming);
+    const token=sessionStorage.getItem('gps-zugang');
+    const qrId=query.get('station')||'';
+    if(incoming){history.replaceState({},'',location.pathname+(qrId?'?station='+encodeURIComponent(qrId):''));}
+    const status=document.getElementById('gps-status');
+    let tourId=null,spielzeit=null;
+    async function api(path,data){
+      const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      const j=await r.json();if(!r.ok)throw new Error(j.error||'Anfrage fehlgeschlagen.');return j;
+    }
+    function zeigeStation(d){
+      document.getElementById('gps-game').hidden=false;
+      document.getElementById('gps-complete').hidden=true;
+      document.getElementById('gps-tour').textContent=d.tour||'';
+      document.getElementById('gps-counter').textContent='Station '+d.station+' von '+d.gesamt;
+      document.getElementById('gps-question').textContent=d.frage;
+      const liste=document.getElementById('gps-choices');liste.replaceChildren();
+      d.antworten.forEach((antwort,index)=>{
+        const label=document.createElement('label');label.className='gps-choice';
+        const radio=document.createElement('input');radio.type='radio';radio.name='antwort';radio.value=index;radio.required=true;
+        const text=document.createElement('span');text.textContent=antwort;label.append(radio,text);liste.append(label);
+      });
+    }
+    async function starten(){
+      if(!token){status.textContent='Öffne den persönlichen Spielzugang aus deiner Buchungsbestätigung.';return;}
+      try{
+        const d=await api('/api/gps/start',{token});
+        if(d.abgeschlossen){zeigeAbschluss(d.spielzeitSekunden);return;}
+        zeigeStation(d);
+        if(!qrId)status.textContent='Scanne am Standort den dort angebrachten QR-Code und gib danach den Zahlencode ein.';
+        else status.textContent='QR-Code erkannt. Wähle die Antwort und gib den Zahlencode ein.';
+      }catch(e){status.textContent=e.message;}
+    }
+    function zeigeAbschluss(sekunden){
+      spielzeit=sekunden;document.getElementById('gps-game').hidden=true;
+      document.getElementById('gps-complete').hidden=false;
+      document.getElementById('gps-time').textContent='Benötigte Zeit: '+Math.floor(sekunden/60)+' Min. '+(sekunden%60)+' Sek.';
+      status.textContent='Deine Tour wurde abgeschlossen.';
+    }
+    document.getElementById('gps-answer').addEventListener('submit',async event=>{
+      event.preventDefault();const answer=document.querySelector('input[name="antwort"]:checked');
+      if(!qrId){status.textContent='Bitte zuerst den QR-Code an der Station scannen.';return;}
+      const button=event.target.querySelector('button');button.disabled=true;status.textContent='Prüfe Station …';
+      try{
+        const d=await api('/api/gps/pruefen',{token,qrId,kontrollcode:document.getElementById('gps-code').value,antwort:Number(answer.value)});
+        document.getElementById('gps-code').value='';
+        if(d.abgeschlossen)zeigeAbschluss(d.spielzeitSekunden);
+        else{zeigeStation(d.naechsteStation);status.textContent='Richtig! Scanne den QR-Code an der nächsten Station.';history.replaceState({},'',location.pathname);}
+      }catch(e){status.textContent=e.message;}
+      finally{button.disabled=false;}
+    });
+    document.getElementById('gps-guest').addEventListener('submit',async event=>{
+      event.preventDefault();
+      try{
+        const einwilligung=document.getElementById('gps-consent').checked;
+        await api('/api/gps/abschluss',{token,einwilligung,name:document.getElementById('gps-name').value});
+        status.textContent=einwilligung?'Danke, dein Eintrag wurde gespeichert.':'Danke fürs Mitspielen. Es wurde kein öffentlicher Eintrag erstellt.';
+        event.target.hidden=true;
+      }catch(e){status.textContent=e.message;}
+    });
+    starten();
+  </script>
+</body>
+</html>

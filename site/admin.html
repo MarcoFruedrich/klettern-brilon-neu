@@ -210,6 +210,44 @@
   <div id="angebote-admin-liste"></div>
 </section>
 
+<section id="gps-verwaltung">
+  <h2>GPS-Schatzsuchen</h2>
+  <p>Touren verwalten, Kontrollcodes ändern und Zugänge für bestätigte Buchungen ausstellen.</p>
+  <form id="gps-tour-form">
+    <input name="id" type="hidden">
+    <label>Titel<input name="titel" maxlength="120" required></label>
+    <label>Beschreibung<textarea name="beschreibung" maxlength="2000" rows="3"></textarea></label>
+    <div class="two">
+      <label>Schwierigkeitsgrad<input name="schwierigkeitsgrad" maxlength="30" placeholder="leicht" required></label>
+      <label>Altersgruppe<input name="altersgruppe" maxlength="80" placeholder="3. und 4. Klasse" required></label>
+    </div>
+    <div class="two">
+      <label>Startpunkt<input name="startpunkt" maxlength="160" required></label>
+      <label>Ziel<input name="ziel" maxlength="160" required></label>
+    </div>
+    <div class="two">
+      <label>Dauer (Minuten)<input name="dauer" type="number" min="15" max="1440" required></label>
+      <label>Preis pro Gruppe (€)<input name="preis" type="number" min="0" step="0.01" required></label>
+    </div>
+    <label>Stationen als JSON
+      <textarea name="stationen" rows="10" required placeholder='[{"id":"s1","qrId":"QR-WERT","kontrollcode":"1234","frage":"Frage?","antworten":["A","B"],"loesungIndex":0,"latitude":51.4,"longitude":8.6}]'></textarea>
+    </label>
+    <p class="hint">Kontrollcodes werden als HMAC gespeichert. Koordinaten werden vom Spielbrowser nicht ausgeliefert.</p>
+    <label class="check"><input name="buchbar" type="checkbox"><span>Buchbar</span></label>
+    <label class="check"><input name="aktiv" type="checkbox"><span>Aktivieren</span></label>
+    <button class="btn" type="submit">GPS-Tour anlegen</button>
+  </form>
+  <p id="gps-tour-status" role="status"></p>
+  <div id="gps-tour-list" class="admin-grid"></div>
+  <h3>Spielzugang erstellen</h3>
+  <form id="gps-game-form">
+    <label>Aktive GPS-Tour<select name="tourId" required></select></label>
+    <label>Bestätigte Buchung<select name="buchungId" required></select></label>
+    <button class="btn secondary" type="submit">Einmaligen Spielzugang erstellen</button>
+  </form>
+  <p id="gps-game-status" role="status"></p>
+</section>
+
     
     <p id="status" role="status"></p>
       </div>

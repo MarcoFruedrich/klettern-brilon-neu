@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('../lib/gpsspiel');
+const { stationFuerSpiel, stationPruefen, gpsSpieldauer, kontrollcodeHash } = require('../lib/gpsspiel');
 
 const tour = { stationen: [
   {id:'s1', qrId:'qr-a', kontrollcode:'1234', frage:'Frage 1?', antworten:['A','B'], loesungIndex:1, latitude:51.4, longitude:8.6},
@@ -16,6 +16,16 @@ test('Falscher QR-Code, Kontrollcode oder Antwort geben die Station nicht frei',
   assert.equal(stationPruefen(tour, spiel, {qrId:'qr-x', kontrollcode:'1234', antwort:1}).grund, 'qr');
   assert.equal(stationPruefen(tour, spiel, {qrId:'qr-a', kontrollcode:'0000', antwort:1}).grund, 'code');
   assert.equal(stationPruefen(tour, spiel, {qrId:'qr-a', kontrollcode:'1234', antwort:0}).grund, 'antwort');
+});
+test('Kontrollcodes können gehasht geprüft werden und der Hash bleibt geheim', () => {
+  const secret='test-secret-with-at-least-32-characters';
+  const hashed={stationen:[
+    {...tour.stationen[0],kontrollcode:undefined,kontrollcodeHash:kontrollcodeHash('1234',secret)},
+    tour.stationen[1]
+  ]};
+  const result=stationPruefen(hashed,{stationIndex:0,abgeschlossen:false},{qrId:'qr-a',kontrollcode:'1234',antwort:1},secret);
+  assert.equal(result.korrekt,true);
+  assert.equal('kontrollcodeHash' in result.naechsteStation,false);
 });
 test('Richtige Stationsdaten geben nur die unmittelbar folgende Station frei', () => {
   const result = stationPruefen(tour, {stationIndex:0, abgeschlossen:false}, {qrId:'qr-a', kontrollcode:'1234', antwort:1});

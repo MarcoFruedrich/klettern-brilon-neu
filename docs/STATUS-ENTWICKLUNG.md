@@ -22,7 +22,11 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Überweisungsinformationen setzen die stabile Buchungsnummer als Verwendungszweck ein.
 - E-Mail-Absender und Betreiberempfänger sind nicht mehr fest im Code hinterlegt; sie werden über `BREVO_SENDER_EMAIL` und `BOOKING_NOTIFY_EMAIL` konfiguriert. Der Bildspeicher ist optional und wird ohne Konfiguration sauber abgewiesen.
 - Schemaänderungen werden nur noch ausgeführt, wenn `RUN_SCHEMA_MIGRATIONS=true` gesetzt ist. Kein produktiver Datenbankzugriff oder Schemaänderung wurde in dieser Arbeit ausgeführt.
-- Eine testbare GPS-Domänenlogik prüft QR-Kennung, Kontrollcode und Antwort. Die aktive Station wird ohne Koordinaten späterer Stationen serialisiert; zwei Gruppenstände bleiben unabhängig.
+- GPS-Touren sind über den Admin anlegbar, bearbeitbar sowie aktivierbar/deaktivierbar. Stationen enthalten Koordinaten, zwei Antworten und gehashte Kontrollcodes.
+- Eine GPS-Tour erzeugt ein passendes buchbares Programm mit Gruppenpreis. Spielzugänge lassen sich nur für bestätigte Buchungen desselben Programms ausstellen.
+- Für bestätigte Buchungen lassen sich einzelne Spielzugänge ausstellen. Gruppenstände, Start-/Abschlusszeit und Dauer werden gespeichert. Die mobile Spielseite prüft QR-Kennung, Zahlencode und Antwort; spätere Stationskoordinaten werden nie an den Browser ausgeliefert.
+- Die Gästeliste zeigt nur abgeschlossene Spiele mit ausdrücklicher Zustimmung zur Namensveröffentlichung. Ohne Zustimmung wird kein Name gespeichert.
+- GPS-Kontrollcodes werden mit HMAC gehasht; Spielzugänge werden nur gehasht gespeichert. Das Geheimnis `GPS_CODE_SECRET` ist erforderlich.
 - Unmögliche Kalendertage werden beim Erstellen einer Anfrage als Eingabefehler zurückgewiesen.
 
 ## Prüfergebnisse
@@ -31,7 +35,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 
 - `node --check server.js` – bestanden.
 - `node --check site/admin.js` – bestanden.
-- `npm test` – 16 bestanden, 0 fehlgeschlagen.
+- `npm test` – 17 bestanden, 0 fehlgeschlagen.
 - `git diff --check` – bestanden.
 
 Die Datenbank- und E-Mail-Routen wurden nicht gegen Produktivdienste aufgerufen. Es wurden keine UI-Viewport- oder Browsertests ausgeführt.
@@ -43,7 +47,7 @@ Die Datenbank- und E-Mail-Routen wurden nicht gegen Produktivdienste aufgerufen.
 - Such- und Statusfilter sind clientseitig und begrenzen nicht die geladene Ergebnismenge von 250 Einträgen.
 - Der Programmstamm braucht Kategorien, Zielgruppen, Veranstaltungsorte, Kapazitäten, Termine, Hinweise, Buchbarkeit/Veröffentlichungsstatus und erweiterbare Ortsverwaltung.
 - Anschlussangebote benötigen Verfügbarkeits-/Kapazitätsprüfung, Vorschau mit kontrollierter Freigabe, nachvollziehbare Preisrevisionen und korrekte Neubewertung bereits geleisteter Zahlungen.
-- GPS braucht persistente Verwaltungs- und Spiel-APIs, individuelle Zugangstoken, Code-Rotation, Rate-Limits, Abschlusszeit und Gästeeinträge mit ausdrücklicher Zustimmung. Die aktuelle GPS-Datei ist nur Domänenlogik, kein nutzbares Spiel.
+- GPS benötigt noch QR-Code-Erzeugung und druckbare Etiketten. Die Verwaltung zeigt dafür stationäre QR-Zieladressen. Beim Bearbeiten einer Tour müssen neue Kontrollcodes für alle Stationen eingetragen werden.
 - Die Brilon-Mustertour mit 15 Stationen fehlt. Historische Fakten, genaue Koordinaten, Zugänglichkeit und praktische Sicherheit müssen vor Veröffentlichung örtlich geprüft werden.
 - Der Status der produktiven Schema- und Kalenderdefinitionen ist noch zu ermitteln. Die Tabellen werden für lokale/isolierte Tests nicht automatisch angelegt.
 - Datenschutz- und Löschkonzept, Auskunft/Export, Einwilligungsnachweis für öffentliche Gästeliste sowie verbindliche Bedingungen sind noch zu entwickeln und fachlich zu prüfen.
@@ -52,9 +56,9 @@ Die Datenbank- und E-Mail-Routen wurden nicht gegen Produktivdienste aufgerufen.
 ## Nutzung der bestehenden Verwaltung
 
 1. Lokal Node.js 20+ und Abhängigkeiten bereitstellen.
-2. Für eine isolierte Entwicklungsdatenbank `DATABASE_URL`, `ADMIN_USER` und `ADMIN_PASSWORD` konfigurieren. Keine Produktivzugangsdaten verwenden.
+2. Für eine isolierte Entwicklungsdatenbank `DATABASE_URL`, `ADMIN_USER`, `ADMIN_PASSWORD` und ein mindestens 32 Zeichen langes `GPS_CODE_SECRET` konfigurieren. Keine Produktivzugangsdaten verwenden.
 3. Schemaänderungen bleiben standardmäßig aus. Nur in einer eigens angelegten Testdatenbank und nach Schema-Review `RUN_SCHEMA_MIGRATIONS=true` setzen.
-4. `npm start` starten und `/admin.html` öffnen. Zahlungsdaten werden in der Buchungskarte mit tatsächlichem Betrag und Zahlungsart ergänzt.
+4. `npm start` starten und `/admin.html` öffnen. Zahlungseingänge werden in der Buchungskarte mit tatsächlichem Betrag und Zahlungsart ergänzt. Unter GPS eine Tour mit vollständigem Stations-JSON anlegen, die dauerhaften Standort-QR-Codes auf die angezeigten Zieladressen verweisen lassen und für bestätigte Buchungen Spielzugänge erstellen.
 5. Benachrichtigungen nur mit Test-Mailpostfach und `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` und optional `BOOKING_NOTIFY_EMAIL` testen.
 
 ## Veröffentlichungsstatus

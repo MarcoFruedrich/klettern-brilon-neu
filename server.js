@@ -4,7 +4,8 @@
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
-const { zahlungsstand, zahlungErgaenzen } = require('./lib/buchungslogik');
+const { preisFuerTeilnehmer, zahlungsstand, zahlungErgaenzen } = require('./lib/buchungslogik');
+const { stationFuerSpiel, stationPruefen, gpsSpieldauer, kontrollcodeHash } = require('./lib/gpsspiel');
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -50,6 +51,39 @@ function gueltigesDatum(v){
   if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
   const datum=new Date(v+'T12:00:00Z');
   return !Number.isNaN(datum.getTime())&&datum.toISOString().slice(0,10)===v;
+}
+function gpsTokenHash(token){return crypto.createHash('sha256').update(String(token)).digest('hex')}
+function gpsTourSpeichern(d,alter=null){
+  if(!process.env.GPS_CODE_SECRET||process.env.GPS_CODE_SECRET.length<32)
+    throw new Error('GPS_CODE_SECRET muss mindestens 32 Zeichen lang sein.');
+  const titel=safeText(d.titel,120),beschreibung=safeText(d.beschreibung,2000);
+  const schwierigkeitsgrad=safeText(d.schwierigkeitsgrad,30),altersgruppe=safeText(d.altersgruppe,80);
+  const startpunkt=safeText(d.startpunkt,160),ziel=safeText(d.ziel,160);
+  const dauer=Number(d.dauer),preis=Number(d.preis);
+  if(!titel||!startpunkt||!ziel||!Number.isInteger(dauer)||dauer<15||dauer>1440||
+     !Number.isFinite(preis)||preis<0||!Array.isArray(d.stationen)||d.stationen.length<1||d.stationen.length>60)
+    throw new Error('Tourdaten oder Stationsanzahl sind ungültig.');
+  const ids=new Set(),qrIds=new Set();
+  const stationen=d.stationen.map((s,index)=>{
+    const id=safeText(s.id,80)||'station-'+(index+1);
+    const qrId=safeText(s.qrId,120),frage=safeText(s.frage,500),kontrollcode=safeText(s.kontrollcode,8);
+    const antworten=Array.isArray(s.antworten)?s.antworten.map(a=>safeText(a,160)):[];
+    const latitude=Number(s.latitude),longitude=Number(s.longitude),loesungIndex=Number(s.loesungIndex);
+    if(ids.has(id)||qrIds.has(qrId)||!qrId||!frage||!/^\d{4,8}$/.test(kontrollcode)||
+       antworten.length!==2||antworten.some(a=>!a)||![0,1].includes(loesungIndex)||
+       !Number.isFinite(latitude)||latitude< -90||latitude>90||
+       !Number.isFinite(longitude)||longitude< -180||longitude>180)
+      throw new Error('Station '+(index+1)+' ist unvollständig oder ungültig.');
+    ids.add(id);
+    qrIds.add(qrId);
+    return {id,qrId,frage,antworten,loesungIndex,latitude,longitude,
+      kontrollcodeHash:kontrollcodeHash(kontrollcode,process.env.GPS_CODE_SECRET)};
+  });
+  return {titel,angebotName:'GPS-Schatzsuche: '+titel,beschreibung,schwierigkeitsgrad,altersgruppe,startpunkt,ziel,dauer,preis,
+    buchbar:d.buchbar===true,stationen};
+}
+function gpsTourAdminAnsicht(data){
+  return {...data,stationen:data.stationen.map(({kontrollcodeHash:_hash,...station})=>station)};
 }
 function session(req){const match=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/);const token=match?.[1],exp=sessions.get(token);if(!exp)return false;if(exp<Date.now()){sessions.delete(token);return false}return true}
 function admin(req,res){if(!session(req)){reply(res,401,{error:'Bitte anmelden.'});return false}return true}
@@ -134,29 +168,15 @@ async function main(req,res){
         return reply(res,400,{error:'Bitte Pflichtfelder korrekt ausfüllen.'});
 
       let gesamtpreis = null;
-
-const gruppe =
-  teilnehmer >= 5 && teilnehmer <= 10 ? '5-10' :
-  teilnehmer >= 11 && teilnehmer <= 15 ? '11-15' :
-  teilnehmer >= 16 && teilnehmer <= 20 ? '16-20' : null;
-
-if (gruppe) {
-  const preisAbfrage = await pool.query(
-    `SELECT preise FROM brilon_angebote
-     WHERE name = $1 AND aktiv = true
-     LIMIT 1`,
-    [angebot]
-  );
-
-  if (preisAbfrage.rows.length) {
-    const preis = preisAbfrage.rows[0].preise?.[gruppe];
-
-    if (typeof preis === 'number' &&
-        Number.isFinite(preis) && preis >= 0) {
-      gesamtpreis = preis;
-    }
-  }
-}
+      const preisAbfrage = await pool.query(
+        `SELECT preise FROM brilon_angebote
+         WHERE name = $1 AND aktiv = true
+         LIMIT 1`,[angebot]
+      );
+      if(preisAbfrage.rows.length){
+        const preisCent=preisFuerTeilnehmer(preisAbfrage.rows[0].preise,teilnehmer);
+        if(preisCent!==null)gesamtpreis=preisCent/100;
+      }
       const data={
        name,vorname,nachname,email,datum,angebot,teilnehmer,
 gesamtpreis,
@@ -341,6 +361,107 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       return reply(res,200,q.rows);
     }
 
+    if(route==='/api/gps/start'&&req.method==='POST'){
+      if(!pool)return reply(res,503,{error:'Spiel derzeit nicht verfügbar.'});
+      if(!limit('gps-start:'+ip,30,600000))return reply(res,429,{error:'Bitte kurz warten.'});
+      const d=await body(req),token=safeText(d.token,120);
+      if(token.length<32)return reply(res,401,{error:'Ungültiger Spielzugang.'});
+      const q=await pool.query(
+        `SELECT g.id,g.station_index,g.gestartet_am,g.abgeschlossen_am,g.spielzeit_sekunden,
+                t.data AS tour
+         FROM brilon_gps_spiele g
+         JOIN brilon_gps_touren t ON t.id=g.tour_id
+         JOIN brilon_buchungen b ON b.id=g.buchung_id
+         WHERE g.token_hash=$1 AND t.aktiv=true AND t.data->>'buchbar'='true'
+           AND b.status='bestaetigt'`,[gpsTokenHash(token)]
+      );
+      if(!q.rowCount)return reply(res,404,{error:'Spielzugang nicht gefunden oder nicht freigegeben.'});
+      const game=q.rows[0];
+      if(game.abgeschlossen_am)return reply(res,200,{abgeschlossen:true,spielzeitSekunden:game.spielzeit_sekunden});
+      if(!game.gestartet_am){
+        const gestartet=await pool.query(
+          'UPDATE brilon_gps_spiele SET gestartet_am=NOW() WHERE id=$1 AND gestartet_am IS NULL RETURNING gestartet_am',[game.id]
+        );
+        game.gestartet_am=gestartet.rows[0]?.gestartet_am||new Date();
+      }
+      return reply(res,200,{tour:game.tour.titel,...stationFuerSpiel(game.tour,game.station_index)});
+    }
+
+    if(route==='/api/gps/pruefen'&&req.method==='POST'){
+      if(!pool)return reply(res,503,{error:'Spiel derzeit nicht verfügbar.'});
+      const d=await body(req),token=safeText(d.token,120);
+      if(token.length<32||!limit('gps-answer:'+gpsTokenHash(token),20,600000))
+        return reply(res,429,{error:'Zu viele Versuche oder ungültiger Zugang.'});
+      const client=await pool.connect();
+      let ergebnis;
+      try{
+        await client.query('BEGIN');
+        const q=await client.query(
+          `SELECT g.id,g.station_index,g.gestartet_am,g.abgeschlossen_am,t.data AS tour
+           FROM brilon_gps_spiele g JOIN brilon_gps_touren t ON t.id=g.tour_id
+           JOIN brilon_buchungen b ON b.id=g.buchung_id
+           WHERE g.token_hash=$1 AND t.aktiv=true AND b.status='bestaetigt' FOR UPDATE OF g`,
+          [gpsTokenHash(token)]
+        );
+        if(!q.rowCount){ergebnis={ungueltig:true};await client.query('ROLLBACK');}
+        else{
+          const game=q.rows[0];
+          if(!game.gestartet_am||game.abgeschlossen_am){ergebnis={ungueltig:true};await client.query('ROLLBACK');}
+          else{
+            const check=stationPruefen(game.tour,{stationIndex:game.station_index,abgeschlossen:false},
+              {qrId:d.qrId,kontrollcode:d.kontrollcode,antwort:d.antwort},process.env.GPS_CODE_SECRET);
+            if(!check.korrekt){ergebnis={falsch:true,grund:check.grund};await client.query('ROLLBACK');}
+            else{
+              const abgeschlossen=check.spiel.abgeschlossen;
+              const dauer=abgeschlossen?gpsSpieldauer(new Date(game.gestartet_am).getTime(),Date.now()):null;
+              await client.query(
+                `UPDATE brilon_gps_spiele SET station_index=$1,
+                 abgeschlossen_am=CASE WHEN $2 THEN NOW() ELSE NULL END,
+                 spielzeit_sekunden=CASE WHEN $2 THEN $3 ELSE NULL END WHERE id=$4`,
+                [check.spiel.stationIndex,abgeschlossen,dauer,game.id]
+              );
+              ergebnis={korrekt:true,abgeschlossen,spielzeitSekunden:dauer,
+                naechsteStation:check.naechsteStation};
+              await client.query('COMMIT');
+            }
+          }
+        }
+      }catch(error){try{await client.query('ROLLBACK')}catch{};throw error;}
+      finally{client.release();}
+      if(ergebnis.ungueltig)return reply(res,404,{error:'Spielzugang nicht aktiv.'});
+      if(ergebnis.falsch)return reply(res,422,{error:'QR-Code, Kontrollcode oder Antwort stimmen nicht.'});
+      return reply(res,200,ergebnis);
+    }
+
+    if(route==='/api/gps/abschluss'&&req.method==='POST'){
+      if(!pool)return reply(res,503,{error:'Gästeliste derzeit nicht verfügbar.'});
+      const d=await body(req),token=safeText(d.token,120),einwilligung=d.einwilligung===true;
+      if(token.length<32||!limit('gps-guest:'+ip,12,600000))return reply(res,429,{error:'Bitte kurz warten.'});
+      const name=einwilligung?safeText(d.name,80):null;
+      if(einwilligung&&!name)return reply(res,400,{error:'Bitte einen Namen eingeben oder nicht zustimmen.'});
+      const q=await pool.query(
+        `UPDATE brilon_gps_spiele SET gast_name=$1,gast_einwilligung=$2
+         WHERE token_hash=$3 AND abgeschlossen_am IS NOT NULL RETURNING id`,
+        [name,einwilligung,gpsTokenHash(token)]
+      );
+      if(!q.rowCount)return reply(res,404,{error:'Spiel nicht abgeschlossen oder Zugang ungültig.'});
+      return reply(res,200,{success:true,oeffentlich:einwilligung});
+    }
+
+    if(route==='/api/gps/gaesteliste'&&req.method==='GET'){
+      if(!pool)return reply(res,200,[]);
+      const tourId=safeText(u.searchParams.get('tour'),36);
+      if(!/^[0-9a-f-]{36}$/i.test(tourId))return reply(res,400,{error:'Tour-ID ungültig.'});
+      const q=await pool.query(
+        `SELECT g.gast_name AS name,to_char(g.abgeschlossen_am,'YYYY-MM-DD') AS datum,
+                g.spielzeit_sekunden AS dauer_sekunden
+         FROM brilon_gps_spiele g WHERE g.tour_id=$1 AND g.gast_einwilligung=true
+           AND g.gast_name IS NOT NULL AND g.abgeschlossen_am IS NOT NULL
+         ORDER BY g.abgeschlossen_am DESC LIMIT 200`,[tourId]
+      );
+      return reply(res,200,q.rows);
+    }
+
     if(route==='/api/admin/login'&&req.method==='POST'){
       if(!limit('login:'+ip,6))
         return reply(res,429,{error:'Zu viele Versuche.'});
@@ -412,7 +533,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         );
         if(!q.rowCount)return {fehlt:true};
         const data=q.rows[0].data;
-        if(!Number.isFinite(Number(data.gesamtpreis))||Number(data.gesamtpreis)<0)
+        if(typeof data.gesamtpreis!=='number'||!Number.isFinite(data.gesamtpreis)||data.gesamtpreis<0)
           return {keinPreis:true};
         const zahlungen=Array.isArray(data.zahlungen)?data.zahlungen:[];
         const gesamtCent=Math.round(Number(data.gesamtpreis)*100);
@@ -800,6 +921,85 @@ preis=safeText(d.preis,50);
     if(route.startsWith('/api/admin/')){
       if(!admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+
+      if(route==='/api/admin/gps/touren'&&req.method==='GET'){
+        const q=await pool.query('SELECT id,data,aktiv,erstellt_am,aktualisiert_am FROM brilon_gps_touren ORDER BY erstellt_am DESC');
+        return reply(res,200,q.rows.map(r=>({id:r.id,...gpsTourAdminAnsicht(r.data),aktiv:r.aktiv,
+          erstelltAm:r.erstellt_am,aktualisiertAm:r.aktualisiert_am})));
+      }
+
+      if(route==='/api/admin/gps/touren'&&req.method==='POST'){
+        const d=await body(req);
+        let data;
+        try{data=gpsTourSpeichern(d);}catch(error){return reply(res,400,{error:error.message});}
+        const id=crypto.randomUUID(),aktiv=d.aktiv===true&&data.buchbar;
+        const client=await pool.connect();
+        try{
+          await client.query('BEGIN');
+          const offer=await client.query(
+            `INSERT INTO brilon_angebote(name,beschreibung,dauer,preise,aktiv)
+             VALUES($1,$2,$3,$4::jsonb,$5) RETURNING id`,
+            [data.angebotName,data.beschreibung,data.dauer,
+              JSON.stringify({'5-10':data.preis,'11-15':data.preis,'16-20':data.preis}),aktiv]
+          );
+          await client.query('INSERT INTO brilon_gps_touren(id,angebot_id,data,aktiv) VALUES($1,$2,$3::jsonb,$4)',
+            [id,offer.rows[0].id,JSON.stringify(data),aktiv]);
+          await client.query('COMMIT');
+        }catch(error){try{await client.query('ROLLBACK')}catch{};throw error;}
+        finally{client.release();}
+        return reply(res,201,{id,aktiv,angebotName:data.angebotName});
+      }
+
+      const tourRoute=route.match(/^\/api\/admin\/gps\/touren\/([0-9a-fA-F-]{36})$/);
+      if(tourRoute&&req.method==='PATCH'){
+        const d=await body(req);
+        if(typeof d.aktiv==='boolean'&&d.stationen===undefined){
+          const status=await pool.query(
+            'UPDATE brilon_gps_touren SET aktiv=$1,aktualisiert_am=NOW() WHERE id=$2 RETURNING id,aktiv',
+            [d.aktiv,tourRoute[1]]
+          );
+          if(!status.rowCount)return reply(res,404,{error:'GPS-Tour nicht gefunden.'});
+          const offerId=await pool.query('SELECT angebot_id,data FROM brilon_gps_touren WHERE id=$1',[tourRoute[1]]);
+          if(offerId.rows[0].angebot_id)await pool.query('UPDATE brilon_angebote SET aktiv=$1 WHERE id=$2',
+            [d.aktiv&&offerId.rows[0].data.buchbar,offerId.rows[0].angebot_id]);
+          return reply(res,200,status.rows[0]);
+        }
+        const aktuell=await pool.query('SELECT data,angebot_id FROM brilon_gps_touren WHERE id=$1',[tourRoute[1]]);
+        if(!aktuell.rowCount)return reply(res,404,{error:'GPS-Tour nicht gefunden.'});
+        let data;
+        try{data=gpsTourSpeichern(d);}catch(error){return reply(res,400,{error:error.message});}
+        const aktiv=typeof d.aktiv==='boolean'?d.aktiv:null;
+        const q=await pool.query(
+          'UPDATE brilon_gps_touren SET data=$1::jsonb,aktiv=COALESCE($2,aktiv),aktualisiert_am=NOW() WHERE id=$3 RETURNING id,aktiv',
+          [JSON.stringify(data),aktiv===true&&!data.buchbar?false:aktiv,tourRoute[1]]
+        );
+        if(aktuell.rows[0].angebot_id)await pool.query(
+          `UPDATE brilon_angebote SET name=$1,beschreibung=$2,dauer=$3,preise=$4::jsonb,aktiv=$5 WHERE id=$6`,
+          [data.angebotName,data.beschreibung,data.dauer,
+            JSON.stringify({'5-10':data.preis,'11-15':data.preis,'16-20':data.preis}),
+            q.rows[0].aktiv&&data.buchbar,aktuell.rows[0].angebot_id]
+        );
+        return reply(res,200,{id:q.rows[0].id,aktiv:q.rows[0].aktiv});
+      }
+
+      if(route==='/api/admin/gps/spiele'&&req.method==='POST'){
+        const d=await body(req),tourId=safeText(d.tourId,36),buchungId=safeText(d.buchungId,36);
+        if(!/^[0-9a-f-]{36}$/i.test(tourId)||!/^[0-9a-f-]{36}$/i.test(buchungId))
+          return reply(res,400,{error:'Tour und bestätigte Buchung auswählen.'});
+        const zulassung=await pool.query(
+          `SELECT t.id FROM brilon_gps_touren t JOIN brilon_buchungen b ON b.id=$2
+           WHERE t.id=$1 AND t.aktiv=true AND t.data->>'buchbar'='true'
+             AND b.status='bestaetigt' AND b.data->>'angebot'=t.data->>'angebotName'`,
+          [tourId,buchungId]
+        );
+        if(!zulassung.rowCount)return reply(res,409,{error:'Tour oder Buchung ist nicht freigegeben.'});
+        const token=crypto.randomBytes(32).toString('base64url'),id=crypto.randomUUID();
+        await pool.query(
+          'INSERT INTO brilon_gps_spiele(id,token_hash,tour_id,buchung_id) VALUES($1,$2,$3,$4)',
+          [id,gpsTokenHash(token),tourId,buchungId]
+        );
+        return reply(res,201,{id,zugangslink:`/gps.html?zugang=${encodeURIComponent(token)}`});
+      }
 
       // Lesende Uebersicht: angrenzende bestaetigte Buchungen am selben Tag.
       // Keine automatische Rabattberechtigung und keine Preisveraenderung.
@@ -1305,6 +1505,32 @@ await pool.query(`
     created_at TIMESTAMPTZ DEFAULT NOW()
   )
 `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS brilon_gps_touren (
+        id UUID PRIMARY KEY,
+        angebot_id BIGINT REFERENCES brilon_angebote(id),
+        data JSONB NOT NULL,
+        aktiv BOOLEAN NOT NULL DEFAULT false,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query('ALTER TABLE brilon_gps_touren ADD COLUMN IF NOT EXISTS angebot_id BIGINT REFERENCES brilon_angebote(id)');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS brilon_gps_spiele (
+        id UUID PRIMARY KEY,
+        token_hash TEXT NOT NULL UNIQUE,
+        tour_id UUID NOT NULL REFERENCES brilon_gps_touren(id),
+        buchung_id UUID NOT NULL REFERENCES brilon_buchungen(id),
+        station_index INTEGER NOT NULL DEFAULT 0,
+        gestartet_am TIMESTAMPTZ,
+        abgeschlossen_am TIMESTAMPTZ,
+        spielzeit_sekunden INTEGER,
+        gast_name TEXT,
+        gast_einwilligung BOOLEAN NOT NULL DEFAULT false,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }
