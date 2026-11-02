@@ -74,7 +74,7 @@
       const blocked=!!station.gesperrt_am;
       panel.append(elt('strong',station.name),
         elt('p',!station.aktiv?'STATION DEAKTIVIERT – NICHT BENUTZEN':
-          blocked?'GESPERRT – NICHT BENUTZEN':'Aktiv und nicht gesperrt'));
+          blocked?'GESPERRT – NICHT BENUTZEN':'Nicht gesperrt – Station aktiv'));
       if(blocked){
         panel.append(elt('p','Grund: '+(station.sperrgrund||'Nicht angegeben')));
         const button=elt('button','Nach fachlicher Prüfung freigeben');
