@@ -585,9 +585,35 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await secondKiosk()).status,401);
   assert.equal((await extraPost('/api/pruefung/code-anfordern',{})).status,409,
     'Nicht ausgewählte andere Tablets dürfen die Codeanforderung nicht ermöglichen');
-  const tabletRevocation=await fetch(root+'/api/admin/pruefung/tablets/'+tabletId+'/sperren',{method:'PATCH',
-    headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
-  assert.equal(tabletRevocation.status,200);
-  assert.equal((await kiosk()).status,401);
-  assert.equal((await tabletList()).find(x=>x.id===tabletId).online,false);
+  // Admin initiates replacement of the remaining tablet. Old access is
+  // immediately revoked; a short-lived code is issued atomically.
+  const replacementPath='/api/admin/pruefung/tablets/'+tabletId+'/ersetzen';
+  assert.equal((await fetch(root+replacementPath,{method:'POST'})).status,401);
+  assert.equal((await fetch(root+replacementPath,{method:'POST',
+    headers:{Origin:root,Cookie:cookie,'Content-Type':'application/json'},
+    body:JSON.stringify({wechselBestaetigt:true})})).status,403);
+  assert.equal((await adminPost(replacementPath,{wechselBestaetigt:false})).status,400);
+  const replacement=await adminPost(replacementPath,{wechselBestaetigt:true});
+  assert.equal(replacement.status,201);
+  const replacementCode=(await replacement.json()).code;
+  assert.match(replacementCode,/^\d{8}$/);
+  assert.equal((await kiosk()).status,401,'Bisheriges Tablet ist nach Gerätewechsel abgemeldet.');
+  assert.equal((await tabletList()).find(x=>x.id===tabletId).aktiv,false);
+  assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,0);
+  assert.equal((await adminPost(replacementPath,{wechselBestaetigt:true})).status,409,
+    'Ein bereits gesperrtes Gerät darf nicht erneut ausgetauscht werden');
+  const replacePair=await fetch(root+'/api/pruefung/tablet/koppeln',{
+    method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({code:replacementCode,name:'Neues Kletterhallen-Tablet'})});
+  assert.equal(replacePair.status,201);
+  const replacementCookie=replacePair.headers.get('set-cookie').split(';')[0];
+  const replacementKiosk=()=>fetch(root+tabletPath,{headers:{Cookie:replacementCookie}});
+  assert.equal((await fetch(root+'/api/pruefung/tablet/koppeln',{
+    method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({code:replacementCode,name:'Nicht zulässiges Zweitgerät'})})).status,409);
+  const newKioskData=await (await replacementKiosk()).json();
+  assert.equal(newKioskData.code,null);
+  assert.equal(newKioskData.pruefdisplay,false,
+    'Ersatzgerät benötigt eine bewusste neue Admin-Auswahl als Prüfdisplay');
+  assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,0);
 });
