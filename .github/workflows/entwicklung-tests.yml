@@ -47,4 +47,6 @@ jobs:
       - name: Abhängigkeiten ohne Installationsskripte installieren
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Alle Tests einschließlich isolierter PostgreSQL-Integration
+        env:
+          NODE_OPTIONS: --require=./test-support/mocks/force-mock-modules.js
         run: npm test
