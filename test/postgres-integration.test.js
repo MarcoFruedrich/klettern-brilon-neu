@@ -462,4 +462,36 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await adminPost(mailUrl+'/'+receipt.id+'/erneut-senden',
     {doppelversandGeprueft:true})).status,409,
     'Ein ungeklärter Versandzustand darf nicht blind erneut gesendet werden');
+
+
+  const tabletPath='/api/pruefung/tablet/anzeige';
+  assert.equal((await fetch(root+tabletPath)).status,401);
+  assert.equal((await userPost('/api/pruefung/code-anfordern',{})).status,409);
+  const pairing=await adminPost('/api/admin/pruefung/tablet/kopplung',{});
+  assert.equal(pairing.status,201);
+  const pairingCode=(await pairing.json()).code;
+  assert.match(pairingCode,/^\\d{8}$/);
+  const connect=code=>fetch(root+'/api/pruefung/tablet/koppeln',{
+    method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({code,name:'Test-Werbetablet'})});
+  const paired=await connect(pairingCode);
+  assert.equal(paired.status,201);
+  const kioskCookie=paired.headers.get('set-cookie').split(';')[0];
+  assert.equal((await connect(pairingCode)).status,409);
+  const kiosk=()=>fetch(root+tabletPath,{headers:{Cookie:kioskCookie}});
+  const requested=await userPost('/api/pruefung/code-anfordern',{});
+  assert.equal(requested.status,201);
+  const shown=await (await kiosk()).json();
+  assert.match(shown.code,/^\\d{6}$/);
+  const crypt=await pool.query('SELECT code_verschluesselt FROM brilon_pruef_codes WHERE verbraucht_am IS NULL ORDER BY ablauf DESC LIMIT 1');
+  assert.ok(crypt.rows[0].code_verschluesselt);
+  assert.ok(!crypt.rows[0].code_verschluesselt.includes(shown.code));
+  assert.equal((await userPost('/api/pruefung/freischalten',{code:shown.code})).status,200);
+  assert.equal((await (await kiosk()).json()).code,null);
+  const devices=await (await fetch(root+'/api/admin/pruefung/tablets',{headers:{Cookie:cookie}})).json();
+  const id=devices.find(x=>x.name==='Test-Werbetablet').id;
+  const revoke=await fetch(root+'/api/admin/pruefung/tablets/'+id+'/sperren',{method:'PATCH',
+    headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
+  assert.equal(revoke.status,200);
+  assert.equal((await kiosk()).status,401);
 });
