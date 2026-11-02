@@ -265,6 +265,7 @@
   find('pruef-report-refresh')?.addEventListener('click',refresh);
   find('pruef-hinweis-refresh')?.addEventListener('click',refresh);
   find('pruef-mail-refresh')?.addEventListener('click',refresh);
+  find('tablet-admin-refresh')?.addEventListener('click',refresh);
   // The admin workspace is revealed by the existing login flow.
   const observer=new MutationObserver(()=>{
     if(!find('workspace')?.hidden && !initialized){initialized=true;refresh();}
