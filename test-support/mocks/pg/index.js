@@ -8,6 +8,8 @@ class Pool {
     this.guests = JSON.parse(process.env.MOCK_GUESTBOOK || '[]');
     this.calendar = JSON.parse(process.env.MOCK_CALENDAR || '[]');
     this.places = JSON.parse(process.env.MOCK_PLACES || '[]');
+    this.gpsTours = JSON.parse(process.env.MOCK_GPS_TOURS || '[]');
+    this.nextOfferId = this.offers.reduce((next,offer)=>Math.max(next,Number(offer.id)||0),0)+1;
     this.adminSessions = new Map();
     this.adminTotpSteps = new Map();
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
@@ -24,6 +26,47 @@ class Pool {
       throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
     if (process.env.MOCK_ADMIN_TOTP_FAIL==='1'&&sql.includes('brilon_admin_totp_steps'))
       throw new Error('Test-double: TOTP-Zählertabelle fehlt');
+    if(sql.includes('INSERT INTO brilon_angebote(name,beschreibung,dauer,preise,aktiv)')){
+      const [name,beschreibung,dauer,rawPrices,aktiv]=params;
+      const offer={id:this.nextOfferId++,name,beschreibung,dauer,preise:JSON.parse(rawPrices),aktiv};
+      this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
+    }
+    if(sql.includes('INSERT INTO brilon_gps_touren(id,angebot_id,data,aktiv)')){
+      const [id,angebot_id,raw,aktiv]=params;
+      const tour={id,angebot_id,data:JSON.parse(raw),aktiv,erstellt_am:new Date().toISOString(),aktualisiert_am:null};
+      this.gpsTours.push(tour);return {rows:[],rowCount:1};
+    }
+    if(sql.includes('FROM brilon_gps_touren')&&sql.includes('ORDER BY erstellt_am DESC'))
+      return {rows:[...this.gpsTours].reverse(),rowCount:this.gpsTours.length};
+    if(sql.includes('UPDATE brilon_gps_touren SET aktiv=$1,aktualisiert_am=NOW()')){
+      const [aktiv,id]=params,tour=this.gpsTours.find(item=>item.id===id);
+      if(!tour)return {rows:[],rowCount:0};
+      tour.aktiv=aktiv;tour.aktualisiert_am=new Date().toISOString();
+      return {rows:[{id,aktiv}],rowCount:1};
+    }
+    if(sql.includes('SELECT angebot_id,data FROM brilon_gps_touren WHERE id=$1')){
+      const tour=this.gpsTours.find(item=>item.id===params[0]);
+      return {rows:tour?[{angebot_id:tour.angebot_id,data:tour.data}]:[],rowCount:tour?1:0};
+    }
+    if(sql.includes('SELECT data,angebot_id FROM brilon_gps_touren WHERE id=$1')){
+      const tour=this.gpsTours.find(item=>item.id===params[0]);
+      return {rows:tour?[{data:tour.data,angebot_id:tour.angebot_id}]:[],rowCount:tour?1:0};
+    }
+    if(sql.includes('UPDATE brilon_gps_touren SET data=$1::jsonb,aktiv=COALESCE($2,aktiv)')){
+      const [raw,aktiv,id]=params,tour=this.gpsTours.find(item=>item.id===id);
+      if(!tour)return {rows:[],rowCount:0};
+      tour.data=JSON.parse(raw);if(aktiv!==null)tour.aktiv=aktiv;tour.aktualisiert_am=new Date().toISOString();
+      return {rows:[{id,aktiv:tour.aktiv}],rowCount:1};
+    }
+    if(sql.includes('UPDATE brilon_angebote SET name=$1,beschreibung=$2,dauer=$3,preise=$4::jsonb,aktiv=$5 WHERE id=$6')){
+      const [name,beschreibung,dauer,rawPrices,aktiv,id]=params,offer=this.offers.find(item=>String(item.id)===String(id));
+      if(!offer)return {rows:[],rowCount:0};
+      Object.assign(offer,{name,beschreibung,dauer,preise:JSON.parse(rawPrices),aktiv});return {rows:[],rowCount:1};
+    }
+    if(sql.includes('UPDATE brilon_angebote SET aktiv=$1 WHERE id=$2')){
+      const [aktiv,id]=params,offer=this.offers.find(item=>String(item.id)===String(id));
+      if(!offer)return {rows:[],rowCount:0};offer.aktiv=aktiv;return {rows:[],rowCount:1};
+    }
     if(sql.includes('INSERT INTO brilon_admin_totp_steps')){
       const [factorId,step]=params,previous=this.adminTotpSteps.get(factorId);
       if(previous!==undefined&&previous>=Number(step))return {rows:[],rowCount:0};

@@ -41,6 +41,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Admin-Logins sind zusätzlich auf sechs Versuche je IP und 30 je Konto innerhalb von zehn Minuten begrenzt; der Konto-Schlüssel wird nur gehasht im Rate-Limit-Speicher geführt.
 - Ein lokaler HTTP-Test prüft Admin-Anmeldung, Cookie-Flags, geschützte Lesezugriffe und erlaubte/abgewiesene Schreibanfragen mit Datenbank-/Supabase-Stubs; er versendet keine E-Mails.
 - Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, mehrtägige Sperrzeiten, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Der Verfügbarkeits-Endpunkt prüft belegte Zeitfenster einschließlich direkt anschließender freier Startzeiten; beide Randtage einer Sperrzeit bleiben gesperrt. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
+- Ein separater GPS-HTTP-Test prüft den Adminschutz, Anlegen und Bearbeiten von Touren, Codeerhalt bei unveränderter Station, erforderliche Codeerneuerung bei QR-Wechsel, sichere Antworten ohne Kontrollcode/Hash und Deaktivierung; alle Datenbankzugriffe laufen über ein isoliertes Test-Double.
 - Der öffentliche Kalender verwendet dieselbe inklusive Datumsbereichslogik für Sperrzeitanzeige und manuelle Datumseingabe. Gesperrte Tage deaktivieren die Uhrzeitauswahl; Änderungen am nativen Datumsfeld laden die belegten Zeiten neu.
 - Der Brevo-Versand ist in eine injizierbare Mailer-Funktion ausgelagert. Vier Tests prüfen Empfänger, Nachrichtentext, Absender, fehlende Konfiguration und Fehlerantworten ausschließlich mit einem Fetch-Test-Double; dabei erfolgt kein externer Aufruf.
 - Der HTTP-End-to-End-Test fängt Buchungseingang, Anzahlung-Bestätigung und Stornierung über einen lokalen IPC-Mail-Test-Double ab. Er prüft Kunden- und Betreiberpostfach sowie Referenz, Gesamtpreis, 25-%-Anzahlung und Restbetrag; ausgehender Netzwerkverkehr ist in diesem Test blockiert.
@@ -74,7 +75,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 63 bestanden, 0 fehlgeschlagen.
+- `npm test` – 64 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
