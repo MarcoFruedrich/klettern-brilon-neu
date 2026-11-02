@@ -13,6 +13,14 @@
 
 **Wichtige Sicherheitsregel:** Bei einem Mangel ist die betroffene Station **nicht zu verwenden**, bis eine fachlich verantwortliche Person ihre Sicherheit geprüft und die Nutzung ausdrücklich freigegeben hat. Eine elektronische Dokumentation ist keine automatische Betriebsfreigabe.
 
+## Automatische Stationssperrung und fachliche Freigabe
+
+Jede als **Mangel** gespeicherte Stationsprüfung sperrt die betroffene Station automatisch in der Datenbank und dokumentiert ein Ereignis mit Bericht, Prüfperson und Beschreibung. Die Sperrung bleibt bestehen, auch wenn ein späterer Prüfbericht für dieselbe Station „in Ordnung“ vermerkt.
+
+Die Verwaltung zeigt gesperrte Stationen deutlich an. Erst nachdem eine fachkundige Person die Station vor Ort nachgeprüft und erforderliche Mängel behoben hat, darf eine autorisierte Verwaltungsperson die Schaltfläche „Nach fachlicher Prüfung freigeben“ verwenden. Die Verwaltung verlangt dabei den Namen der prüfenden Person, eine konkrete Dokumentation der Nachkontrolle und eine abschließende Bestätigung. Die Freigabe wird in einem dauerhaft nachvollziehbaren Ereignisverlauf protokolliert.
+
+**Wichtig:** Die digitale Freigabe ist eine dokumentierte Verwaltungsentscheidung; sie führt selbst keine technische Kontrolle durch. Auch nach Freigabe ist vor einem neuen Programm eine eigenständige vollständige Vorabprüfung erforderlich. Eine gemeldete gesperrte Station darf nicht in Betrieb genommen werden.
+
 ## Mängelbenachrichtigung
 
 Eine Mängel-E-Mail wird nur verschickt, wenn `PRUEF_MANGEL_EMAIL` und die Mailanbindung gültig eingerichtet sind. Der Server bestätigt gesondert den tatsächlichen Versandstatus. Falls nicht konfiguriert oder gescheitert, muss die Fachkraft die verantwortliche Person direkt informieren. Ein verlässlicher Wiederholungsversand fehlt noch.
@@ -23,9 +31,9 @@ Eine Mängel-E-Mail wird nur verschickt, wenn `PRUEF_MANGEL_EMAIL` und die Maila
 - Ein eingegebener Vor-Ort-Code beweist die physische Anwesenheit nicht unabhängig. Er dient der zusätzlichen Hürde.
 - Fotos sind im privaten Bericht gespeichert; eine gesonderte Aufbewahrungsfrist, Ersetzungs-/Löschregelung, Bildinhaltsprüfung und vollständige Datenschutzinformation fehlen.
 - Die Auswahl der verwendeten Stationen liegt bei der prüfenden Fachkraft. Das System kann nicht selbst erkennen, ob eine Station ausgelassen wurde.
-- Es gibt noch keinen automatischen Workflow für Mängelbeseitigung, Nachkontrolle und fachliche Wiederfreigabe.
+- Die automatische Sperrung und eine dokumentierte administrative Freigabe sind umgesetzt. Es gibt noch keine unabhängige digitale Verifikation der fachlichen Nachkontrolle, keine verpflichtende gesonderte Abnahme durch einen qualifizierten Prüfer und keine automatisierte Auftragsverfolgung der Mängelbeseitigung.
 - Mitarbeitersitzungen sind vier Stunden gültig. Der Vor-Ort-Code ist einmalig, die Berichtsfreigabe läuft spätestens nach 15 Minuten ab.
-- Neue Prüftabellen dürfen nur nach Schema-Review und ausdrücklicher Freigabe migriert werden. **Keine produktive Migration**.
+- Neue Prüftabellen sowie die Spalten `gesperrt_am`/`sperrgrund` und die neue Tabelle `brilon_pruef_stationsereignisse` dürfen nur nach Schema-Review und ausdrücklicher Freigabe migriert werden. **Keine produktive Migration**.
 
 ## Testumfang
 
