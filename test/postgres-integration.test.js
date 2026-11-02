@@ -489,9 +489,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await userPost('/api/pruefung/freischalten',{code:shown.code})).status,200);
   assert.equal((await (await kiosk()).json()).code,null);
   const devices=await (await fetch(root+'/api/admin/pruefung/tablets',{headers:{Cookie:cookie}})).json();
-  const id=devices.find(x=>x.name==='Test-Werbetablet').id;
-  const revoke=await fetch(root+'/api/admin/pruefung/tablets/'+id+'/sperren',{method:'PATCH',
+  const tabletId=devices.find(x=>x.name==='Test-Werbetablet').id;
+  const tabletRevocation=await fetch(root+'/api/admin/pruefung/tablets/'+tabletId+'/sperren',{method:'PATCH',
     headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
-  assert.equal(revoke.status,200);
+  assert.equal(tabletRevocation.status,200);
   assert.equal((await kiosk()).status,401);
 });
