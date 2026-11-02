@@ -255,8 +255,10 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const stations=await fetch(root+'/api/pruefung/stationen',{headers:{Cookie:staffCookie}});
   assert.equal(stations.status,200);
   assert.equal((await stations.json()).stationen.some(p=>p.id===stationId),true);
+  const fotoBytes=Buffer.concat([Buffer.from([255,216,255]),Buffer.alloc(95,0),Buffer.from([255,217])]);
+  const foto='data:image/jpeg;base64,'+fotoBytes.toString('base64');
   const input={programm:'Klettern Klasse CI',beginn:day1+'T10:00',
-    pruefungen:[{stationId,zustand:'mangel',
+    pruefungen:[{stationId,zustand:'mangel',foto,
       beschreibung:'Karabiner lässt sich nicht ordnungsgemäß schließen'}]};
   assert.equal((await userPost('/api/pruefung/berichte',input)).status,403,
     'Ohne Vor-Ort-Code darf kein Prüfprotokoll gespeichert werden');
@@ -282,4 +284,15 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(report.pruefer,staffData.name);
   assert.equal(report.pruefungen[0].zustand,'mangel');
   assert.equal(report.hat_mangel,true);
+  assert.equal(report.pruefungen[0].hatFoto,true);
+  assert.equal(report.pruefungen[0].foto,undefined,
+    'Der Admin-Berichtsüberblick enthält keine Rohbilddaten');
+  const imageUrl=root+'/api/admin/pruefung/berichte/'+receipt.id+'/foto/'+stationId;
+  const imageDenied=await fetch(imageUrl);
+  assert.equal(imageDenied.status,401,'Stationsfotos dürfen nur von angemeldeten Administratoren gelesen werden');
+  const image=await fetch(imageUrl,{headers:{Cookie:cookie}});
+  assert.equal(image.status,200);
+  assert.match(image.headers.get('content-type'),/image\/jpeg/);
+  assert.match(image.headers.get('content-disposition'),/attachment/);
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()),fotoBytes);
 });
