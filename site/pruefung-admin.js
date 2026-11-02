@@ -42,8 +42,17 @@
       const article=elt('article');article.className='booking';
       article.append(elt('strong',report.programm+' · '+report.beginn),
         elt('p','Prüfer: '+report.pruefer+' · Ergebnis: '+(report.hat_mangel?'MANGEL – nicht freigegeben':'Kein Mangel gemeldet')));
-      for(const p of report.pruefungen)article.append(elt('p',
-        (p.station||'Station')+': '+(p.zustand==='ok'?'In Ordnung':'Mangel – '+p.beschreibung)));
+      for(const p of report.pruefungen){
+        article.append(elt('p',
+          (p.station||'Station')+': '+(p.zustand==='ok'?'In Ordnung':'Mangel – '+p.beschreibung)));
+        if(p.hatFoto){
+          const link=elt('a','Fotobeleg herunterladen – '+(p.station||'Station'));
+          link.href='/api/admin/pruefung/berichte/'+encodeURIComponent(report.id)+
+            '/foto/'+encodeURIComponent(p.stationId);
+          link.download='stationsfoto.jpg';
+          article.append(link);
+        }
+      }
       target.append(article);
     }
   }
