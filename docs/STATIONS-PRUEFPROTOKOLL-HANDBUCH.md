@@ -25,6 +25,16 @@
 
 **Festgelegte Zugangssituation:** Das Tablet ist ausschließlich für die Verwaltung physisch erreichbar und bedienbar. Mitarbeitende bedienen das Tablet **nicht**; sie können den kurz angezeigten Code lediglich ablesen. Gäste können Werbung sehen, jedoch keinerlei Eingaben am Tablet vornehmen. Daher ist eine zusätzliche Android-Kiosksperre gegen unbefugte Touch-Bedienung nicht zwingend, sofern die Abschirmung in der Praxis gewährleistet ist. Die Verwaltung übernimmt die Erstkopplung, Betriebssystem-Einstellungen und nötige Gerätesperrungen. Vor echtem Einsatz sollten Befestigung, Sichtbarkeit der Anzeige, WLAN-Ausfall und automatischer Wiederanlauf geprüft werden. Die physische Anwesenheit wird durch den Code nicht unabhängig bewiesen.
 
+## Zuverlässige Werbeanzeige im Dauerbetrieb
+
+- **Angebote:** Alle elf Sekunden wird zum nächsten veröffentlichten Angebot gewechselt. Alle fünf Minuten wird die Liste aktualisiert; Änderungen aus der Verwaltung können so ohne Neustart sichtbar werden. Bei einem kurzzeitigen Serverausfall bleibt die zuvor geladene Werbung erhalten.
+- **Sicherheitscode:** Der Code unterbricht die Werbung nur kurzzeitig und wird lokal zeitlich begrenzt. Bei Codeverbrauch, Ablauf, Netzwerkausfall oder zwischenzeitlichem Wechsel zu einer anderen App wird die Codeanzeige sofort ausgeblendet bzw. vor erneuter Anzeige durch den Server überprüft.
+- **Bildschirm:** Die Webseite versucht über die Browser-Schnittstelle Screen Wake Lock, den Bildschirm während der Anzeige wach zu halten. Das funktioniert nur bei unterstütztem Browser und sicherer HTTPS-Verbindung. Es ersetzt **keine** Android-Einstellung für dauerhaft eingeschalteten Bildschirm beim Laden.
+- **Neustart:** Nach erneutem Öffnen der Webseite beginnt die Werbeanzeige ohne zusätzliche Anmeldung, sofern die widerrufbare Tablet-Kopplung gültig bleibt. Für einen **automatischen Browserstart nach vollständigem Android-Neustart** ist eine gesonderte Konfiguration des Gerätes erforderlich; das kann eine Webseite nicht selbst erzwingen.
+- **Bedienung:** Das Tablet ist gemäß Betriebsvorgabe ausschließlich von der Verwaltung physisch zugänglich. Andere Personen können nur die Anzeige sehen. Ein zusätzlicher Besucherschutz gegen Bedienung wird deshalb nicht vorausgesetzt.
+
+**Vor Ort prüfen:** Gerät dauerhaft laden, Bildschirm-Energiesparverhalten im Android-System kontrollieren, Ausfall der Internetverbindung simulieren, anschließend die Werbeanzeige und die kurze Codeeinblendung mit einem Testmitarbeiter prüfen. Erst danach das Tablet fest montieren bzw. freigeben.
+
 ## Hinweise und kleinere Mängel ohne automatische Sperre
 
 Ein Hinweis eignet sich für **nicht unmittelbar sicherheitsrelevante Auffälligkeiten**, beispielsweise eine verblasste Beschriftung oder einen organisatorischen Verbesserungsbedarf. Hier ist eine Beschreibung mit mindestens zehn Zeichen verpflichtend; ein Foto kann ergänzt werden. Der Hinweis erscheint als **offener Prüfpunkt** in der Verwaltung.
