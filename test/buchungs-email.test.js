@@ -25,9 +25,11 @@ test('Buchungsanfrage berechnet die Preisanteile centgenau, wenn sie nicht gespe
 
 test('Bestätigungsnachricht enthält Referenznummer und tatsächlichen Zahlungsstand',()=>{
   const message=buchungsstatusNachricht('bestaetigt',{buchungsnummer:'MUELLER-MAX-151126'},
-    {erhaltenCent:3013,offenCent:9037});
+    {gesamtCent:12050,anzahlungCent:3013,erhaltenCent:3013,offenCent:9037});
   assert.equal(message.betreff,'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon');
   assert.match(message.text,/Buchungsnummer: MUELLER-MAX-151126/);
+  assert.match(message.text,/Gesamtpreis: 120,50 €/);
+  assert.match(message.text,/Anzahlung \(25 %\): 30,13 €/);
   assert.match(message.text,/Tatsächlich erfasst: 30,13 €/);
   assert.match(message.text,/Noch offen: 90,37 €/);
 });
