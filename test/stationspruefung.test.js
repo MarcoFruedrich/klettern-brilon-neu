@@ -2,7 +2,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
-const {emailGueltig,passwortHash,passwortPruefen,codeHash,programmPruefen}=require('../lib/stationspruefung');
+const {emailGueltig,passwortHash,passwortPruefen,codeHash,programmPruefen,pruefFoto}=require('../lib/stationspruefung');
 
 test('Prüfpersonal: Passwörter werden gesalzen gehasht und konstant verglichen',()=>{
   const hash=passwortHash('Pruefung-Local-Secret-2026!');
@@ -38,4 +38,20 @@ test('Stationsprüfung akzeptiert alle gewählten Stationen nur mit eindeutigen 
   assert.throws(()=>programmPruefen({...fields,beginn:'2026-11-01T15:00'},['a','b'],now),/vergangen/);
   assert.throws(()=>programmPruefen({...fields,beginn:'2026-11-02T10:30'},['a','b'],now),/vergangen/);
   assert.equal(programmPruefen({...fields,pruefungen:[{stationId:'a',zustand:'ok'}]},['a'],now).hatMangel,false);
+});
+
+test('Mängelfoto: nur kleine JPEG-Belege für defekte Stationen',()=>{
+  const fake=Buffer.concat([Buffer.from([255,216,255]),Buffer.alloc(95,0),Buffer.from([255,217])]);
+  const jpeg='data:image/jpeg;base64,'+fake.toString('base64');
+  assert.equal(pruefFoto(jpeg),jpeg);
+  assert.equal(pruefFoto(null),null);
+  assert.throws(()=>pruefFoto('data:image/png;base64,'+fake.toString('base64')),/JPEG/);
+  assert.throws(()=>pruefFoto('data:image/jpeg;base64,'+Buffer.alloc(80001).toString('base64')),/JPEG/);
+  const base={programm:'Test',beginn:'2027-03-15T12:00',pruefungen:[
+    {stationId:'a',zustand:'ok',foto:jpeg}]};
+  assert.equal(programmPruefen(base,['a'],new Date('2026-11-02T11:00:00Z')).pruefungen[0].foto,null,
+    'Fotos zu mängelfreien Stationen werden nicht gespeichert');
+  const broken={...base,pruefungen:[{stationId:'a',zustand:'mangel',
+    beschreibung:'Karabiner am oberen Umlenkpunkt beschädigt',foto:jpeg}]};
+  assert.equal(programmPruefen(broken,['a'],new Date('2026-11-02T11:00:00Z')).pruefungen[0].foto,jpeg);
 });
