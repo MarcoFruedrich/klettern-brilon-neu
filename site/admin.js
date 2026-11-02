@@ -2,9 +2,9 @@
 const login = document.getElementById('login');
 const workspace = document.getElementById('workspace');
 const status = document.getElementById('status');
-let aktuelleZahlungsBuchungen=[];
 let refreshSequenz=0;
 let bookingPage=1;
+let zahlungsPage=1,zahlungsLadeSequenz=0;
 
 async function api(path, options = {}) {
   const r = await fetch(path, {
@@ -33,12 +33,11 @@ function euroCent(cent){
   return (cent/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
 }
 
-function zahlungsuebersichtRendern(buchungen=aktuelleZahlungsBuchungen){
-  aktuelleZahlungsBuchungen=buchungen;
+function zahlungsuebersichtRendern(ergebnis){
   const summary=document.getElementById('payment-overview-summary');
   const list=document.getElementById('payment-overview-list');
-  if(!summary||!list||!window.BuchungsZahlungen)return;
-  const totals=window.BuchungsZahlungen.summiere(buchungen);
+  if(!summary||!list)return;
+  const totals=ergebnis.summen;
   summary.replaceChildren();
   for(const [label,value] of [
     ['Tatsächlich eingegangen',euroCent(totals.eingegangenCent)],
@@ -49,14 +48,16 @@ function zahlungsuebersichtRendern(buchungen=aktuelleZahlungsBuchungen){
     const card=el('article');card.className='booking payment-total';
     card.append(el('small',label),el('strong',value));summary.append(card);
   }
-  const filter=document.getElementById('payment-overview-filter')?.value||'alle';
-  const entries=totals.eintraege.filter(entry=>{
-    if(filter==='offen')return entry.offenCent>0;
-    if(filter==='teilzahlung')return entry.eingegangenCent>0&&entry.offenCent>0;
-    if(filter==='vollstaendig')return entry.gesamtpreisCent!==null&&entry.gesamtpreisCent>0&&entry.eingegangenCent>=entry.gesamtpreisCent;
-    if(filter==='gutschrift')return entry.gutschriftCent>0;
-    return true;
-  });
+  const entries=ergebnis.eintraege;
+  const pages=Math.max(1,Math.ceil(ergebnis.anzahl/ergebnis.proSeite));
+  const pager=document.getElementById('payment-overview-pagination');
+  if(pager)pager.hidden=ergebnis.anzahl<=ergebnis.proSeite;
+  const prev=document.getElementById('payment-overview-prev');
+  const next=document.getElementById('payment-overview-next');
+  const info=document.getElementById('payment-overview-page-info');
+  if(prev)prev.disabled=ergebnis.seite<=1;
+  if(next)next.disabled=ergebnis.seite>=pages;
+  if(info)info.textContent=`Seite ${ergebnis.seite} / ${pages} · ${ergebnis.anzahl} Buchungen`;
   list.replaceChildren();
   if(!entries.length){list.append(el('p','Für diesen Filter gibt es keine Buchungen.'));return;}
   const methoden={ueberweisung:'Überweisung',bar:'Bar',karte:'Karte',sonstiges:'Sonstiges'};
@@ -80,6 +81,21 @@ function zahlungsuebersichtRendern(buchungen=aktuelleZahlungsBuchungen){
   }
 }
 
+async function zahlungsuebersichtLaden(){
+  const sequenz=++zahlungsLadeSequenz;
+  const filter=document.getElementById('payment-overview-filter')?.value||'alle';
+  try{
+    const result=await api(`/api/admin/zahlungsuebersicht?seite=${zahlungsPage}&filter=${encodeURIComponent(filter)}`);
+    if(sequenz!==zahlungsLadeSequenz)return;
+    const pages=Math.max(1,Math.ceil(result.anzahl/result.proSeite));
+    if(zahlungsPage>pages){zahlungsPage=pages;return zahlungsuebersichtLaden();}
+    zahlungsuebersichtRendern(result);
+  }catch(error){
+    if(sequenz!==zahlungsLadeSequenz)return;
+    document.getElementById('payment-overview-list')?.replaceChildren(el('p','Zahlungsübersicht konnte nicht geladen werden: '+error.message));
+  }
+}
+
 async function refresh() {
   const aktuelleSequenz=++refreshSequenz;
   try {
@@ -90,7 +106,7 @@ async function refresh() {
     const bookingResult=await api('/api/admin/buchungen?'+query.toString());
     const bookings=bookingResult.buchungen;
     if(aktuelleSequenz!==refreshSequenz)return;
-    zahlungsuebersichtRendern(alleBuchungen);
+    await zahlungsuebersichtLaden();
 
     login.hidden = true;
     workspace.hidden = false;
@@ -635,7 +651,9 @@ document.getElementById('bookings-search')?.addEventListener('input', () => {
 document.getElementById('bookings-status-filter')?.addEventListener('change', () => {bookingPage=1;refresh();});
 document.getElementById('bookings-prev')?.addEventListener('click',()=>{if(bookingPage>1){bookingPage--;refresh();}});
 document.getElementById('bookings-next')?.addEventListener('click',()=>{bookingPage++;refresh();});
-document.getElementById('payment-overview-filter')?.addEventListener('change', () => zahlungsuebersichtRendern());
+document.getElementById('payment-overview-filter')?.addEventListener('change', () => {zahlungsPage=1;zahlungsuebersichtLaden();});
+document.getElementById('payment-overview-prev')?.addEventListener('click',()=>{if(zahlungsPage>1){zahlungsPage--;zahlungsuebersichtLaden();}});
+document.getElementById('payment-overview-next')?.addEventListener('click',()=>{zahlungsPage++;zahlungsuebersichtLaden();});
 
 login.onsubmit = async e => {
   e.preventDefault();

@@ -48,7 +48,7 @@
 
       <section id="payment-overview-section" class="booking admin-anchor">
         <h2>Zahlungsübersicht</h2>
-        <p>Übersicht der erfassten Zahlungseingänge und offenen Beträge für die zuletzt geladenen Buchungen. Gutschriften werden getrennt ausgewiesen; Auszahlungen bleiben manuell zu bearbeiten.</p>
+        <p>Gesamtsummen über alle Buchungen; gefilterte Einträge werden seitenweise angezeigt. Gutschriften werden getrennt ausgewiesen; Auszahlungen bleiben manuell zu bearbeiten.</p>
         <div id="payment-overview-summary" class="admin-grid payment-summary-grid" aria-live="polite"></div>
         <label class="payment-overview-filter">Einträge filtern
           <select id="payment-overview-filter">
@@ -60,6 +60,11 @@
           </select>
         </label>
         <div id="payment-overview-list" class="admin-grid"></div>
+        <nav id="payment-overview-pagination" class="calendar-navigation" aria-label="Zahlungsseiten" hidden>
+          <button type="button" id="payment-overview-prev" class="btn secondary">← Vorherige</button>
+          <span id="payment-overview-page-info" aria-live="polite"></span>
+          <button type="button" id="payment-overview-next" class="btn secondary">Weitere →</button>
+        </nav>
       </section>
 
       <h2 id="bookings-section" class="admin-anchor">Buchungen &amp; Zahlungen</h2>

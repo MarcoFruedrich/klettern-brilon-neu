@@ -21,7 +21,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   ];
   const archivedBookings=Array.from({length:55},(_,i)=>({
     id:`archive-${i+1}`,status:'offen',buchungsnummer:`ARCHIV-${String(i+1).padStart(3,'0')}`,
-    data:{name:`Archiv Gruppe ${i+1}`,email:`archiv${i+1}@example.test`,angebot:'Archivprogramm',datum:'2026-01-01'},
+    data:{name:`Archiv Gruppe ${i+1}`,email:`archiv${i+1}@example.test`,angebot:'Archivprogramm',datum:'2026-01-01',
+      gesamtpreis:100,zahlungen:[{betragCent:1000,erhaltenAm:'2026-01-02T00:00:00Z',methode:'ueberweisung'}]},
     created_at:new Date(i*1000).toISOString()
   }));
   const offerSecret='test-only-booking-offer-secret-32-chars';
@@ -69,6 +70,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(guestbookPrivate.status,401,'Gästelisten-Verwaltung muss geschützt sein');
   const guestDeletePrivate=await fetch(root+`/api/admin/gps/gaesteliste/${guestId}`,{method:'DELETE'});
   assert.equal(guestDeletePrivate.status,401,'Gästelisteneinträge müssen vor unberechtigter Löschung geschützt sein');
+  const paymentPrivate=await fetch(root+'/api/admin/zahlungsuebersicht');
+  assert.equal(paymentPrivate.status,401,'Zahlungsdetails müssen vor unberechtigtem Zugriff geschützt sein');
   const anfrage=(uhrzeit)=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     vorname:'Max',nachname:'Mueller',email:'max@example.test',datum:'2027-03-15',uhrzeit,
     teilnehmer:4,angebot:'Klettern',datenschutz:'on'
@@ -95,6 +98,15 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal((await calendar.json()).length,55,'Kalender lädt alle Buchungen des Monats, auch außerhalb der letzten 250');
   const invalidCalendarMonth=await fetch(root+'/api/admin/kalenderbuchungen?monat=2026-13',{headers:{Cookie:cookie}});
   assert.equal(invalidCalendarMonth.status,400);
+  const paymentPage=await fetch(root+'/api/admin/zahlungsuebersicht?seite=2&filter=teilzahlung',{headers:{Cookie:cookie}});
+  assert.equal(paymentPage.status,200);
+  const paymentResult=await paymentPage.json();
+  assert.equal(paymentResult.anzahl,55);
+  assert.equal(paymentResult.eintraege.length,5);
+  assert.equal(paymentResult.summen.eingegangenCent,55000);
+  assert.equal(paymentResult.summen.offenCent,515000);
+  const invalidPaymentPage=await fetch(root+'/api/admin/zahlungsuebersicht?seite=0',{headers:{Cookie:cookie}});
+  assert.equal(invalidPaymentPage.status,400);
   const adminHeaders={Cookie:cookie,Origin:root,'Content-Type':'application/json'};
   const addPlace=await fetch(root+'/api/admin/orte',{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Sundern'})});
   assert.equal(addPlace.status,201);

@@ -31,8 +31,8 @@ werden.
   Saldo wird aus den Einträgen berechnet. Bei Erreichen der 25-%-Anzahlung wird
   eine offene Buchung automatisch bestätigt; der verbleibende Betrag entspricht
   dem Restbetrag.
-- „Zahlungsübersicht“ zeigt Eingänge, offene Beträge und Gutschriften für die
-  250 zuletzt geladenen Buchungen. Eine
+- „Zahlungsübersicht“ zeigt Gesamtsummen über alle Buchungen und 50 gefilterte
+  Einträge pro Seite. Einzelne Zahlungseingänge lassen sich aufklappen. Eine
   Gutschrift wird nicht automatisch ausgezahlt; Erstattungen müssen kontrolliert
   und separat abgewickelt werden.
 

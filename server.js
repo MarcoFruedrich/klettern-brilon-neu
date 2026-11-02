@@ -10,6 +10,7 @@ const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpssp
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 const { sameOriginMutation } = require('./lib/sicherheit');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter } = require('./lib/sicherheitszustand');
+const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -1202,6 +1203,37 @@ preis=safeText(d.preis,50);
            ORDER BY data->>'datum',data->>'uhrzeit',created_at`,[start,ende]
         );
         return reply(res,200,q.rows);
+      }
+
+      if(route==='/api/admin/zahlungsuebersicht'&&req.method==='GET'){
+        const seiteText=u.searchParams.get('seite')||'1',seite=Number(seiteText),proSeite=50;
+        const filter=safeText(u.searchParams.get('filter'),20)||'alle';
+        const erlaubteFilter=['alle','offen','teilzahlung','vollstaendig','gutschrift'];
+        if(!/^\d+$/.test(seiteText)||!Number.isSafeInteger(seite)||seite<1||seite>100000)
+          return reply(res,400,{error:'Ungültige Zahlungsseite.'});
+        if(!erlaubteFilter.includes(filter))return reply(res,400,{error:'Ungültiger Zahlungsfilter.'});
+        const q=await pool.query(
+          `SELECT id,status,buchungsnummer,
+             jsonb_build_object(
+               'buchungsnummer',data->'buchungsnummer','name',data->'name','angebot',data->'angebot',
+               'datum',data->'datum','gesamtpreis',data->'gesamtpreis','zahlungen',data->'zahlungen',
+               'zahlungsgutschriftCent',data->'zahlungsgutschriftCent'
+             ) AS data
+           FROM brilon_buchungen ORDER BY created_at DESC`
+        );
+        const totals=zahlungenSummieren(q.rows);
+        const gefiltert=totals.eintraege.filter(e=>{
+          if(filter==='offen')return e.offenCent>0;
+          if(filter==='teilzahlung')return e.eingegangenCent>0&&e.offenCent>0;
+          if(filter==='vollstaendig')return e.gesamtpreisCent!==null&&e.gesamtpreisCent>0&&e.eingegangenCent>=e.gesamtpreisCent;
+          if(filter==='gutschrift')return e.gutschriftCent>0;
+          return true;
+        });
+        return reply(res,200,{
+          eintraege:gefiltert.slice((seite-1)*proSeite,seite*proSeite),anzahl:gefiltert.length,
+          seite,proSeite,summen:{eingegangenCent:totals.eingegangenCent,offenCent:totals.offenCent,
+            gutschriftCent:totals.gutschriftCent,zahlungseingaenge:totals.zahlungseingaenge}
+        });
       }
 
       const guestbookEntry=route.match(/^\/api\/admin\/gps\/gaesteliste\/([0-9a-f-]{36})$/i);
