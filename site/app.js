@@ -532,7 +532,7 @@ if (item.preis !== undefined && item.preis !== null && item.preis !== '') {
   const preis = Number(String(item.preis).replace(',', '.'));
 
   preisAnzeige.textContent = Number.isFinite(preis)
-    ? 'Preis: ' + preis.toLocaleString('de-DE', {
+    ? 'Aktionspreis (vorbehaltlich Bestätigung): ' + preis.toLocaleString('de-DE', {
         style: 'currency',
         currency: 'EUR'
       })
