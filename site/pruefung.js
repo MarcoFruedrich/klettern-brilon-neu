@@ -96,6 +96,14 @@ $('staff-login').addEventListener('submit',async event=>{
     form.reset();await signedIn();notice('Angemeldet. Bitte Vor-Ort-Code vom Tablet eingeben.');
   }catch(e){notice('Anmeldung fehlgeschlagen: '+e.message);}finally{submit.disabled=false;}
 });
+$('request-tablet-code')?.addEventListener('click',async()=>{
+  const button=$('request-tablet-code');button.disabled=true;
+  try{
+    await request('/api/pruefung/code-anfordern',{method:'POST'});
+    notice('Der sechsstellige Code wird für zwei Minuten auf dem gekoppelten Tablet angezeigt.');
+  }catch(error){notice('Tablet-Code konnte nicht angezeigt werden: '+error.message);}
+  finally{button.disabled=false;}
+});
 $('onsite-unlock').addEventListener('submit',async event=>{
   event.preventDefault();const form=event.currentTarget;
   try{
