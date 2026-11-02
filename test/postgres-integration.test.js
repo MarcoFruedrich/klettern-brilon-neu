@@ -479,6 +479,10 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const kioskCookie=paired.headers.get('set-cookie').split(';')[0];
   assert.equal((await connect(pairingCode)).status,409);
   const kiosk=()=>fetch(root+tabletPath,{headers:{Cookie:kioskCookie}});
+  // Pairing alone is not proof that the display is actually online.
+  const initialDisplay=await kiosk();
+  assert.equal(initialDisplay.status,200);
+  assert.equal((await initialDisplay.json()).code,null);
   const requested=await userPost('/api/pruefung/code-anfordern',{});
   assert.equal(requested.status,201);
   const shown=await (await kiosk()).json();
@@ -488,10 +492,27 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.ok(!crypt.rows[0].code_verschluesselt.includes(shown.code));
   assert.equal((await userPost('/api/pruefung/freischalten',{code:shown.code})).status,200);
   assert.equal((await (await kiosk()).json()).code,null);
-  const devices=await (await fetch(root+'/api/admin/pruefung/tablets',{headers:{Cookie:cookie}})).json();
+  const tabletList=async()=>{
+    const response=await fetch(root+'/api/admin/pruefung/tablets',{headers:{Cookie:cookie}});
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  const devices=await tabletList();
   const tabletId=devices.find(x=>x.name==='Test-Werbetablet').id;
+  assert.equal(devices.find(x=>x.id===tabletId).online,true);
+  assert.ok(devices.find(x=>x.id===tabletId).zuletzt_gesehen_am);
+  // A paired but dormant display must not receive a newly requested code.
+  await pool.query("UPDATE brilon_pruef_tablets SET zuletzt_gesehen_am=NOW()-INTERVAL '70 seconds' WHERE id=$1",
+    [tabletId]);
+  const dormant=await tabletList();
+  assert.equal(dormant.find(x=>x.id===tabletId).online,false);
+  assert.equal((await userPost('/api/pruefung/code-anfordern',{})).status,409,
+    'Bei einer seit über 45 Sekunden fehlenden Tabletmeldung darf kein Prüfcode angefordert werden');
+  assert.equal((await kiosk()).status,200,'Beim erneuten Öffnen kann das gekoppelte Tablet wieder melden');
+  assert.equal((await tabletList()).find(x=>x.id===tabletId).online,true);
   const tabletRevocation=await fetch(root+'/api/admin/pruefung/tablets/'+tabletId+'/sperren',{method:'PATCH',
     headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
   assert.equal(tabletRevocation.status,200);
   assert.equal((await kiosk()).status,401);
+  assert.equal((await tabletList()).find(x=>x.id===tabletId).online,false);
 });
