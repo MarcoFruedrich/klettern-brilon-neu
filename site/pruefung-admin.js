@@ -119,6 +119,27 @@
         block.append(select);
       }
       if(device.aktiv){
+        const replace=elt('button','Tablet ersetzen / neu koppeln');
+        replace.type='button';replace.className='btn secondary';
+        replace.addEventListener('click',async()=>{
+          if(!confirm('Der bisherige Tablet-Zugang wird sofort gesperrt und sämtliche noch aktiven Codes dieses Geräts werden ungültig. Neuen einmaligen Kopplungscode erzeugen?'))return;
+          replace.disabled=true;
+          try{
+            const data=await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id)+'/ersetzen',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({wechselBestaetigt:true})
+            });
+            find('tablet-pair-code').textContent='Ersatzgerät jetzt koppeln: '+data.code+
+              ' (zehn Minuten gültig, einmalig). Anschließend das neue Gerät bei Bedarf als Prüfdisplay auswählen.';
+            await refresh();
+          }catch(error){
+            find('tablet-admin-status').textContent='Gerätewechsel fehlgeschlagen: '+error.message;
+            replace.disabled=false;
+          }
+        });
+        block.append(replace);
+      }
+      if(device.aktiv){
         const button=elt('button','Tablet-Zugang sperren');button.type='button';
         button.className='btn secondary';
         button.addEventListener('click',async()=>{
