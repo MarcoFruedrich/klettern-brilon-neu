@@ -461,10 +461,10 @@ function sonderaktionAnfragen(aktion){
   // An action title is not necessarily a bookable programme. Select it only
   // if an identical, currently available programme actually exists.
   const programm=angeboteCache.find(a=>a.name===titel);
-  if(programm){
-    angebotAuswahl.value=programm.name;
-    angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
-  }
+  // A special action can be independent of the programme catalogue. Avoid
+  // silently retaining a programme selected for an earlier special.
+  angebotAuswahl.value=programm?.name||'';
+  angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
   const verfuegbar=programm?.verfuegbare_termine;
   const tagFreigegeben=!Array.isArray(verfuegbar)||!verfuegbar.length||
     verfuegbar.includes(datumswert);
