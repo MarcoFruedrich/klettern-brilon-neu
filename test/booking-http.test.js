@@ -288,6 +288,12 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     body:JSON.stringify({status:'storniert',bearbeitungsnotiz:'Lokaler Test'})});
   const cancelResult=await cancel.json();
   assert.equal(cancel.status,200,JSON.stringify({cancelResult,serverErrors}));
+  await waitForEmails(11);
+  const cancellationNotice=mailMessages.find(message=>message.to?.[0]?.email==='max@example.test'&&
+    message.subject==='Deine Buchung wurde storniert – Klettern Brilon');
+  assert.ok(cancellationNotice,'Eine Stornierung muss eine Kundenbenachrichtigung auslösen');
+  assert.match(cancellationNotice.textContent,new RegExp(addonData.buchungsnummer));
+  assert.match(cancellationNotice.textContent,/wurde storniert/i);
   const bookingsCancelled=await fetch(root+'/api/admin/buchungen',{headers:{Cookie:cookie}});
   const cancelled=await bookingsCancelled.json();
   const restoredParent=cancelled.find(item=>item.id===adjacentData.id);
