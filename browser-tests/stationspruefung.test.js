@@ -105,4 +105,54 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
       await page.close();
     });
   }
+
+  await t.test('Kleinen Hinweis am Smartphone mit Beschreibung und optionalem Bild erfassen',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const station='550e8400-e29b-41d4-a716-446655440001';
+    const state={loggedIn:false,unlocked:false,saved:null};
+    await page.route('**/api/pruefung/**',async route=>{
+      const req=route.request(),url=new URL(req.url()),endpoint=url.pathname;
+      const respond=(status,data)=>route.fulfill({status,contentType:'application/json',
+        body:JSON.stringify(data)});
+      if(endpoint==='/api/pruefung/login'&&req.method()==='POST'){
+        state.loggedIn=true;return respond(200,{name:'Testmitarbeiterin'});
+      }
+      if(!state.loggedIn)return respond(401,{error:'Mitarbeiteranmeldung erforderlich.'});
+      if(endpoint==='/api/pruefung/stationen')
+        return respond(200,{mitarbeiter:'Testmitarbeiterin',entsperrtBis:null,
+          stationen:[{id:station,name:'Boulderbereich'}]});
+      if(endpoint==='/api/pruefung/freischalten'){
+        state.unlocked=true;return respond(200,{success:true,gueltigMinuten:15});
+      }
+      if(endpoint==='/api/pruefung/berichte'&&req.method()==='POST'){
+        if(!state.unlocked)return respond(403,{error:'Vor-Ort-Code erforderlich.'});
+        state.saved=JSON.parse(req.postData());state.unlocked=false;
+        return respond(201,{id:'test-hinweis',hatHinweis:true,hatMangel:false,
+          gesperrteStationen:[],status:'hinweis_offen',benachrichtigung:'kein_mangel'});
+      }
+      return respond(404,{error:'Nicht gefunden.'});
+    });
+    await page.goto(root+'/pruefung.html');
+    await page.locator('#staff-login input[name="email"]').fill('test@example.test');
+    await page.locator('#staff-login input[name="passwort"]').fill('Personal-Geheimnis-2026');
+    await page.locator('#staff-login button').click();
+    await page.locator('#onsite-unlock input[name="code"]').waitFor({state:'visible'});
+    await page.locator('#onsite-unlock input[name="code"]').fill('123456');
+    await page.locator('#onsite-unlock button').click();
+    await page.locator('#station-inspection').waitFor({state:'visible'});
+    await page.locator('#station-inspection input[name="programm"]').fill('Kletterkurs');
+    await page.locator('#station-inspection input[name="beginn"]').fill('2027-03-15T10:00');
+    await page.locator('.pruefung-station .pruefung-aktiv').check();
+    await page.locator('.pruefung-station .pruefung-zustand').selectOption('hinweis');
+    assert.equal(await page.locator('.pruefung-station .pruefung-beschreibung').isVisible(),true);
+    assert.equal(await page.locator('.pruefung-station .pruefung-foto').isVisible(),true);
+    await page.locator('.pruefung-station .pruefung-beschreibung')
+      .fill('Beschriftung der Klettergriffe ist teilweise abgeblättert');
+    await page.locator('#station-inspection button[type="submit"]').click();
+    await page.waitForFunction(()=>document.getElementById('pruefung-status')?.textContent.includes('HINWEIS ERFASST'));
+    assert.equal(state.saved.pruefungen[0].zustand,'hinweis');
+    assert.match(state.saved.pruefungen[0].beschreibung,/Beschriftung/);
+    assert.equal(await page.locator('#pruefung-status').textContent().then(t=>t.includes('GESPERRT')),false);
+    await page.close();
+  });
 });
