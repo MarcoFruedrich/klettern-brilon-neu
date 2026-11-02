@@ -58,7 +58,7 @@
       panel.append(button);
     };
     heading('Sicherheitsgesperrt oder stillgelegt',stationen,
-      Number(c.gesperrt||0)+Number(c.stillgelegt||0));
+      Number(c.nicht_nutzbar||0));
     for(const station of stationen){
       const box=elt('article');box.className='booking';
       const blocked=!!station.gesperrt_am;
