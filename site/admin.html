@@ -43,6 +43,7 @@
         <a href="#anschlussrabatt-section">Anschlussrabatte</a>
         <a href="#admin-guestbook-section">Gästeliste</a>
         <a href="#gps-verwaltung">GPS-Touren</a>
+        <a href="#settings-section">Einstellungen</a>
       </nav>
 
       <section id="payment-overview-section" class="booking admin-anchor">
@@ -234,8 +235,6 @@
   <label>Kategorie<input name="kategorie" maxlength="60" placeholder="Klettern"></label>
   <label>Zielgruppe<input name="zielgruppe" maxlength="120" placeholder="Familien, Schulklassen"></label>
   <label>Veranstaltungsort<select name="veranstaltungsort" id="angebot-ort" required></select></label>
-  <label>Neuen Veranstaltungsort hinzufügen<input id="neuer-ort-name" maxlength="80" placeholder="z. B. Sundern"></label>
-  <button type="button" id="ort-hinzufuegen" class="btn secondary">Ort zur Auswahl hinzufügen</button>
   <label>Kapazität (Teilnehmende)<input name="kapazitaet" type="number" min="1" max="500" value="20" required></label>
   <label>Verfügbare Termine (ein Datum pro Zeile; leer = offen)<textarea name="verfuegbare_termine" rows="3" placeholder="2026-12-01"></textarea></label>
   <label>Besondere Hinweise<textarea name="hinweise" rows="2" maxlength="1000"></textarea></label>
@@ -248,6 +247,19 @@
 </form>
 
   <div id="angebote-admin-liste"></div>
+</section>
+
+<section id="settings-section" class="booking admin-anchor">
+  <h2>Einstellungen · Veranstaltungsorte</h2>
+  <p>Orte hier ergänzen. Neue Programme können anschließend einen der aktiven Orte auswählen. Bestehende Programme und Buchungen werden durch das Ergänzen nicht verändert.</p>
+  <form id="admin-place-form">
+    <label>Neuer Veranstaltungsort
+      <input name="name" maxlength="80" placeholder="z. B. Sundern" required>
+    </label>
+    <button class="btn" type="submit">Veranstaltungsort hinzufügen</button>
+  </form>
+  <p id="admin-place-status" role="status" aria-live="polite"></p>
+  <div id="admin-place-list" class="admin-grid"></div>
 </section>
 
 <section id="admin-guestbook-section" class="booking admin-anchor">

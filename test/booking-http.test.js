@@ -23,6 +23,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
+    MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),
     MOCK_GUESTBOOK:JSON.stringify([
       {name:'Freigegebener Teamname',datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:true},
       {name:'Nicht öffentlich',datum:'2027-03-15',dauer_sekunden:500,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:false}
@@ -62,6 +63,12 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie').split(';',1)[0];
   const adminHeaders={Cookie:cookie,Origin:root,'Content-Type':'application/json'};
+  const addPlace=await fetch(root+'/api/admin/orte',{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Sundern'})});
+  assert.equal(addPlace.status,201);
+  const activePlaces=await fetch(root+'/api/admin/orte',{headers:{Cookie:cookie}});
+  assert.deepEqual((await activePlaces.json()).map(place=>place.name).sort(),['Brilon','Sundern']);
+  const invalidPlace=await fetch(root+'/api/admin/orte',{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'   '})});
+  assert.equal(invalidPlace.status,400);
   const matchingBookings=await fetch(root+'/api/admin/buchungen?suche=max&status=offen',{headers:{Cookie:cookie}});
   assert.equal(matchingBookings.status,200);
   assert.equal((await matchingBookings.json()).length,2,'Suche und Statusfilter werden serverseitig kombiniert');

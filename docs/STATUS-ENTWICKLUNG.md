@@ -39,6 +39,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Die GPS-Gästeliste ist jetzt zusätzlich zentral im Admin-Bereich nach Tour filterbar. Der Admin-Endpunkt liefert ausschließlich abgeschlossene Spiele mit expliziter Einwilligung, verlangt eine gültige Sitzung und gibt weder Spielzugang noch interne Spieldaten aus.
 - Die Zahlungsübersicht fasst tatsächliche Zahlungseingänge, offene Salden und Gutschriften zusammen. Einzelne Zahlungseinträge lassen sich pro Buchung aufklappen; Summen werden centgenau berechnet. Die Übersicht nutzt wie die Buchungsverwaltung die zuletzt geladenen 250 Buchungen.
 - Buchungssuche und Statusfilter werden nun parametrisiert in PostgreSQL ausgeführt, bevor die Trefferbegrenzung von 250 greift. Dadurch findet die Suche auch ältere Buchungen; parallele Suchanfragen können keine veraltete Ergebnisliste mehr überschreiben.
+- Veranstaltungsorte lassen sich jetzt zentral unter „Einstellungen“ ergänzen und einsehen. Die aktive Ortsliste bleibt mit der Programmauswahl synchron; das Hinzufügen eines Orts ändert keine bestehenden Programme oder Buchungen.
 - Beim Bearbeiten einer GPS-Tour bleiben Kontrollcode-Hashes für Stations-ID und QR-Kennung unverändert erhalten. Geänderte QR-Kennungen sowie neue Stationen erfordern einen neuen gültigen Zahlencode; die Admin-Antwort enthält weiterhin weder Code noch Hash.
 - Unmögliche Kalendertage werden beim Erstellen einer Anfrage als Eingabefehler zurückgewiesen.
 
@@ -51,6 +52,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
 - `npm test` – 34 bestanden, 0 fehlgeschlagen.
+- Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - `node --check test/booking-http.test.js` – bestanden.
 - `node --check test/admin-navigation.test.js` – bestanden.
 - `node --check site/zahlungsuebersicht.js` – bestanden.
@@ -76,7 +78,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 1. Lokal Node.js 20+ und Abhängigkeiten bereitstellen.
 2. Für eine isolierte Entwicklungsdatenbank `DATABASE_URL`, `ADMIN_USER`, `ADMIN_PASSWORD` und ein mindestens 32 Zeichen langes `GPS_CODE_SECRET` konfigurieren. Keine Produktivzugangsdaten verwenden.
 3. Schemaänderungen bleiben standardmäßig aus. Nur in einer eigens angelegten Testdatenbank und nach Schema-Review `RUN_SCHEMA_MIGRATIONS=true` setzen.
-4. `npm start` starten und `/admin.html` öffnen. Die Zahlungsübersicht zeigt Eingangssummen, offene Beträge und dokumentierte Gutschriften; Einzelbuchungen lassen sich aufklappen. Zahlungseingänge werden zusätzlich direkt in der jeweiligen Buchung erfasst. Unter „Anschlussrabatt“ bestätigte Buchungen desselben Tages wählen, die Vorschau prüfen und erst dann die dauerhafte Anwendung bestätigen. Bestätigungs-E-Mails führen mit den genannten Zugangseinstellungen zur passenden Anschlussseite. Unter GPS eine Tour mit vollständigem Stations-JSON anlegen, die dauerhaften Standort-QR-Codes auf die angezeigten Zieladressen verweisen lassen und für bestätigte Buchungen Spielzugänge erstellen.
+4. `npm start` starten und `/admin.html` öffnen. Unter „Einstellungen“ Veranstaltungsorte ergänzen; neue Programme können diese anschließend auswählen. Die Zahlungsübersicht zeigt Eingangssummen, offene Beträge und dokumentierte Gutschriften; Einzelbuchungen lassen sich aufklappen. Zahlungseingänge werden zusätzlich direkt in der jeweiligen Buchung erfasst. Unter „Anschlussrabatt“ bestätigte Buchungen desselben Tages wählen, die Vorschau prüfen und erst dann die dauerhafte Anwendung bestätigen. Bestätigungs-E-Mails führen mit den genannten Zugangseinstellungen zur passenden Anschlussseite. Unter GPS eine Tour mit vollständigem Stations-JSON anlegen, die dauerhaften Standort-QR-Codes auf die angezeigten Zieladressen verweisen lassen und für bestätigte Buchungen Spielzugänge erstellen.
 5. Benachrichtigungen nur mit Test-Mailpostfach und `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` und optional `BOOKING_NOTIFY_EMAIL` testen.
 
 ## Veröffentlichungsstatus

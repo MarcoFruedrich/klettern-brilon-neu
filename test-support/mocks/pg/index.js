@@ -5,6 +5,7 @@ class Pool {
     this.offers = JSON.parse(process.env.MOCK_OFFERS || '[]');
     this.bookings = [];
     this.guests = JSON.parse(process.env.MOCK_GUESTBOOK || '[]');
+    this.places = JSON.parse(process.env.MOCK_PLACES || '[]');
   }
 
   async query(sql, params=[]) { return this.run(sql, params); }
@@ -20,6 +21,15 @@ class Pool {
         ?this.offers.filter(item=>String(item.id)===String(params[0]))
         :params[0]?this.offers.filter(item=>item.name===params[0]):this.offers;
       return { rows:offers, rowCount:offers.length };
+    }
+    if (sql.includes('FROM brilon_orte')) {
+      const rows=this.places.filter(item=>item.aktiv===true).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+      return {rows,rowCount:rows.length};
+    }
+    if (sql.includes('INSERT INTO brilon_orte')) {
+      const name=params[0];let place=this.places.find(item=>item.name.toLocaleLowerCase('de-DE')===name.toLocaleLowerCase('de-DE'));
+      if(place)place.aktiv=true;else{place={id:this.places.length+1,name,aktiv:true};this.places.push(place);}
+      return {rows:[place],rowCount:1};
     }
     if (sql.includes('FROM brilon_kalender')) return { rows:[], rowCount:0 };
     if (sql.includes('FROM brilon_gps_spiele g JOIN brilon_gps_touren t')&&sql.includes('gast_einwilligung=true')) {

@@ -1078,18 +1078,32 @@ if (neuesAngebotForm) {
 }
 
 async function orteLaden(){
-  const select=document.getElementById('angebot-ort');if(!select)return;
+  const select=document.getElementById('angebot-ort');
+  const liste=document.getElementById('admin-place-list');
+  if(!select&&!liste)return;
   try{
-    const orte=await api('/api/admin/orte');select.replaceChildren();
-    for(const ort of orte){const o=el('option',ort.name);o.value=ort.name;select.append(o);}
+    const orte=await api('/api/admin/orte');
+    if(select){select.replaceChildren();for(const ort of orte){const o=el('option',ort.name);o.value=ort.name;select.append(o);}}
+    if(liste){
+      liste.replaceChildren();
+      if(!orte.length)liste.append(el('p','Noch keine Veranstaltungsorte angelegt.'));
+      for(const ort of orte){const card=el('article');card.className='booking';card.append(el('strong',ort.name),el('p','Aktiv und für neue Programme auswählbar'));liste.append(card);}
+    }
   }catch(error){status.textContent='Veranstaltungsorte konnten nicht geladen werden: '+error.message;}
 }
 
-document.getElementById('ort-hinzufuegen')?.addEventListener('click',async()=>{
-  const input=document.getElementById('neuer-ort-name');
-  try{const ort=await api('/api/admin/orte',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:input.value})});
-    await orteLaden();document.getElementById('angebot-ort').value=ort.name;input.value='';status.textContent='Veranstaltungsort hinzugefügt.';
-  }catch(error){status.textContent='Ort konnte nicht gespeichert werden: '+error.message;}
+document.getElementById('admin-place-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget,message=document.getElementById('admin-place-status');
+  const button=form.querySelector('button[type="submit"]');button.disabled=true;
+  try{
+    const result=await api('/api/admin/orte',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:form.elements.name.value})});
+    await orteLaden();
+    const select=document.getElementById('angebot-ort');if(select)select.value=result.name;
+    form.reset();message.textContent=`Veranstaltungsort „${result.name}“ ist jetzt auswählbar.`;
+  }catch(error){message.textContent='Ort konnte nicht gespeichert werden: '+error.message;}
+  finally{button.disabled=false;}
 });
 
 /* Gespeicherte Erlebnisangebote anzeigen */
