@@ -11,7 +11,8 @@
       ['/api/admin/pruefung/stationen','pruef-station-list','pruef-station-status',renderStations],
       ['/api/admin/pruefung/berichte','pruef-report-list','pruef-report-status',renderReports],
       ['/api/admin/pruefung/hinweise','pruef-hinweis-list','pruef-hinweis-status',renderHints],
-      ['/api/admin/pruefung/meldungen','pruef-mail-list','pruef-mail-status',renderMailStatus]
+      ['/api/admin/pruefung/meldungen','pruef-mail-list','pruef-mail-status',renderMailStatus],
+      ['/api/admin/pruefung/tablets','tablet-admin-list','tablet-admin-status',renderTablets]
     ]){
       try{render(find(container),await api(url));}
       catch(err){find(statusId).textContent='Laden fehlgeschlagen: '+err.message;}
@@ -83,6 +84,34 @@
         }catch(error){find('pruef-station-status').textContent='Verlauf nicht verfügbar: '+error.message;}
       });
       panel.append(audit,details);target.append(panel);
+    }
+  }
+  function renderTablets(target,devices){
+    target.replaceChildren();
+    if(!devices.length)target.append(elt('p','Noch kein Werbetablet gekoppelt.'));
+    for(const device of devices){
+      const block=elt('article');block.className='booking';
+      block.append(elt('strong',device.name),
+        elt('p',device.aktiv?'Gekoppelt – gültiger Gerätezugang':'Gesperrt'),
+        elt('p','Gekoppelt: '+new Date(device.gekoppelt_am).toLocaleString('de-DE')));
+      if(device.aktiv){
+        const button=elt('button','Tablet-Zugang sperren');button.type='button';
+        button.className='btn secondary';
+        button.addEventListener('click',async()=>{
+          if(!confirm('Dieses Tablet dauerhaft aus der Codeanzeige aussperren? Eine neue Kopplung wird erforderlich.'))return;
+          button.disabled=true;
+          try{
+            await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id)+'/sperren',
+              {method:'PATCH'});
+            await refresh();
+          }catch(error){
+            find('tablet-admin-status').textContent='Tablet konnte nicht gesperrt werden: '+error.message;
+            button.disabled=false;
+          }
+        });
+        block.append(button);
+      }
+      target.append(block);
     }
   }
   function renderMailStatus(target,notifications){
@@ -213,6 +242,13 @@
       form.reset();find('pruef-station-status').textContent='Station gespeichert.';
       await refresh();
     }catch(err){find('pruef-station-status').textContent='Fehler: '+err.message;}
+  });
+  find('tablet-pair-generate')?.addEventListener('click',async()=>{
+    const display=find('tablet-pair-code');display.textContent='Kopplungscode wird erzeugt …';
+    try{
+      const data=await api('/api/admin/pruefung/tablet/kopplung',{method:'POST'});
+      display.textContent='Tablet-Kopplungscode: '+data.code+' (zehn Minuten gültig, einmalig)';
+    }catch(error){display.textContent='Kopplung fehlgeschlagen: '+error.message;}
   });
   find('pruef-code-generate')?.addEventListener('click',async()=>{
     const target=find('pruef-code-display');target.textContent='Code wird erzeugt …';
