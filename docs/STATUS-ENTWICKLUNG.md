@@ -74,7 +74,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Die GitHub-Actions-Prüfung `.github/workflows/entwicklung-tests.yml` läuft ausschließlich für den festgelegten Entwicklungszweig mit einer flüchtigen PostgreSQL-16-Datenbank `brilon_test`. Sie prüft über echte HTTP-Anfragen die parallele Buchungs- und Tageskapazität, Zeitfenster sowie den Unique-Index der Buchungsnummern. Die sonstigen HTTP-Tests bleiben durch einen gezielten Modul-Loader bei ihren isolierten Datenbank-Doubles.
 
 
-- Eine separate Chromium-Browser-Suite wurde für vier typische Viewports und die Kundenbuchungsstrecke eingerichtet. Das automatische Testsystem enthält einen unabhängigen Browser-Job und benötigt dafür keine produktiven Buchungsdaten.
+- Die Chromium-Browser-Suite prüft nun zusätzlich das angemeldete Dashboard bei 360/768/1280 px auf horizontalen Überlauf sowie mit simulierten Admin-APIs das Anlegen, Bearbeiten und Aktivieren von Programmen, die Suche/Bearbeitung von Buchungen und das Anlegen von Veranstaltungsorten. Änderungen müssen in den Browsertests den erwarteten CSRF-Token mitführen. Der Debounce der Buchungssuche wird vor Änderungen abgewartet. Es werden keine echten Buchungen verändert.
 
 ## Prüfergebnisse
 
@@ -84,7 +84,7 @@ Unit-/HTTP-Tests liefen mit isolierten Datenbank-Test-Doubles; zusätzlich wurde
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – **72 bestanden, 0 fehlgeschlagen** (GitHub Actions auf Node.js 22 mit isoliertem PostgreSQL 16, auch im Lauf 41521590062). Die Unit-/HTTP-Tests werden ausdrücklich nur aus `test/*.test.js` geladen; Browsertests liegen separat.
+- `npm test` – **72 bestanden, 0 fehlgeschlagen** (Node.js 22 mit isoliertem PostgreSQL 16, zuletzt im Lauf 41524393036). Zusätzlich **8 Chromium-Tests bestanden, 0 fehlgeschlagen** im separaten Browser-Job desselben Laufs. Die Unit-/HTTP-Tests werden ausdrücklich nur aus `test/*.test.js` geladen; Browsertests liegen separat.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
@@ -100,7 +100,7 @@ Unit-/HTTP-Tests liefen mit isolierten Datenbank-Test-Doubles; zusätzlich wurde
 - `node --check lib/sicherheitszustand.js` – bestanden.
 - `git diff --check` – bestanden.
 
-Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. In GitHub Actions wurde eine isolierte PostgreSQL-16-Datenbank erfolgreich getestet; echte E-Mail-Dienste wurden nicht kontaktiert. Im getrennten Chromium-Job konnten jetzt **alle vier Browsertests (0 Fehler)** erfolgreich ausgeführt werden: keine horizontalen Seitenüberläufe auf Startseite, Verwaltung, GPS- und Anschlussseite bei 360/390/768/1280 px; Mobilmenü inklusive Escape/Fokus; öffentliches Buchungsformular mit Gruppenpreis, belegtem Zeitfenster und ausschließlich simulierter Testbestätigung. Der native Datumseingang nutzt nun die `Europe/Berlin`-Ortszeit in ISO-Format unabhängig von Browser-Lokalisierung.
+Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. In GitHub Actions wurde eine isolierte PostgreSQL-16-Datenbank erfolgreich getestet; echte E-Mail-Dienste wurden nicht kontaktiert. Im getrennten Chromium-Job konnten jetzt **alle acht Browsertests (0 Fehler)** erfolgreich ausgeführt werden: keine horizontalen Seitenüberläufe auf Startseite, Verwaltung, GPS- und Anschlussseite bei 360/390/768/1280 px; Mobilmenü inklusive Escape/Fokus; öffentliches Buchungsformular mit Gruppenpreis, belegtem Zeitfenster und ausschließlich simulierter Testbestätigung. Der native Datumseingang nutzt nun die `Europe/Berlin`-Ortszeit in ISO-Format unabhängig von Browser-Lokalisierung.
 
 ## Noch offen
 
@@ -114,7 +114,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 - Datenschutz- und Löschkonzept sowie verbindliche Bedingungen sind noch zu entwickeln und fachlich zu prüfen. Der Export gruppiert nach exakt übereinstimmender Kontakt-E-Mail; ein abweichender oder falsch eingetragener Kontakt wird dadurch nicht zusammengeführt.
 - Einwilligungszeitpunkt und Textversion werden gespeichert. Ein allgemeines Aufbewahrungs-/Löschkonzept und ein Export über nicht per E-Mail verknüpfte Personendatensätze bleiben offen.
 - Mobile, Tablet- und Desktop-Layouts sind nun in Chromium bei vier Bildschirmbreiten automatisiert auf horizontalen Überlauf geprüft; vollständige visuelle Qualität, Touch-Bedienung, Browser-Vielfalt und Screenreader-Nutzung müssen weiterhin manuell geprüft werden. Automatisiert getestet sind Sprunglinks, Fokusregeln, Bewegungsreduktion und das öffentliche Mobilmenü.
-- Die neue Admin-Sprungnavigation wurde strukturell auf gültige Ziele geprüft. Der Chromium-Test prüft bislang nur die nicht angemeldete Verwaltungsseite auf Bildschirmbreite, nicht das vollständige angemeldete Dashboard mit vielen Programmen und Buchungen. Dieser weitergehende visuelle und funktionale Test bleibt offen.
+- Die Admin-Sprungnavigation wurde strukturell auf gültige Ziele geprüft. Ein Chromium-Test prüft jetzt den angemeldeten Dashboardzustand auf drei Bildschirmbreiten und die grundlegenden Bearbeitungsabläufe mit wenigen simulierten Datensätzen. Lastfälle mit vielen Programmen/Buchungen, echte HTTP-Sitzungen, mehrsprachige Browser und manuelle Screenreader-/Touch-Tests sind weiterhin offen.
 - HTML-, JSON- und Fehlerantworten senden einheitliche `nosniff`-, Referrer- und Frame-Schutzheader; statische Seiten behalten zusätzlich die Content-Security-Policy. Der HTTP-Test prüft die Header an Adminseite und Login-Antwort.
 
 ## Nutzung der bestehenden Verwaltung
