@@ -33,6 +33,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Die Gästeliste zeigt nur abgeschlossene Spiele mit ausdrücklicher Zustimmung zur Namensveröffentlichung. Ohne Zustimmung wird kein Name gespeichert.
 - GPS-Kontrollcodes werden mit HMAC gehasht; Spielzugänge werden nur gehasht gespeichert. Das Geheimnis `GPS_CODE_SECRET` ist erforderlich.
 - Admin-Schreibanfragen mit Sitzung verlangen zusätzlich einen passenden `Origin`-Header für denselben Host und dasselbe Protokoll; die vorhandenen `HttpOnly`, `Secure`, `SameSite=Strict`-Cookies bleiben bestehen.
+- Rate-Limit-Zustände sind auf 10.000 Schlüssel begrenzt; veraltete Schlüssel werden beim Bereinigen entfernt und die Zahl gespeicherter Versuche pro Schlüssel bleibt beschränkt. Abgelaufene Admin-Sitzungen werden bei Anmeldung und regelmäßig bei Sitzungsprüfungen bereinigt. Die Sitzungen selbst bleiben prozesslokal.
 - Ein lokaler HTTP-Test prüft Admin-Anmeldung, Cookie-Flags, geschützte Lesezugriffe und erlaubte/abgewiesene Schreibanfragen mit Datenbank-/Supabase-Stubs; er versendet keine E-Mails.
 - Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
 - Die Admin-Verwaltung besitzt eine dauerhaft erreichbare Sprungnavigation für Buchungen/Zahlungen, Kalender, Programme, Tagesangebote, Anschlussrabatte und GPS-Touren. Auf schmalen Bildschirmen bleibt die Navigation horizontal wischbar; Kalenderaktionen und Sprungziele berücksichtigen Touch-Größen und Sticky-Kopfzeilen.
@@ -55,12 +56,13 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 36 bestanden, 0 fehlgeschlagen.
+- `npm test` – 39 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - `node --check test/booking-http.test.js` – bestanden.
 - `node --check test/admin-navigation.test.js` – bestanden.
 - `node --check site/zahlungsuebersicht.js` – bestanden.
+- `node --check lib/sicherheitszustand.js` – bestanden.
 - `git diff --check` – bestanden.
 
 Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. Die reguläre Arbeitskopie enthält keine installierten Node-Abhängigkeiten (`pg` fehlt). Datenbank- und E-Mail-Routen wurden nicht gegen Dienste aufgerufen. Ein Viewport-Test war nicht möglich, weil die Chromium-Browserdatei fehlt.
