@@ -50,6 +50,9 @@ async function refresh() {
         el('strong', (b.data.name || 'Unbekannt') + ' – ' + (b.data.datum || ''))
       );
 
+      if (b.data.buchungsnummer) {
+        c.append(el('p', 'Buchungsnummer: ' + b.data.buchungsnummer));
+      }
       for (const k of [
         'angebot', 'teilnehmer', 'uhrzeit',
         'email', 'telefon', 'nachricht'
