@@ -10,7 +10,7 @@ const net = require('node:net');
 function fakeAdminApi(page) {
   const state = {
     signedIn: false, csrf: 'a'.repeat(64), mutations: [],
-    tours: [], games: [],
+    tours: [], games: [], specials: [],
     inspectionEvents: [], inspectionStatusEvents: [], inspectionStaff: [],
     inspectionHints: [],
     inspectionMails: [],
@@ -233,7 +233,11 @@ function fakeAdminApi(page) {
     }
     if(endpoint==='/api/admin/gps/gaesteliste')return json(200,[]);
     if(endpoint==='/api/admin/kalenderbuchungen'||endpoint==='/api/admin/kalender')return json(200,[]);
-    if(endpoint==='/api/aktionen'||endpoint==='/api/admin/aktionen')return json(200,[]);
+    if(endpoint==='/api/aktionen'||endpoint==='/api/admin/aktionen')return json(200,state.specials);
+    if(endpoint==='/api/admin/aktionen'&&method==='POST'){
+      const item={...readBody(),id:'550e8400-e29b-41d4-a716-446655443333'};
+      state.specials.push(item);return json(201,{id:item.id});
+    }
     if(endpoint==='/api/admin/orte'&&method==='GET')return json(200,state.places);
     if(endpoint==='/api/admin/orte'&&method==='POST'){
       const name=readBody().name;
@@ -745,6 +749,28 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(await page.locator('#pruef-hinweis-list').getAttribute('tabindex'),'-1');
     assert.equal(state.mutations.filter(m=>m.endpoint.includes('/pruefung/')).length,0,
       'The dashboard must be read-only.');
+    await page.close();
+  });
+
+  await t.test('Sonderaktionen lassen sich ausdrücklich mit einem veröffentlichten Programm verknüpfen',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    state.programs[0].aktiv=true;
+    state.programs[0].veroeffentlicht=true;
+    await login(page,root);
+    const selected=page.locator('#special-program-select');
+    await selected.locator('option[value="11"]').waitFor({state:'attached'});
+    await selected.selectOption('11');
+    await page.locator('#special-form [name="titel"]').fill('Sonder-Kletteraktion');
+    await page.locator('#special-form [name="datum"]').fill('2027-03-15');
+    await page.locator('#special-form button[type="submit"], #special-form button:not([type])').click();
+    await page.locator('#special-list').getByText('Sonder-Kletteraktion').waitFor();
+    assert.equal(state.specials.length,1);
+    assert.equal(state.specials[0].programm_id,'11',
+      'Programme are linked by stable identifier, not by similar titles');
+    assert.match(await page.locator('#special-list').textContent(),
+      /Explizit verknüpft mit Programm-ID: 11/);
+    assert.equal(state.mutations.filter(x=>x.endpoint==='/api/admin/aktionen').length,1);
     await page.close();
   });
 
