@@ -34,6 +34,7 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - GPS-Kontrollcodes werden mit HMAC gehasht; Spielzugänge werden nur gehasht gespeichert. Das Geheimnis `GPS_CODE_SECRET` ist erforderlich.
 - Admin-Schreibanfragen mit Sitzung verlangen zusätzlich einen passenden `Origin`-Header für denselben Host und dasselbe Protokoll; die vorhandenen `HttpOnly`, `Secure`, `SameSite=Strict`-Cookies bleiben bestehen.
 - Ein lokaler HTTP-Test prüft Admin-Anmeldung, Cookie-Flags, geschützte Lesezugriffe und erlaubte/abgewiesene Schreibanfragen mit Datenbank-/Supabase-Stubs; er versendet keine E-Mails.
+- Ein HTTP-End-to-End-Test nutzt ein isoliertes, speicherbasiertes PostgreSQL-Test-Double für Buchungen, Konflikte, Referenzkollisionen, Anzahlung, Anschlussvorschläge, rabattierte Zusatzbuchungen und Storno. Dabei wurde ein nicht definierter Dauervariablenname im Anschlussbuchungs-Endpunkt gefunden und korrigiert.
 - Beim Bearbeiten einer GPS-Tour bleiben Kontrollcode-Hashes für Stations-ID und QR-Kennung unverändert erhalten. Geänderte QR-Kennungen sowie neue Stationen erfordern einen neuen gültigen Zahlencode; die Admin-Antwort enthält weiterhin weder Code noch Hash.
 - Unmögliche Kalendertage werden beim Erstellen einer Anfrage als Eingabefehler zurückgewiesen.
 
@@ -45,17 +46,18 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 30 bestanden, 0 fehlgeschlagen.
+- `npm test` – 31 bestanden, 0 fehlgeschlagen.
+- `node --check test/booking-http.test.js` – bestanden.
 - `git diff --check` – bestanden.
 
 Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. Die reguläre Arbeitskopie enthält keine installierten Node-Abhängigkeiten (`pg` fehlt). Datenbank- und E-Mail-Routen wurden nicht gegen Dienste aufgerufen. Ein Viewport-Test war nicht möglich, weil die Chromium-Browserdatei fehlt.
 
 ## Noch offen
 
-- Buchungserstellung, Zahlungstransaktionen, Anschlussbuchung und E-Mail-Zustellung benötigen noch Integrationstests mit Test-Doubles für PostgreSQL und Mailtransport.
+- Der HTTP-End-to-End-Test deckt die Kernstrecke mit einem speicherbasierten PostgreSQL-Test-Double ab. Die echte PostgreSQL-Integration, Datenbank-Constraints/Transaktionsisolation und E-Mail-Zustellung benötigen noch separate Tests in einer isolierten Umgebung mit Mail-Test-Double.
 - Eine Admin-Sitzung wird im Arbeitsspeicher gehalten. Für mehrere Instanzen/Neustarts fehlt weiterhin ein persistenter Session-Store; zusätzlich sind CSRF-/Origin-Prüfung, Sitzungsrotation und ein zweiter Faktor zu prüfen.
 - Such- und Statusfilter sind clientseitig und begrenzen nicht die geladene Ergebnismenge von 250 Einträgen.
-- Die kundenseitige Anschlussstrecke benötigt noch Integrationstests mit isolierten PostgreSQL- und Mail-Test-Doubles. Eine erkannte Überzahlung/Gutschrift wird nicht automatisch ausgezahlt; dafür ist ein kontrollierter Erstattungsprozess erforderlich.
+- Die kundenseitige Anschlussstrecke ist im HTTP-Test mit einem PostgreSQL-Test-Double abgedeckt. Eine erkannte Überzahlung/Gutschrift wird nicht automatisch ausgezahlt; dafür ist ein kontrollierter Erstattungsprozess erforderlich.
 - GPS benötigt noch QR-Code-Erzeugung und druckbare Etiketten. Die Verwaltung zeigt dafür stationäre QR-Zieladressen. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.
 - Die 15 Fragen umfassende Mustertour liegt als Entwurf vor. Koordinaten, Routenführung, Zugänglichkeit und praktische Sicherheit müssen vor Veröffentlichung örtlich geprüft werden.
 - Der Status der produktiven Schema- und Kalenderdefinitionen ist noch zu ermitteln. Die Tabellen werden für lokale/isolierte Tests nicht automatisch angelegt.
