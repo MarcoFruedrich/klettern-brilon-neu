@@ -1,0 +1,50 @@
+name: Entwicklung – isolierte Buchungs- und PostgreSQL-Tests
+
+on:
+  push:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: brilon_test
+          POSTGRES_USER: brilon_ci
+          POSTGRES_PASSWORD: local-only-integration-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U brilon_ci -d brilon_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PG_INTEGRATION_URL: postgresql://brilon_ci:local-only-integration-password@127.0.0.1:5432/brilon_test
+      RUN_SCHEMA_MIGRATIONS: 'false'
+      BREVO_API_KEY: ''
+      BREVO_SENDER_EMAIL: ''
+      BOOKING_NOTIFY_EMAIL: ''
+      SUPABASE_URL: ''
+      SUPABASE_SECRET_KEY: ''
+
+    steps:
+      - name: Quellcode des Entwicklungszweigs laden
+        uses: actions/checkout@v4
+      - name: Node.js 22 einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Abhängigkeiten ohne Installationsskripte installieren
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Alle Tests einschließlich isolierter PostgreSQL-Integration
+        run: npm test
