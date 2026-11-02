@@ -22,6 +22,11 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
 
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:{ca:process.env.DATABASE_CA_CERT,rejectUnauthorized:true}}):null;
 const sessions=new Map(), rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon'};
+const securityHeaders={
+  'X-Content-Type-Options':'nosniff',
+  'X-Frame-Options':'DENY',
+  'Referrer-Policy':'strict-origin-when-cross-origin'
+};
 async function brevoMail(empfaenger, betreff, inhalt) {
   if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL)
     throw new Error('E-Mail-Versand ist nicht konfiguriert.');
@@ -49,7 +54,7 @@ async function brevoMail(empfaenger, betreff, inhalt) {
     );
   }
 }
-function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers});res.end(JSON.stringify(data))}
+function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
 async function body(req){let data='';for await(const chunk of req){data+=chunk;if(data.length>16000)throw Error('Anfrage zu groß')}try{return JSON.parse(data)}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){return rateLimiter.erlauben(key,max,window)}
 function safeText(v,n=200){return typeof v==='string'?v.trim().slice(0,n):''}
@@ -1964,13 +1969,14 @@ if (route === '/api/angebote' && req.method === 'GET') {
 
     fs.readFile(target,(err,data)=>{
       if(err){
-        res.writeHead(404);
+        res.writeHead(404,securityHeaders);
         return res.end('Nicht gefunden');
       }
       res.writeHead(200,{
         'Content-Type':mime[path.extname(target)]||'application/octet-stream',
-        'X-Content-Type-Options':'nosniff',
-'Content-Security-Policy':"default-src 'self'; img-src 'self' https://fssjruvxkdqeltjdrlfo.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'none'"      });
+        ...securityHeaders,
+        'Content-Security-Policy':"default-src 'self'; img-src 'self' https://fssjruvxkdqeltjdrlfo.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'none'"
+      });
       res.end(req.method==='HEAD'?undefined:data);
     });
   }catch(e){

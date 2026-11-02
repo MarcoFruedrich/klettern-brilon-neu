@@ -88,6 +88,7 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 - Einwilligungszeitpunkt und Textversion werden gespeichert. Ein allgemeines Aufbewahrungs-/Löschkonzept und ein Export über nicht per E-Mail verknüpfte Personendatensätze bleiben offen.
 - Mobile und Desktop-Bedienung, Tastaturbedienbarkeit und Screenreader-Verhalten sind noch visuell und automatisiert zu testen.
 - Die neue Admin-Sprungnavigation wurde strukturell auf gültige Ziele geprüft. Ein visueller Smartphone-/Tablet-/Desktop-Test bleibt offen, da in der Umgebung kein Chromium-Browser verfügbar ist.
+- HTML-, JSON- und Fehlerantworten senden einheitliche `nosniff`-, Referrer- und Frame-Schutzheader; statische Seiten behalten zusätzlich die Content-Security-Policy. Der HTTP-Test prüft die Header an Adminseite und Login-Antwort.
 
 ## Nutzung der bestehenden Verwaltung
 

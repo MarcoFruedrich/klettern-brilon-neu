@@ -56,6 +56,9 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
     body: JSON.stringify({ username: 'test-admin', password: 'test-only-password' })
   });
   assert.equal(login.status, 200);
+  assert.equal(login.headers.get('x-content-type-options'),'nosniff');
+  assert.equal(login.headers.get('x-frame-options'),'DENY');
+  assert.equal(login.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
   const setCookie = login.headers.get('set-cookie');
   assert.match(setCookie, /HttpOnly/i);
   assert.match(setCookie, /Secure/i);
@@ -66,6 +69,11 @@ test('HTTP: Admin-Login, Sitzung und Same-Origin-Schutz', async t => {
   const csrfResponse=await fetch(root+'/api/admin/csrf',{headers:{Cookie:cookie}});
   assert.equal(csrfResponse.status,200,'Ein angemeldeter Browser muss das Sitzungstoken nach einem Neuladen erneut abrufen können');
   assert.equal((await csrfResponse.json()).csrfToken,loginData.csrfToken);
+  const adminPage=await fetch(root+'/admin.html');
+  assert.equal(adminPage.headers.get('x-content-type-options'),'nosniff');
+  assert.equal(adminPage.headers.get('x-frame-options'),'DENY');
+  assert.equal(adminPage.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
+  assert.match(adminPage.headers.get('content-security-policy'),/frame-ancestors 'none'/);
 
   const authenticated = await fetch(root + '/api/admin/buchungen', { headers: { Cookie: cookie } });
   assert.equal(authenticated.status, 503, 'Sitzung wurde akzeptiert; nur die absichtlich fehlende DB blockiert');
