@@ -404,7 +404,7 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
       box.append(c);
     }
 
-    const offers = await api('/api/aktionen');
+    const offers = await api('/api/admin/aktionen');
     const list = document.getElementById('special-list');
     list.replaceChildren();
 
@@ -414,7 +414,11 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
 
       c.append(
         el('strong', a.titel),
-        el('p', (a.datum || '') + ' ' + (a.beschreibung || ''))
+        el('p', (a.datum || '') + ' ' + (a.beschreibung || '')),
+        el('p',a.programm_id?
+          'Explizit verknüpft mit Programm-ID: '+a.programm_id+
+          ' (Verfügbarkeit wird bei Anfragen neu geprüft)':
+          'Unabhängige Aktion – kein Programm automatisch ausgewählt')
       );
 
       const bildBereich = document.createElement('div');
@@ -1452,6 +1456,19 @@ async function erlebnisangeboteLaden() {
 
   try {
     const angebote = await api('/api/admin/angebote');
+    const specialSelect=document.getElementById('special-program-select');
+    if(specialSelect){
+      const selected=specialSelect.value;
+      specialSelect.replaceChildren();
+      const empty=el('option','Unabhängige Sonderaktion – keine automatische Programmauswahl');
+      empty.value='';specialSelect.append(empty);
+      for(const offer of angebote.filter(a=>a.aktiv&&a.buchbar&&a.veroeffentlicht)){
+        const option=el('option',offer.name+' · '+offer.veranstaltungsort);
+        option.value=String(offer.id);
+        specialSelect.append(option);
+      }
+      if([...specialSelect.options].some(o=>o.value===selected))specialSelect.value=selected;
+    }
 
     liste.innerHTML = '';
 
