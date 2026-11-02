@@ -192,8 +192,8 @@ restbetrag: gesamtpreis === null ? null : Math.round(gesamtpreis * 75) / 100,
         }
         data.buchungsnummer=buchungsnummer;
         await client.query(
-          'INSERT INTO brilon_buchungen (id,data,status) VALUES ($1,$2,$3)',
-          [id,JSON.stringify(data),'offen']
+          'INSERT INTO brilon_buchungen (id,data,status,buchungsnummer) VALUES ($1,$2,$3,$4)',
+          [id,JSON.stringify(data),'offen',buchungsnummer]
         );
         return {id,buchungsnummer:data.buchungsnummer};
       });
