@@ -21,6 +21,8 @@ const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 const angebotAuswahl = document.getElementById('angebot-auswahl');
 let angeboteCache=[];
+let verfuegbarkeitsAnfrage=0;
+let sonderaktionsPrefix='';
 function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
   return Number(programm?.dauer)||
@@ -65,6 +67,7 @@ uhrzeitenAnzeigen();
 
 async function belegteUhrzeitenLaden() {
   if (!uhrzeitAuswahl) return;
+  const anfrageId=++verfuegbarkeitsAnfrage;
   if (!date.value) {
     uhrzeitenAnzeigen();
     uhrzeitAuswahl.disabled = true;
@@ -83,6 +86,7 @@ async function belegteUhrzeitenLaden() {
     document.getElementById('buchungs-teilnehmer')?.value
   );
   const angebot=angebotAuswahl?.value;
+  const teilnehmerWert=document.getElementById('buchungs-teilnehmer')?.value;
   if(!angebot){
     uhrzeitenAnzeigen();
     uhrzeitAuswahl.disabled=true;
@@ -105,7 +109,10 @@ async function belegteUhrzeitenLaden() {
 
     const daten = await antwort.json();
 
-    if (date.value !== datum || datumIstGesperrt(datum)) return;
+    if (anfrageId!==verfuegbarkeitsAnfrage || date.value!==datum ||
+        angebotAuswahl?.value!==angebot ||
+        document.getElementById('buchungs-teilnehmer')?.value!==teilnehmerWert ||
+        datumIstGesperrt(datum)) return;
 
     // Der Server prüft jedes auswählbare Startfenster gegen die belegten Zeiträume.
     const belegteZeiten = new Set(
@@ -135,13 +142,17 @@ async function belegteUhrzeitenLaden() {
       buchungsdauerBerechnen();
     }
   } catch (fehler) {
+    if(anfrageId!==verfuegbarkeitsAnfrage)return;
     uhrzeitenAnzeigen();
     uhrzeitHinweis.textContent =
       'Verfügbarkeit derzeit nicht abrufbar. ' +
       'Bitte versuche es später erneut.';
     uhrzeitAuswahl.disabled = true;
   } finally {
-    if (date.value === datum && !datumIstGesperrt(datum) &&
+    if (anfrageId===verfuegbarkeitsAnfrage &&
+        date.value===datum && angebotAuswahl?.value===angebot &&
+        document.getElementById('buchungs-teilnehmer')?.value===teilnehmerWert &&
+        !datumIstGesperrt(datum) &&
         !uhrzeitHinweis.textContent.includes('nicht abrufbar')) {
       uhrzeitAuswahl.disabled = false;
     }
@@ -406,6 +417,9 @@ form.addEventListener('submit', async e => {
     });
 
     form.reset();
+    sonderaktionsPrefix='';
+    const angebotHinweis=document.getElementById('selected-special');
+    if(angebotHinweis)angebotHinweis.hidden=true;
   } catch (err) {
     status.textContent = '⚠ Buchung nicht möglich: ' + err.message;
     status.style.color = '#a61b1b';
@@ -424,6 +438,47 @@ form.addEventListener('submit', async e => {
     btn.disabled = false;
   }
 });
+
+// Öffentliche Tagesaktion: Nur eine unverbindliche Anfrage vorbereiten.
+// Es gibt keine automatische Rabatt-/Preis-Zusage oder verbindliche Reservierung.
+function sonderaktionAnfragen(aktion){
+  const nachricht=form.querySelector('textarea[name="nachricht"]');
+  const hinweis=document.getElementById('selected-special');
+  if(!nachricht||!hinweis)return;
+  const titel=String(aktion.titel||'').trim().slice(0,120);
+  if(!titel)return;
+  const datumswert=typeof aktion.datum==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(aktion.datum)?
+    aktion.datum:'';
+  const prefix='Anfrage zur Sonderaktion: '+titel+
+    (datumswert?' (Termin: '+datumswert+')':'')+'\n';
+  // Replace only the prefix inserted by us. Preserve personal wishes.
+  let rest=nachricht.value;
+  if(sonderaktionsPrefix&&rest.startsWith(sonderaktionsPrefix))
+    rest=rest.slice(sonderaktionsPrefix.length);
+  nachricht.value=(prefix+rest).slice(0,2000);
+  sonderaktionsPrefix=prefix;
+
+  // An action title is not necessarily a bookable programme. Select it only
+  // if an identical, currently available programme actually exists.
+  const programm=angeboteCache.find(a=>a.name===titel);
+  if(programm){
+    angebotAuswahl.value=programm.name;
+    angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  const verfuegbar=programm?.verfuegbare_termine;
+  const tagFreigegeben=!Array.isArray(verfuegbar)||!verfuegbar.length||
+    verfuegbar.includes(datumswert);
+  if(datumswert&&datumswert>=buchungstagInBerlin()&&tagFreigegeben){
+    date.value=datumswert;
+    date.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+
+  hinweis.hidden=false;
+  hinweis.textContent='Ausgewählte Sonderaktion: '+titel+
+    '. Bitte Programm und Termin prüfen. Preis und Verfügbarkeit werden erst nach Prüfung der Anfrage bestätigt.';
+  form.scrollIntoView({behavior:'smooth',block:'start'});
+  nachricht.focus({preventScroll:true});
+}
 
 // Tages- und Sonderangebote
 async function specials() {
@@ -486,7 +541,8 @@ if (item.preis !== undefined && item.preis !== null && item.preis !== '') {
       const anfrageButton = document.createElement('a');
 anfrageButton.href = '#buchung';
 anfrageButton.className = 'btn';
-anfrageButton.textContent = 'Jetzt anfragen';
+anfrageButton.textContent = 'Diese Aktion anfragen';
+anfrageButton.addEventListener('click',()=>sonderaktionAnfragen(item));
 anfrageButton.style.display = 'inline-block';
 anfrageButton.style.marginTop = '12px';
 
