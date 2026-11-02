@@ -38,7 +38,8 @@ werden.
 
 ## Kalender, Sperrzeiten und Programme
 
-- Im Buchungskalender zwischen Monaten wechseln. Unter „Eigene Termine &
+- Im Buchungskalender zwischen Monaten wechseln. Buchungen werden für den
+  angezeigten Monat aus der Datenbank geladen. Unter „Eigene Termine &
   Sperrzeiten“ einen Termin oder eine Sperrzeit mit Titel, Datum und optionalen
   Uhrzeiten anlegen. Ein Enddatum kann für mehrtägige Einträge angegeben werden.
 - Unter „Angebote & Preise verwalten“ Name, Beschreibung, Dauer, Kategorie,

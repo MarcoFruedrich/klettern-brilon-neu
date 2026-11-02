@@ -710,6 +710,7 @@ const kalenderFarben = {
 };
 
 let eigeneKalenderTermine = [];
+let kalenderLadeSequenz=0;
 function kalenderAnzeigen() {
   if (!kalenderRaster) return;
 
@@ -880,10 +881,15 @@ for (const e of eigeneTermine) {
 }
 
 async function kalenderLaden() {
+  const aktuelleSequenz=++kalenderLadeSequenz;
+  const monat=`${kalenderDatum.getFullYear()}-${String(kalenderDatum.getMonth()+1).padStart(2,'0')}`;
   try {
-    kalenderBuchungen = await api('/api/admin/buchungen');
+    const buchungen=await api('/api/admin/kalenderbuchungen?monat='+encodeURIComponent(monat));
+    if(aktuelleSequenz!==kalenderLadeSequenz)return;
+    kalenderBuchungen=buchungen;
     kalenderAnzeigen();
   } catch (err) {
+    if(aktuelleSequenz!==kalenderLadeSequenz)return;
     kalenderInfo.textContent =
       'Kalender konnte nicht geladen werden: ' + err.message;
   }
@@ -891,12 +897,12 @@ async function kalenderLaden() {
 
 document.getElementById('calendar-prev').onclick = () => {
   kalenderDatum.setMonth(kalenderDatum.getMonth() - 1);
-  kalenderAnzeigen();
+  kalenderLaden();
 };
 
 document.getElementById('calendar-next').onclick = () => {
   kalenderDatum.setMonth(kalenderDatum.getMonth() + 1);
-  kalenderAnzeigen();
+  kalenderLaden();
 };
 
 const bisherigesRefresh = refresh;

@@ -1186,6 +1186,24 @@ preis=safeText(d.preis,50);
         return reply(res,200,q.rows);
       }
 
+      if(route==='/api/admin/kalenderbuchungen'&&req.method==='GET'){
+        const monat=safeText(u.searchParams.get('monat'),7);
+        const match=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(monat);
+        if(!match||Number(match[1])<1900||Number(match[1])>9998)
+          return reply(res,400,{error:'Ungültiger Kalendermonat.'});
+        const start=monat+'-01';
+        const endDate=new Date(Date.UTC(Number(match[1]),Number(match[2]),1));
+        const ende=endDate.toISOString().slice(0,10);
+        const q=await pool.query(
+          `SELECT id,data,status,created_at
+           FROM brilon_buchungen
+           WHERE data->>'datum'>=$1 AND data->>'datum'<$2
+             AND COALESCE(status,'offen') IN ('offen','bestaetigt')
+           ORDER BY data->>'datum',data->>'uhrzeit',created_at`,[start,ende]
+        );
+        return reply(res,200,q.rows);
+      }
+
       const guestbookEntry=route.match(/^\/api\/admin\/gps\/gaesteliste\/([0-9a-f-]{36})$/i);
       if(guestbookEntry&&req.method==='DELETE'){
         const q=await pool.query(

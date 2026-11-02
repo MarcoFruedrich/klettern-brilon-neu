@@ -45,6 +45,12 @@ class Pool {
       return {rows:[place],rowCount:1};
     }
     if (sql.includes('FROM brilon_kalender')) return { rows:[], rowCount:0 };
+    if (sql.includes('FROM brilon_buchungen')&&sql.includes("data->>'datum'>=$1")) {
+      const rows=this.bookings.filter(item=>item.data.datum>=params[0]&&item.data.datum<params[1]&&
+        ['offen','bestaetigt'].includes(item.status||'offen'))
+        .map(item=>({id:item.id,data:item.data,status:item.status,created_at:item.created_at||new Date(0)}));
+      return {rows,rowCount:rows.length};
+    }
     if (sql.includes('FROM brilon_gps_spiele g JOIN brilon_gps_touren t')&&sql.includes('gast_einwilligung=true')) {
       const rows=this.guests.filter(item=>item.einwilligung===true&&(!params[0]||item.tour_id===params[0]))
         .map(({id,name,datum,dauer_sekunden,tour,einwilligung_am})=>({id,name,datum,dauer_sekunden,tour,einwilligung_am}));

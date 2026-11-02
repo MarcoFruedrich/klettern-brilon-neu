@@ -88,6 +88,13 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     body:JSON.stringify({username:'test-admin',password:'test-only-password'})});
   assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie').split(';',1)[0];
+  const unauthCalendar=await fetch(root+'/api/admin/kalenderbuchungen?monat=2026-01');
+  assert.equal(unauthCalendar.status,401,'Kalenderbuchungen müssen geschützt sein');
+  const calendar=await fetch(root+'/api/admin/kalenderbuchungen?monat=2026-01',{headers:{Cookie:cookie}});
+  assert.equal(calendar.status,200);
+  assert.equal((await calendar.json()).length,55,'Kalender lädt alle Buchungen des Monats, auch außerhalb der letzten 250');
+  const invalidCalendarMonth=await fetch(root+'/api/admin/kalenderbuchungen?monat=2026-13',{headers:{Cookie:cookie}});
+  assert.equal(invalidCalendarMonth.status,400);
   const adminHeaders={Cookie:cookie,Origin:root,'Content-Type':'application/json'};
   const addPlace=await fetch(root+'/api/admin/orte',{method:'POST',headers:adminHeaders,body:JSON.stringify({name:'Sundern'})});
   assert.equal(addPlace.status,201);
