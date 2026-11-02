@@ -1,6 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const net = require('node:net');
 const path = require('node:path');
@@ -21,12 +22,15 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const offerSecret='test-only-booking-offer-secret-32-chars';
   const tourId='123e4567-e89b-12d3-a456-426614174000';
   const guestId='123e4567-e89b-12d3-a456-426614174001';
+  const guestToken='gps-guest-token-for-consent-test-00000001';
+  const guestTokenHash=crypto.createHash('sha256').update(guestToken).digest('hex');
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),
     MOCK_GUESTBOOK:JSON.stringify([
-      {id:guestId,name:'Freigegebener Teamname',datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:true},
+      {id:guestId,name:null,datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,
+        token_hash:guestTokenHash,abgeschlossen:true,einwilligung:false,einwilligung_am:null},
       {name:'Nicht öffentlich',datum:'2027-03-15',dauer_sekunden:500,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:false}
     ]),
     RUN_SCHEMA_MIGRATIONS:'false',BREVO_API_KEY:'',BREVO_SENDER_EMAIL:'',BOOKING_NOTIFY_EMAIL:'',
@@ -42,6 +46,15 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     catch{await new Promise(resolve=>setTimeout(resolve,50));}
   }
   assert.equal(ready,true,'Server sollte mit dem PostgreSQL-Test-Double starten');
+  const missingGuestName=await fetch(root+'/api/gps/abschluss',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token:guestToken,einwilligung:true,name:''})});
+  assert.equal(missingGuestName.status,400,'Ein öffentlicher Eintrag erfordert einen freiwilligen Namen');
+  const consent=await fetch(root+'/api/gps/abschluss',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token:guestToken,einwilligung:true,name:'Freigegebener Teamname'})});
+  assert.equal(consent.status,200);
+  assert.equal((await consent.json()).oeffentlich,true);
+  const publicGuestbook=await fetch(root+'/api/gps/gaesteliste?tour='+tourId);
+  assert.equal((await publicGuestbook.json())[0].name,'Freigegebener Teamname');
   const guestbookPrivate=await fetch(root+'/api/admin/gps/gaesteliste');
   assert.equal(guestbookPrivate.status,401,'Gästelisten-Verwaltung muss geschützt sein');
   const guestDeletePrivate=await fetch(root+`/api/admin/gps/gaesteliste/${guestId}`,{method:'DELETE'});
@@ -84,6 +97,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(guestEntries[0].id,guestId);
   assert.equal(guestEntries[0].name,'Freigegebener Teamname');
   assert.equal(guestEntries[0].tour,'Brilon-Rätseltour');
+  assert.ok(Number.isFinite(Date.parse(guestEntries[0].einwilligung_am)),'Einwilligungszeitpunkt muss erfasst werden');
   const guestDelete=await fetch(root+`/api/admin/gps/gaesteliste/${guestId}`,{method:'DELETE',headers:adminHeaders});
   assert.equal(guestDelete.status,200);
   const guestbookAfterDelete=await fetch(root+'/api/admin/gps/gaesteliste?tour='+tourId,{headers:{Cookie:cookie}});

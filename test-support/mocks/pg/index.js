@@ -26,6 +26,13 @@ class Pool {
       const rows=this.places.filter(item=>item.aktiv===true).sort((a,b)=>a.name.localeCompare(b.name,'de'));
       return {rows,rowCount:rows.length};
     }
+    if (/UPDATE brilon_gps_spiele SET gast_name=\$1,gast_einwilligung=\$2/.test(sql)) {
+      const [name,consent,tokenHash]=params;
+      const guest=this.guests.find(item=>item.token_hash===tokenHash&&item.abgeschlossen===true);
+      if(!guest)return {rows:[],rowCount:0};
+      guest.name=name;guest.einwilligung=consent;guest.einwilligung_am=consent?new Date().toISOString():null;
+      return {rows:[{id:guest.id}],rowCount:1};
+    }
     if (sql.includes('FROM brilon_gps_spiele g WHERE g.tour_id=$1')&&sql.includes('gast_einwilligung=true')) {
       const rows=this.guests.filter(item=>item.einwilligung===true&&item.name&&item.tour_id===params[0])
         .map(({name,datum,dauer_sekunden})=>({name,datum,dauer_sekunden}));
@@ -39,13 +46,13 @@ class Pool {
     if (sql.includes('FROM brilon_kalender')) return { rows:[], rowCount:0 };
     if (sql.includes('FROM brilon_gps_spiele g JOIN brilon_gps_touren t')&&sql.includes('gast_einwilligung=true')) {
       const rows=this.guests.filter(item=>item.einwilligung===true&&(!params[0]||item.tour_id===params[0]))
-        .map(({id,name,datum,dauer_sekunden,tour})=>({id,name,datum,dauer_sekunden,tour}));
+        .map(({id,name,datum,dauer_sekunden,tour,einwilligung_am})=>({id,name,datum,dauer_sekunden,tour,einwilligung_am}));
       return {rows,rowCount:rows.length};
     }
     if (/UPDATE brilon_gps_spiele SET gast_name=NULL,gast_einwilligung=false/.test(sql)) {
       const guest=this.guests.find(item=>item.id===params[0]&&item.einwilligung===true);
       if(!guest)return {rows:[],rowCount:0};
-      guest.name=null;guest.einwilligung=false;
+      guest.name=null;guest.einwilligung=false;guest.einwilligung_am=null;
       return {rows:[{id:guest.id}],rowCount:1};
     }
     if (sql.includes('COUNT(*)::integer AS anzahl')) {

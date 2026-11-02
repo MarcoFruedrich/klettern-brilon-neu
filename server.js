@@ -586,7 +586,8 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const name=einwilligung?safeText(d.name,80):null;
       if(einwilligung&&!name)return reply(res,400,{error:'Bitte einen Namen eingeben oder nicht zustimmen.'});
       const q=await pool.query(
-        `UPDATE brilon_gps_spiele SET gast_name=$1,gast_einwilligung=$2
+        `UPDATE brilon_gps_spiele SET gast_name=$1,gast_einwilligung=$2,
+           gast_einwilligung_am=CASE WHEN $2 THEN NOW() ELSE NULL END
          WHERE token_hash=$3 AND abgeschlossen_am IS NOT NULL RETURNING id`,
         [name,einwilligung,gpsTokenHash(token)]
       );
@@ -1173,6 +1174,7 @@ preis=safeText(d.preis,50);
           return reply(res,400,{error:'Tour-ID ungültig.'});
         const q=await pool.query(
           `SELECT g.id,g.gast_name AS name,to_char(g.abgeschlossen_am,'YYYY-MM-DD') AS datum,
+                  g.gast_einwilligung_am AS einwilligung_am,
                   g.spielzeit_sekunden AS dauer_sekunden,t.data->>'titel' AS tour
            FROM brilon_gps_spiele g JOIN brilon_gps_touren t ON t.id=g.tour_id
            WHERE g.gast_einwilligung=true AND g.gast_name IS NOT NULL
@@ -1185,7 +1187,7 @@ preis=safeText(d.preis,50);
       const guestbookEntry=route.match(/^\/api\/admin\/gps\/gaesteliste\/([0-9a-f-]{36})$/i);
       if(guestbookEntry&&req.method==='DELETE'){
         const q=await pool.query(
-          `UPDATE brilon_gps_spiele SET gast_name=NULL,gast_einwilligung=false
+          `UPDATE brilon_gps_spiele SET gast_name=NULL,gast_einwilligung=false,gast_einwilligung_am=NULL
            WHERE id=$1 AND gast_einwilligung=true RETURNING id`,[guestbookEntry[1]]
         );
         if(!q.rowCount)return reply(res,404,{error:'Freigegebener Gästelisteneintrag nicht gefunden.'});
@@ -1868,9 +1870,11 @@ await pool.query(`
         spielzeit_sekunden INTEGER,
         gast_name TEXT,
         gast_einwilligung BOOLEAN NOT NULL DEFAULT false,
+        gast_einwilligung_am TIMESTAMPTZ,
         erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_am TIMESTAMPTZ');
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }

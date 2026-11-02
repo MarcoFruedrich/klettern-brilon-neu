@@ -544,6 +544,10 @@ async function adminGaestelisteLaden(){
       card.append(el('strong',entry.name||'Name nicht angegeben'),
         el('p',`${entry.tour||'GPS-Tour'} · ${entry.datum||'Datum unbekannt'}`),
         el('p',`Benötigte Zeit: ${minutes} Min. ${seconds} Sek.`));
+      if(entry.einwilligung_am){
+        const timestamp=new Date(entry.einwilligung_am);
+        if(!Number.isNaN(timestamp.getTime()))card.append(el('small',`Öffentliche Einwilligung erfasst: ${timestamp.toLocaleString('de-DE')}`));
+      }
       const remove=el('button','Öffentlichen Eintrag entfernen');remove.type='button';remove.className='danger';
       remove.onclick=async()=>{
         if(!window.confirm(`Den öffentlichen Namenseintrag „${entry.name}“ entfernen? Spielabschluss und Spielzeit bleiben erhalten.`))return;
