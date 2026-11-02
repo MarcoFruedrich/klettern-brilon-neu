@@ -9,7 +9,8 @@
     for(const [url,container,statusId,render] of [
       ['/api/admin/pruefung/mitarbeitende','pruef-personal-list','pruef-personal-status',renderStaff],
       ['/api/admin/pruefung/stationen','pruef-station-list','pruef-station-status',renderStations],
-      ['/api/admin/pruefung/berichte','pruef-report-list','pruef-report-status',renderReports]
+      ['/api/admin/pruefung/berichte','pruef-report-list','pruef-report-status',renderReports],
+      ['/api/admin/pruefung/hinweise','pruef-hinweis-list','pruef-hinweis-status',renderHints]
     ]){
       try{render(find(container),await api(url));}
       catch(err){find(statusId).textContent='Laden fehlgeschlagen: '+err.message;}
@@ -83,15 +84,58 @@
       panel.append(audit,details);target.append(panel);
     }
   }
+  function renderHints(target,hints){
+    target.replaceChildren();
+    const offene=hints.filter(x=>!x.erledigt_am);
+    find('pruef-hinweis-status').textContent=offene.length+
+      ' offene Hinweise zur Nachprüfung'+(hints.length>=200?' (maximal 200 angezeigt)':'')+'.';
+    for(const item of hints){
+      const article=elt('article');article.className='booking';
+      const erledigt=!!item.erledigt_am;
+      article.append(elt('strong',(erledigt?'Geprüfter Hinweis: ':'Offener Hinweis: ')+item.station),
+        elt('p',item.beschreibung),
+        elt('p','Gemeldet von: '+item.erstellt_von+' · '+
+          new Date(item.erstellt_am).toLocaleString('de-DE')));
+      if(item.gesperrt_am)article.append(elt('p','ACHTUNG: Station ist bereits gesperrt.'));
+      if(erledigt){
+        article.append(elt('p','Geprüft von: '+item.erledigt_von+' · '+item.erledigt_notiz));
+      }else{
+        const button=elt('button','Nach Prüfung als erledigt markieren');
+        button.type='button';button.className='btn secondary';
+        button.addEventListener('click',async()=>{
+          const pruefer=prompt('Wer hat den Hinweis geprüft?');
+          if(!pruefer)return;
+          const ergebnis=prompt('Prüfergebnis und ggf. durchgeführte Maßnahmen (mindestens 20 Zeichen):');
+          if(!ergebnis)return;
+          if(!confirm('Ist der Hinweis tatsächlich geprüft und darf als erledigt gekennzeichnet werden?'))return;
+          button.disabled=true;
+          try{
+            await api('/api/admin/pruefung/hinweise/'+encodeURIComponent(item.id)+'/erledigen',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({pruefer,ergebnis,geprueft:true})
+            });
+            await refresh();
+          }catch(error){
+            find('pruef-hinweis-status').textContent='Prüfvermerk konnte nicht gespeichert werden: '+error.message;
+            button.disabled=false;
+          }
+        });
+        article.append(button);
+      }
+      target.append(article);
+    }
+  }
   function renderReports(target,reports){
     target.replaceChildren();
     for(const report of reports){
       const article=elt('article');article.className='booking';
       article.append(elt('strong',report.programm+' · '+report.beginn),
-        elt('p','Prüfer: '+report.pruefer+' · Ergebnis: '+(report.hat_mangel?'MANGEL – nicht freigegeben':'Kein Mangel gemeldet')));
+        elt('p','Prüfer: '+report.pruefer+' · Ergebnis: '+(report.hat_mangel?'Sicherheitsmangel – gesperrte Station prüfen':
+          report.hat_hinweis?'Hinweis(e) zur Prüfung vorgemerkt':'Kein Mangel gemeldet')));
       for(const p of report.pruefungen){
-        article.append(elt('p',
-          (p.station||'Station')+': '+(p.zustand==='ok'?'In Ordnung':'Mangel – '+p.beschreibung)));
+        article.append(elt('p',(p.station||'Station')+': '+
+          (p.zustand==='ok'?'In Ordnung':p.zustand==='hinweis'?
+          'Hinweis – zur Prüfung vorgemerkt: '+p.beschreibung:'Sicherheitsmangel – '+p.beschreibung)));
         if(p.hatFoto){
           const link=elt('a','Fotobeleg herunterladen – '+(p.station||'Station'));
           link.href='/api/admin/pruefung/berichte/'+encodeURIComponent(report.id)+
@@ -132,6 +176,7 @@
     }catch(err){target.textContent='Fehler: '+err.message;}
   });
   find('pruef-report-refresh')?.addEventListener('click',refresh);
+  find('pruef-hinweis-refresh')?.addEventListener('click',refresh);
   // The admin workspace is revealed by the existing login flow.
   const observer=new MutationObserver(()=>{
     if(!find('workspace')?.hidden && !initialized){initialized=true;refresh();}
