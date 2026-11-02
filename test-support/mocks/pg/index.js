@@ -13,15 +13,31 @@ class Pool {
     this.adminSessions = new Map();
     this.adminTotpSteps = new Map();
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
+    this.advisoryLockOwner = null;
+    this.advisoryLockWaiters = [];
   }
 
   async query(sql, params=[]) { return this.run(sql, params); }
   async connect() {
-    return { query: (sql, params=[]) => this.run(sql, params), release() {} };
+    const client={query:(sql,params=[])=>this.run(sql,params,client),release:()=>this.advisoryLockFreigeben(client)};
+    return client;
   }
 
-  async run(sql, params) {
-    if (/^\s*(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock)/i.test(sql)) return { rows:[], rowCount:0 };
+  async run(sql, params, client=null) {
+    if(/^\s*BEGIN\b/i.test(sql))return {rows:[],rowCount:0};
+    if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql)){
+      if(client)this.advisoryLockFreigeben(client);
+      return {rows:[],rowCount:0};
+    }
+    if(/^\s*SELECT\s+pg_advisory_xact_lock\(/i.test(sql)){
+      if(client&&this.advisoryLockOwner!==client){
+        if(this.advisoryLockOwner)this.advisoryLockWaiters.push(client);
+        else this.advisoryLockOwner=client;
+        if(this.advisoryLockOwner!==client)
+          await new Promise(resolve=>{client.advisoryLockFortsetzen=resolve;});
+      }
+      return {rows:[],rowCount:0};
+    }
     if (process.env.MOCK_ADMIN_SESSION_FAIL==='1'&&sql.includes('brilon_admin_sessions'))
       throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
     if (process.env.MOCK_ADMIN_TOTP_FAIL==='1'&&sql.includes('brilon_admin_totp_steps'))
@@ -285,6 +301,17 @@ class Pool {
       return { rows:[item], rowCount:1 };
     }
     throw new Error('SQL im Test-Double nicht implementiert: '+sql.slice(0,100));
+  }
+
+  advisoryLockFreigeben(client){
+    if(this.advisoryLockOwner!==client)return;
+    const naechster=this.advisoryLockWaiters.shift();
+    this.advisoryLockOwner=naechster||null;
+    if(naechster&&naechster.advisoryLockFortsetzen){
+      const fortsetzen=naechster.advisoryLockFortsetzen;
+      delete naechster.advisoryLockFortsetzen;
+      fortsetzen();
+    }
   }
 }
 module.exports = { Pool };
