@@ -7,6 +7,7 @@
   async function refresh(){
     if(!initialized||find('workspace')?.hidden)return;
     for(const [url,container,statusId,render] of [
+      ['/api/admin/pruefung/uebersicht','pruef-uebersicht-inhalt','pruef-uebersicht-status',renderSafetyOverview],
       ['/api/admin/pruefung/mitarbeitende','pruef-personal-list','pruef-personal-status',renderStaff],
       ['/api/admin/pruefung/stationen','pruef-station-list','pruef-station-status',renderStations],
       ['/api/admin/pruefung/berichte','pruef-report-list','pruef-report-status',renderReports],
@@ -16,6 +17,79 @@
     ]){
       try{render(find(container),await api(url));}
       catch(err){find(statusId).textContent='Laden fehlgeschlagen: '+err.message;}
+    }
+  }
+  function renderSafetyOverview(target,data){
+    target.replaceChildren();
+    const counts=find('pruef-uebersicht-zaehler');
+    counts.replaceChildren();
+    const c=data.zaehler||{};
+    for(const [label,key] of [
+      ['Sicherheitsgesperrte Stationen','gesperrt'],
+      ['Stillgelegte Stationen','stillgelegt'],
+      ['Offene kleine Hinweise','hinweise_offen'],
+      ['Nicht bestätigte Mängel-E-Mails','meldungen_ungeklaert']
+    ]){
+      const card=elt('p',label+': '+Number(c[key]||0));
+      card.className='booking';
+      counts.append(card);
+    }
+    find('pruef-uebersicht-status').textContent='Stand: '+
+      new Date(data.stand).toLocaleString('de-DE')+
+      '. Angezeigte Einträge sind offene Prüfaufgaben, keine Freigabe zur Nutzung.';
+    const stationen=Array.isArray(data.stationen)?data.stationen:[];
+    const hinweise=Array.isArray(data.hinweise)?data.hinweise:[];
+    const meldungen=Array.isArray(data.meldungen)?data.meldungen:[];
+    const heading=(title,items,total)=>{
+      const h=elt('h4',title);target.append(h);
+      if(!items.length){target.append(elt('p','Keine offenen Einträge.'));return;}
+      if(total>items.length)target.append(elt('p',
+        'Es werden '+items.length+' von '+total+' Einträgen angezeigt. Weitere im jeweiligen Verwaltungsbereich prüfen.'));
+    };
+    const jump=(panel,id,label)=>{
+      const button=elt('button',label);
+      button.type='button';button.className='btn secondary';
+      button.addEventListener('click',()=>{
+        const section=find(id);
+        section?.scrollIntoView({behavior:'smooth',block:'start'});
+        if(section)section.setAttribute('tabindex','-1');
+        section?.focus({preventScroll:true});
+      });
+      panel.append(button);
+    };
+    heading('Sicherheitsgesperrt oder stillgelegt',stationen,
+      Number(c.gesperrt||0)+Number(c.stillgelegt||0));
+    for(const station of stationen){
+      const box=elt('article');box.className='booking';
+      const blocked=!!station.gesperrt_am;
+      box.append(elt('strong',station.name),
+        elt('p',blocked?'NICHT BENUTZEN – SICHERHEITSMANGEL':
+          'NICHT BENUTZEN – STATION STILLGELEGT'));
+      if(blocked&&station.sperrgrund)box.append(elt('p','Sperrgrund: '+station.sperrgrund));
+      if(!station.aktiv&&blocked)box.append(elt('p','Zusätzlich administrativ stillgelegt.'));
+      if(Number(station.offene_hinweise)>0)
+        box.append(elt('p','Zusätzlich '+station.offene_hinweise+' offene Hinweise.'));
+      jump(box,'pruef-station-list','Station in der Verwaltung prüfen');
+      target.append(box);
+    }
+    heading('Kleinere Hinweise zur Nachkontrolle',hinweise,Number(c.hinweise_offen||0));
+    for(const note of hinweise){
+      const box=elt('article');box.className='booking';
+      box.append(elt('strong',note.station),elt('p',note.beschreibung),
+        elt('p',note.gesperrt_am?'Station ist bereits sicherheitsgesperrt.':
+          note.aktiv?'Hinweis offen – keine automatische Stationssperre.':
+          'Station ist stillgelegt – keine Nutzung.'));
+      jump(box,'pruef-hinweis-list','Hinweis und Nachprüfung öffnen');
+      target.append(box);
+    }
+    heading('Nicht bestätigte Mängelbenachrichtigungen',meldungen,
+      Number(c.meldungen_ungeklaert||0));
+    for(const mail of meldungen){
+      const box=elt('article');box.className='booking';
+      box.append(elt('strong',mail.programm||'Sicherheitsmangel'),
+        elt('p','Mailstatus: '+mail.status+' · Versuche: '+Number(mail.versuche||0)));
+      jump(box,'pruef-mail-list','Benachrichtigung prüfen');
+      target.append(box);
     }
   }
   function renderStaff(target,people){
@@ -378,6 +452,7 @@
       target.textContent=response.code+' (120 Sekunden gültig, einmalig)';
     }catch(err){target.textContent='Fehler: '+err.message;}
   });
+  find('pruef-uebersicht-refresh')?.addEventListener('click',refresh);
   find('pruef-report-refresh')?.addEventListener('click',refresh);
   find('pruef-hinweis-refresh')?.addEventListener('click',refresh);
   find('pruef-mail-refresh')?.addEventListener('click',refresh);
