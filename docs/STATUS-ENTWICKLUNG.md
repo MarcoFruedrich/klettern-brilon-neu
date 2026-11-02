@@ -68,6 +68,11 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Veranstaltungsorte lassen sich jetzt zentral unter „Einstellungen“ ergänzen und einsehen. Die aktive Ortsliste bleibt mit der Programmauswahl synchron; das Hinzufügen eines Orts ändert keine bestehenden Programme oder Buchungen.
 - Beim Bearbeiten einer GPS-Tour bleiben Kontrollcode-Hashes für Stations-ID und QR-Kennung unverändert erhalten. Geänderte QR-Kennungen sowie neue Stationen erfordern einen neuen gültigen Zahlencode; die Admin-Antwort enthält weiterhin weder Code noch Hash.
 - Unmögliche Kalendertage werden beim Erstellen einer Anfrage als Eingabefehler zurückgewiesen.
+- Neue Buchungsanfragen und kundenseitige Anschlussbuchungen zu vergangenen Terminen werden abgewiesen. Als heutiger Veranstaltungstag gilt `Europe/Berlin` und nicht UTC; zwei Zeitzonen-Tests prüfen den Tageswechsel und die Sommerzeit.
+- Eine nicht mehr bestätigte Ausgangsbuchung wird auch während der Anschlussbuchungs-Transaktion sauber als Konflikt behandelt. Die bisher fehlerhafte Zuordnung `ungueltig`/`ungültig` wurde vereinheitlicht.
+- Für einen isolierten PostgreSQL-Integrationstest ist ein unverschlüsselter Datenbankzugriff explizit nur auf Loopback-Adressen möglich (`DATABASE_SSL_MODE=disable`). Standardmäßig bleibt die TLS-Zertifikatsprüfung eingeschaltet.
+- Die GitHub-Actions-Prüfung `.github/workflows/entwicklung-tests.yml` läuft ausschließlich für den festgelegten Entwicklungszweig mit einer flüchtigen PostgreSQL-16-Datenbank `brilon_test`. Sie prüft über echte HTTP-Anfragen die parallele Buchungs- und Tageskapazität, Zeitfenster sowie den Unique-Index der Buchungsnummern. Die sonstigen HTTP-Tests bleiben durch einen gezielten Modul-Loader bei ihren isolierten Datenbank-Doubles.
+
 
 ## Prüfergebnisse
 
@@ -77,7 +82,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check site/admin.js` – bestanden.
 - `node --check lib/gpstour.js` – bestanden.
 - `node --check` für das Inline-JavaScript der Anschlussseite – bestanden.
-- `npm test` – 66 bestanden, 0 fehlgeschlagen.
+- `npm test` – **72 bestanden, 0 fehlgeschlagen** (GitHub Actions auf Node.js 22 mit isoliertem PostgreSQL 16, Lauf 41520103630).
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
 - Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
@@ -93,11 +98,11 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `node --check lib/sicherheitszustand.js` – bestanden.
 - `git diff --check` – bestanden.
 
-Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. Die reguläre Arbeitskopie enthält keine installierten Node-Abhängigkeiten (`pg` fehlt). PostgreSQL, `psql`, Docker und Podman sind in dieser Umgebung nicht vorhanden; Datenbank- und E-Mail-Routen wurden nicht gegen Dienste aufgerufen. Ein Viewport-Test war nicht möglich, weil die Chromium-Browserdatei fehlt.
+Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für `/anschluss.html` HTTP 200; die Vorschau-API antwortete ohne Datenbank erwartungsgemäß HTTP 503. Die reguläre Arbeitskopie enthält keine installierten Node-Abhängigkeiten (`pg` fehlt). PostgreSQL, `psql`, Docker und Podman waren in der ursprünglichen lokalen Umgebung nicht vorhanden. In GitHub Actions wurde nun eine isolierte PostgreSQL-16-Datenbank erfolgreich getestet; echte E-Mail-Dienste wurden nicht kontaktiert. Ein Viewport-Test war nicht möglich, weil die Chromium-Browserdatei fehlt.
 
 ## Noch offen
 
-- Der HTTP-End-to-End-Test deckt die Kernstrecke mit einem speicherbasierten PostgreSQL-Test-Double ab. Die echte PostgreSQL-Integration, Datenbank-Constraints/Transaktionsisolation und E-Mail-Zustellung benötigen noch separate Tests in einer isolierten Umgebung mit Mail-Test-Double.
+- Der HTTP-End-to-End-Test deckt die Kernstrecke mit einem speicherbasierten PostgreSQL-Test-Double ab. Ein erster echter PostgreSQL-Integrationstest für parallele Buchungen, Kapazitäten und Buchungsnummern-Unique-Index ist erfolgreich. Weitergehende Datenbank-Constraints, Transaktionsisolation über die geprüften Fälle hinaus und tatsächliche E-Mail-Zustellung benötigen noch zusätzliche isolierte Tests.
 - Vor DB-gestütztem Admin-Betrieb müssen die geschützten Migrationen für `brilon_admin_sessions` und `brilon_admin_totp_steps` geprüft und freigegeben werden; sie wurden nicht ausgeführt. Admin-Schreibanfragen verlangen einen sitzungsgebundenen CSRF-Token und prüfen zusätzlich den exakten Origin sowie `Sec-Fetch-Site`, sofern der Browser den Header sendet. Der TOTP-Schlüssel muss außerhalb von Git eingerichtet und sicher verwahrt werden.
 - Buchungsliste und Zahlungsübersicht sind seitenweise vollständig durchsuchbar. Die Kalenderansicht lädt jeweils den ausgewählten Monat.
 - Die kundenseitige Anschlussstrecke ist im HTTP-Test mit einem PostgreSQL-Test-Double abgedeckt. Eine erkannte Überzahlung/Gutschrift wird nicht automatisch ausgezahlt; dafür ist ein kontrollierter Erstattungsprozess erforderlich.
