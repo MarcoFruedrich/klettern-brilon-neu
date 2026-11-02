@@ -548,7 +548,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
          FROM brilon_gps_spiele g
          JOIN brilon_gps_touren t ON t.id=g.tour_id
          JOIN brilon_buchungen b ON b.id=g.buchung_id
-         WHERE g.token_hash=$1 AND t.aktiv=true AND t.data->>'buchbar'='true'
+         WHERE g.token_hash=$1 AND g.gesperrt_am IS NULL AND t.aktiv=true AND t.data->>'buchbar'='true'
            AND b.status='bestaetigt'`,[gpsTokenHash(token)]
       );
       if(!q.rowCount)return reply(res,404,{error:'Spielzugang nicht gefunden oder nicht freigegeben.'});
@@ -576,7 +576,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           `SELECT g.id,g.station_index,g.gestartet_am,g.abgeschlossen_am,t.data AS tour
            FROM brilon_gps_spiele g JOIN brilon_gps_touren t ON t.id=g.tour_id
            JOIN brilon_buchungen b ON b.id=g.buchung_id
-           WHERE g.token_hash=$1 AND t.aktiv=true AND b.status='bestaetigt' FOR UPDATE OF g`,
+           WHERE g.token_hash=$1 AND g.gesperrt_am IS NULL AND t.aktiv=true AND b.status='bestaetigt' FOR UPDATE OF g`,
           [gpsTokenHash(token)]
         );
         if(!q.rowCount){ergebnis={ungueltig:true};await client.query('ROLLBACK');}
@@ -621,7 +621,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         `UPDATE brilon_gps_spiele SET gast_name=$1,gast_einwilligung=$2,
            gast_einwilligung_am=CASE WHEN $2 THEN NOW() ELSE NULL END,
            gast_einwilligung_version=CASE WHEN $2 THEN $3 ELSE NULL END
-         WHERE token_hash=$4 AND abgeschlossen_am IS NOT NULL RETURNING id`,
+         WHERE token_hash=$4 AND gesperrt_am IS NULL AND abgeschlossen_am IS NOT NULL RETURNING id`,
         [name,einwilligung,einwilligung?GPS_GAESTELISTE_EINWILLIGUNG_VERSION:null,gpsTokenHash(token)]
       );
       if(!q.rowCount)return reply(res,404,{error:'Spiel nicht abgeschlossen oder Zugang ungültig.'});
@@ -1349,6 +1349,53 @@ preis=safeText(d.preis,50);
         return reply(res,200,{buchungen:q.rows,anzahl:Number(count.rows[0]?.anzahl||0),seite,proSeite});
       }
 
+      // Nur Metadaten: Die geheimen GPS-Tokens und ihre Hashwerte werden nie ausgeliefert.
+      if(route==='/api/admin/gps/spiele'&&req.method==='GET'){
+        const seiteText=u.searchParams.get('seite')||'1',seite=Number(seiteText),proSeite=30;
+        const tourId=u.searchParams.get('tourId')||'';
+        if(!/^\d+$/.test(seiteText)||!Number.isSafeInteger(seite)||seite<1||seite>100000)
+          return reply(res,400,{error:'Ungültige GPS-Zugangsseite.'});
+        if(tourId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tourId))
+          return reply(res,400,{error:'Ungültige GPS-Tour.'});
+        const params=[tourId||null];
+        const where='WHERE ($1::uuid IS NULL OR g.tour_id=$1::uuid)';
+        const count=await pool.query(
+          `SELECT COUNT(*)::text AS anzahl FROM brilon_gps_spiele g ${where}`,params);
+        const q=await pool.query(
+          `SELECT g.id,g.tour_id AS "tourId",g.buchung_id AS "buchungId",
+             g.erstellt_am AS "erstelltAm",g.gestartet_am AS "gestartetAm",
+             g.abgeschlossen_am AS "abgeschlossenAm",g.gesperrt_am AS "gesperrtAm",
+             g.station_index AS "stationIndex",g.spielzeit_sekunden AS "spielzeitSekunden",
+             t.data->>'titel' AS tour,
+             COALESCE(b.buchungsnummer,b.data->>'buchungsnummer') AS buchungsnummer,
+             b.data->>'name' AS name,b.data->>'datum' AS datum,
+             CASE
+               WHEN g.gesperrt_am IS NOT NULL THEN 'gesperrt'
+               WHEN g.abgeschlossen_am IS NOT NULL THEN 'abgeschlossen'
+               WHEN t.aktiv=false OR t.data->>'buchbar'<>'true' OR b.status<>'bestaetigt'
+                 THEN 'nicht_freigegeben'
+               WHEN g.gestartet_am IS NOT NULL THEN 'gestartet'
+               ELSE 'ausgestellt'
+             END AS status
+           FROM brilon_gps_spiele g
+           JOIN brilon_gps_touren t ON t.id=g.tour_id
+           JOIN brilon_buchungen b ON b.id=g.buchung_id ${where}
+           ORDER BY g.erstellt_am DESC,g.id DESC LIMIT $2 OFFSET $3`,
+          [...params,proSeite,(seite-1)*proSeite]
+        );
+        return reply(res,200,{spiele:q.rows,anzahl:Number(count.rows[0]?.anzahl||0),seite,proSeite});
+      }
+
+      const sperrenGps=route.match(/^\/api\/admin\/gps\/spiele\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/sperren$/i);
+      if(sperrenGps&&req.method==='PATCH'){
+        const q=await pool.query(
+          'UPDATE brilon_gps_spiele SET gesperrt_am=COALESCE(gesperrt_am,NOW()) WHERE id=$1 RETURNING id,gesperrt_am AS "gesperrtAm"',
+          [sperrenGps[1]]
+        );
+        if(!q.rowCount)return reply(res,404,{error:'GPS-Spielzugang nicht gefunden.'});
+        return reply(res,200,{success:true,...q.rows[0]});
+      }
+
       if(route==='/api/admin/gps/spiele'&&req.method==='POST'){
         const d=await body(req),tourId=safeText(d.tourId,36),buchungId=safeText(d.buchungId,36);
         if(!/^[0-9a-f-]{36}$/i.test(tourId)||!/^[0-9a-f-]{36}$/i.test(buchungId))
@@ -2072,11 +2119,13 @@ await pool.query(`
         gast_einwilligung BOOLEAN NOT NULL DEFAULT false,
         gast_einwilligung_am TIMESTAMPTZ,
         gast_einwilligung_version TEXT,
+        gesperrt_am TIMESTAMPTZ,
         erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
     await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_am TIMESTAMPTZ');
     await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_version TEXT');
+    await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }
