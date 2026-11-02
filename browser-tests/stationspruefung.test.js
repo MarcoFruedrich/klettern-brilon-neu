@@ -84,11 +84,22 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
       await page.locator('.pruefung-station .pruefung-zustand').selectOption('mangel');
       assert.equal(await page.locator('.pruefung-station .pruefung-beschreibung').getAttribute('required'),'');
       await page.locator('.pruefung-station .pruefung-beschreibung').fill('Defekter Sicherungskarabiner');
+      const pngBase64=await page.evaluate(()=>{
+        const canvas=document.createElement('canvas');
+        canvas.width=8;canvas.height=8;
+        canvas.getContext('2d').fillRect(0,0,8,8);
+        return canvas.toDataURL('image/png').split(',')[1];
+      });
+      await page.locator('.pruefung-station .pruefung-foto').setInputFiles({
+        name:'defekt.png',mimeType:'image/png',buffer:Buffer.from(pngBase64,'base64')
+      });
       await page.locator('#station-inspection button[type="submit"]').click();
       await page.waitForFunction(()=>document.getElementById('pruefung-status')?.textContent.includes('MANGEL ERFASST'));
       assert.equal(state.saved.pruefungen[0].stationId,station);
       assert.equal(state.saved.pruefungen[0].zustand,'mangel');
       assert.match(state.saved.pruefungen[0].beschreibung,/Sicherungskarabiner/);
+      assert.match(state.saved.pruefungen[0].foto,/^data:image\/jpeg;base64,/,
+        'Das Foto muss vor dem Upload lokal in ein kompaktes JPEG umgewandelt werden');
       assert.equal(await page.locator('#station-inspection').isHidden(),true);
       assert.equal(await page.locator('#onsite-unlock').isVisible(),true);
       await page.close();
