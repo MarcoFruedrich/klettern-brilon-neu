@@ -4,6 +4,7 @@ class Pool {
     if (process.env.MOCK_PG !== '1') throw new Error('Der HTTP-Test darf keine echte Datenbank öffnen.');
     this.offers = JSON.parse(process.env.MOCK_OFFERS || '[]');
     this.bookings = [];
+    this.guests = JSON.parse(process.env.MOCK_GUESTBOOK || '[]');
   }
 
   async query(sql, params=[]) { return this.run(sql, params); }
@@ -21,6 +22,11 @@ class Pool {
       return { rows:offers, rowCount:offers.length };
     }
     if (sql.includes('FROM brilon_kalender')) return { rows:[], rowCount:0 };
+    if (sql.includes('FROM brilon_gps_spiele g JOIN brilon_gps_touren t')&&sql.includes('gast_einwilligung=true')) {
+      const rows=this.guests.filter(item=>item.einwilligung===true&&(!params[0]||item.tour_id===params[0]))
+        .map(({name,datum,dauer_sekunden,tour})=>({name,datum,dauer_sekunden,tour}));
+      return {rows,rowCount:rows.length};
+    }
     if (sql.includes('COUNT(*)::integer AS anzahl')) {
       const count=this.bookings.filter(item=>item.data.anschlussElternId===params[0]&&item.id!==params[1]&&item.status==='bestaetigt').length;
       return { rows:[{anzahl:count}], rowCount:1 };

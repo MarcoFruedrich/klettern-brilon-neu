@@ -19,9 +19,14 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
       verfuegbare_termine:['2027-03-15'],buchbar:true,veroeffentlicht:true,dauer:60}
   ];
   const offerSecret='test-only-booking-offer-secret-32-chars';
+  const tourId='123e4567-e89b-12d3-a456-426614174000';
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
+    MOCK_GUESTBOOK:JSON.stringify([
+      {name:'Freigegebener Teamname',datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:true},
+      {name:'Nicht öffentlich',datum:'2027-03-15',dauer_sekunden:500,tour:'Brilon-Rätseltour',tour_id:tourId,einwilligung:false}
+    ]),
     RUN_SCHEMA_MIGRATIONS:'false',BREVO_API_KEY:'',BREVO_SENDER_EMAIL:'',BOOKING_NOTIFY_EMAIL:'',
     SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',BOOKING_OFFER_SECRET:offerSecret,
     ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password'
@@ -35,6 +40,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     catch{await new Promise(resolve=>setTimeout(resolve,50));}
   }
   assert.equal(ready,true,'Server sollte mit dem PostgreSQL-Test-Double starten');
+  const guestbookPrivate=await fetch(root+'/api/admin/gps/gaesteliste');
+  assert.equal(guestbookPrivate.status,401,'Gästelisten-Verwaltung muss geschützt sein');
   const anfrage=(uhrzeit)=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     vorname:'Max',nachname:'Mueller',email:'max@example.test',datum:'2027-03-15',uhrzeit,
     teilnehmer:4,angebot:'Klettern',datenschutz:'on'
@@ -55,6 +62,12 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie').split(';',1)[0];
   const adminHeaders={Cookie:cookie,Origin:root,'Content-Type':'application/json'};
+  const guestbook=await fetch(root+'/api/admin/gps/gaesteliste?tour='+tourId,{headers:{Cookie:cookie}});
+  assert.equal(guestbook.status,200);
+  const guestEntries=await guestbook.json();
+  assert.equal(guestEntries.length,1);
+  assert.equal(guestEntries[0].name,'Freigegebener Teamname');
+  assert.equal(guestEntries[0].tour,'Brilon-Rätseltour');
   const payment=await fetch(root+`/api/admin/buchungen/${adjacentData.id}/zahlungen`,{method:'POST',headers:adminHeaders,
     body:JSON.stringify({betrag:'25.00',methode:'ueberweisung',notiz:'Lokaler Testeingang'})});
   assert.equal(payment.status,201);

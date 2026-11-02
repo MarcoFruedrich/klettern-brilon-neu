@@ -418,12 +418,17 @@ c.append(bildBereich);
 async function gpsTourenLaden(buchungen) {
   const tourSelect=document.querySelector('#gps-game-form [name="tourId"]');
   const buchungSelect=document.querySelector('#gps-game-form [name="buchungId"]');
+  const gaestelistenTour=document.getElementById('admin-guestbook-tour');
   const liste=document.getElementById('gps-tour-list');
   if(!tourSelect||!buchungSelect||!liste)return;
   try{
     const tours=await api('/api/admin/gps/touren');
     liste.replaceChildren();tourSelect.replaceChildren();buchungSelect.replaceChildren();
+    if(gaestelistenTour){
+      const alle=el('option','Alle Touren');alle.value='';gaestelistenTour.replaceChildren(alle);
+    }
     for(const tour of tours){
+      if(gaestelistenTour){const option=el('option',tour.titel);option.value=tour.id;gaestelistenTour.append(option);}
       const card=el('article');card.className='booking';
       card.append(el('strong',tour.titel),el('p',`${tour.stationen.length} Stationen · ${tour.schwierigkeitsgrad} · ${tour.altersgruppe}`),
         el('p',`${tour.aktiv?'Aktiv':'Deaktiviert'} · ${tour.buchbar?'buchbar':'nicht buchbar'} · ${tour.startpunkt} → ${tour.ziel}`));
@@ -441,14 +446,9 @@ async function gpsTourenLaden(buchungen) {
       toggle.onclick=async()=>{await api('/api/admin/gps/touren/'+encodeURIComponent(tour.id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({aktiv:!tour.aktiv})});await gpsTourenLaden(buchungen);};
       const gaeste=el('button','Gästeliste anzeigen');gaeste.type='button';gaeste.className='btn secondary';
       gaeste.onclick=async()=>{
-        try{const entries=await api('/api/gps/gaesteliste?tour='+encodeURIComponent(tour.id));
-          card.querySelector('.gps-guests')?.remove();
-          const guests=el('div');guests.className='gps-guests';
-          guests.append(el('h4','Öffentliche Teilnahmen'));
-          if(!entries.length)guests.append(el('p','Noch keine freigegebenen Einträge.'));
-          for(const entry of entries)guests.append(el('p',`${entry.name} · ${entry.datum} · ${Math.floor(entry.dauer_sekunden/60)} Min.`));
-          card.append(guests);
-        }catch(error){status.textContent=error.message;}
+        if(gaestelistenTour)gaestelistenTour.value=tour.id;
+        await adminGaestelisteLaden();
+        document.getElementById('admin-guestbook-section')?.scrollIntoView({behavior:'smooth',block:'start'});
       };
       const qr=el('details');const summary=el('summary','QR-Zieladressen anzeigen');qr.append(summary);
       for(const station of tour.stationen){
@@ -467,6 +467,31 @@ async function gpsTourenLaden(buchungen) {
     const noBooking=el('option','Bestätigte Buchung auswählen');noBooking.value='';buchungSelect.prepend(noBooking);
   }catch(error){document.getElementById('gps-tour-status').textContent='GPS-Verwaltung nicht verfügbar: '+error.message;}
 }
+
+async function adminGaestelisteLaden(){
+  const list=document.getElementById('admin-guestbook-list');
+  const message=document.getElementById('admin-guestbook-status');
+  const tour=document.getElementById('admin-guestbook-tour')?.value||'';
+  if(!list||!message)return;
+  message.textContent='Einträge werden geladen …';list.replaceChildren();
+  try{
+    const query=tour?'?tour='+encodeURIComponent(tour):'';
+    const entries=await api('/api/admin/gps/gaesteliste'+query);
+    if(!entries.length){message.textContent='Keine freigegebenen Gästelisteneinträge vorhanden.';return;}
+    message.textContent=`${entries.length} freigegebene Einträge`;
+    for(const entry of entries){
+      const card=el('article');card.className='booking';
+      const minutes=Math.floor(Number(entry.dauer_sekunden||0)/60);
+      const seconds=String(Number(entry.dauer_sekunden||0)%60).padStart(2,'0');
+      card.append(el('strong',entry.name||'Name nicht angegeben'),
+        el('p',`${entry.tour||'GPS-Tour'} · ${entry.datum||'Datum unbekannt'}`),
+        el('p',`Benötigte Zeit: ${minutes} Min. ${seconds} Sek.`));
+      list.append(card);
+    }
+  }catch(error){message.textContent='Gästeliste konnte nicht geladen werden: '+error.message;}
+}
+
+document.getElementById('admin-guestbook-load')?.addEventListener('click',adminGaestelisteLaden);
 
 document.getElementById('gps-tour-form')?.addEventListener('submit',async event=>{
   event.preventDefault();const form=event.currentTarget;const statusGps=document.getElementById('gps-tour-status');

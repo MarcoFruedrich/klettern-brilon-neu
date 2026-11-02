@@ -1167,6 +1167,21 @@ preis=safeText(d.preis,50);
       if(!admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 
+      if(route==='/api/admin/gps/gaesteliste'&&req.method==='GET'){
+        const tourId=safeText(u.searchParams.get('tour'),36)||null;
+        if(tourId&&!/^[0-9a-f-]{36}$/i.test(tourId))
+          return reply(res,400,{error:'Tour-ID ungültig.'});
+        const q=await pool.query(
+          `SELECT g.gast_name AS name,to_char(g.abgeschlossen_am,'YYYY-MM-DD') AS datum,
+                  g.spielzeit_sekunden AS dauer_sekunden,t.data->>'titel' AS tour
+           FROM brilon_gps_spiele g JOIN brilon_gps_touren t ON t.id=g.tour_id
+           WHERE g.gast_einwilligung=true AND g.gast_name IS NOT NULL
+             AND g.abgeschlossen_am IS NOT NULL AND ($1::uuid IS NULL OR g.tour_id=$1::uuid)
+           ORDER BY g.abgeschlossen_am DESC LIMIT 500`,[tourId]
+        );
+        return reply(res,200,q.rows);
+      }
+
       if(route==='/api/admin/gps/touren'&&req.method==='GET'){
         const q=await pool.query('SELECT id,data,aktiv,erstellt_am,aktualisiert_am FROM brilon_gps_touren ORDER BY erstellt_am DESC');
         return reply(res,200,q.rows.map(r=>({id:r.id,...gpsTourAdminAnsicht(r.data),aktiv:r.aktiv,

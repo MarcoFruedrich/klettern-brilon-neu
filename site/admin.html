@@ -40,6 +40,7 @@
         <a href="#angebote-verwaltung">Programme</a>
         <a href="#special-offers-section">Tagesangebote</a>
         <a href="#anschlussrabatt-section">Anschlussrabatte</a>
+        <a href="#admin-guestbook-section">Gästeliste</a>
         <a href="#gps-verwaltung">GPS-Touren</a>
       </nav>
 
@@ -229,6 +230,19 @@
 </form>
 
   <div id="angebote-admin-liste"></div>
+</section>
+
+<section id="admin-guestbook-section" class="booking admin-anchor">
+  <h2>Teilnahme-Gästeliste</h2>
+  <p>Angezeigt werden nur abgeschlossene Touren, für die eine ausdrückliche Veröffentlichungseinwilligung vorliegt.</p>
+  <div class="admin-booking-filters">
+    <label>GPS-Tour
+      <select id="admin-guestbook-tour"><option value="">Alle Touren</option></select>
+    </label>
+    <button type="button" id="admin-guestbook-load" class="btn secondary">Einträge laden</button>
+  </div>
+  <p id="admin-guestbook-status" role="status" aria-live="polite"></p>
+  <div id="admin-guestbook-list" class="admin-grid"></div>
 </section>
 
 <section id="gps-verwaltung">
