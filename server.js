@@ -13,6 +13,7 @@ const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben }
 const { decodeBase32:totpSecretDecode, verifyTotp } = require('./lib/totp');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
+const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 
 const { createClient } = require('@supabase/supabase-js');
@@ -402,17 +403,7 @@ const ende = fenster
     ':' + String(fenster[1] % 60).padStart(2, '0')
   : 'nach Absprache';
 
-const buchungsdetails = [
-  `Buchungsnummer: ${ergebnis.buchungsnummer}`,
-  `Name: ${name}`,
-  `Datum: ${datum}`,
-  `Angebot: ${angebot}`,
-  `Teilnehmer: ${teilnehmer}`,
-  `Beginn: ${data.uhrzeit} Uhr`,
-  `Ende: ${ende}${fenster ? ' Uhr' : ''}`,
-  `Telefon: ${data.telefon || 'Nicht angegeben'}`,
-  `Nachricht: ${data.nachricht || 'Keine'}`
-].join('\n');
+const buchungsdetails=buchungsDetails({...data,ende:`${ende}${fenster?' Uhr':''}`});
 
 
 
@@ -973,24 +964,7 @@ if (
     gesamtCent, Array.isArray(kunde.zahlungen) ? kunde.zahlungen : []
   );
 
-  const nachrichten = {
-    bestaetigt: {
-      betreff: 'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
-      text: stand
-        ? `Deine Buchung wurde verbindlich bestätigt.\n\nTatsächlich erfasst: ${(stand.erhaltenCent / 100).toFixed(2).replace('.', ',')} €\nNoch offen: ${(stand.offenCent / 100).toFixed(2).replace('.', ',')} €.`
-        : 'Deine Buchung wurde verbindlich bestätigt.'
-    },
-    abgelehnt: {
-      betreff: 'Rückmeldung zu deiner Buchungsanfrage – Klettern Brilon',
-      text: 'Leider können wir deine Buchungsanfrage nicht annehmen.'
-    },
-    storniert: {
-      betreff: 'Deine Buchung wurde storniert – Klettern Brilon',
-      text: 'Deine Buchung wurde storniert.'
-    }
-  };
-
-  const nachricht = nachrichten[status];
+  const nachricht=buchungsstatusNachricht(status,kunde,stand);
 
   if (empfaenger && nachricht) {
     const inhalt =
@@ -1054,52 +1028,15 @@ if (
     error: 'Für diese Buchung ist kein gültiger Gesamtpreis hinterlegt.'
   });
 }  
-    const gesamtpreis = kunde.gesamtpreis;
-const anzahlung = Math.round(gesamtpreis * 25) / 100;
-const restbetrag = Math.round((gesamtpreis - anzahlung) * 100) / 100;
-
-const euro = betrag =>
-  betrag.toLocaleString('de-DE', {
-    style: 'currency',
-    currency: 'EUR'
-  });  
-
      if (!process.env.BANK_NAME || !process.env.BANK_IBAN) {
   return reply(res, 503, {
     error: 'Bankverbindung ist noch nicht vollständig eingerichtet.'
   });
 } 
-     const zahlungstext = [
-  `Hallo ${kunde.name || ''},`,
-  '',
-  'vielen Dank für deine Buchungsanfrage bei Klettern & Abenteuer Brilon.',
-  '',
-  `Angebot: ${kunde.angebot}`,
-  `Datum: ${kunde.datum}`,
-  `Gesamtpreis: ${euro(gesamtpreis)}`,
-  '',
-  'Zahlungsmöglichkeiten:',
-  `1. Anzahlung von 25 %: ${euro(anzahlung)}`,
-  `   Restbetrag vor Ort: ${euro(restbetrag)}`,
-  `2. Vollständige Vorauszahlung: ${euro(gesamtpreis)}`,
-  '',
-  'Bankverbindung:',
-  `Bank: ${process.env.BANK_NAME || ''}`,
-  `IBAN: ${process.env.BANK_IBAN || ''}`,
-  `Verwendungszweck: ${kunde.buchungsnummer || buchung.buchungsnummer || buchungsId}`,
-  '',
-  'Bitte überweise den gewählten Betrag innerhalb von 48 Stunden.',
-  'Bei kurzfristigen Buchungen bitten wir um sofortige Überweisung.',
-  '',
-  'Bei einer Anzahlung kannst du den Restbetrag',
-  'am Veranstaltungstag bar oder per Karte bezahlen.',
-  '',
-  'Die Buchung wird erst nach Eingang der erforderlichen Zahlung',
-  'und unserer ausdrücklichen Bestätigung verbindlich.',
-  '',
-  'Viele Grüße',
-  'Klettern & Abenteuer Brilon'
-].join('\n'); 
+     const zahlungstext=zahlungsinformationenText(kunde,{
+       bankName:process.env.BANK_NAME,iban:process.env.BANK_IBAN,
+       bookingId:buchung.buchungsnummer||buchungsId
+     });
   if (!kunde.email) {
   return reply(res, 400, {
     error: 'Für diese Buchung ist keine Kunden-E-Mail hinterlegt.'
