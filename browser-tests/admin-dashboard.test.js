@@ -240,7 +240,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('1 Buchung(en) gefunden'));
     assert.equal(await page.locator('#bookings .booking').count(),1);
     assert.match(await page.locator('#bookings .booking').first().textContent(),/MASSENTEST-120/);
-    await page.locator('#payment-overview-page-info').getByText('Seite 1 / 3', {exact:false}).waitFor();
+    await page.waitForFunction(()=>document.getElementById('payment-overview-page-info')?.textContent.includes('Seite 1 / 3'));
     assert.equal(await page.locator('#payment-overview-list .payment-record').count(),50);
     await page.locator('#payment-overview-next').click();
     await page.waitForFunction(()=>document.getElementById('payment-overview-page-info')?.textContent.includes('Seite 2 / 3'));
