@@ -233,7 +233,8 @@ function fakeAdminApi(page) {
     }
     if(endpoint==='/api/admin/gps/gaesteliste')return json(200,[]);
     if(endpoint==='/api/admin/kalenderbuchungen'||endpoint==='/api/admin/kalender')return json(200,[]);
-    if(endpoint==='/api/aktionen'||endpoint==='/api/admin/aktionen')return json(200,state.specials);
+    if((endpoint==='/api/aktionen'||endpoint==='/api/admin/aktionen')&&method==='GET')
+      return json(200,state.specials);
     if(endpoint==='/api/admin/aktionen'&&method==='POST'){
       const item={...readBody(),id:'550e8400-e29b-41d4-a716-446655443333'};
       state.specials.push(item);return json(201,{id:item.id});
