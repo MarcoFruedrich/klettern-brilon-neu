@@ -39,7 +39,8 @@ Arbeitszweig: `entwicklung/phase-1-buchungen-sonderangebote-gps`
 - Die Admin-Verwaltung besitzt eine dauerhaft erreichbare Sprungnavigation für Buchungen/Zahlungen, Kalender, Programme, Tagesangebote, Anschlussrabatte und GPS-Touren. Auf schmalen Bildschirmen bleibt die Navigation horizontal wischbar; Kalenderaktionen und Sprungziele berücksichtigen Touch-Größen und Sticky-Kopfzeilen.
 - Die GPS-Gästeliste ist jetzt zusätzlich zentral im Admin-Bereich nach Tour filterbar. Der Admin-Endpunkt liefert ausschließlich abgeschlossene Spiele mit expliziter Einwilligung, verlangt eine gültige Sitzung und gibt weder Spielzugang noch interne Spieldaten aus.
 - Admins können einen öffentlichen Gästelisteneintrag nach Bestätigung entfernen. Dabei werden Name und Einwilligung gelöscht; Abschlusszeit und Spielzeit bleiben für den internen Spielstand erhalten. Der HTTP-Test prüft Adminschutz und dass der Name danach auch aus der öffentlichen Gästeliste verschwindet.
-- Bei öffentlicher Zustimmung wird nun zusätzlich der Einwilligungszeitpunkt gespeichert und nur in der geschützten Admin-Gästeliste angezeigt. Ein Widerruf entfernt auch diesen Zeitpunkt. Die dazugehörige Spaltenmigration ist migrationsgeschützt und wurde nicht ausgeführt.
+- Bei öffentlicher Zustimmung wird der Einwilligungszeitpunkt gespeichert und nur in der geschützten Admin-Gästeliste angezeigt. Ein Widerruf entfernt auch diesen Zeitpunkt. Die Spaltenmigration ist geschützt und wurde nicht ausgeführt.
+- Die GPS-Gästeliste speichert jetzt auch die Kennung der angezeigten Einwilligungstextversion. Der Server weist veraltete Versionen zurück; der Admin sieht Kennung und Zeitpunkt. Wortlaut und Änderungsablauf stehen in `GPS-GAESTELISTEN-EINWILLIGUNG.md`. Die Spaltenmigrationen bleiben geschützt und wurden nicht ausgeführt.
 - Die GPS-Verwaltung erzeugt QR-Etiketten lokal als SVG aus den festen Stationskennungen und öffnet einen druckbaren Satz pro Tour. Die QR-Grafik enthält nur den Stationslink, keine Koordinaten oder Kontrollcodes. Dafür ist qrcode-generator von Kazuhiko Arase lokal mit MIT-Lizenz beigefügt; es werden keine externen QR-Dienste verwendet.
 - Die Bedienungsanleitung im Admin-Handbuch beschreibt die vorhandenen Buchungs-, Zahlungs-, Kalender-, Programm-, Rabatt- und GPS-Abläufe einschließlich des Stations-JSON-Formats und sicherer Zugangsausgabe.
 - Die Zahlungsübersicht zeigt jetzt 50 gefilterte Buchungen je Seite. Ihre centgenauen Eingangs-, Rest- und Gutschriftssummen werden über alle Buchungen berechnet; einzelne Zahlungseinträge lassen sich aufklappen.
@@ -62,6 +63,7 @@ Ausgeführt lokal ohne Datenbank, SMTP/Brevo, Supabase oder externe E-Mail:
 - `npm test` – 39 bestanden, 0 fehlgeschlagen.
 - QR-Etiketten: automatisierte Tests prüfen SVG-Ausgabe, Daten-URI, Ruhezone sowie ungültige/überlange Eingaben.
 - Der HTTP-Test prüft das Hinzufügen und Auslesen eines Orts sowie die Zurückweisung eines leeren Ortsnamens.
+- Der HTTP-Test weist eine alte GPS-Gästelisten-Einwilligungsversion zurück, prüft die aktuelle Version in der geschützten Verwaltung und stellt sicher, dass sie nicht in der öffentlichen Liste erscheint.
 - `node --check test/booking-http.test.js` – bestanden.
 - `node --check test/admin-navigation.test.js` – bestanden.
 - `node --check site/zahlungsuebersicht.js` – bestanden.
@@ -79,8 +81,8 @@ Ein statischer Smoke-Test mit temporären lokalen Dependency-Stubs lieferte für
 - QR-Etiketten können erzeugt und gedruckt werden. Ausdrucke müssen vor dem Einsatz an den Stationen praktisch mit mehreren Smartphones gescannt werden. Beim Bearbeiten bleiben Kontrollcode-Hashes erhalten, sofern Stations-ID und QR-Kennung gleich bleiben; bei einer neuen oder umgezogenen Station ist ein neuer Code erforderlich.
 - Die 15 Fragen umfassende Mustertour liegt als Entwurf vor. Koordinaten, Routenführung, Zugänglichkeit und praktische Sicherheit müssen vor Veröffentlichung örtlich geprüft werden.
 - Der Status der produktiven Schema- und Kalenderdefinitionen ist noch zu ermitteln. Die Tabellen werden für lokale/isolierte Tests nicht automatisch angelegt.
-- Datenschutz- und Löschkonzept, Auskunft/Export, Versionierung des Einwilligungstexts sowie verbindliche Bedingungen sind noch zu entwickeln und fachlich zu prüfen.
-- Der Einwilligungszeitpunkt wird gespeichert; eine revisionssichere Dokumentation der Textversion sowie ein allgemeines Aufbewahrungs-/Löschkonzept für alle Buchungs- und Spieldaten bleiben offen.
+- Datenschutz- und Löschkonzept, Auskunft/Export sowie verbindliche Bedingungen sind noch zu entwickeln und fachlich zu prüfen.
+- Einwilligungszeitpunkt und Textversion werden gespeichert. Ein allgemeines Aufbewahrungs-/Löschkonzept und eine Auskunft/Exportfunktion für Buchungs- und Spieldaten bleiben offen.
 - Mobile und Desktop-Bedienung, Tastaturbedienbarkeit und Screenreader-Verhalten sind noch visuell und automatisiert zu testen.
 - Die neue Admin-Sprungnavigation wurde strukturell auf gültige Ziele geprüft. Ein visueller Smartphone-/Tablet-/Desktop-Test bleibt offen, da in der Umgebung kein Chromium-Browser verfügbar ist.
 

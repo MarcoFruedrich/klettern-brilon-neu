@@ -38,7 +38,7 @@
         <h2>Geschafft!</h2>
         <p id="gps-time"></p>
         <form id="gps-guest">
-          <label class="gps-choice"><input id="gps-consent" type="checkbox"><span>Ich stimme zu, dass der von mir angegebene Name, das Datum und die benötigte Zeit öffentlich in der Gästeliste erscheinen. Die Teilnahme ist auch ohne Einwilligung möglich.</span></label>
+          <label class="gps-choice"><input id="gps-consent" type="checkbox" data-consent-version="2026-11-02-v1"><span>Ich stimme zu, dass der von mir angegebene Name, das Datum und die benötigte Zeit öffentlich in der Gästeliste erscheinen. Die Teilnahme ist auch ohne Einwilligung möglich.</span></label>
           <label>Name oder Gruppenname (optional)<input id="gps-name" maxlength="80"></label>
           <button class="btn secondary" type="submit">Teilnahme speichern</button>
         </form>
@@ -105,7 +105,9 @@
       event.preventDefault();
       try{
         const einwilligung=document.getElementById('gps-consent').checked;
-        await api('/api/gps/abschluss',{token,einwilligung,name:document.getElementById('gps-name').value});
+        const consent=document.getElementById('gps-consent');
+        await api('/api/gps/abschluss',{token,einwilligung,name:document.getElementById('gps-name').value,
+          einwilligungVersion:einwilligung?consent.dataset.consentVersion:null});
         status.textContent=einwilligung?'Danke, dein Eintrag wurde gespeichert.':'Danke fürs Mitspielen. Es wurde kein öffentlicher Eintrag erstellt.';
         event.target.hidden=true;
       }catch(e){status.textContent=e.message;}

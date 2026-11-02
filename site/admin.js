@@ -602,6 +602,7 @@ async function adminGaestelisteLaden(){
         const timestamp=new Date(entry.einwilligung_am);
         if(!Number.isNaN(timestamp.getTime()))card.append(el('small',`Öffentliche Einwilligung erfasst: ${timestamp.toLocaleString('de-DE')}`));
       }
+      if(entry.einwilligung_version)card.append(el('small',`Einwilligungstext-Version: ${entry.einwilligung_version}`));
       const remove=el('button','Öffentlichen Eintrag entfernen');remove.type='button';remove.className='danger';
       remove.onclick=async()=>{
         if(!window.confirm(`Den öffentlichen Namenseintrag „${entry.name}“ entfernen? Spielabschluss und Spielzeit bleiben erhalten.`))return;

@@ -57,15 +57,22 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(qrLibrary.status,200,'Lokale QR-Bibliothek muss über die Website erreichbar sein');
   const qrBuilder=await fetch(root+'/qr-etiketten.js');
   assert.equal(qrBuilder.status,200,'Lokaler QR-Etikettengenerator muss über die Website erreichbar sein');
+  const gpsPage=await fetch(root+'/gps.html');
+  assert.match(await gpsPage.text(),/data-consent-version="2026-11-02-v1"/);
   const missingGuestName=await fetch(root+'/api/gps/abschluss',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({token:guestToken,einwilligung:true,name:''})});
   assert.equal(missingGuestName.status,400,'Ein öffentlicher Eintrag erfordert einen freiwilligen Namen');
+  const oldConsent=await fetch(root+'/api/gps/abschluss',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token:guestToken,einwilligung:true,name:'Freigegebener Teamname',einwilligungVersion:'2026-10-01-v1'})});
+  assert.equal(oldConsent.status,409,'Veraltete Einwilligungstexte dürfen keinen öffentlichen Eintrag freigeben');
   const consent=await fetch(root+'/api/gps/abschluss',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({token:guestToken,einwilligung:true,name:'Freigegebener Teamname'})});
+    body:JSON.stringify({token:guestToken,einwilligung:true,name:'Freigegebener Teamname',einwilligungVersion:'2026-11-02-v1'})});
   assert.equal(consent.status,200);
   assert.equal((await consent.json()).oeffentlich,true);
   const publicGuestbook=await fetch(root+'/api/gps/gaesteliste?tour='+tourId);
-  assert.equal((await publicGuestbook.json())[0].name,'Freigegebener Teamname');
+  const publicEntry=(await publicGuestbook.json())[0];
+  assert.equal(publicEntry.name,'Freigegebener Teamname');
+  assert.equal('einwilligung_version' in publicEntry,false,'Einwilligungsversion bleibt in der geschützten Verwaltung');
   const guestbookPrivate=await fetch(root+'/api/admin/gps/gaesteliste');
   assert.equal(guestbookPrivate.status,401,'Gästelisten-Verwaltung muss geschützt sein');
   const guestDeletePrivate=await fetch(root+`/api/admin/gps/gaesteliste/${guestId}`,{method:'DELETE'});
@@ -139,6 +146,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(guestEntries[0].name,'Freigegebener Teamname');
   assert.equal(guestEntries[0].tour,'Brilon-Rätseltour');
   assert.ok(Number.isFinite(Date.parse(guestEntries[0].einwilligung_am)),'Einwilligungszeitpunkt muss erfasst werden');
+  assert.equal(guestEntries[0].einwilligung_version,'2026-11-02-v1');
   const guestDelete=await fetch(root+`/api/admin/gps/gaesteliste/${guestId}`,{method:'DELETE',headers:adminHeaders});
   assert.equal(guestDelete.status,200);
   const guestbookAfterDelete=await fetch(root+'/api/admin/gps/gaesteliste?tour='+tourId,{headers:{Cookie:cookie}});

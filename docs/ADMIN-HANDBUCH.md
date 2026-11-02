@@ -107,7 +107,8 @@ Zusatzbuchung bestätigt wird.
 - Die Gästeliste zeigt nur abgeschlossene Spiele mit ausdrücklicher Zustimmung.
   Ein Admin kann einen öffentlichen Eintrag entfernen; dabei werden Name und
   Einwilligung gelöscht, der interne Abschluss und die Spielzeit bleiben
-  erhalten.
+  erhalten. Die Verwaltung zeigt außerdem den Einwilligungszeitpunkt und die
+  Textversion. Version `2026-11-02-v1` ist im Einwilligungsregister dokumentiert.
 
 GPS-Koordinaten, Routenführung, historische Fragen, Zugänglichkeit und
 praktisches Sicherheitskonzept müssen vor Veröffentlichung vor Ort geprüft
