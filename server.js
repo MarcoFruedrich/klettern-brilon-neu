@@ -3,6 +3,7 @@
 'use strict';
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
+const { anschlussrabatte } = require('./lib/anschlussrabatt');
 
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
@@ -361,6 +362,24 @@ Promise.allSettled([
       return reply(res,200,{success:true},{
         'Set-Cookie':`${cookieName}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`
       });
+    }
+
+    // Nur Vorschau: keine Buchung und kein Zahlungssaldo wird veraendert.
+    if(route==='/api/admin/anschlussrabatt/vorschau'&&req.method==='POST'){
+      if(!admin(req,res))return;
+      const d=await body(req);
+      if(!d||!Array.isArray(d.programme)||d.programme.length<2||d.programme.length>20)
+        return reply(res,400,{error:'Bitte 2 bis 20 Programme angeben.'});
+      try{
+        const positionen=anschlussrabatte(d.programme);
+        return reply(res,200,{
+          positionen,
+          rabattGesamtCent:positionen.reduce((sum,p)=>sum+p.rabattCent,0),
+          endpreisGesamtCent:positionen.reduce((sum,p)=>sum+p.endpreisCent,0)
+        });
+      }catch(fehler){
+        return reply(res,400,{error:fehler.message});
+      }
     }
 
     if(route==='/api/admin/logout'&&req.method==='POST'){
