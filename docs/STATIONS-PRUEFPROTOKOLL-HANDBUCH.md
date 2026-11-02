@@ -25,6 +25,18 @@
 
 **Festgelegte Zugangssituation:** Das Tablet ist ausschließlich für die Verwaltung physisch erreichbar und bedienbar. Mitarbeitende bedienen das Tablet **nicht**; sie können den kurz angezeigten Code lediglich ablesen. Gäste können Werbung sehen, jedoch keinerlei Eingaben am Tablet vornehmen. Daher ist eine zusätzliche Android-Kiosksperre gegen unbefugte Touch-Bedienung nicht zwingend, sofern die Abschirmung in der Praxis gewährleistet ist. Die Verwaltung übernimmt die Erstkopplung, Betriebssystem-Einstellungen und nötige Gerätesperrungen. Vor echtem Einsatz sollten Befestigung, Sichtbarkeit der Anzeige, WLAN-Ausfall und automatischer Wiederanlauf geprüft werden. Die physische Anwesenheit wird durch den Code nicht unabhängig bewiesen.
 
+## Tablet-Verbindung in der Verwaltung prüfen
+
+In der geschützten Stationsprüfung-Verwaltung zeigt **„Tablet-Verbindung prüfen“** die gekoppelten Tablets mit dem letzten vom Server empfangenen Lebenszeichen. Die Anzeige unterscheidet:
+
+- **Erreichbar:** Ein gültig gekoppeltes, nicht gesperrtes Tablet hat sich in den letzten 45 Sekunden beim Server gemeldet.
+- **Keine aktuelle Verbindung:** Das Tablet ist zwar gekoppelt, hat sich aber seit mehr als 45 Sekunden nicht gemeldet oder die Werbeseite wurde noch nie geöffnet. Neue Prüfcode-Anforderungen werden dann abgewiesen.
+- **Gesperrt:** Der Gerätezugang wurde durch die Verwaltung deaktiviert und kann keine Prüfcodes mehr empfangen.
+
+Ist die Code-Anforderung auf dem Mitarbeitertelefon gesperrt, zunächst vor Ort überprüfen, ob das Werbetablet eingeschaltet ist, die Webseite sichtbar läuft und eine Internetverbindung besteht. Nach Wiederherstellung der Verbindung wird der Status durch eine neue Tabletanfrage aktualisiert. Die Erreichbarkeitsanzeige bestätigt **nur den letzten Kontakt zum Server**, nicht die tatsächliche physische Aufstellung oder Anwesenheit einer Person.
+
+Bei einem Wechsel zu einer anderen App oder einem unsichtbaren Browser-Tab beendet die Werbeseite ihre regelmäßigen Lebenszeichen und blendet einen gerade sichtbaren Prüfcode aus. Die Werbeanzeige selbst wird nicht über den Mitarbeiterzugang bedient.
+
 ## Zuverlässige Werbeanzeige im Dauerbetrieb
 
 - **Angebote:** Alle elf Sekunden wird zum nächsten veröffentlichten Angebot gewechselt. Alle fünf Minuten wird die Liste aktualisiert; Änderungen aus der Verwaltung können so ohne Neustart sichtbar werden. Bei einem kurzzeitigen Serverausfall bleibt die zuvor geladene Werbung erhalten.
