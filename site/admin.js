@@ -28,7 +28,15 @@ const statusNamen = {
 
 async function refresh() {
   try {
-    const bookings = await api('/api/admin/buchungen');
+    const alleBuchungen = await api('/api/admin/buchungen');
+    const suchtext = (document.getElementById('bookings-search')?.value || '').trim().toLocaleLowerCase('de-DE');
+    const statusFilter = document.getElementById('bookings-status-filter')?.value || 'alle';
+    const bookings = alleBuchungen.filter(b => {
+      const d=b.data || {};
+      const durchsuchbar=[d.name,d.buchungsnummer,b.buchungsnummer,d.email,d.angebot].join(' ').toLocaleLowerCase('de-DE');
+      return (!suchtext || durchsuchbar.includes(suchtext)) &&
+        (statusFilter==='alle' || (b.status || 'offen')===statusFilter);
+    });
 
     login.hidden = true;
     workspace.hidden = false;
@@ -68,18 +76,15 @@ async function refresh() {
       );
 
       const gesamtpreis = Number(b.data.gesamtpreis);
-let zahlungsstatus = b.data.zahlungsstatus || 'offen';
 
 if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
+  const zahlungen = Array.isArray(b.data.zahlungen) ? b.data.zahlungen : [];
+  const erhaltenCent = zahlungen.reduce((summe, z) => summe + Number(z.betragCent || 0), 0);
+  const gesamtCent = Math.round(gesamtpreis * 100);
+  const restbetragCent = Math.max(0, gesamtCent - erhaltenCent);
+  const anzahlungCent = Math.round(gesamtCent * 0.25);
 
-  const erhalten =
-    zahlungsstatus === 'vollstaendig' ? gesamtpreis :
-    zahlungsstatus === 'anzahlung' ? Math.round(gesamtpreis * 25) / 100 :
-    0;
-
-  const restbetrag = Math.round((gesamtpreis - erhalten) * 100) / 100;
-
-  const euro = wert => wert.toLocaleString('de-DE', {
+  const euro = cent => (cent / 100).toLocaleString('de-DE', {
     style: 'currency',
     currency: 'EUR'
   });
@@ -91,13 +96,47 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
   zahlungsInfo.style.borderRadius = '8px';
 
   zahlungsInfo.append(
-    el('p', 'Gesamtpreis: ' + euro(gesamtpreis)),
-    el('p', 'Zahlung erhalten: ' + euro(erhalten)),
-    el('p', 'Offener Restbetrag: ' + euro(restbetrag))
+    el('p', 'Gesamtpreis: ' + euro(gesamtCent)),
+    el('p', 'Tatsächlich eingegangen: ' + euro(erhaltenCent)),
+    el('p', 'Offener Restbetrag: ' + euro(restbetragCent)),
+    el('p', '25 % Anzahlung: ' + euro(anzahlungCent) +
+      (erhaltenCent >= anzahlungCent ? ' – erreicht' : ' – noch nicht erreicht'))
   );
 
-  c.append(zahlungsInfo);
+  const zahlungsformular = document.createElement('form');
+  zahlungsformular.className = 'payment-entry';
+  zahlungsformular.innerHTML = '<label>Eingegangener Betrag (€)<input name="betrag" type="number" min="0.01" max="' +
+    (restbetragCent / 100).toFixed(2) + '" step="0.01" required></label>' +
+    '<label>Zahlungsart<select name="methode"><option value="ueberweisung">Überweisung</option>' +
+    '<option value="bar">Bar</option><option value="karte">Karte</option><option value="sonstiges">Sonstiges</option></select></label>' +
+    '<label>Interne Notiz (optional)<input name="notiz" maxlength="300"></label>' +
+    '<button class="btn secondary" type="submit">Zahlungseingang erfassen</button>';
+  if (restbetragCent === 0) zahlungsformular.hidden = true;
+  zahlungsformular.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = zahlungsformular.querySelector('button');
+    button.disabled = true;
+    try {
+      const values = Object.fromEntries(new FormData(zahlungsformular));
+      await api('/api/admin/buchungen/' + encodeURIComponent(b.id) + '/zahlungen', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(values)
+      });
+      await refresh();
+    } catch (err) {
+      meldung.textContent = 'Zahlung konnte nicht erfasst werden: ' + err.message;
+      button.disabled = false;
+    }
+  });
+
+  for (const z of zahlungen) {
+    const cent = Number(z.betragCent || 0);
+    zahlungsInfo.append(el('small', new Date(z.erhaltenAm).toLocaleString('de-DE') +
+      ' · ' + euro(cent) + ' · ' + z.methode + (z.notiz ? ' · ' + z.notiz : '')));
+  }
+
+  c.append(zahlungsInfo, zahlungsformular);
 }
+
       const statusZeile = el(
         'p',
         'Bearbeitungsstatus: ' + (statusNamen[b.status] || 'Offen')
@@ -124,28 +163,6 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
       auswahl.value = b.status || 'offen';
       c.append(statusLabel, auswahl);
 
-      const zahlungsLabel = el('label', 'Zahlungsstatus');
-zahlungsLabel.style.display = 'block';
-zahlungsLabel.style.marginTop = '15px';
-
-const zahlungsAuswahl = document.createElement('select');
-zahlungsAuswahl.style.width = '100%';
-zahlungsAuswahl.style.padding = '12px';
-zahlungsAuswahl.style.margin = '8px 0 15px';
-
-[
-  ['offen', 'Noch keine Zahlung erhalten'],
-  ['anzahlung', '25 % Anzahlung erhalten – 75 % vor Ort offen'],
-  ['vollstaendig', '100 % vollständig bezahlt']
-].forEach(([wert, bezeichnung]) => {
-  const option = document.createElement('option');
-  option.value = wert;
-  option.textContent = bezeichnung;
-  zahlungsAuswahl.append(option);
-});
-
-zahlungsAuswahl.value = b.data.zahlungsstatus || 'offen';
-c.append(zahlungsLabel, zahlungsAuswahl);
       const notizLabel = el('label', 'Interne Bearbeitungsnotiz');
       notizLabel.style.display = 'block';
 
@@ -179,14 +196,12 @@ c.append(zahlungsLabel, zahlungsAuswahl);
       },
       body: JSON.stringify({
         status: auswahl.value,
-        bearbeitungsnotiz: notiz.value,
-        zahlungsstatus: zahlungsAuswahl.value
+        bearbeitungsnotiz: notiz.value
       })
     });
 
     b.status = ergebnis.status;
     b.bearbeitungsnotiz = notiz.value;
-    b.data.zahlungsstatus = zahlungsAuswahl.value;
     auswahl.value = b.status;
 
     statusZeile.textContent =
@@ -393,6 +408,9 @@ c.append(bildBereich);
     status.textContent = e.message;
   }
 }
+
+document.getElementById('bookings-search')?.addEventListener('input', () => refresh());
+document.getElementById('bookings-status-filter')?.addEventListener('change', () => refresh());
 
 login.onsubmit = async e => {
   e.preventDefault();

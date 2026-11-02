@@ -4,27 +4,20 @@
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
+const { zahlungsstand, zahlungErgaenzen } = require('./lib/buchungslogik');
 
-const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SECRET_KEY
-);
-
-const mailTransporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
+const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
+  : null;
 
 
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:{ca:process.env.DATABASE_CA_CERT,rejectUnauthorized:true}}):null;
 const sessions=new Map(), attempts=new Map();const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon'};
 async function brevoMail(empfaenger, betreff, inhalt) {
+  if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL)
+    throw new Error('E-Mail-Versand ist nicht konfiguriert.');
   const antwort = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
@@ -35,7 +28,7 @@ async function brevoMail(empfaenger, betreff, inhalt) {
     body: JSON.stringify({
       sender: {
         name: 'Klettern & Abenteuer Brilon',
-        email: 'vormund.friedrich@gmail.com'
+        email: process.env.BREVO_SENDER_EMAIL
       },
       to: [{ email: empfaenger }],
       subject: betreff,
@@ -53,6 +46,11 @@ function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':
 async function body(req){let data='';for await(const chunk of req){data+=chunk;if(data.length>16000)throw Error('Anfrage zu groß')}try{return JSON.parse(data)}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){const now=Date.now(),a=attempts.get(key)||[];const next=a.filter(t=>t>now-window);next.push(now);attempts.set(key,next);return next.length<=max}
 function safeText(v,n=200){return typeof v==='string'?v.trim().slice(0,n):''}
+function gueltigesDatum(v){
+  if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
+  const datum=new Date(v+'T12:00:00Z');
+  return !Number.isNaN(datum.getTime())&&datum.toISOString().slice(0,10)===v;
+}
 function session(req){const match=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/);const token=match?.[1],exp=sessions.get(token);if(!exp)return false;if(exp<Date.now()){sessions.delete(token);return false}return true}
 function admin(req,res){if(!session(req)){reply(res,401,{error:'Bitte anmelden.'});return false}return true}
 
@@ -130,7 +128,7 @@ async function main(req,res){
             teilnehmer=Number(d.teilnehmer);
 
       if(!vorname||!nachname||!/^\S+@\S+\.\S+$/.test(email)||
-         !/^\d{4}-\d{2}-\d{2}$/.test(datum)||
+         !gueltigesDatum(datum)||
          !angebot||!Number.isInteger(teilnehmer)||
          teilnehmer<1||teilnehmer>150||d.datenschutz!=='on')
         return reply(res,400,{error:'Bitte Pflichtfelder korrekt ausfüllen.'});
@@ -224,7 +222,7 @@ const buchungsdetails = [
 
 
 
-Promise.allSettled([
+const benachrichtigungen = [
   brevoMail(
     email,
     'Deine Buchungsanfrage – Klettern & Abenteuer Brilon',
@@ -234,15 +232,18 @@ Promise.allSettled([
     `\n\nDeine Anfrage ist eingegangen, aber noch nicht verbindlich bestätigt.` +
     `\nDu erhältst eine gesonderte Rückmeldung.\n\n` +
     `Gut Seil!\nKlettern & Abenteuer Brilon`
-  ),
-  brevoMail(
-    'vormund.friedrich@gmail.com',
+  )
+];
+if (process.env.BOOKING_NOTIFY_EMAIL) {
+  benachrichtigungen.push(brevoMail(
+    process.env.BOOKING_NOTIFY_EMAIL,
     'Neue Buchungsanfrage – Klettern Brilon',
     `Eine neue Buchungsanfrage ist eingegangen:\n\n` +
     buchungsdetails +
     `\n\nKunden-E-Mail: ${email}\nStatus: Offen`
-  )
-]).then(ergebnisse => {
+  ));
+}
+Promise.allSettled(benachrichtigungen).then(ergebnisse => {
   ergebnisse.forEach((ergebnis, index) => {
     if (ergebnis.status === 'rejected') {
       console.error(
@@ -390,6 +391,85 @@ Promise.allSettled([
       });
     }
 
+    const zahlungenRoute = route.match(/^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})\/zahlungen$/);
+    if(zahlungenRoute&&req.method==='POST'){
+      if(!admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      const d=await body(req);
+      const betragText=typeof d.betrag==='string'?d.betrag:String(d.betrag??'');
+      if(!/^\d{1,7}(?:[.,]\d{1,2})?$/.test(betragText))
+        return reply(res,400,{error:'Bitte einen gültigen Zahlbetrag eingeben.'});
+      const betragCent=Math.round(Number(betragText.replace(',','.'))*100);
+      if(!Number.isSafeInteger(betragCent)||betragCent<=0)
+        return reply(res,400,{error:'Der Zahlbetrag muss größer als 0 € sein.'});
+      const methode=safeText(d.methode,24);
+      if(!['ueberweisung','bar','karte','sonstiges'].includes(methode))
+        return reply(res,400,{error:'Bitte eine gültige Zahlungsart auswählen.'});
+      const ergebnis=await reservierungsTransaktion(async client=>{
+        const q=await client.query(
+          'SELECT id,data,status FROM brilon_buchungen WHERE id=$1 FOR UPDATE',
+          [zahlungenRoute[1]]
+        );
+        if(!q.rowCount)return {fehlt:true};
+        const data=q.rows[0].data;
+        if(!Number.isFinite(Number(data.gesamtpreis))||Number(data.gesamtpreis)<0)
+          return {keinPreis:true};
+        const zahlungen=Array.isArray(data.zahlungen)?data.zahlungen:[];
+        const gesamtCent=Math.round(Number(data.gesamtpreis)*100);
+        let zahlungsErgebnis;
+        try { zahlungsErgebnis=zahlungErgaenzen(gesamtCent,zahlungen,betragCent,methode); }
+        catch(error){
+          if(error.message.includes('offenen Rest'))
+            return {ueberzahlung:true,offenCent:zahlungsstand(gesamtCent,zahlungen).offenCent};
+          throw error;
+        }
+        const zahlung={
+          id:crypto.randomUUID(),
+          betragCent,
+          methode,
+          erhaltenAm:new Date().toISOString(),
+          notiz:safeText(d.notiz,300),
+          erfasstVon:safeText(process.env.ADMIN_USER,100)||'admin'
+        };
+        data.zahlungen=[...zahlungen,zahlung];
+        const neuerStand=zahlungsstand(Math.round(Number(data.gesamtpreis)*100),data.zahlungen);
+        const neuerStatus=neuerStand.anzahlungErreicht&&q.rows[0].status==='offen'
+          ?'bestaetigt':q.rows[0].status;
+        const gespeichert=await client.query(
+          `UPDATE brilon_buchungen SET data=$1::jsonb,status=$2,updated_at=NOW()
+           WHERE id=$3 RETURNING id,data,status`,
+          [JSON.stringify(data),neuerStatus,q.rows[0].id]
+        );
+        return {
+          buchung:gespeichert.rows[0],zahlung,stand:neuerStand,
+          bestaetigtJetzt:neuerStatus!==q.rows[0].status
+        };
+      });
+      if(ergebnis.fehlt)return reply(res,404,{error:'Buchung nicht gefunden.'});
+      if(ergebnis.keinPreis)return reply(res,409,{error:'Für diese Buchung ist kein Gesamtpreis hinterlegt.'});
+      if(ergebnis.ueberzahlung)return reply(res,409,{
+        error:'Der Betrag übersteigt den noch offenen Betrag.',
+        offenCent:ergebnis.offenCent
+      });
+      if(ergebnis.bestaetigtJetzt){
+        const data=ergebnis.buchung.data;
+        const bestaetigungsText=`Deine Buchung ${data.buchungsnummer || ''} ist verbindlich bestätigt.\n`+
+          `Erfasste Zahlung: ${(ergebnis.stand.erhaltenCent/100).toFixed(2).replace('.',',')} €\n`+
+          `Offener Restbetrag: ${(ergebnis.stand.offenCent/100).toFixed(2).replace('.',',')} €\n\n`+
+          `Termin: ${data.datum} um ${data.uhrzeit} Uhr`;
+        const mails=[brevoMail(data.email,'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
+          `Hallo ${data.name || ''},\n\n${bestaetigungsText}\n\nGut Seil!\nKlettern & Abenteuer Brilon`)];
+        if(process.env.BOOKING_NOTIFY_EMAIL)mails.push(brevoMail(
+          process.env.BOOKING_NOTIFY_EMAIL,'Buchung bestätigt – Zahlungseingang erfasst',
+          `${bestaetigungsText}\n\nKundin/Kunde: ${data.name || ''} · ${data.email || ''}`
+        ));
+        Promise.allSettled(mails).then(results=>results.forEach(result=>{
+          if(result.status==='rejected')console.error('Buchungsbestätigung konnte nicht versendet werden.');
+        }));
+      }
+      return reply(res,201,ergebnis);
+    }
+
     if(route.match(/^\/api\/admin\/buchungen\/[0-9a-f-]{36}$/)&&req.method==='PATCH'){
       if(!admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
@@ -398,20 +478,14 @@ Promise.allSettled([
       if(!d||typeof d!=='object'||Array.isArray(d))
         return reply(res,400,{error:'Ungültige Eingabe.'});
 
+      if(d.zahlungsstatus!==undefined)
+        return reply(res,400,{error:'Zahlungen müssen mit Betrag und Zahlungsart einzeln erfasst werden.'});
+
       let status = d.status,
-      notiz = safeText(d.bearbeitungsnotiz, 2000),
-      zahlungsstatus = d.zahlungsstatus;
+      notiz = safeText(d.bearbeitungsnotiz, 2000);
       if(!['offen','bestaetigt','abgelehnt','storniert'].includes(status))
         return reply(res,400,{error:'Ungültiger Buchungsstatus.'});
 
-      if (
-  zahlungsstatus !== undefined &&
-  !['offen', 'anzahlung', 'vollstaendig'].includes(zahlungsstatus)
-) {
-  return reply(res, 400, {
-    error: 'Ungültiger Zahlungsstatus.'
-  });
-}
       const ergebnis=await reservierungsTransaktion(async client=>{
         
 const alt=await client.query(
@@ -422,14 +496,7 @@ const alt=await client.query(
         if(!alt.rowCount)return {fehlt:true};
         
 const alterStatus = alt.rows[0].status;
-       const alterZahlungsstatus = alt.rows[0].data.zahlungsstatus || 'offen'; 
-
-        if (zahlungsstatus === 'anzahlung' || zahlungsstatus === 'vollstaendig') status = 'bestaetigt';
     const buchungsdaten = alt.rows[0].data;
-
-if (zahlungsstatus !== undefined) {
-  buchungsdaten.zahlungsstatus = zahlungsstatus;
-}    
 
 
         if(status==='offen'||status==='bestaetigt'){
@@ -454,7 +521,6 @@ if (zahlungsstatus !== undefined) {
 return {
   buchung: q.rows[0],
   alterStatus,
-  alterZahlungsstatus,
   kundenDaten: buchungsdaten
 };
 
@@ -467,21 +533,22 @@ return {
 
       
 if (
-  (ergebnis.alterStatus !== status && status !== 'offen') ||
-  (status === 'bestaetigt' && zahlungsstatus !== undefined &&
-   ergebnis.alterZahlungsstatus !== zahlungsstatus)
+  ergebnis.alterStatus !== status && status !== 'offen'
 ) {
   const kunde = ergebnis.kundenDaten;
   const empfaenger = kunde?.email;
+  const gesamtCent = Number.isFinite(Number(kunde.gesamtpreis))
+    ? Math.round(Number(kunde.gesamtpreis) * 100) : null;
+  const stand = gesamtCent === null ? null : zahlungsstand(
+    gesamtCent, Array.isArray(kunde.zahlungen) ? kunde.zahlungen : []
+  );
 
   const nachrichten = {
     bestaetigt: {
       betreff: 'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
-     text: kunde.zahlungsstatus === 'anzahlung'
-  ? `Deine Buchung ist verbindlich bestätigt.\n\nAnzahlung erhalten: ${(kunde.gesamtpreis * 0.25).toFixed(2).replace('.', ',')} €\nRestbetrag vor Ort: ${(kunde.gesamtpreis * 0.75).toFixed(2).replace('.', ',')} €\n\nDen Restbetrag kannst du am Veranstaltungstag bar oder mit Karte bezahlen.`
-  : kunde.zahlungsstatus === 'vollstaendig'
-  ? `Deine Buchung ist verbindlich bestätigt und vollständig bezahlt.\n\nGesamtbetrag: ${kunde.gesamtpreis.toFixed(2).replace('.', ',')} €\nAm Veranstaltungstag ist keine weitere Zahlung erforderlich.`
-  : 'Deine Buchung wurde verbindlich bestätigt.'
+      text: stand
+        ? `Deine Buchung wurde verbindlich bestätigt.\n\nTatsächlich erfasst: ${(stand.erhaltenCent / 100).toFixed(2).replace('.', ',')} €\nNoch offen: ${(stand.offenCent / 100).toFixed(2).replace('.', ',')} €.`
+        : 'Deine Buchung wurde verbindlich bestätigt.'
     },
     abgelehnt: {
       betreff: 'Rückmeldung zu deiner Buchungsanfrage – Klettern Brilon',
@@ -528,7 +595,7 @@ if (
     const buchungsId = route.split('/')[4];
 
 const buchungAbfrage = await pool.query(
-  `SELECT id, data, status
+  `SELECT id, data, status, buchungsnummer
    FROM brilon_buchungen
    WHERE id = $1`,
   [buchungsId]
@@ -584,7 +651,7 @@ const euro = betrag =>
   'Bankverbindung:',
   `Bank: ${process.env.BANK_NAME || ''}`,
   `IBAN: ${process.env.BANK_IBAN || ''}`,
-  `Verwendungszweck: Buchung ${buchungsId}`,
+  `Verwendungszweck: ${kunde.buchungsnummer || buchung.buchungsnummer || buchungsId}`,
   '',
   'Bitte überweise den gewählten Betrag innerhalb von 48 Stunden.',
   'Bei kurzfristigen Buchungen bitten wir um sofortige Überweisung.',
@@ -991,7 +1058,8 @@ if (bildRoute && req.method === 'POST') {
   const dateiname =
     angebotId + '/' + crypto.randomUUID() + '.' + endung;
 
-  const { error } = await supabase.storage
+      if (!supabase) return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
+      const { error } = await supabase.storage
     .from('angebotsbilder')
     .upload(dateiname, bild, {
       contentType: dateityp,
@@ -1104,6 +1172,7 @@ if (aktionsBildRoute && req.method === 'POST') {
     'sonderaktionen/' + aktionsId + '/' +
     crypto.randomUUID() + '.' + endung;
 
+  if (!supabase) return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
   const { error } = await supabase.storage
     .from('angebotsbilder')
     .upload(dateiname, bild, {
@@ -1200,6 +1269,8 @@ if (route === '/api/angebote' && req.method === 'GET') {
 async function start(){
   if(pool){
     await pool.query('SELECT 1');
+    // Schema changes are opt-in. A normal server start must not alter a live database.
+    if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){
     await pool.query(
       'CREATE TABLE IF NOT EXISTS brilon_buchungen (id UUID PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())'
     );
@@ -1234,7 +1305,9 @@ await pool.query(`
     created_at TIMESTAMPTZ DEFAULT NOW()
   )
 `);
-
+    } else {
+      console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
+    }
     console.log('PostgreSQL verbunden');
   }else{
     console.warn('DATABASE_URL fehlt: Datenbankfunktionen nicht verfügbar');

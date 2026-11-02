@@ -10,6 +10,9 @@ Eigenständige responsive Website mit Terminanfragen, PostgreSQL und geschützte
 4. `npm start`
 5. `http://localhost:3000` öffnen.
 
+Tests: `npm test` (Node.js Test Runner).
+Schemaänderungen sind standardmäßig deaktiviert. Für eine eigens angelegte, isolierte Entwicklungsdatenbank muss `RUN_SCHEMA_MIGRATIONS=true` ausdrücklich gesetzt werden.
+
 ## Render
 
 - Repository auf GitHub hochladen; **alle Dateien aus diesem Ordner in das Repository-Hauptverzeichnis**, nicht den übergeordneten ZIP-Ordner.

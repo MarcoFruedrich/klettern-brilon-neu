@@ -595,3 +595,6 @@ footer a {
     width: 100%;
   }
 }
+.admin-booking-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:12px;margin:16px 0}
+.payment-entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px;padding:14px;background:#edf3ee;border-radius:10px}
+@media(max-width:600px){.admin-booking-filters{grid-template-columns:1fr}.payment-entry{grid-template-columns:1fr}}

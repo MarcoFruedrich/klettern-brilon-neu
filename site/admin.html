@@ -35,6 +35,20 @@
       <button id="logout" class="btn secondary">Abmelden</button>
 
       <h2>Buchungsanfragen</h2>
+      <div class="admin-booking-filters">
+        <label>Suche nach Name, Nummer, E-Mail oder Angebot
+          <input id="bookings-search" type="search" autocomplete="off">
+        </label>
+        <label>Status
+          <select id="bookings-status-filter">
+            <option value="alle">Alle Status</option>
+            <option value="offen">Offen</option>
+            <option value="bestaetigt">Bestätigt</option>
+            <option value="abgelehnt">Abgelehnt</option>
+            <option value="storniert">Storniert</option>
+          </select>
+        </label>
+      </div>
       <div id="bookings" class="admin-grid"></div>
 
       <h2>Buchungskalender</h2>
