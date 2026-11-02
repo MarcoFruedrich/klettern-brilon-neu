@@ -8,6 +8,7 @@ const { zugelasseneAnschlusszeiten, anschlussPreis, erzeugeZugang, pruefeZugang 
 const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, preisBeiAnschlussstorno, zahlungErgaenzen } = require('./lib/buchungslogik');
 const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpsspiel');
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
+const { sameOriginMutation } = require('./lib/sicherheit');
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -115,7 +116,11 @@ async function anschlussRabattElternZuruecknehmen(client,zusatz,zusatzId){
   return {zurueckgenommen:true,buchung:saved.rows[0],stand};
 }
 function session(req){const match=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/);const token=match?.[1],exp=sessions.get(token);if(!exp)return false;if(exp<Date.now()){sessions.delete(token);return false}return true}
-function admin(req,res){if(!session(req)){reply(res,401,{error:'Bitte anmelden.'});return false}return true}
+function admin(req,res){
+  if(!session(req)){reply(res,401,{error:'Bitte anmelden.'});return false}
+  if(!sameOriginMutation(req)){reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});return false}
+  return true;
+}
 
 // Ein Zeitfenster ist halb offen: Eine Buchung darf direkt nach der anderen beginnen.
 function minuten(v){
