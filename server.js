@@ -538,7 +538,18 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     if(route==='/api/aktionen'&&req.method==='GET'){
       if(!pool)return reply(res,200,[]);
       const q=await pool.query(
-"SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,data->>'beschreibung' AS beschreibung,data->>'preis' AS preis,data->>'bild_url' AS bild_url FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100"      );
+        `SELECT a.id,a.data->>'titel' AS titel,a.data->>'datum' AS datum,
+          a.data->>'beschreibung' AS beschreibung,a.data->>'preis' AS preis,
+          a.data->>'bild_url' AS bild_url,
+          p.id AS programm_id,p.name AS programm_name
+         FROM brilon_aktionen a
+         LEFT JOIN brilon_angebote p ON p.id::text=a.data->>'programm_id'
+           AND p.aktiv=true AND p.buchbar=true AND p.veroeffentlicht=true
+           AND (a.data->>'datum' IS NULL OR a.data->>'datum'=''
+             OR jsonb_array_length(COALESCE(p.verfuegbare_termine,'[]'::jsonb))=0
+             OR p.verfuegbare_termine ? (a.data->>'datum'))
+         ORDER BY a.data->>'datum' ASC NULLS LAST,a.id DESC LIMIT 100`
+      );
       return reply(res,200,q.rows);
     }
 
@@ -1571,17 +1582,39 @@ preis=safeText(d.preis,50);
         return reply(res,200,{success:true,gpsSpieleGeloescht:loeschung.gpsSpieleGeloescht});
       }
 
+      if(route==='/api/admin/aktionen'&&req.method==='GET'){
+        const q=await pool.query(
+          `SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,
+            data->>'beschreibung' AS beschreibung,data->>'preis' AS preis,
+            data->>'bild_url' AS bild_url,data->>'programm_id' AS programm_id
+           FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100`);
+        return reply(res,200,q.rows);
+      }
+
       if(route==='/api/admin/aktionen'&&req.method==='POST'){
         const d=await body(req),
-      titel=safeText(d.titel,120),
-      datum=safeText(d.datum,10)||null,
-      beschreibung=safeText(d.beschreibung,1000),
-      preis=safeText(d.preis,50);
-        if(!titel||datum&&!/^\d{4}-\d{2}-\d{2}$/.test(datum))
-          return reply(res,400,{error:'Ungültige Eingabe.'});
+          titel=safeText(d.titel,120),
+          datum=safeText(d.datum,10)||null,
+          beschreibung=safeText(d.beschreibung,1000),
+          preis=safeText(d.preis,50),
+          programmId=String(d.programm_id||'').trim();
+        if(!titel||datum&&!/^\d{4}-\d{2}-\d{2}$/.test(datum)||
+          programmId&&!/^[1-9]\d{0,15}$/.test(programmId))
+          return reply(res,400,{error:'Ungültiger Aktionstitel, Termin oder Programmbezug.'});
+        if(programmId){
+          const selected=await pool.query(
+            'SELECT id,verfuegbare_termine FROM brilon_angebote WHERE id=$1 AND aktiv=true AND buchbar=true AND veroeffentlicht=true',
+            [programmId]);
+          if(!selected.rowCount)
+            return reply(res,400,{error:'Verknüpftes Programm ist nicht veröffentlicht und buchbar.'});
+          const days=selected.rows[0].verfuegbare_termine;
+          if(datum&&Array.isArray(days)&&days.length&&!days.includes(datum))
+            return reply(res,400,{error:'Aktionstag ist für das verknüpfte Programm nicht freigegeben.'});
+        }
         const q=await pool.query(
           'INSERT INTO brilon_aktionen(id,data) VALUES ($1,$2) RETURNING id',
-          [crypto.randomUUID(),JSON.stringify({titel,datum,beschreibung,preis})]
+          [crypto.randomUUID(),JSON.stringify({titel,datum,beschreibung,preis,
+            ...(programmId?{programm_id:programmId}:{})})]
         );
         return reply(res,201,{id:q.rows[0].id});
       }
