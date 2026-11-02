@@ -91,8 +91,13 @@
     if(!devices.length)target.append(elt('p','Noch kein Werbetablet gekoppelt.'));
     for(const device of devices){
       const block=elt('article');block.className='booking';
+      const lastSeen=device.zuletzt_gesehen_am?
+        new Date(device.zuletzt_gesehen_am).toLocaleString('de-DE'):'Noch keine Verbindung';
       block.append(elt('strong',device.name),
-        elt('p',device.aktiv?'Gekoppelt – gültiger Gerätezugang':'Gesperrt'),
+        elt('p',!device.aktiv?'Zugang gesperrt':
+          device.online?'Erreichbar – letztes Lebenszeichen innerhalb von 45 Sekunden':
+          'Keine aktuelle Verbindung – Codeanforderung nicht möglich'),
+        elt('p','Zuletzt gemeldet: '+lastSeen),
         elt('p','Gekoppelt: '+new Date(device.gekoppelt_am).toLocaleString('de-DE')));
       if(device.aktiv){
         const button=elt('button','Tablet-Zugang sperren');button.type='button';
