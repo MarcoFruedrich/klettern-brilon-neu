@@ -734,6 +734,36 @@ preis=safeText(d.preis,50);
       if(!admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 
+      // Lesende Uebersicht: angrenzende bestaetigte Buchungen am selben Tag.
+      // Keine automatische Rabattberechtigung und keine Preisveraenderung.
+      if(route==='/api/admin/anschlussrabatt/kandidaten'&&req.method==='GET'){
+        const datum=u.searchParams.get('datum')||'';
+        if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(datum))
+          return reply(res,400,{error:'Datum im Format YYYY-MM-DD erforderlich.'});
+        const q=await pool.query(
+          `SELECT id,buchungsnummer,data FROM brilon_buchungen
+           WHERE data->>'datum'=$1 AND status='bestaetigt'
+           ORDER BY data->>'uhrzeit',created_at`,
+          [datum]
+        );
+        const kandidaten=q.rows.map(b=>{
+          const fenster=buchungsfenster(b.data);
+          return {
+            id:b.id,
+            buchungsnummer:b.buchungsnummer||b.data.buchungsnummer||null,
+            angebot:b.data.angebot,
+            uhrzeit:b.data.uhrzeit,
+            beginnMinuten:fenster?fenster[0]:null,
+            endeMinuten:fenster?fenster[1]:null,
+            preisCent:Number.isFinite(Number(b.data.gesamtpreis))
+              &&b.data.gesamtpreis!==null
+              ?Math.round(Number(b.data.gesamtpreis)*100):null
+          };
+        });
+        return reply(res,200,{datum,kandidaten,hinweis:
+          'Nur Zeituebersicht. Rabatte, Kapazitaet und Zahlungen muessen gesondert geprueft werden.'});
+      }
+
       if(route==='/api/admin/buchungen'&&req.method==='GET'){
         const q=await pool.query(
          
