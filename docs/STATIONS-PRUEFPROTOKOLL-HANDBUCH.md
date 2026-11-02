@@ -5,13 +5,25 @@
 ## Ablauf vor jedem Programm
 
 1. Die verantwortliche Person erfasst im Adminbereich unter **Stationsprüfungen** alle zu kontrollierenden Stationen und die Mitarbeiterkonten.
-2. Am Standort wird der neue sechsstellige Code erzeugt. Er bleibt höchstens 120 Sekunden gültig und kann nur einmal verwendet werden.
-3. Die Fachkraft öffnet `/pruefung.html`, meldet sich persönlich an und trägt den Code ein.
+2. Die Fachkraft meldet sich auf ihrem Smartphone an und tippt **„Code am Tablet anzeigen“**. Der neue sechsstellige Code erscheint nur auf einem bereits gekoppelten Tablet am Standort. Er bleibt höchstens 120 Sekunden gültig und kann nur einmal verwendet werden.
+3. Die Fachkraft liest den Code am Tablet ab und trägt ihn auf ihrem Smartphone unter `/pruefung.html` ein.
 4. Sie gibt Programm und geplanten Programmbeginn an. Alle **tatsächlich verwendeten** Stationen müssen ausgewählt werden; jede wird auf **In Ordnung**, **Hinweis / kleiner Mangel** oder **Sicherheitsmangel** gesetzt.
 5. Bei Hinweisen und Mängeln sind eine konkrete Beschreibung und bei Bedarf bis zu drei Fotos möglich. Die Bildverarbeitung erfolgt auf dem Gerät (max. 640 Pixel Kantenlänge und 80 KB JPEG pro Foto). Personen möglichst nicht abbilden.
 6. Der Bericht wird gespeichert. Eine neue Prüfung erfordert einen neuen Code. Der Bericht kann in der Verwaltung eingesehen werden. Fotobelege werden separat und nur für angemeldete Administratoren ausgegeben.
 
 **Wichtige Sicherheitsregel:** Bei einem Mangel ist die betroffene Station **nicht zu verwenden**, bis eine fachlich verantwortliche Person ihre Sicherheit geprüft und die Nutzung ausdrücklich freigegeben hat. Eine elektronische Dokumentation ist keine automatische Betriebsfreigabe.
+
+## Gesichertes Werbetablet – einmalige Einrichtung
+
+1. Das fest installierte Tablet über eine gesicherte HTTPS-Verbindung mit `/tablet.html` verbinden. Solange es nicht gekoppelt ist, erscheint das einmalige Kopplungsformular.
+2. In der geschützten Verwaltung unter `/admin.html#stationspruefung` **Tablet-Kopplungscode erzeugen** wählen. Es erscheint ein achtstelliger Code, der zehn Minuten lang und nur einmal nutzbar ist.
+3. Am Tablet eine aussagekräftige Gerätebezeichnung, zum Beispiel `Kletterhalle Fenster-Tablet`, und den achtstelligen Code eingeben.
+4. Das Tablet zeigt nun abwechselnd die öffentlich buchbaren Angebote. Wird von einer angemeldeten Fachkraft eine Prüfung angefordert, wechselt das Tablet für höchstens zwei Minuten zur sechsstelligen Codeanzeige. Bei Ablauf, Verbrauch oder Verbindungsausfall verschwindet der Code.
+5. Wird das Tablet verloren, entwendet oder ausgetauscht, in der Verwaltung **Tablet-Zugang sperren** auswählen. Eine erneute Nutzung erfordert eine neue Kopplung.
+
+**Technische Grenzen:** Das Tablet hat keine Adminsitzung. Sein Geräteschlüssel liegt als `HttpOnly`-, `Secure`- und `SameSite=Strict`-Cookie vor und wird nicht in JavaScript gespeichert. Die zugehörige Berechtigung läuft spätestens nach 30 Tagen ab und ist widerrufbar. Der angeforderte Prüfcode wird nur verschlüsselt in PostgreSQL vorgehalten und mit einem serverseitigen Geheimnis entschlüsselt. Die Fachkraft kann ihn nicht auf ihrem eigenen Telefon abrufen. Ein ungültiger oder mehrfach verwendeter Code wird abgewiesen.
+
+**Vor dem realen Einsatz:** Den Android-Kioskmodus bzw. den Einzel-App-Modus durch die Geräteverwaltung einrichten, das Tablet physisch gegen Zugriff absichern, Kopplung unter Aufsicht durchführen und den Ablauf bei WLAN-Ausfall testen. Eine Browserseite allein verhindert weder das Verlassen der App noch die Nutzung des Tablets an einem anderen Standort. Die physische Anwesenheit wird durch dieses Verfahren nicht unabhängig bewiesen.
 
 ## Hinweise und kleinere Mängel ohne automatische Sperre
 
@@ -39,8 +51,8 @@ Unter **Stationsprüfungen → Mängelmeldungen – E-Mail-Versand** sieht die b
 
 ## Sicherheits- und Datenschutzgrenzen
 
-- Die Codeausgabe ist derzeit nur aus der **vollwertigen Adminverwaltung** möglich. Ein öffentlich erreichbares Tablet darf daher nicht einfach mit einer offenen Adminsitzung betrieben werden. Vor Ort wird eine separate, technisch beschränkte Kiosk-Anzeige benötigt.
-- Ein eingegebener Vor-Ort-Code beweist die physische Anwesenheit nicht unabhängig. Er dient der zusätzlichen Hürde.
+- Der eigenständige Tablet-Modus mit Gerätetausch/Sperrung ist implementiert. Eine physische Installation und eine echte Android-Kiosk-/Einzel-App-Konfiguration sind noch nicht durchgeführt; ohne diese organisatorischen Schutzmaßnahmen darf das Tablet nicht unbeaufsichtigt betrieben werden.
+- Ein eingegebener Vor-Ort-Code beweist die physische Anwesenheit nicht unabhängig. Er dient der zusätzlichen Hürde, ebenso wie die widerrufbare Kopplung des Tablets.
 - Fotos sind im privaten Bericht gespeichert; eine gesonderte Aufbewahrungsfrist, Ersetzungs-/Löschregelung, Bildinhaltsprüfung und vollständige Datenschutzinformation fehlen.
 - Die Auswahl der verwendeten Stationen liegt bei der prüfenden Fachkraft. Das System kann nicht selbst erkennen, ob eine Station ausgelassen wurde.
 - Die automatische Sperrung und eine dokumentierte administrative Freigabe sind umgesetzt. Es gibt noch keine unabhängige digitale Verifikation der fachlichen Nachkontrolle, keine verpflichtende gesonderte Abnahme durch einen qualifizierten Prüfer und keine automatisierte Auftragsverfolgung der Mängelbeseitigung.
