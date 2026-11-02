@@ -31,7 +31,11 @@ Die Verwaltung zeigt gesperrte Stationen deutlich an. Erst nachdem eine fachkund
 
 ## Mängelbenachrichtigung
 
-Eine Mängel-E-Mail wird nur verschickt, wenn `PRUEF_MANGEL_EMAIL` und die Mailanbindung gültig eingerichtet sind. Der Server bestätigt gesondert den tatsächlichen Versandstatus. Falls nicht konfiguriert oder gescheitert, muss die Fachkraft die verantwortliche Person direkt informieren. Ein verlässlicher Wiederholungsversand fehlt noch.
+Jede Sicherheitsmangelmeldung wird dauerhaft in der isolierten Testdatenbank als Mail-Ausgangsvorgang angelegt. Der erste Versand erfolgt unmittelbar nach dem Speichern des Prüfprotokolls, sofern `PRUEF_MANGEL_EMAIL` und die E-Mail-Anbindung korrekt eingerichtet sind. Gespeichert werden der Versandstatus, die Zahl der Versuche und die Zeitpunkte. **„Vom Anbieter angenommen“ bedeutet nicht „beim Empfänger zugestellt“.**
+
+Unter **Stationsprüfungen → Mängelmeldungen – E-Mail-Versand** sieht die berechtigte Verwaltung nicht bestätigte Meldungen. Bei `fehlgeschlagen` oder `nicht_konfiguriert` kann nach ausdrücklicher Kontrolle und Bestätigung ein neuer Versandversuch gestartet werden. Dabei sollte zuvor geprüft werden, ob die Nachricht trotz Fehlermeldung angekommen ist. Wurde sie vom Anbieter bereits angenommen, sperrt das System den Neuversand. Ein **unklarer Versandzustand** nach Serverabbruch wird nicht blind erneut versucht.
+
+**Bei sicherheitsrelevanten Mängeln und jeder ausgefallenen Benachrichtigung:** Verantwortliche Person zusätzlich unmittelbar kontaktieren; der E-Mail-Ausgang ist kein Ersatz für notwendige Gefahrenabwehr. Kleine nicht sicherheitsrelevante Hinweise erzeugen keine Sicherheitsmangel-E-Mail. Ein automatischer zeitgesteuerter Neuversand ist noch nicht vorhanden.
 
 ## Sicherheits- und Datenschutzgrenzen
 
@@ -41,7 +45,7 @@ Eine Mängel-E-Mail wird nur verschickt, wenn `PRUEF_MANGEL_EMAIL` und die Maila
 - Die Auswahl der verwendeten Stationen liegt bei der prüfenden Fachkraft. Das System kann nicht selbst erkennen, ob eine Station ausgelassen wurde.
 - Die automatische Sperrung und eine dokumentierte administrative Freigabe sind umgesetzt. Es gibt noch keine unabhängige digitale Verifikation der fachlichen Nachkontrolle, keine verpflichtende gesonderte Abnahme durch einen qualifizierten Prüfer und keine automatisierte Auftragsverfolgung der Mängelbeseitigung.
 - Mitarbeitersitzungen sind vier Stunden gültig. Der Vor-Ort-Code ist einmalig, die Berichtsfreigabe läuft spätestens nach 15 Minuten ab.
-- Neue Prüftabellen sowie die Spalten `gesperrt_am`/`sperrgrund` und die neue Tabelle `brilon_pruef_stationsereignisse` dürfen nur nach Schema-Review und ausdrücklicher Freigabe migriert werden. **Keine produktive Migration**.
+- Neue Prüftabellen sowie die Spalten `gesperrt_am`/`sperrgrund` und die Tabellen `brilon_pruef_stationsereignisse` und `brilon_pruef_meldungen` dürfen nur nach Schema-Review und ausdrücklicher Freigabe migriert werden. **Keine produktive Migration**.
 
 ## Testumfang
 
