@@ -743,4 +743,50 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await stationList()).find(x=>x.id===extraId).aktiv,false,
     'Reading the overview must not reactivate or release a station.');
   assert.ok((await stationList()).find(x=>x.id===extraId).gesperrt_am);
+
+  // A daily special must explicitly refer to a currently bookable programme.
+  // A misleading same-name match or a deactivated programme is never enough.
+  const specialProgramme=await pool.query('SELECT id FROM brilon_angebote WHERE name=$1',[programName]);
+  assert.equal(specialProgramme.rowCount,1);
+  const linkedId=String(specialProgramme.rows[0].id);
+  const invalidAction=await adminPost('/api/admin/aktionen',{
+    titel:'Falsche Verknüpfung',datum:day1,programm_id:'999999999'});
+  assert.equal(invalidAction.status,400);
+  const missingId=await adminPost('/api/admin/aktionen',{
+    titel:'Ungültige Kennung',datum:day1,programm_id:'NOT-A-NUMBER'});
+  assert.equal(missingId.status,400);
+  const savedAction=await adminPost('/api/admin/aktionen',{
+    titel:'Herbst-Erlebnisaktion',datum:day1,beschreibung:'CI Aktionsbeschreibung',
+    preis:'80',programm_id:linkedId});
+  assert.equal(savedAction.status,201);
+  const savedActionId=(await savedAction.json()).id;
+  const publicActions=async()=>{
+    const response=await fetch(root+'/api/aktionen');
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  const activeAction=(await publicActions()).find(x=>x.id===savedActionId);
+  assert.equal(String(activeAction.programm_id),linkedId);
+  assert.equal(activeAction.programm_name,programName);
+  assert.notEqual(activeAction.titel,programName);
+  const actionForAdmin=await fetch(root+'/api/admin/aktionen',{headers:{Cookie:cookie}});
+  assert.equal(actionForAdmin.status,200);
+  assert.equal((await actionForAdmin.json()).find(x=>x.id===savedActionId).programm_id,linkedId);
+  assert.equal((await fetch(root+'/api/admin/aktionen')).status,401);
+  await pool.query('UPDATE brilon_angebote SET aktiv=false WHERE id=$1',[linkedId]);
+  const disabledAction=(await publicActions()).find(x=>x.id===savedActionId);
+  assert.equal(disabledAction.programm_id,null,
+    'A disabled programme may never be selected through an old special action.');
+  await pool.query('UPDATE brilon_angebote SET aktiv=true WHERE id=$1',[linkedId]);
+  const newlyRestricted=await pool.query(
+    'UPDATE brilon_angebote SET verfuegbare_termine=$2::jsonb WHERE id=$1',
+    [linkedId,JSON.stringify([day2])]);
+  assert.equal(newlyRestricted.rowCount,1);
+  assert.equal((await publicActions()).find(x=>x.id===savedActionId).programm_id,null,
+    'No programme auto-select when the special date is no longer enabled.');
+  assert.equal((await adminPost('/api/admin/aktionen',{
+    titel:'Aktionsdatum unzulässig',datum:day1,programm_id:linkedId})).status,400);
+  // Keep other integration assertions unaffected by the temporary programme.
+  await pool.query('UPDATE brilon_angebote SET verfuegbare_termine=$2::jsonb WHERE id=$1',
+    [linkedId,'[]']);
 });
