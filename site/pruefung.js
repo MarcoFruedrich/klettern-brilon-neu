@@ -98,8 +98,11 @@ $('onsite-unlock').addEventListener('submit',async event=>{
   try{
     await request('/api/pruefung/freischalten',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(Object.fromEntries(new FormData(form)))});
-    form.reset();form.hidden=true;$('station-inspection').hidden=false;
-    notice('Prüfformular für diese Programmkontrolle freigeschaltet.');
+    form.reset();form.hidden=true;
+    // Aktuelle Sperrungen nochmals abrufen, bevor die Fachkraft Stationen auswählt.
+    await loadStations();
+    $('station-inspection').hidden=false;
+    notice('Prüfformular für diese Programmkontrolle freigeschaltet. Gesperrte Stationen nicht verwenden.');
   }catch(e){notice('Freigabe fehlgeschlagen: '+e.message);}
 });
 $('station-inspection').addEventListener('submit',async event=>{
