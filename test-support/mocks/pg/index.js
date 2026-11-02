@@ -101,6 +101,11 @@ class Pool {
         .map(item=>({id:item.id,data:item.data,status:item.status,created_at:item.created_at||new Date(0)}));
       return {rows,rowCount:rows.length};
     }
+    if(/SELECT\s+data\s+FROM brilon_buchungen/.test(sql)&&sql.includes("data->>'datum'=$1")){
+      const rows=this.bookings.filter(item=>item.data.datum===params[0]&&
+        ['offen','bestaetigt'].includes(item.status||'offen')).map(item=>({data:item.data}));
+      return {rows,rowCount:rows.length};
+    }
     if (sql.includes('FROM brilon_gps_spiele g JOIN brilon_gps_touren t')&&sql.includes('gast_einwilligung=true')) {
       const rows=this.guests.filter(item=>item.einwilligung===true&&(!params[0]||item.tour_id===params[0]))
         .map(({id,name,datum,dauer_sekunden,tour,einwilligung_am,einwilligung_version})=>({id,name,datum,dauer_sekunden,tour,einwilligung_am,einwilligung_version}));

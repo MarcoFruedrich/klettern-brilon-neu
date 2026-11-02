@@ -126,6 +126,16 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(first.status,201);
   const firstData=await first.json();
   assert.equal(firstData.buchungsnummer,'MUELLER-MAX-150327');
+  const availability=await fetch(root+'/api/belegte-zeiten?datum=2027-03-15&teilnehmer=4&angebot=Klettern');
+  const availabilityBody=await availability.text();
+  assert.equal(availability.status,200,JSON.stringify({availabilityBody,serverErrors}));
+  const availableTimes=JSON.parse(availabilityBody).zeiten;
+  assert.equal(availableTimes.find(item=>item.uhrzeit==='09:00').belegt,false,
+    'Ein direkt vor dem gebuchten Fenster endender Termin bleibt verfügbar');
+  assert.equal(availableTimes.find(item=>item.uhrzeit==='10:00').belegt,true,
+    'Ein identisches Startfenster wird als belegt markiert');
+  assert.equal(availableTimes.find(item=>item.uhrzeit==='11:00').belegt,false,
+    'Ein direkt an das gebuchte Fenster anschließender Termin bleibt verfügbar');
   await waitForEmails(2);
   const customerRequest=mailMessages.find(message=>message.to?.[0]?.email==='max@example.test');
   const operatorRequest=mailMessages.find(message=>message.to?.[0]?.email==='operator@example.test');

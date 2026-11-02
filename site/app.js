@@ -97,10 +97,7 @@ async function belegteUhrzeitenLaden() {
 
     if (date.value !== datum || datumIstGesperrt(datum)) return;
 
-    // Die bisherige Serverabfrage liefert einzelne belegte Startzeiten.
-    // Für eine vollständige Überschneidungsprüfung benötigen wir
-    // zusätzlich die Anfangs- und Endzeiten aller Reservierungen.
-    // Bis dahin zeigen wir nur die direkt gemeldeten Belegungen an.
+    // Der Server prüft jedes auswählbare Startfenster gegen die belegten Zeiträume.
     const belegteZeiten = new Set(
       daten.zeiten.filter(eintrag => eintrag.belegt)
         .map(eintrag => eintrag.uhrzeit)
