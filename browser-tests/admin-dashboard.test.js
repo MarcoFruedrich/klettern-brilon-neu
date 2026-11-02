@@ -12,6 +12,7 @@ function fakeAdminApi(page) {
     signedIn: false, csrf: 'a'.repeat(64), mutations: [],
     tours: [], games: [],
     inspectionEvents: [],
+    inspectionHints: [],
     inspectionStations: [{id:'550e8400-e29b-41d4-a716-446655440099',
       name:'Kletterwand Test',aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
       sperrgrund:'Defekte Sicherheitsverbindung an der Wand'}],
@@ -49,6 +50,17 @@ function fakeAdminApi(page) {
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
     if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='GET')return json(200,[]);
     if(endpoint==='/api/admin/pruefung/berichte'&&method==='GET')return json(200,[]);
+    if(endpoint==='/api/admin/pruefung/hinweise'&&method==='GET')
+      return json(200,state.inspectionHints);
+    const finishHint=endpoint.match(/^\/api\/admin\/pruefung\/hinweise\/([^/]+)\/erledigen$/);
+    if(finishHint&&method==='POST'){
+      const hint=state.inspectionHints.find(x=>x.id===finishHint[1]),d=readBody();
+      if(!hint||hint.erledigt_am)return json(409,{error:'Nicht mehr offen'});
+      if(!d.geprueft||d.pruefer.length<3||d.ergebnis.length<20)
+        return json(400,{error:'Prüfung nicht vollständig'});
+      hint.erledigt_am='2027-01-01T16:00:00Z';hint.erledigt_von=d.pruefer;
+      hint.erledigt_notiz=d.ergebnis;return json(200,{id:hint.id,erledigt_am:hint.erledigt_am});
+    }
     if(endpoint==='/api/admin/pruefung/stationen'&&method==='GET')
       return json(200,state.inspectionStations);
     const inspectionRelease=endpoint.match(/^\/api\/admin\/pruefung\/stationen\/([^/]+)\/freigeben$/);
@@ -434,6 +446,44 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       .getByRole('button',{name:'Prüf- und Freigabeverlauf anzeigen'}).click();
     await page.locator('#pruef-station-list').getByText(/fachlich geprüft und kontrolliert/).waitFor();
     assert.equal(await release.count(),0,'Freigabe darf nicht mehrfach angefordert werden');
+    await page.close();
+  });
+
+  await t.test('Offenen kleinen Hinweis zur Nachprüfung verwalten ohne Stationssperre',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const hintId='550e8400-e29b-41d4-a716-446655440055';
+    state.inspectionStations[0].gesperrt_am=null;
+    state.inspectionStations[0].sperrgrund=null;
+    state.inspectionHints=[{
+      id:hintId,station_id:state.inspectionStations[0].id,
+      bericht_id:'550e8400-e29b-41d4-a716-446655440066',
+      beschreibung:'Stationsschild lässt sich schwer lesen, sollte geprüft werden',
+      station:'Kletterwand Test',gesperrt_am:null,
+      erstellt_von:'CI Mitarbeiterin',erstellt_am:'2027-01-01T14:00:00Z',
+      erledigt_am:null,erledigt_von:null,erledigt_notiz:null
+    }];
+    const dialogs=[];
+    page.on('dialog',async dialog=>{
+      dialogs.push(dialog.type());
+      if(dialog.type()==='prompt')
+        await dialog.accept(dialogs.filter(x=>x==='prompt').length===1?
+          'CI Prüfer':'Stationsschild kontrolliert und vollständig ausgetauscht.');
+      else await dialog.accept();
+    });
+    await login(page,root);
+    await page.locator('#pruef-hinweis-list').getByText(/Offener Hinweis: Kletterwand Test/).waitFor();
+    assert.match(await page.locator('#pruef-hinweis-status').textContent(),/1 offene/);
+    assert.equal(state.inspectionStations[0].gesperrt_am,null);
+    await page.locator('#pruef-hinweis-list')
+      .getByRole('button',{name:'Nach Prüfung als erledigt markieren'}).click();
+    await page.waitForFunction(()=>document.getElementById('pruef-hinweis-list')?.textContent.includes('Geprüfter Hinweis'));
+    assert.ok(state.inspectionHints[0].erledigt_am);
+    assert.equal(state.inspectionStations[0].gesperrt_am,null);
+    assert.deepEqual(dialogs,['prompt','prompt','confirm']);
+    assert.equal(await page.locator('#pruef-hinweis-list')
+      .getByRole('button',{name:'Nach Prüfung als erledigt markieren'}).count(),0);
+    assert.ok(state.mutations.some(x=>x.endpoint.endsWith(hintId+'/erledigen')));
     await page.close();
   });
 
