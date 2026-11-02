@@ -50,3 +50,32 @@ jobs:
         env:
           NODE_OPTIONS: --require=./test-support/mocks/force-mock-modules.js
         run: npm test
+
+
+  browser:
+    name: Chromium – Smartphone, Tablet, Desktop und Buchungsformular
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ''
+      RUN_SCHEMA_MIGRATIONS: 'false'
+      BREVO_API_KEY: ''
+      BREVO_SENDER_EMAIL: ''
+      BOOKING_NOTIFY_EMAIL: ''
+      SUPABASE_URL: ''
+      SUPABASE_SECRET_KEY: ''
+    steps:
+      - name: Quellcode des Entwicklungszweigs laden
+        uses: actions/checkout@v4
+      - name: Node.js 22 einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Server-Abhängigkeiten installieren
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Playwright-Testbrowser installieren
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Browser-Smoketests ohne Produktionszugang ausführen
+        run: node --test browser-tests/browser-smoke.test.js
