@@ -616,4 +616,79 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(newKioskData.pruefdisplay,false,
     'Ersatzgerät benötigt eine bewusste neue Admin-Auswahl als Prüfdisplay');
   assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,0);
+
+  // Administratively disable a station without deleting the original defect
+  // or the inspection/audit history. Re-enabling must NOT clear its safety lock.
+  const patchAdmin=(endpoint,data)=>fetch(root+endpoint,{method:'PATCH',
+    headers:{Origin:root,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf},
+    body:JSON.stringify(data)});
+  const stationStop='/api/admin/pruefung/stationen/'+extraId+'/deaktivieren';
+  assert.equal((await fetch(root+stationStop,{method:'PATCH'})).status,401);
+  assert.equal((await fetch(root+stationStop,{method:'PATCH',headers:{Cookie:cookie,Origin:root}})).status,403);
+  assert.equal((await patchAdmin(stationStop,{begruendung:'kurz'})).status,400);
+  const stopped=await patchAdmin(stationStop,{begruendung:'Station wird zur Wartung vorübergehend stillgelegt.'});
+  assert.equal(stopped.status,200);
+  const stoppedData=await stopped.json();
+  assert.equal(stoppedData.aktiv,false);
+  assert.ok(stoppedData.gesperrt_am,'Eine Stilllegung darf keinen Sicherheitsmangel löschen');
+  assert.equal((await stationList()).find(x=>x.id===extraId).aktiv,false);
+  const listedForStaff=await (await fetch(root+'/api/pruefung/stationen',
+    {headers:{Cookie:staffCookie}})).json();
+  assert.equal(listedForStaff.stationen.some(x=>x.id===extraId),false,
+    'Stillgelegte Stationen dürfen im mobilen Formular nicht angeboten werden');
+  assert.equal((await patchAdmin(stationStop,{begruendung:'Erneuter Stilllegungsversuch nicht erlaubt'})).status,409);
+  const startAgain='/api/admin/pruefung/stationen/'+extraId+'/reaktivieren';
+  const reactivated=await patchAdmin(startAgain,{
+    begruendung:'Wartung abgeschlossen, Station für künftige Prüfungen wieder aufnehmen.'});
+  assert.equal(reactivated.status,200);
+  assert.equal((await reactivated.json()).aktiv,true);
+  assert.ok((await stationList()).find(x=>x.id===extraId).gesperrt_am,
+    'Reaktivierung darf keine noch bestehende Sicherheitsmängelsperre freigeben');
+  assert.equal((await patchAdmin(startAgain,{begruendung:'Nicht erneut aktivieren'})).status,409);
+  const statusLogResponse=await fetch(root+'/api/admin/pruefung/stationen/'+extraId+'/statusverlauf',
+    {headers:{Cookie:cookie}});
+  assert.equal(statusLogResponse.status,200);
+  const statusLog=await statusLogResponse.json();
+  assert.equal(statusLog.length,2);
+  assert.deepEqual(new Set(statusLog.map(x=>x.art)),new Set(['deaktiviert','reaktiviert']));
+  assert.ok(statusLog.every(x=>x.begruendung.length>=15));
+  assert.ok((await (await fetch(root+'/api/admin/pruefung/berichte',
+    {headers:{Cookie:cookie}})).json()).some(x=>x.id===urgentReceipt.id),
+    'Historische Prüfberichte müssen auch nach Stationsstilllegung erhalten bleiben');
+
+  // Staff credentials must never revive with the old password or old sessions.
+  const employeePath='/api/admin/pruefung/mitarbeitende/'+savedEmployee.id;
+  assert.equal((await patchAdmin(employeePath+'/reaktivieren',
+    {passwort:'Ohne-Vorherige-Deaktivierung'})).status,409);
+  assert.equal((await patchAdmin(employeePath+'/passwort-setzen',{passwort:'short'})).status,400);
+  const reset=await patchAdmin(employeePath+'/passwort-setzen',
+    {passwort:'Aktualisiert-Sicher-2026-!'});
+  assert.equal(reset.status,200);
+  assert.equal((await reset.json()).sitzungenWiderrufen,true);
+  assert.equal((await fetch(root+'/api/pruefung/stationen',
+    {headers:{Cookie:staffCookie}})).status,401,
+    'Alle alten Mitarbeitersitzungen sind nach Passwortwechsel widerrufen');
+  const tryLogin=(passwort)=>fetch(root+'/api/pruefung/login',{method:'POST',
+    headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({email:staffData.email,passwort})});
+  assert.equal((await tryLogin(staffData.passwort)).status,401);
+  const freshLogin=await tryLogin('Aktualisiert-Sicher-2026-!');
+  assert.equal(freshLogin.status,200);
+  const freshCookie=freshLogin.headers.get('set-cookie').split(';')[0];
+  const deactivated=await patchAdmin(employeePath+'/deaktivieren',{});
+  assert.equal(deactivated.status,200);
+  assert.equal((await deactivated.json()).aktiv,false);
+  assert.equal((await fetch(root+'/api/pruefung/stationen',
+    {headers:{Cookie:freshCookie}})).status,401);
+  assert.equal((await tryLogin('Aktualisiert-Sicher-2026-!')).status,401);
+  assert.equal((await patchAdmin(employeePath+'/deaktivieren',{})).status,409);
+  assert.equal((await patchAdmin(employeePath+'/reaktivieren',{passwort:'zu kurz'})).status,400);
+  const restarted=await patchAdmin(employeePath+'/reaktivieren',
+    {passwort:'Reaktiviert-Einmal-2026-!'});
+  assert.equal(restarted.status,200);
+  assert.equal((await restarted.json()).aktiv,true);
+  assert.equal((await fetch(root+'/api/pruefung/stationen',
+    {headers:{Cookie:freshCookie}})).status,401);
+  assert.equal((await tryLogin('Aktualisiert-Sicher-2026-!')).status,401);
+  assert.equal((await tryLogin('Reaktiviert-Einmal-2026-!')).status,200);
 });
