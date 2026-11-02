@@ -13,6 +13,7 @@ function fakeAdminApi(page) {
     tours: [], games: [],
     inspectionEvents: [],
     inspectionHints: [],
+    inspectionMails: [],
     inspectionStations: [{id:'550e8400-e29b-41d4-a716-446655440099',
       name:'Kletterwand Test',aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
       sperrgrund:'Defekte Sicherheitsverbindung an der Wand'}],
@@ -50,6 +51,17 @@ function fakeAdminApi(page) {
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
     if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='GET')return json(200,[]);
     if(endpoint==='/api/admin/pruefung/berichte'&&method==='GET')return json(200,[]);
+    if(endpoint==='/api/admin/pruefung/meldungen'&&method==='GET')
+      return json(200,state.inspectionMails);
+    const retryMail=endpoint.match(/^\/api\/admin\/pruefung\/meldungen\/([^/]+)\/erneut-senden$/);
+    if(retryMail&&method==='POST'){
+      const data=readBody(),item=state.inspectionMails.find(x=>x.bericht_id===retryMail[1]);
+      if(!item)return json(404,{error:'Nicht gefunden'});
+      if(!data.doppelversandGeprueft)return json(400,{error:'Doppelversand nicht geprüft'});
+      if(item.status==='angenommen'||item.status==='sendet')return json(409,{error:'Versand schon bestätigt oder ungeklärt'});
+      item.status='angenommen';item.versuche++;item.angenommen_am='2027-01-01T14:00:00Z';
+      return json(200,{gefunden:true,erneutVersendet:true,status:'gesendet'});
+    }
     if(endpoint==='/api/admin/pruefung/hinweise'&&method==='GET')
       return json(200,state.inspectionHints);
     const finishHint=endpoint.match(/^\/api\/admin\/pruefung\/hinweise\/([^/]+)\/erledigen$/);
@@ -484,6 +496,32 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(await page.locator('#pruef-hinweis-list')
       .getByRole('button',{name:'Nach Prüfung als erledigt markieren'}).count(),0);
     assert.ok(state.mutations.some(x=>x.endpoint.endsWith(hintId+'/erledigen')));
+    await page.close();
+  });
+
+  await t.test('Mängelbenachrichtigung: gesicherte manuelle Wiederholung und kein Doppelsenden',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const id='550e8400-e29b-41d4-a716-446655440075';
+    state.inspectionMails=[{
+      bericht_id:id,programm:'Klettern CI',beginn:'2027-04-01T10:00',
+      status:'fehlgeschlagen',versuche:1,letzter_versuch:'2027-01-01T12:00:00Z',
+      angenommen_am:null,letzter_fehler:'Mail-Anbieter hat Versand nicht bestätigt.',
+      stationen:['Kletterwand']
+    }];
+    const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.type());await dialog.accept();});
+    await login(page,root);
+    await page.locator('#pruef-mail-list').getByText('Versand fehlgeschlagen').waitFor();
+    await page.locator('#pruef-mail-list')
+      .getByRole('button',{name:'Mängelmeldung erneut senden'}).click();
+    await page.waitForFunction(()=>document.querySelector('#pruef-mail-list')?.textContent.includes('Vom Anbieter angenommen'));
+    assert.deepEqual(dialogs,['confirm']);
+    assert.equal(state.inspectionMails[0].versuche,2);
+    assert.equal(state.inspectionMails[0].status,'angenommen');
+    assert.equal(await page.locator('#pruef-mail-list')
+      .getByRole('button',{name:'Mängelmeldung erneut senden'}).count(),0);
+    assert.equal(state.mutations.filter(x=>x.endpoint.endsWith('/erneut-senden')).length,1);
+    assert.equal(state.mutations.find(x=>x.endpoint.endsWith('/erneut-senden')).body.doppelversandGeprueft,true);
     await page.close();
   });
 
