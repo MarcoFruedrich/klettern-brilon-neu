@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 21014)
-Total output lines: 1853
-
 
 // Klettern & Abenteuer Brilon – Node.js / PostgreSQL
 'use strict';
@@ -564,7 +561,417 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
                  spielzeit_sekunden=CASE WHEN $2 THEN $3 ELSE NULL END WHERE id=$4`,
                 [check.spiel.stationIndex,abgeschlossen,dauer,game.id]
               );
-   …5014 tokens truncated…typeof kunde.gesamtpreis !== 'number' ||
+              ergebnis={korrekt:true,abgeschlossen,spielzeitSekunden:dauer,
+                naechsteStation:check.naechsteStation};
+              await client.query('COMMIT');
+            }
+          }
+        }
+      }catch(error){try{await client.query('ROLLBACK')}catch{};throw error;}
+      finally{client.release();}
+      if(ergebnis.ungueltig)return reply(res,404,{error:'Spielzugang nicht aktiv.'});
+      if(ergebnis.falsch)return reply(res,422,{error:'QR-Code, Kontrollcode oder Antwort stimmen nicht.'});
+      return reply(res,200,ergebnis);
+    }
+
+    if(route==='/api/gps/abschluss'&&req.method==='POST'){
+      if(!pool)return reply(res,503,{error:'Gästeliste derzeit nicht verfügbar.'});
+      const d=await body(req),token=safeText(d.token,120),einwilligung=d.einwilligung===true;
+      if(token.length<32||!limit('gps-guest:'+ip,12,600000))return reply(res,429,{error:'Bitte kurz warten.'});
+      const name=einwilligung?safeText(d.name,80):null;
+      if(einwilligung&&!name)return reply(res,400,{error:'Bitte einen Namen eingeben oder nicht zustimmen.'});
+      const q=await pool.query(
+        `UPDATE brilon_gps_spiele SET gast_name=$1,gast_einwilligung=$2
+         WHERE token_hash=$3 AND abgeschlossen_am IS NOT NULL RETURNING id`,
+        [name,einwilligung,gpsTokenHash(token)]
+      );
+      if(!q.rowCount)return reply(res,404,{error:'Spiel nicht abgeschlossen oder Zugang ungültig.'});
+      return reply(res,200,{success:true,oeffentlich:einwilligung});
+    }
+
+    if(route==='/api/gps/gaesteliste'&&req.method==='GET'){
+      if(!pool)return reply(res,200,[]);
+      const tourId=safeText(u.searchParams.get('tour'),36);
+      if(!/^[0-9a-f-]{36}$/i.test(tourId))return reply(res,400,{error:'Tour-ID ungültig.'});
+      const q=await pool.query(
+        `SELECT g.gast_name AS name,to_char(g.abgeschlossen_am,'YYYY-MM-DD') AS datum,
+                g.spielzeit_sekunden AS dauer_sekunden
+         FROM brilon_gps_spiele g WHERE g.tour_id=$1 AND g.gast_einwilligung=true
+           AND g.gast_name IS NOT NULL AND g.abgeschlossen_am IS NOT NULL
+         ORDER BY g.abgeschlossen_am DESC LIMIT 200`,[tourId]
+      );
+      return reply(res,200,q.rows);
+    }
+
+    if(route==='/api/admin/login'&&req.method==='POST'){
+      if(!limit('login:'+ip,6))
+        return reply(res,429,{error:'Zu viele Versuche.'});
+      const d=await body(req),
+            username=process.env.ADMIN_USER,
+            password=process.env.ADMIN_PASSWORD;
+      if(!username||!password)
+        return reply(res,503,{error:'Admin-Zugang nicht eingerichtet.'});
+
+      const a=Buffer.from(String(d.username||'')),
+            b=Buffer.from(username),
+            c=Buffer.from(String(d.password||'')),
+            e=Buffer.from(password);
+      if(a.length!==b.length||c.length!==e.length||
+         !crypto.timingSafeEqual(a,b)||!crypto.timingSafeEqual(c,e))
+        return reply(res,401,{error:'Zugangsdaten nicht korrekt.'});
+
+      const token=crypto.randomBytes(32).toString('hex');
+      sessions.set(token,Date.now()+8*3600000);
+      return reply(res,200,{success:true},{
+        'Set-Cookie':`${cookieName}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`
+      });
+    }
+
+    // Nur Vorschau: keine Buchung und kein Zahlungssaldo wird veraendert.
+    if(route==='/api/admin/anschlussrabatt/vorschau'&&req.method==='POST'){
+      if(!admin(req,res))return;
+      const d=await body(req);
+      if(!d||!Array.isArray(d.programme)||d.programme.length<2||d.programme.length>20)
+        return reply(res,400,{error:'Bitte 2 bis 20 Programme angeben.'});
+      try{
+        const positionen=anschlussrabatte(d.programme);
+        return reply(res,200,{
+          positionen,
+          rabattGesamtCent:positionen.reduce((sum,p)=>sum+p.rabattCent,0),
+          endpreisGesamtCent:positionen.reduce((sum,p)=>sum+p.endpreisCent,0)
+        });
+      }catch(fehler){
+        return reply(res,400,{error:fehler.message});
+      }
+    }
+
+    if(route==='/api/admin/anschlussrabatt/anwenden'&&req.method==='POST'){
+      if(!admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      const d=await body(req),ids=Array.isArray(d?.buchungsIds)?[...new Set(d.buchungsIds)]:[];
+      if(ids.length<2||ids.length>20||ids.some(id=>typeof id!=='string'||! /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)))
+        return reply(res,400,{error:'Bitte 2 bis 20 gültige Buchungen auswählen.'});
+      const ergebnis=await reservierungsTransaktion(async client=>{
+        const q=await client.query(
+          `SELECT id,status,data FROM brilon_buchungen WHERE id=ANY($1::uuid[]) FOR UPDATE`,[ids]
+        );
+        if(q.rowCount!==ids.length)return {ungueltig:true};
+        if(q.rows.some(b=>b.status!=='bestaetigt'))return {nichtBestaetigt:true};
+        const datum=q.rows[0].data.datum;
+        if(q.rows.some(b=>b.data.datum!==datum))return {verschiedeneTage:true};
+        if(q.rows.some(b=>b.data.anschlussRabatt10||Number(b.data.anschlussRabattCent)>0))
+          return {bereitsRabattiert:true};
+        const programme=q.rows.map(b=>{
+          const fenster=buchungsfenster(b.data);
+          if(!fenster||!Number.isFinite(Number(b.data.gesamtpreis)))throw new Error('Preis oder Zeitfenster fehlt.');
+          const start=new Date(datum+'T00:00:00Z').getTime()+fenster[0]*60000;
+          const ende=new Date(datum+'T00:00:00Z').getTime()+fenster[1]*60000;
+          return {id:b.id,start:new Date(start).toISOString(),ende:new Date(ende).toISOString(),
+            preisCent:Math.round(Number(b.data.gesamtpreis)*100)};
+        });
+        let positionen;
+        try{positionen=anschlussrabatte(programme);}catch(error){return {ungueltig:true,fehler:error.message};}
+        const nachPosition=new Map(positionen.map(p=>[p.id,p]));
+        const updates=[];
+        for(const buchung of q.rows){
+          const position=nachPosition.get(buchung.id);
+          if(!position?.rabattCent)continue;
+          const data=buchung.data,alterCent=position.originalCent,neuerCent=position.endpreisCent;
+          const payments=Array.isArray(data.zahlungen)?data.zahlungen:[];
+          const stand=preisNachAnschlussrabatt(alterCent,position.rabattCent,payments);
+          const anpassung={grund:'Anschlussrabatt 10 %',am:new Date().toISOString(),vonCent:alterCent,
+            rabattCent:position.rabattCent,aufCent:neuerCent};
+          data.preisanpassungen=[...(Array.isArray(data.preisanpassungen)?data.preisanpassungen:[]),anpassung];
+          data.gesamtpreis=neuerCent/100;
+          data.anschlussRabattCent=position.rabattCent;
+          data.anschlussRabatt10=true;
+          data.restbetrag=stand.offenCent/100;
+          data.zahlungsgutschriftCent=stand.gutschriftCent;
+          const saved=await client.query(
+            'UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW() WHERE id=$2 RETURNING id,buchungsnummer,status,data',
+            [JSON.stringify(data),buchung.id]
+          );
+          updates.push({buchung:saved.rows[0],rabattCent:position.rabattCent,stand});
+        }
+        if(!updates.length)return {keineAnschluesse:true};
+        return {updates};
+      });
+      if(ergebnis.ungueltig)return reply(res,400,{error:ergebnis.fehler||'Ausgewählte Buchungen sind ungültig.'});
+      if(ergebnis.nichtBestaetigt)return reply(res,409,{error:'Nur bestätigte Buchungen können rabattiert werden.'});
+      if(ergebnis.verschiedeneTage)return reply(res,409,{error:'Alle Buchungen müssen am selben Tag stattfinden.'});
+      if(ergebnis.bereitsRabattiert)return reply(res,409,{error:'Mindestens eine Buchung hat bereits einen Anschlussrabatt erhalten.'});
+      if(ergebnis.keineAnschluesse)return reply(res,409,{error:'Keine direkt anschließenden Programmzeiten gefunden.'});
+      for(const item of ergebnis.updates){
+        const data=item.buchung.data;
+        if(data.email)Promise.allSettled([brevoMail(data.email,
+          'Dein Anschlussrabatt – Klettern & Abenteuer Brilon',
+          `Für Buchung ${data.buchungsnummer||''} wurde ein einmaliger Anschlussrabatt von 10 % erfasst.\n`+
+          `Neuer Gesamtpreis: ${Number(data.gesamtpreis).toFixed(2).replace('.',',')} €\n`+
+          `Eingegangen: ${(item.stand.erhaltenCent/100).toFixed(2).replace('.',',')} €\n`+
+          `Noch offen: ${(item.stand.offenCent/100).toFixed(2).replace('.',',')} €\n`+
+          (data.zahlungsgutschriftCent?`Zahlungsgutschrift: ${(data.zahlungsgutschriftCent/100).toFixed(2).replace('.',',')} € – bitte manuell ausgleichen.\n`:'')+
+          `\nBei Fragen melde dich bitte bei uns.`)]).then(results=>results.forEach(r=>{
+            if(r.status==='rejected')console.error('Anschlussrabatt-E-Mail konnte nicht versendet werden.');
+          }));
+      }
+      return reply(res,200,{success:true,updates:ergebnis.updates.map(x=>({
+        id:x.buchung.id,buchungsnummer:x.buchung.buchungsnummer,rabattCent:x.rabattCent,
+        gesamtpreis:x.buchung.data.gesamtpreis,restbetrag:x.stand.offenCent/100,
+        zahlungsgutschriftCent:x.buchung.data.zahlungsgutschriftCent
+      }))});
+    }
+
+    if(route==='/api/admin/logout'&&req.method==='POST'){
+      const match=(req.headers.cookie||'').match(/brilon_session=([a-f0-9]{64})/);
+      if(match)sessions.delete(match[1]);
+      return reply(res,200,{success:true},{
+        'Set-Cookie':`${cookieName}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`
+      });
+    }
+
+    const zahlungenRoute = route.match(/^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})\/zahlungen$/);
+    if(zahlungenRoute&&req.method==='POST'){
+      if(!admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      const d=await body(req);
+      const betragText=typeof d.betrag==='string'?d.betrag:String(d.betrag??'');
+      if(!/^\d{1,7}(?:[.,]\d{1,2})?$/.test(betragText))
+        return reply(res,400,{error:'Bitte einen gültigen Zahlbetrag eingeben.'});
+      const betragCent=Math.round(Number(betragText.replace(',','.'))*100);
+      if(!Number.isSafeInteger(betragCent)||betragCent<=0)
+        return reply(res,400,{error:'Der Zahlbetrag muss größer als 0 € sein.'});
+      const methode=safeText(d.methode,24);
+      if(!['ueberweisung','bar','karte','sonstiges'].includes(methode))
+        return reply(res,400,{error:'Bitte eine gültige Zahlungsart auswählen.'});
+      const ergebnis=await reservierungsTransaktion(async client=>{
+        const q=await client.query(
+          'SELECT id,data,status FROM brilon_buchungen WHERE id=$1 FOR UPDATE',
+          [zahlungenRoute[1]]
+        );
+        if(!q.rowCount)return {fehlt:true};
+        const data=q.rows[0].data;
+        if(typeof data.gesamtpreis!=='number'||!Number.isFinite(data.gesamtpreis)||data.gesamtpreis<0)
+          return {keinPreis:true};
+        const zahlungen=Array.isArray(data.zahlungen)?data.zahlungen:[];
+        const gesamtCent=Math.round(Number(data.gesamtpreis)*100);
+        let zahlungsErgebnis;
+        try { zahlungsErgebnis=zahlungErgaenzen(gesamtCent,zahlungen,betragCent,methode); }
+        catch(error){
+          if(error.message.includes('offenen Rest'))
+            return {ueberzahlung:true,offenCent:zahlungsstand(gesamtCent,zahlungen).offenCent};
+          throw error;
+        }
+        const zahlung={
+          id:crypto.randomUUID(),
+          betragCent,
+          methode,
+          erhaltenAm:new Date().toISOString(),
+          notiz:safeText(d.notiz,300),
+          erfasstVon:safeText(process.env.ADMIN_USER,100)||'admin'
+        };
+        data.zahlungen=[...zahlungen,zahlung];
+        const neuerStand=zahlungsstand(Math.round(Number(data.gesamtpreis)*100),data.zahlungen);
+        const neuerStatus=neuerStand.anzahlungErreicht&&q.rows[0].status==='offen'
+          ?'bestaetigt':q.rows[0].status;
+        const elternRabatt=neuerStatus==='bestaetigt'
+          ?await anschlussRabattElternAnwenden(client,data,q.rows[0].id):{angewendet:false};
+        if(elternRabatt.ungueltig)return {anschlussElternUngueltig:true};
+        const gespeichert=await client.query(
+          `UPDATE brilon_buchungen SET data=$1::jsonb,status=$2,updated_at=NOW()
+           WHERE id=$3 RETURNING id,data,status`,
+          [JSON.stringify(data),neuerStatus,q.rows[0].id]
+        );
+        return {
+          buchung:gespeichert.rows[0],zahlung,stand:neuerStand,
+          bestaetigtJetzt:neuerStatus!==q.rows[0].status,elternRabatt
+        };
+      });
+      if(ergebnis.anschlussElternUngueltig)return reply(res,409,{error:'Die Ursprungsbuchung ist nicht mehr bestätigt.'});
+      if(ergebnis.fehlt)return reply(res,404,{error:'Buchung nicht gefunden.'});
+      if(ergebnis.keinPreis)return reply(res,409,{error:'Für diese Buchung ist kein Gesamtpreis hinterlegt.'});
+      if(ergebnis.ueberzahlung)return reply(res,409,{
+        error:'Der Betrag übersteigt den noch offenen Betrag.',
+        offenCent:ergebnis.offenCent
+      });
+      if(ergebnis.bestaetigtJetzt){
+        const data=ergebnis.buchung.data;
+        const bestaetigungsText=`Deine Buchung ${data.buchungsnummer || ''} ist verbindlich bestätigt.\n`+
+          `Erfasste Zahlung: ${(ergebnis.stand.erhaltenCent/100).toFixed(2).replace('.',',')} €\n`+
+          `Offener Restbetrag: ${(ergebnis.stand.offenCent/100).toFixed(2).replace('.',',')} €\n\n`+
+          `Termin: ${data.datum} um ${data.uhrzeit} Uhr`+
+          (ergebnis.elternRabatt?.angewendet?'\nDer 10-%-Anschlussrabatt wurde auch auf deine ursprüngliche Buchung angewendet.':'');
+        const offerLink=anschlussLink(ergebnis.buchung.id);
+        const angeboteText=offerLink?`\n\nPassende Anschlussprogramme mit 10 % Rabatt findest du hier:\n${offerLink}`:'';
+        const mails=[brevoMail(data.email,'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
+          `Hallo ${data.name || ''},\n\n${bestaetigungsText}${angeboteText}\n\nGut Seil!\nKlettern & Abenteuer Brilon`)];
+        if(process.env.BOOKING_NOTIFY_EMAIL)mails.push(brevoMail(
+          process.env.BOOKING_NOTIFY_EMAIL,'Buchung bestätigt – Zahlungseingang erfasst',
+          `${bestaetigungsText}\n\nKundin/Kunde: ${data.name || ''} · ${data.email || ''}`
+        ));
+        Promise.allSettled(mails).then(results=>results.forEach(result=>{
+          if(result.status==='rejected')console.error('Buchungsbestätigung konnte nicht versendet werden.');
+        }));
+      }
+      return reply(res,201,ergebnis);
+    }
+
+    if(route.match(/^\/api\/admin\/buchungen\/[0-9a-f-]{36}$/)&&req.method==='PATCH'){
+      if(!admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+
+      const id=route.split('/').pop(),d=await body(req);
+      if(!d||typeof d!=='object'||Array.isArray(d))
+        return reply(res,400,{error:'Ungültige Eingabe.'});
+
+      if(d.zahlungsstatus!==undefined)
+        return reply(res,400,{error:'Zahlungen müssen mit Betrag und Zahlungsart einzeln erfasst werden.'});
+
+      let status = d.status,
+      notiz = safeText(d.bearbeitungsnotiz, 2000);
+      if(!['offen','bestaetigt','abgelehnt','storniert'].includes(status))
+        return reply(res,400,{error:'Ungültiger Buchungsstatus.'});
+
+      const ergebnis=await reservierungsTransaktion(async client=>{
+        
+const alt=await client.query(
+  'SELECT id,data,status FROM brilon_buchungen WHERE id=$1',
+  [id]
+);
+
+        if(!alt.rowCount)return {fehlt:true};
+        
+const alterStatus = alt.rows[0].status;
+    const buchungsdaten = alt.rows[0].data;
+
+
+        if(status==='offen'||status==='bestaetigt'){
+          const data=alt.rows[0].data;
+          const konflikt=await pruefeBuchungskonflikt(
+            client,data.datum,buchungsfenster(data),id
+          );
+          if(konflikt)return {konflikt};
+        }
+        const elternRabatt=status==='bestaetigt'
+          ?await anschlussRabattElternAnwenden(client,buchungsdaten,id):{angewendet:false};
+        if(elternRabatt.ungueltig)return {anschlussElternUngueltig:true};
+        const elternRabattZurueck=status!=='bestaetigt'&&alterStatus==='bestaetigt'&&
+          ['storniert','abgelehnt'].includes(status)
+          ?await anschlussRabattElternZuruecknehmen(client,buchungsdaten,id):{zurueckgenommen:false};
+
+       const q = await client.query(
+  `UPDATE brilon_buchungen
+   SET status=$1,
+       bearbeitungsnotiz=$2,
+       data=$3::jsonb,
+       updated_at=NOW()
+   WHERE id=$4
+   RETURNING id,status,data`,
+  [status, notiz, JSON.stringify(buchungsdaten), id]
+);
+       
+return {
+  buchung: q.rows[0],
+  alterStatus,
+  kundenDaten: buchungsdaten,
+  elternRabatt,
+  elternRabattZurueck
+};
+
+      });
+
+      if(ergebnis.fehlt)
+        return reply(res,404,{error:'Buchung nicht gefunden.'});
+      if(ergebnis.konflikt)
+        return reply(res,409,{error:ergebnis.konflikt});
+      if(ergebnis.anschlussElternUngueltig)
+        return reply(res,409,{error:'Die Ursprungsbuchung ist nicht mehr bestätigt.'});
+
+      
+if (
+  ergebnis.alterStatus !== status && status !== 'offen'
+) {
+  const kunde = ergebnis.kundenDaten;
+  const empfaenger = kunde?.email;
+  const gesamtCent = Number.isFinite(Number(kunde.gesamtpreis))
+    ? Math.round(Number(kunde.gesamtpreis) * 100) : null;
+  const stand = gesamtCent === null ? null : zahlungsstand(
+    gesamtCent, Array.isArray(kunde.zahlungen) ? kunde.zahlungen : []
+  );
+
+  const nachrichten = {
+    bestaetigt: {
+      betreff: 'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
+      text: stand
+        ? `Deine Buchung wurde verbindlich bestätigt.\n\nTatsächlich erfasst: ${(stand.erhaltenCent / 100).toFixed(2).replace('.', ',')} €\nNoch offen: ${(stand.offenCent / 100).toFixed(2).replace('.', ',')} €.`
+        : 'Deine Buchung wurde verbindlich bestätigt.'
+    },
+    abgelehnt: {
+      betreff: 'Rückmeldung zu deiner Buchungsanfrage – Klettern Brilon',
+      text: 'Leider können wir deine Buchungsanfrage nicht annehmen.'
+    },
+    storniert: {
+      betreff: 'Deine Buchung wurde storniert – Klettern Brilon',
+      text: 'Deine Buchung wurde storniert.'
+    }
+  };
+
+  const nachricht = nachrichten[status];
+
+  if (empfaenger && nachricht) {
+    const inhalt =
+      `Hallo ${kunde.name || ''},\n\n` +
+      `${nachricht.text}\n\n` +
+      `Datum: ${kunde.datum || 'Nicht angegeben'}\n` +
+      `Beginn: ${kunde.uhrzeit || 'Nach Absprache'} Uhr\n` +
+      `Teilnehmer: ${kunde.teilnehmer || 'Nicht angegeben'}\n\n` +
+      (status==='bestaetigt'&&anschlussLink(ergebnis.buchung.id)
+        ?`Passende Anschlussprogramme mit 10 % Rabatt: ${anschlussLink(ergebnis.buchung.id)}\n\n`:'' )+
+      (ergebnis.elternRabatt?.angewendet?'Der Anschlussrabatt wurde auch auf die ursprüngliche Buchung angewendet.\n\n':'')+
+      (ergebnis.elternRabattZurueck?.zurueckgenommen
+        ?`Der Rabatt auf die ursprüngliche Buchung wurde nach dem Storno zurückgenommen. Neuer Preis: ${(ergebnis.elternRabattZurueck.buchung.data.gesamtpreis).toFixed(2).replace('.',',')} €, offen: ${(ergebnis.elternRabattZurueck.stand.offenCent/100).toFixed(2).replace('.',',')} €.\n\n`:'' )+
+      `Bei Fragen antworte bitte auf diese E-Mail.\n\n` +
+      `Gut Seil!\nKlettern & Abenteuer Brilon`;
+
+    brevoMail(empfaenger, nachricht.betreff, inhalt)
+      .catch(fehler => {
+        console.error('Status-E-Mail fehlgeschlagen:', fehler);
+      });
+  }
+}
+
+      return reply(res,200,ergebnis.buchung);
+    }
+
+    if (route.match(/^\/api\/admin\/buchungen\/[0-9a-f-]{36}\/zahlung$/)
+    && req.method === 'POST') {
+
+  if (!admin(req, res)) return;
+  if (!pool) {
+    return reply(res, 503, {
+      error: 'Datenbank nicht verfügbar.'
+    });
+  }
+
+    const buchungsId = route.split('/')[4];
+
+const buchungAbfrage = await pool.query(
+  `SELECT id, data, status, buchungsnummer
+   FROM brilon_buchungen
+   WHERE id = $1`,
+  [buchungsId]
+);
+
+if (!buchungAbfrage.rows.length) {
+  return reply(res, 404, {
+    error: 'Buchungsanfrage nicht gefunden.'
+  });
+}
+
+const buchung = buchungAbfrage.rows[0];
+const kunde = buchung.data;
+
+if (
+  typeof kunde.gesamtpreis !== 'number' ||
   !Number.isFinite(kunde.gesamtpreis) ||
   kunde.gesamtpreis < 0
 ) {
