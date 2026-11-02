@@ -52,6 +52,14 @@ function fakeAdminApi(page) {
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
     if(endpoint==='/api/admin/pruefung/tablets'&&method==='GET')
       return json(200,state.inspectionTablets);
+    const replacement=endpoint.match(/^\/api\/admin\/pruefung\/tablets\/([^/]+)\/ersetzen$/);
+    if(replacement&&method==='POST'){
+      const d=readBody(),tablet=state.inspectionTablets.find(x=>x.id===replacement[1]&&x.aktiv);
+      if(!d.wechselBestaetigt)return json(400,{error:'Bestätigung erforderlich'});
+      if(!tablet)return json(409,{error:'Gerät bereits gesperrt'});
+      tablet.aktiv=false;tablet.online=false;tablet.pruefdisplay=false;
+      return json(201,{code:'00654321',gueltigSekunden:600,bisherigesGeraet:{id:tablet.id,name:tablet.name}});
+    }
     const chooseTablet=endpoint.match(/^\/api\/admin\/pruefung\/tablets\/([^/]+)\/pruefdisplay$/);
     if(chooseTablet&&method==='PATCH'){
       const device=state.inspectionTablets.find(x=>x.id===chooseTablet[1]&&x.aktiv);
@@ -579,6 +587,27 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(state.inspectionTablets.find(x=>x.id===second).pruefdisplay,true);
     assert.equal(state.inspectionTablets.find(x=>x.id===first).pruefdisplay,false);
     assert.equal(state.mutations.filter(m=>m.endpoint.endsWith('/pruefdisplay')).length,1);
+    await page.close();
+  });
+
+  await t.test('Administrativer Tabletwechsel sperrt das Altgerät und zeigt einen neuen Kopplungscode',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const id='550e8400-e29b-41d4-a716-446655441033';
+    state.inspectionTablets=[{id,name:'Prüfdisplay am Fenster',aktiv:true,online:true,
+      pruefdisplay:true,gekoppelt_am:'2027-01-01T12:00:00Z',
+      zuletzt_gesehen_am:'2027-01-01T12:05:00Z'}];
+    const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.type());await dialog.accept();});
+    await login(page,root);
+    await page.locator('#tablet-admin-list')
+      .getByRole('button',{name:'Tablet ersetzen / neu koppeln'}).click();
+    await page.locator('#tablet-pair-code').getByText(/00654321/).waitFor();
+    await page.locator('#tablet-admin-list').getByText('Zugang gesperrt').waitFor();
+    assert.equal(state.inspectionTablets[0].aktiv,false);
+    assert.equal(state.inspectionTablets[0].pruefdisplay,false);
+    assert.deepEqual(dialogs,['confirm']);
+    assert.equal(state.mutations.filter(x=>x.endpoint.endsWith('/ersetzen')).length,1);
+    assert.equal(state.mutations.find(x=>x.endpoint.endsWith('/ersetzen')).body.wechselBestaetigt,true);
     await page.close();
   });
 
