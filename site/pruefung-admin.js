@@ -10,7 +10,8 @@
       ['/api/admin/pruefung/mitarbeitende','pruef-personal-list','pruef-personal-status',renderStaff],
       ['/api/admin/pruefung/stationen','pruef-station-list','pruef-station-status',renderStations],
       ['/api/admin/pruefung/berichte','pruef-report-list','pruef-report-status',renderReports],
-      ['/api/admin/pruefung/hinweise','pruef-hinweis-list','pruef-hinweis-status',renderHints]
+      ['/api/admin/pruefung/hinweise','pruef-hinweis-list','pruef-hinweis-status',renderHints],
+      ['/api/admin/pruefung/meldungen','pruef-mail-list','pruef-mail-status',renderMailStatus]
     ]){
       try{render(find(container),await api(url));}
       catch(err){find(statusId).textContent='Laden fehlgeschlagen: '+err.message;}
@@ -82,6 +83,51 @@
         }catch(error){find('pruef-station-status').textContent='Verlauf nicht verfügbar: '+error.message;}
       });
       panel.append(audit,details);target.append(panel);
+    }
+  }
+  function renderMailStatus(target,notifications){
+    target.replaceChildren();
+    const outstanding=notifications.filter(x=>x.status!=='angenommen');
+    find('pruef-mail-status').textContent=outstanding.length+
+      ' nicht als angenommen bestätigte Sicherheitsmängelmeldungen von '+
+      notifications.length+' angezeigten Einträgen.';
+    for(const item of notifications){
+      const card=elt('article');card.className='booking';
+      const statuses={ausstehend:'Ausstehend',sendet:'Versand unklar – Anbieter prüfen',
+        angenommen:'Vom Anbieter angenommen (Zustellung nicht bestätigt)',
+        fehlgeschlagen:'Versand fehlgeschlagen',nicht_konfiguriert:'E-Mail nicht konfiguriert'};
+      card.append(elt('strong',item.programm+' · '+(item.stationen||[]).join(', ')),
+        elt('p','Prüfbericht: '+item.bericht_id),
+        elt('p','Status: '+(statuses[item.status]||'Unbekannt')),
+        elt('p','Versuche: '+item.versuche+
+          ' · Letzter Versuch: '+(item.letzter_versuch?
+          new Date(item.letzter_versuch).toLocaleString('de-DE'):'–')));
+      if(item.letzter_fehler)card.append(elt('p',item.letzter_fehler));
+      if(['fehlgeschlagen','nicht_konfiguriert','ausstehend'].includes(item.status)){
+        const resend=elt('button','Mängelmeldung erneut senden');
+        resend.type='button';resend.className='btn secondary';
+        resend.addEventListener('click',async()=>{
+          if(!confirm('Vor erneutem Versand prüfen, ob die Nachricht bereits beim Empfänger oder E-Mail-Anbieter eingegangen ist. Trotzdem erneut versuchen?'))return;
+          resend.disabled=true;
+          try{
+            const result=await api('/api/admin/pruefung/meldungen/'+encodeURIComponent(item.bericht_id)+'/erneut-senden',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({doppelversandGeprueft:true})
+            });
+            find('pruef-mail-status').textContent=result.status==='gesendet'?
+              'Mail-Anbieter hat den Versand angenommen; Zustellung nicht bestätigt.':
+              'Neuer Versand nicht bestätigt: '+result.status+'. Verantwortliche direkt informieren.';
+            await refresh();
+          }catch(error){
+            find('pruef-mail-status').textContent='Erneuter Versand fehlgeschlagen: '+error.message;
+            resend.disabled=false;
+          }
+        });
+        card.append(resend);
+      }else if(item.status==='sendet'){
+        card.append(elt('p','Kein automatischer Neuversand: Versandstatus zuerst beim Anbieter klären.'));
+      }
+      target.append(card);
     }
   }
   function renderHints(target,hints){
@@ -177,6 +223,7 @@
   });
   find('pruef-report-refresh')?.addEventListener('click',refresh);
   find('pruef-hinweis-refresh')?.addEventListener('click',refresh);
+  find('pruef-mail-refresh')?.addEventListener('click',refresh);
   // The admin workspace is revealed by the existing login flow.
   const observer=new MutationObserver(()=>{
     if(!find('workspace')?.hidden && !initialized){initialized=true;refresh();}
