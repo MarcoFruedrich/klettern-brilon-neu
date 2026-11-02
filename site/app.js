@@ -458,9 +458,10 @@ function sonderaktionAnfragen(aktion){
   nachricht.value=(prefix+rest).slice(0,2000);
   sonderaktionsPrefix=prefix;
 
-  // An action title is not necessarily a bookable programme. Select it only
-  // if an identical, currently available programme actually exists.
-  const programm=angeboteCache.find(a=>a.name===titel);
+  // Programme are explicitly assigned in administration using their stable ID.
+  // An equal or similar title is never sufficient to associate a booking.
+  const programm=aktion.programm_id==null?null:
+    angeboteCache.find(a=>String(a.id)===String(aktion.programm_id));
   // A special action can be independent of the programme catalogue. Avoid
   // silently retaining a programme selected for an earlier special.
   angebotAuswahl.value=programm?.name||'';
@@ -475,7 +476,9 @@ function sonderaktionAnfragen(aktion){
 
   hinweis.hidden=false;
   hinweis.textContent='Ausgewählte Sonderaktion: '+titel+
-    '. Bitte Programm und Termin prüfen. Preis und Verfügbarkeit werden erst nach Prüfung der Anfrage bestätigt.';
+    (programm?' · verknüpftes Programm: '+programm.name:
+      ' · noch kein buchbares Programm verknüpft. Bitte Programm auswählen oder uns kontaktieren.')+
+    ' Preis und Verfügbarkeit werden erst nach Prüfung der Anfrage bestätigt.';
   form.scrollIntoView({behavior:'smooth',block:'start'});
   nachricht.focus({preventScroll:true});
 }
