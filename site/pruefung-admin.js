@@ -21,18 +21,50 @@
   function renderStaff(target,people){
     target.replaceChildren();
     for(const person of people){
-      const card=elt('p',person.name+' · '+person.email+' · '+(person.aktiv?'Aktiv':'Deaktiviert'));
+      const card=elt('article');card.className='booking';
+      card.append(elt('strong',person.name+' · '+person.email),
+        elt('p',person.aktiv?'Zugang aktiv':'Zugang deaktiviert'));
       if(person.aktiv){
-        const button=elt('button','Zugang deaktivieren');button.type='button';button.className='btn secondary';
-        button.addEventListener('click',async()=>{
-          if(!confirm('Mitarbeiterzugang dauerhaft deaktivieren?'))return;
-          try{await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/deaktivieren',
-            {method:'PATCH'});await refresh();}
-          catch(err){find('pruef-personal-status').textContent='Fehler: '+err.message;}
+        const stop=elt('button','Zugang deaktivieren');stop.type='button';stop.className='btn secondary';
+        stop.addEventListener('click',async()=>{
+          if(!confirm('Zugang deaktivieren und alle laufenden Mitarbeitersitzungen beenden?'))return;
+          stop.disabled=true;
+          try{
+            await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/deaktivieren',{method:'PATCH'});
+            await refresh();
+          }catch(err){find('pruef-personal-status').textContent='Fehler: '+err.message;stop.disabled=false;}
         });
-        card.append(button);
+        card.append(stop);
       }
-      target.append(card);
+      const field=elt('label',person.aktiv?'Neues Passwort (alle Sitzungen beenden)':
+        'Neues Startpasswort für die Reaktivierung');
+      const password=document.createElement('input');password.type='password';
+      password.autocomplete='new-password';password.minLength=12;
+      password.placeholder='Mindestens 12 Zeichen';
+      field.append(password);card.append(field);
+      const action=person.aktiv?'passwort-setzen':'reaktivieren';
+      const button=elt('button',person.aktiv?'Passwort zurücksetzen':'Zugang reaktivieren');
+      button.type='button';button.className='btn secondary';
+      button.addEventListener('click',async()=>{
+        if(password.value.length<12){
+          find('pruef-personal-status').textContent='Mindestens 12 Zeichen für das neue Passwort erforderlich.';return;
+        }
+        if(!confirm(person.aktiv?'Passwort zurücksetzen und bisherige Sitzungen sperren?':
+          'Mitarbeiterzugang mit neuem Passwort aktivieren?'))return;
+        button.disabled=true;
+        try{
+          await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/'+action,{
+            method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({passwort:password.value})
+          });
+          password.value='';await refresh();
+        }catch(err){
+          password.value='';
+          find('pruef-personal-status').textContent='Zugangsänderung fehlgeschlagen: '+err.message;
+          button.disabled=false;
+        }
+      });
+      card.append(button);target.append(card);
     }
   }
   function renderStations(target,stations){
@@ -41,12 +73,14 @@
       const panel=elt('article');panel.className='booking';
       const blocked=!!station.gesperrt_am;
       panel.append(elt('strong',station.name),
-        elt('p',blocked?'GESPERRT – NICHT BENUTZEN':
-          station.aktiv?'Nicht gesperrt':'Inaktiv'));
+        elt('p',!station.aktiv?'STATION DEAKTIVIERT – NICHT BENUTZEN':
+          blocked?'GESPERRT – NICHT BENUTZEN':'Aktiv und nicht gesperrt'));
       if(blocked){
         panel.append(elt('p','Grund: '+(station.sperrgrund||'Nicht angegeben')));
         const button=elt('button','Nach fachlicher Prüfung freigeben');
         button.type='button';button.className='btn secondary';
+        button.disabled=!station.aktiv;
+        if(!station.aktiv)button.title='Eine inaktive Station kann nicht fachlich freigegeben werden.';
         button.addEventListener('click',async()=>{
           const freigabeDurch=prompt('Name der Person, die die Station fachlich nachgeprüft hat:');
           if(!freigabeDurch)return;
@@ -68,6 +102,48 @@
         });
         panel.append(button);
       }
+      const statusAction=station.aktiv?'deaktivieren':'reaktivieren';
+      const statusButton=elt('button',station.aktiv?'Station deaktivieren':'Station reaktivieren');
+      statusButton.type='button';statusButton.className='btn secondary';
+      statusButton.addEventListener('click',async()=>{
+        const begruendung=prompt(station.aktiv?
+          'Grund der Stationsstilllegung (mindestens 15 Zeichen):':
+          'Grund der Stationsreaktivierung (mindestens 15 Zeichen):');
+        if(!begruendung)return;
+        if(!confirm(station.aktiv?
+          'Station für neue Prüfberichte deaktivieren? Alte Prüfberichte bleiben erhalten.':
+          'Station reaktivieren? Eine vorhandene Sicherheitsmängelsperre bleibt bestehen.'))return;
+        statusButton.disabled=true;
+        try{
+          await api('/api/admin/pruefung/stationen/'+encodeURIComponent(station.id)+'/'+statusAction,{
+            method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({begruendung})
+          });
+          await refresh();
+        }catch(error){
+          find('pruef-station-status').textContent='Stationsstatus konnte nicht geändert werden: '+error.message;
+          statusButton.disabled=false;
+        }
+      });
+      panel.append(statusButton);
+      const statusHistory=elt('button','Stilllegungs- und Reaktivierungsverlauf');
+      statusHistory.type='button';statusHistory.className='btn secondary';
+      const log=elt('div');log.hidden=true;
+      statusHistory.addEventListener('click',async()=>{
+        if(!log.hidden){log.hidden=true;return;}
+        try{
+          const entries=await api('/api/admin/pruefung/stationen/'+encodeURIComponent(station.id)+'/statusverlauf');
+          log.replaceChildren();
+          if(!entries.length)log.append(elt('p','Noch keine Statusänderungen.'));
+          for(const entry of entries)log.append(elt('p',
+            new Date(entry.erstellt_am).toLocaleString('de-DE')+' · '+entry.art+' · '+
+            entry.verantwortlich+' · '+entry.begruendung));
+          log.hidden=false;
+        }catch(error){
+          find('pruef-station-status').textContent='Statusverlauf nicht verfügbar: '+error.message;
+        }
+      });
+      panel.append(statusHistory,log);
       const audit=elt('button','Prüf- und Freigabeverlauf anzeigen');
       audit.type='button';audit.className='btn secondary';
       const details=elt('div');details.hidden=true;
