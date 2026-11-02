@@ -48,6 +48,7 @@
         <a href="#anschlussrabatt-section">Anschlussrabatte</a>
         <a href="#admin-guestbook-section">Gästeliste</a>
         <a href="#gps-verwaltung">GPS-Touren</a>
+        <a href="#stationspruefung">Stationsprüfungen</a>
         <a href="#settings-section">Einstellungen</a>
       </nav>
 
@@ -356,6 +357,36 @@
 </section>
 
     
+    <section id="stationspruefung" class="booking admin-anchor">
+      <h2>Stationsprüfungen – Verwaltung</h2>
+      <p>Für die dokumentierte Kontrolle vor jedem Programm. <a href="/pruefung.html">Prüfformular für Mitarbeitende öffnen</a>.</p>
+      <form id="pruef-personal-form">
+        <h3>Mitarbeiterzugang anlegen</h3>
+        <label>Name<input name="name" maxlength="120" required></label>
+        <label>E-Mail<input name="email" type="email" maxlength="180" required></label>
+        <label>Persönliches Startpasswort (mindestens 12 Zeichen)
+          <input name="passwort" type="password" minlength="12" autocomplete="new-password" required></label>
+        <button class="btn" type="submit">Mitarbeiter anlegen</button>
+      </form>
+      <p id="pruef-personal-status" role="status"></p>
+      <div id="pruef-personal-list"></div>
+      <form id="pruef-station-form">
+        <h3>Station anlegen</h3>
+        <label>Stationsbezeichnung<input name="name" maxlength="100" required placeholder="Kletterwand links"></label>
+        <button class="btn secondary" type="submit">Station speichern</button>
+      </form>
+      <p id="pruef-station-status" role="status"></p>
+      <div id="pruef-station-list"></div>
+      <h3>Einmaligen Vor-Ort-Code anzeigen</h3>
+      <p class="hint">Diesen Code ausschließlich auf dem fest installierten Tablet vor Ort anzeigen. Er ist zwei Minuten gültig und nur einmal verwendbar. Nach jeder Prüfung wird eine neue Freigabe benötigt.</p>
+      <button class="btn secondary" id="pruef-code-generate" type="button">Neuen Prüfcode anzeigen</button>
+      <p id="pruef-code-display" role="status" style="font-size:2rem;letter-spacing:.2rem"></p>
+      <h3>Zuletzt gespeicherte Prüfberichte</h3>
+      <button class="btn secondary" id="pruef-report-refresh" type="button">Berichte aktualisieren</button>
+      <p id="pruef-report-status" role="status"></p>
+      <div id="pruef-report-list"></div>
+    </section>
+
     <p id="status" role="status"></p>
       </div>
   </main>
@@ -364,5 +395,6 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js"></script>
+  <script src="/pruefung-admin.js"></script>
 </body>
 </html>
