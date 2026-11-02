@@ -43,12 +43,13 @@ function fakeAdminApi(page) {
     }
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
     if(endpoint==='/api/admin/buchungen'&&method==='GET'){
-      if(!u.searchParams.has('seite'))return json(200,state.bookings);
+      if(!u.searchParams.has('seite'))return json(200,state.bookings.slice(0,250));
       const search=(u.searchParams.get('suche')||'').toLowerCase();
       const status=u.searchParams.get('status')||'alle';
       const filtered=state.bookings.filter(b=>(status==='alle'||b.status===status)&&
         (!search||JSON.stringify(b.data).toLowerCase().includes(search)));
-      return json(200,{buchungen:filtered,seite:1,proSeite:50,anzahl:filtered.length});
+      const pageNumber=Number(u.searchParams.get('seite'));
+      return json(200,{buchungen:filtered.slice((pageNumber-1)*50,pageNumber*50),seite:pageNumber,proSeite:50,anzahl:filtered.length});
     }
     const bookingRoute=endpoint.match(/^\/api\/admin\/buchungen\/([^/]+)$/);
     if(bookingRoute&&method==='PATCH'){
@@ -59,9 +60,30 @@ function fakeAdminApi(page) {
       found.bearbeitungsnotiz=input.bearbeitungsnotiz;
       return json(200,{status:found.status,id:found.id});
     }
-    if(endpoint==='/api/admin/zahlungsuebersicht'&&method==='GET')
-      return json(200,{summen:{eingegangenCent:0,offenCent:10000,
-        zahlungseingaenge:0,gutschriftCent:0},eintraege:[],seite:1,proSeite:50,anzahl:0});
+    if(endpoint==='/api/admin/zahlungsuebersicht'&&method==='GET'){
+      const filter=u.searchParams.get('filter')||'alle';
+      const pageNumber=Number(u.searchParams.get('seite')||1),proSeite=50;
+      const entries=state.bookings.map(b=>{
+        const paid=(b.data.zahlungen||[]).reduce((sum,z)=>sum+Number(z.betragCent||0),0);
+        const total=Math.round(Number(b.data.gesamtpreis||0)*100);
+        return {id:b.id,status:b.status,buchungsnummer:b.data.buchungsnummer,
+          name:b.data.name,angebot:b.data.angebot,datum:b.data.datum,gesamtpreisCent:total,
+          eingegangenCent:paid,offenCent:Math.max(0,total-paid),
+          gutschriftCent:0,zahlungen:b.data.zahlungen||[]};
+      });
+      const filtered=entries.filter(e=>{
+        if(filter==='offen')return e.offenCent>0;
+        if(filter==='teilzahlung')return e.eingegangenCent>0&&e.offenCent>0;
+        if(filter==='vollstaendig')return e.eingegangenCent>=e.gesamtpreisCent;
+        if(filter==='gutschrift')return e.gutschriftCent>0;
+        return true;
+      });
+      return json(200,{summen:{eingegangenCent:entries.reduce((v,e)=>v+e.eingegangenCent,0),
+        offenCent:entries.reduce((v,e)=>v+e.offenCent,0),
+        zahlungseingaenge:entries.reduce((v,e)=>v+e.zahlungen.length,0),
+        gutschriftCent:0},eintraege:filtered.slice((pageNumber-1)*proSeite,pageNumber*proSeite),
+        seite:pageNumber,proSeite,anzahl:filtered.length});
+    }
     if(endpoint==='/api/admin/gps/touren')return json(200,[]);
     if(endpoint==='/api/admin/gps/gaesteliste')return json(200,[]);
     if(endpoint==='/api/admin/kalenderbuchungen'||endpoint==='/api/admin/kalender')return json(200,[]);
@@ -180,6 +202,55 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.ok(state.mutations.some(r=>r.endpoint==='/api/admin/angebote'&&r.method==='POST'));
     assert.ok(state.mutations.some(r=>r.endpoint==='/api/admin/angebote/'+created.id&&r.method==='PATCH'));
     assert.ok(dialogs.some(x=>x.includes('erfolgreich gespeichert')));
+    await page.close();
+  });
+
+  await t.test('135 Buchungen: Seitenwechsel, Statusfilter und vollständige Zahlungsübersicht',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    state.bookings=Array.from({length:135},(_,i)=>({
+      id:'550e8400-e29b-41d4-a716-'+String(i+1).padStart(12,'0'),
+      status:i<85?'offen':'bestaetigt',bearbeitungsnotiz:'',
+      created_at:new Date(Date.UTC(2027,0,1)+i*60000).toISOString(),
+      data:{
+        name:'Testgruppe '+String(i+1).padStart(3,'0'),vorname:'Testgruppe',
+        nachname:String(i+1).padStart(3,'0'),buchungsnummer:'MASSENTEST-'+String(i+1).padStart(3,'0'),
+        datum:'2027-03-15',uhrzeit:'10:00',teilnehmer:3,angebot:'Klettertest',gesamtpreis:100,
+        email:'gruppe'+(i+1)+'@example.test',zahlungen:i%3===0
+          ?[{betragCent:2500,methode:'ueberweisung',erhaltenAm:'2027-01-01T12:00:00Z'}]:[]
+      }
+    }));
+    await login(page,root);
+    const info=page.locator('#booking-results-summary');
+    await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('135 Buchung(en) gefunden'));
+    assert.equal(await page.locator('#bookings .booking').count(),50);
+    assert.match(await info.textContent(),/Seite 1 von 3/);
+    await page.locator('#bookings-next').click();
+    await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('Seite 2 von 3'));
+    assert.equal(await page.locator('#bookings .booking').count(),50);
+    await page.locator('#bookings-next').click();
+    await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('Seite 3 von 3'));
+    assert.equal(await page.locator('#bookings .booking').count(),35);
+    assert.equal(await page.locator('#bookings-next').isDisabled(),true);
+    await page.locator('#bookings-status-filter').selectOption('bestaetigt');
+    await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('50 Buchung(en) gefunden'));
+    assert.equal(await page.locator('#bookings .booking').count(),50);
+    assert.equal(await page.locator('#bookings-next').isDisabled(),true);
+    await page.locator('#bookings-search').fill('Testgruppe 120');
+    await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('1 Buchung(en) gefunden'));
+    assert.equal(await page.locator('#bookings .booking').count(),1);
+    assert.match(await page.locator('#bookings .booking').first().textContent(),/MASSENTEST-120/);
+    await page.locator('#payment-overview-page-info').getByText('Seite 1 / 3', {exact:false}).waitFor();
+    assert.equal(await page.locator('#payment-overview-list .payment-record').count(),50);
+    await page.locator('#payment-overview-next').click();
+    await page.waitForFunction(()=>document.getElementById('payment-overview-page-info')?.textContent.includes('Seite 2 / 3'));
+    assert.equal(await page.locator('#payment-overview-list .payment-record').count(),50);
+    await page.locator('#payment-overview-filter').selectOption('teilzahlung');
+    await page.waitForFunction(()=>document.getElementById('payment-overview-page-info')?.textContent.includes('45 Buchungen'));
+    assert.equal(await page.locator('#payment-overview-list .payment-record').count(),45);
+    assert.equal(await page.locator('#payment-overview-next').isDisabled(),true);
+    const size=await page.evaluate(()=>({body:document.documentElement.scrollWidth,view:document.documentElement.clientWidth}));
+    assert.ok(size.body<=size.view+2,'Große Datenbestände dürfen die Smartphone-Seite nicht horizontal verbreitern: '+JSON.stringify(size));
     await page.close();
   });
 
