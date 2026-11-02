@@ -36,5 +36,6 @@ test('Stationsprüfung akzeptiert alle gewählten Stationen nur mit eindeutigen 
   assert.throws(()=>programmPruefen({...fields,pruefungen:[
     {stationId:'c',zustand:'ok'}]},['a','b'],now),/inaktiv/);
   assert.throws(()=>programmPruefen({...fields,beginn:'2026-11-01T15:00'},['a','b'],now),/vergangen/);
+  assert.throws(()=>programmPruefen({...fields,beginn:'2026-11-02T10:30'},['a','b'],now),/vergangen/);
   assert.equal(programmPruefen({...fields,pruefungen:[{stationId:'a',zustand:'ok'}]},['a'],now).hatMangel,false);
 });
