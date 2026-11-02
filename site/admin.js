@@ -1137,3 +1137,110 @@ eintrag.appendChild(preisButton);
 
 
 
+
+
+function anschlussrabattStarten() {
+  const liste = document.getElementById('anschlussrabatt-positionen');
+  const ergebnis = document.getElementById('anschlussrabatt-ergebnis');
+  const hinzufuegen = document.getElementById('anschlussrabatt-hinzufuegen');
+  const berechnen = document.getElementById('anschlussrabatt-berechnen');
+  if (!liste || !ergebnis || !hinzufuegen || !berechnen) return;
+  let zaehler = 0;
+
+  function programmHinzufuegen() {
+    const nummer = ++zaehler;
+    const zeile = document.createElement('fieldset');
+    zeile.className = 'booking';
+    zeile.dataset.programmId = String(nummer);
+    const titel = el('legend', 'Programm ' + nummer);
+    zeile.append(titel);
+
+    function feld(text, typ, name, wert) {
+      const label = el('label', text);
+      const eingabe = document.createElement('input');
+      eingabe.type = typ;
+      eingabe.name = name;
+      eingabe.required = true;
+      if (typ === 'number') {
+        eingabe.min = '0';
+        eingabe.step = '0.01';
+      }
+      if (wert) eingabe.value = wert;
+      label.append(eingabe);
+      zeile.append(label);
+    }
+
+    feld('Bezeichnung', 'text', 'bezeichnung', 'Programm ' + nummer);
+    feld('Beginn', 'datetime-local', 'start');
+    feld('Ende', 'datetime-local', 'ende');
+    feld('Preis in Euro', 'number', 'preis');
+
+    const entfernen = el('button', 'Programm entfernen');
+    entfernen.type = 'button';
+    entfernen.onclick = () => {
+      zeile.remove();
+      ergebnis.textContent = '';
+    };
+    zeile.append(entfernen);
+    liste.append(zeile);
+  }
+
+  hinzufuegen.addEventListener('click', programmHinzufuegen);
+  berechnen.addEventListener('click', async () => {
+    const zeilen = Array.from(liste.querySelectorAll('fieldset'));
+    if (zeilen.length < 2 || zeilen.length > 20) {
+      ergebnis.textContent = 'Bitte 2 bis 20 Programme eingeben.';
+      return;
+    }
+    const programme = [];
+    for (const zeile of zeilen) {
+      const eingaben = Object.fromEntries(
+        Array.from(zeile.querySelectorAll('input')).map(input => [input.name, input.value])
+      );
+      const preis = Number(eingaben.preis);
+      if (!eingaben.bezeichnung || !eingaben.start || !eingaben.ende ||
+          eingaben.preis === '' || !Number.isFinite(preis) || preis < 0) {
+        ergebnis.textContent = 'Bitte alle Programmfelder korrekt ausfuellen.';
+        return;
+      }
+      programme.push({
+        id: zeile.dataset.programmId,
+        start: new Date(eingaben.start).toISOString(),
+        ende: new Date(eingaben.ende).toISOString(),
+        preisCent: Math.round(preis * 100)
+      });
+    }
+
+    berechnen.disabled = true;
+    ergebnis.textContent = 'Rabatt wird berechnet ...';
+    try {
+      const daten = await api('/api/admin/anschlussrabatt/vorschau', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ programme })
+      });
+      ergebnis.replaceChildren();
+      const euro = cent => (cent / 100).toLocaleString('de-DE', {
+        style: 'currency', currency: 'EUR'
+      });
+      for (const position of daten.positionen) {
+        const programm = programme.find(p => p.id === position.id);
+        const zeile = zeilen.find(z => z.dataset.programmId === position.id);
+        const name = zeile.querySelector('[name="bezeichnung"]').value;
+        ergebnis.append(el('p', name + ': ' + euro(position.endpreisCent) +
+          ' (Rabatt ' + euro(position.rabattCent) + ')'));
+      }
+      ergebnis.append(el('strong', 'Gesamtpreis: ' +
+        euro(daten.endpreisGesamtCent) + ' | Ersparnis: ' +
+        euro(daten.rabattGesamtCent)));
+      ergebnis.append(el('p', 'Nur Vorschau: Es wurden keine Buchungen oder Zahlungen geaendert.'));
+    } catch (fehler) {
+      ergebnis.textContent = 'Fehler: ' + fehler.message;
+    } finally {
+      berechnen.disabled = false;
+    }
+  });
+  programmHinzufuegen();
+  programmHinzufuegen();
+}
+anschlussrabattStarten();
