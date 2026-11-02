@@ -569,7 +569,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(switched.status,200);
   assert.equal((await (await kiosk()).json()).code,null);
   assert.equal((await (await secondKiosk()).json()).code,null);
-  assert.equal((await userPost('/api/pruefung/freischalten',{code:codeOnlyFirst})).status,409,
+  assert.equal((await extraPost('/api/pruefung/freischalten',{code:codeOnlyFirst})).status,409,
     'Ein beim Tabletwechsel ungültig gemachter Prüfcode darf nicht weiter gelten');
   assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,1);
   const requestedForSecond=await extraPost('/api/pruefung/code-anfordern',{});
