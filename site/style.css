@@ -730,3 +730,16 @@ footer a {
     top: auto;
   }
 }
+
+/* Mobile Stationsprüfung: lange Worte und Formularfelder dürfen den Viewport nicht sprengen. */
+.pruef-page .narrow { width:100%; min-width:0; }
+.pruef-page h1 { font-size:clamp(28px,7vw,42px); overflow-wrap:anywhere; }
+.pruef-page .logo { min-width:0; overflow-wrap:anywhere; font-size:clamp(17px,4.8vw,22px); }
+.pruef-page form,.pruef-page fieldset,.pruef-page label { min-width:0; max-width:100%; }
+.pruef-page fieldset { border:1px solid #40515e; border-radius:8px; }
+.pruef-page .pruefung-station { display:block; }
+.pruef-page .pruefung-station legend { max-width:100%; overflow-wrap:anywhere; }
+@media(max-width:600px) {
+  .pruef-page .narrow { padding:20px 14px; }
+  .pruef-page form { padding:16px; }
+}
