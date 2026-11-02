@@ -34,7 +34,54 @@
   }
   function renderStations(target,stations){
     target.replaceChildren();
-    for(const station of stations)target.append(elt('p',station.name+' · '+(station.aktiv?'Aktiv':'Inaktiv')));
+    for(const station of stations){
+      const panel=elt('article');panel.className='booking';
+      const blocked=!!station.gesperrt_am;
+      panel.append(elt('strong',station.name),
+        elt('p',blocked?'GESPERRT – NICHT BENUTZEN':
+          station.aktiv?'Nicht gesperrt':'Inaktiv'));
+      if(blocked){
+        panel.append(elt('p','Grund: '+(station.sperrgrund||'Nicht angegeben')));
+        const button=elt('button','Nach fachlicher Prüfung freigeben');
+        button.type='button';button.className='btn secondary';
+        button.addEventListener('click',async()=>{
+          const freigabeDurch=prompt('Name der Person, die die Station fachlich nachgeprüft hat:');
+          if(!freigabeDurch)return;
+          const begruendung=prompt('Nachkontrolle: Welche Mängel wurden behoben? Prüfverfahren und Ergebnis dokumentieren (mindestens 20 Zeichen):');
+          if(!begruendung)return;
+          if(!confirm('Bestätigst du, dass die Station vor Ort fachlich nachgeprüft wurde und für den Betrieb wieder sicher ist?'))return;
+          button.disabled=true;
+          try{
+            await api('/api/admin/pruefung/stationen/'+encodeURIComponent(station.id)+'/freigeben',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({freigabeDurch,begruendung,nachkontrolleBestaetigt:true})
+            });
+            find('pruef-station-status').textContent='Fachliche Freigabe für '+station.name+' protokolliert. Eine Vorabprüfung vor dem nächsten Programm bleibt erforderlich.';
+            await refresh();
+          }catch(error){
+            find('pruef-station-status').textContent='Freigabe fehlgeschlagen: '+error.message;
+            button.disabled=false;
+          }
+        });
+        panel.append(button);
+      }
+      const audit=elt('button','Prüf- und Freigabeverlauf anzeigen');
+      audit.type='button';audit.className='btn secondary';
+      const details=elt('div');details.hidden=true;
+      audit.addEventListener('click',async()=>{
+        if(!details.hidden){details.hidden=true;return;}
+        try{
+          const events=await api('/api/admin/pruefung/stationen/'+encodeURIComponent(station.id)+'/ereignisse');
+          details.replaceChildren();
+          if(!events.length)details.append(elt('p','Noch keine Mängel-/Freigabeereignisse.'));
+          for(const ev of events)details.append(elt('p',
+            new Date(ev.erstellt_am).toLocaleString('de-DE')+' · '+
+            (ev.art==='mangel'?'Mangel':'Freigabe')+' · '+ev.verantwortlich+' · '+ev.notiz));
+          details.hidden=false;
+        }catch(error){find('pruef-station-status').textContent='Verlauf nicht verfügbar: '+error.message;}
+      });
+      panel.append(audit,details);target.append(panel);
+    }
   }
   function renderReports(target,reports){
     target.replaceChildren();
