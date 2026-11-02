@@ -2,6 +2,7 @@
 // Klettern & Abenteuer Brilon – Node.js / PostgreSQL
 'use strict';
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
+const {buchungsnummer}=require('./lib/buchungsnummer');
 
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
@@ -175,12 +176,24 @@ restbetrag: gesamtpreis === null ? null : Math.round(gesamtpreis * 75) / 100,
         const konflikt=await pruefeBuchungskonflikt(client,datum,fenster);
         if(konflikt)return {konflikt};
 
+        // Dieselbe Transaktion sperrt bereits parallele Buchungsanfragen.
+        // Der Suffix wird auch bei stornierten Buchungen nicht wiederverwendet.
+        let nummer, zaehler=1;
+        while(true){
+          nummer=buchungsnummer(name,datum,zaehler++);
+          const vorhanden=await client.query(
+            "SELECT 1 FROM brilon_buchungen WHERE data->>'buchungsnummer'=$1 LIMIT 1",
+            [nummer]
+          );
+          if(!vorhanden.rowCount)break;
+        }
+        data.buchungsnummer=nummer;
         const id=crypto.randomUUID();
         await client.query(
           'INSERT INTO brilon_buchungen (id,data,status) VALUES ($1,$2,$3)',
           [id,JSON.stringify(data),'offen']
         );
-        return {id};
+        return {id,buchungsnummer:nummer};
       });
 
       if(ergebnis.konflikt)
@@ -194,6 +207,7 @@ const ende = fenster
   : 'nach Absprache';
 
 const buchungsdetails = [
+  `Buchungsnummer: ${ergebnis.buchungsnummer}`,
   `Name: ${name}`,
   `Datum: ${datum}`,
   `Angebot: ${angebot}`,
@@ -238,7 +252,7 @@ Promise.allSettled([
 });
 
 
-      return reply(res,201,{success:true,id:ergebnis.id});
+      return reply(res,201,{success:true,id:ergebnis.id,buchungsnummer:ergebnis.buchungsnummer});
     }
 
     if(route==='/api/belegte-zeiten'&&req.method==='GET'){
@@ -549,7 +563,7 @@ const euro = betrag =>
   'Bankverbindung:',
   `Bank: ${process.env.BANK_NAME || ''}`,
   `IBAN: ${process.env.BANK_IBAN || ''}`,
-  `Verwendungszweck: Buchung ${buchungsId}`,
+  `Verwendungszweck: Buchung ${kunde.buchungsnummer || buchungsId}`,
   '',
   'Bitte überweise den gewählten Betrag innerhalb von 48 Stunden.',
   'Bei kurzfristigen Buchungen bitten wir um sofortige Überweisung.',
@@ -1152,6 +1166,9 @@ await pool.query(
   'ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS zahlungsinfo_gesendet_am TIMESTAMPTZ'
 );
 
+    await pool.query(
+      "CREATE UNIQUE INDEX IF NOT EXISTS brilon_buchungen_buchungsnummer_unique ON brilon_buchungen ((data->>'buchungsnummer')) WHERE data ? 'buchungsnummer'"
+    );
     await pool.query(
       'CREATE TABLE IF NOT EXISTS brilon_aktionen (id BIGSERIAL PRIMARY KEY,titel TEXT NOT NULL,datum DATE,beschreibung TEXT,created_at TIMESTAMPTZ DEFAULT NOW())'
     );
