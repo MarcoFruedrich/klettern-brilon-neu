@@ -223,7 +223,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(refusedGuest.status,404,'Gesperrter Zugang darf keine Gästelistenfreigabe ändern');
 
   // Stationsprüfprotokoll: eigene Mitarbeiterkonten, Code und Mangelbericht.
-  const csrf=(await login.clone().json()).csrfToken;
+  const csrf=csrfToken;
   const adminPost=(url,data)=>fetch(root+url,{method:'POST',headers:{
     Origin:root,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf
   },body:JSON.stringify(data)});
