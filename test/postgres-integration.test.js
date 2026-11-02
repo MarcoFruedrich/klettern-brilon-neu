@@ -170,4 +170,53 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(unfiltered.anzahl,310,'Offene Buchungen dürfen nicht als GPS-Zugänge erscheinen');
   const invalid=await fetch(root+'/api/admin/gps/buchungen?tourId=ungueltig',{headers:{Cookie:cookie}});
   assert.equal(invalid.status,400,'Eine ungültige GPS-Tour muss abgewiesen werden');
+
+  // Verwaltung ausgestellter Zugänge: ausschließlich Metadaten, permanente Sperrung.
+  const gameId=crypto.randomUUID(),secretToken=crypto.randomBytes(32).toString('base64url');
+  const tokenHash=crypto.createHash('sha256').update(secretToken).digest('hex');
+  await pool.query(
+    'INSERT INTO brilon_gps_spiele(id,token_hash,tour_id,buchung_id) VALUES($1,$2,$3,$4)',
+    [gameId,tokenHash,gpsTourId,gpsFound.buchungen[0].id]
+  );
+  const adminGames=async args=>{
+    const response=await fetch(root+'/api/admin/gps/spiele?'+new URLSearchParams(args),
+      {headers:{Cookie:cookie}});
+    assert.equal(response.status,200);
+    return response.json();
+  };
+  const currentGames=await adminGames({tourId:gpsTourId,seite:'1'});
+  assert.equal(currentGames.anzahl,1);
+  assert.equal(currentGames.spiele[0].id,gameId);
+  assert.equal(currentGames.spiele[0].status,'ausgestellt');
+  const exposed=JSON.stringify(currentGames);
+  assert.ok(!exposed.includes(tokenHash)&&!exposed.includes(secretToken),
+    'Der Spielzugang darf weder den geheimen Token noch den Token-Hash offenlegen');
+  const noAuth=await fetch(root+'/api/admin/gps/spiele');
+  assert.equal(noAuth.status,401,'Die Liste ist nur nach Anmeldung lesbar');
+  const invalidPage=await fetch(root+'/api/admin/gps/spiele?seite=0',{headers:{Cookie:cookie}});
+  assert.equal(invalidPage.status,400);
+  const revokeUrl=root+'/api/admin/gps/spiele/'+gameId+'/sperren';
+  const noCsrf=await fetch(revokeUrl,{method:'PATCH',headers:{Cookie:cookie,Origin:root}});
+  assert.equal(noCsrf.status,403,'Die Sperrung ist mit dem Admin-CSRF-Token geschützt');
+  const csrfToken=(await login.json()).csrfToken;
+  const revoke=()=>fetch(revokeUrl,{method:'PATCH',
+    headers:{Cookie:cookie,Origin:root,'X-CSRF-Token':csrfToken}});
+  const result=await revoke();
+  assert.equal(result.status,200,'Ein ausgestellter Zugang muss sperrbar sein');
+  const firstRevoked=(await result.json()).gesperrtAm;
+  assert.ok(firstRevoked);
+  const repeated=await revoke();
+  assert.equal(repeated.status,200,'Wiederholte Sperrung muss idempotent sein');
+  assert.equal((await repeated.json()).gesperrtAm,firstRevoked);
+  const revokedList=await adminGames({tourId:gpsTourId});
+  assert.equal(revokedList.spiele[0].status,'gesperrt');
+  assert.ok(!JSON.stringify(revokedList).includes(tokenHash));
+  const refused=await fetch(root+'/api/gps/start',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token:secretToken})});
+  assert.equal(refused.status,404,'Gesperrter Token darf ein Spiel nicht mehr starten');
+  const refusedGuest=await fetch(root+'/api/gps/abschluss',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token:secretToken,einwilligung:false})});
+  assert.equal(refusedGuest.status,404,'Gesperrter Zugang darf keine Gästelistenfreigabe ändern');
 });
