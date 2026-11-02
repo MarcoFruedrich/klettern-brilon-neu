@@ -10,6 +10,7 @@ const net = require('node:net');
 function fakeAdminApi(page) {
   const state = {
     signedIn: false, csrf: 'a'.repeat(64), mutations: [],
+    tours: [],
     places: [{ id: 1, name: 'Brilon', aktiv: true }],
     programs: [{ id: 11, name: 'Klettertest', beschreibung: 'Testprogramm', dauer: 90,
       preise: {'1-4':100, '5-10':160}, aktiv: false, bild_url: null, kategorie: 'Klettern',
@@ -84,7 +85,28 @@ function fakeAdminApi(page) {
         gutschriftCent:0},eintraege:filtered.slice((pageNumber-1)*proSeite,pageNumber*proSeite),
         seite:pageNumber,proSeite,anzahl:filtered.length});
     }
-    if(endpoint==='/api/admin/gps/touren')return json(200,[]);
+    if(endpoint==='/api/admin/gps/touren')return json(200,state.tours);
+    if(endpoint==='/api/admin/gps/buchungen'&&method==='GET'){
+      const tourId=u.searchParams.get('tourId');
+      const tour=state.tours.find(t=>t.id===tourId&&t.aktiv&&t.buchbar);
+      const suche=(u.searchParams.get('suche')||'').toLowerCase();
+      const seite=Number(u.searchParams.get('seite')||1),proSeite=30;
+      const matches=state.bookings.filter(b=>b.status==='bestaetigt'&&
+        tour&&b.data.angebot===tour.angebotName &&
+        (!suche||[b.data.name,b.data.buchungsnummer,b.data.datum,b.data.angebot]
+          .some(x=>String(x||'').toLowerCase().includes(suche))));
+      return json(200,{buchungen:matches.slice((seite-1)*proSeite,seite*proSeite).map(b=>({
+        id:b.id,buchungsnummer:b.data.buchungsnummer,name:b.data.name,
+        datum:b.data.datum,angebot:b.data.angebot
+      })),anzahl:matches.length,seite,proSeite});
+    }
+    if(endpoint==='/api/admin/gps/spiele'&&method==='POST'){
+      const {tourId,buchungId}=readBody();
+      const tour=state.tours.find(t=>t.id===tourId&&t.aktiv&&t.buchbar);
+      if(!tour||!state.bookings.some(b=>b.id===buchungId&&b.status==='bestaetigt'&&b.data.angebot===tour.angebotName))
+        return json(409,{error:'Tour oder Buchung ist nicht freigegeben.'});
+      return json(201,{id:'test-id',zugangslink:'/gps.html?zugang=TEST-NICHT-ECHT'});
+    }
     if(endpoint==='/api/admin/gps/gaesteliste')return json(200,[]);
     if(endpoint==='/api/admin/kalenderbuchungen'||endpoint==='/api/admin/kalender')return json(200,[]);
     if(endpoint==='/api/aktionen'||endpoint==='/api/admin/aktionen')return json(200,[]);
@@ -254,6 +276,50 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(await page.locator('#payment-overview-next').isDisabled(),true);
     const size=await page.evaluate(()=>({body:document.documentElement.scrollWidth,view:document.documentElement.clientWidth}));
     assert.ok(size.body<=size.view+2,'Große Datenbestände dürfen die Smartphone-Seite nicht horizontal verbreitern: '+JSON.stringify(size));
+    await page.close();
+  });
+
+  await t.test('GPS-Zugang: bestätigte Buchung jenseits von 250 finden und auswählen',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const tourId='550e8400-e29b-41d4-a716-446655440abc';
+    const name='GPS-Schatzsuche: CI-Mustertour';
+    state.tours=[{id:tourId,titel:'CI-Mustertour',angebotName:name,
+      schwierigkeitsgrad:'leicht',altersgruppe:'3./4. Klasse',stationen:[],
+      startpunkt:'Brilon',ziel:'Brilon',aktiv:true,buchbar:true}];
+    state.bookings=Array.from({length:330},(_,i)=>({
+      id:'550e8400-e29b-41d4-a716-'+String(i+1).padStart(12,'0'),
+      status:i<310?'bestaetigt':'offen',bearbeitungsnotiz:'',
+      created_at:new Date(Date.UTC(2027,0,1)+i*60000).toISOString(),
+      data:{name:'GPS Gruppe '+String(i+1).padStart(3,'0'),
+        buchungsnummer:'GPS-CI-'+String(i+1).padStart(3,'0'),datum:'2027-03-15',
+        angebot:i%11===0?'Anderes Programm':name,gesamtpreis:100,zahlungen:[]}
+    }));
+    const calls=[];page.on('request',r=>{if(r.url().includes('/api/admin/gps/buchungen'))calls.push(r.url());});
+    await login(page,root);
+    await page.locator('#gps-game-form [name="tourId"]').selectOption(tourId);
+    await page.waitForFunction(()=>document.getElementById('gps-booking-results')?.textContent.includes('passende bestätigte'));
+    const eligible=state.bookings.filter(b=>b.status==='bestaetigt'&&b.data.angebot===name);
+    assert.equal(await page.locator('#gps-game-form [name="buchungId"] option').count(),31);
+    assert.match(await page.locator('#gps-booking-results').textContent(),new RegExp(String(eligible.length)));
+    await page.locator('#gps-booking-next').click();
+    await page.waitForFunction(()=>document.getElementById('gps-booking-page-info')?.textContent.includes('Seite 2 /'));
+    assert.equal(await page.locator('#gps-game-form [name="buchungId"] option').count(),31);
+    await page.locator('#gps-booking-search').fill('GPS-CI-305');
+    await page.waitForFunction(()=>document.getElementById('gps-booking-results')?.textContent.includes('1 passende'));
+    const select=page.locator('#gps-game-form [name="buchungId"]');
+    assert.equal(await select.locator('option').count(),2);
+    await select.selectOption(state.bookings[304].id);
+    await page.locator('#gps-game-form button[type="submit"]').click();
+    await page.waitForFunction(()=>document.getElementById('gps-game-status')?.textContent.includes('TEST-NICHT-ECHT'));
+    assert.ok(state.mutations.some(m=>m.endpoint==='/api/admin/gps/spiele'&&m.body.buchungId===state.bookings[304].id),
+      'Eine ältere GPS-Buchung muss trotz mehr als 250 Datensätzen erreichbar sein');
+    assert.ok(calls.some(url=>url.includes('seite=2')));
+    assert.ok(calls.every(url=>url.includes('tourId=')));
+    const dimensions=await page.evaluate(()=>({
+      doc:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth
+    }));
+    assert.ok(dimensions.doc<=dimensions.viewport+2);
     await page.close();
   });
 
