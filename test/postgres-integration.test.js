@@ -295,4 +295,63 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.match(image.headers.get('content-type'),/image\/jpeg/);
   assert.match(image.headers.get('content-disposition'),/attachment/);
   assert.deepEqual(Buffer.from(await image.arrayBuffer()),fotoBytes);
+
+  const stationList=async ()=>(await (await fetch(root+'/api/admin/pruefung/stationen',
+    {headers:{Cookie:cookie}})).json());
+  const locked=(await stationList()).find(x=>x.id===stationId);
+  assert.ok(locked.gesperrt_am,'Ein gemeldeter Mangel muss die Station automatisch sperren');
+  assert.match(locked.sperrgrund,/Karabiner/);
+  assert.equal(receipt.status,'station_gesperrt');
+  assert.deepEqual(receipt.gesperrteStationen.map(x=>x.id),[stationId]);
+
+  const stillBlockedResponse=await fetch(root+'/api/pruefung/stationen',
+    {headers:{Cookie:staffCookie}});
+  assert.equal(stillBlockedResponse.status,200);
+  const blockedStation=(await stillBlockedResponse.json()).stationen.find(x=>x.id===stationId);
+  assert.ok(blockedStation.gesperrt_am,'Die Sperre muss Mitarbeitenden sofort sichtbar sein');
+
+  const newCodeResponse=await adminPost('/api/admin/pruefung/code',{});
+  assert.equal(newCodeResponse.status,201);
+  const newCode=(await newCodeResponse.json()).code;
+  assert.equal((await userPost('/api/pruefung/freischalten',{code:newCode})).status,200);
+  const greenReport=await userPost('/api/pruefung/berichte',{
+    programm:'Nachkontrolle CI',beginn:day1+'T10:00',
+    pruefungen:[{stationId,zustand:'ok',beschreibung:''}]
+  });
+  assert.equal(greenReport.status,201);
+  const greenData=await greenReport.json();
+  assert.equal(greenData.hatMangel,false);
+  assert.equal(greenData.status,'station_gesperrt',
+    'Auch ein späterer mängelfreier Bericht darf die alte Sperre nicht aufheben');
+  assert.ok((await stationList()).find(x=>x.id===stationId).gesperrt_am);
+
+  const releasePath='/api/admin/pruefung/stationen/'+stationId+'/freigeben';
+  assert.equal((await fetch(root+releasePath,{method:'POST'})).status,401,
+    'Nicht angemeldete Personen dürfen keine Sperren aufheben');
+  assert.equal((await fetch(root+releasePath,{method:'POST',
+    headers:{Origin:root,Cookie:cookie,'Content-Type':'application/json'},
+    body:JSON.stringify({freigabeDurch:'CI Fachprüferin',begruendung:'Station fachlich nachgeprüft und sicher',nachkontrolleBestaetigt:true})})).status,403,
+    'Stationsfreigaben benötigen den Admin-CSRF-Schutz');
+  assert.equal((await adminPost(releasePath,{freigabeDurch:'CI Fachprüferin',
+    begruendung:'Austausch am Sicherungspunkt',nachkontrolleBestaetigt:false})).status,400);
+  assert.equal((await adminPost(releasePath,{freigabeDurch:'CI Fachprüferin',
+    begruendung:'zu kurz',nachkontrolleBestaetigt:true})).status,400);
+  const released=await adminPost(releasePath,{
+    freigabeDurch:'CI Fachprüferin',
+    begruendung:'Schließmechanismus ersetzt und die Station vor Ort belastungsfrei nachgeprüft.',
+    nachkontrolleBestaetigt:true
+  });
+  assert.equal(released.status,200);
+  assert.equal((await released.json()).gesperrt,false);
+  assert.equal((await stationList()).find(x=>x.id===stationId).gesperrt_am,null);
+  assert.equal((await adminPost(releasePath,{freigabeDurch:'CI Fachprüferin',
+    begruendung:'Erneute Freigabe ohne neue Sperre nicht erlaubt',nachkontrolleBestaetigt:true})).status,409);
+  const historyResponse=await fetch(root+'/api/admin/pruefung/stationen/'+stationId+'/ereignisse',
+    {headers:{Cookie:cookie}});
+  assert.equal(historyResponse.status,200);
+  const history=await historyResponse.json();
+  assert.equal(history.length,2,'Mangel und Freigabe müssen dauerhaft nachvollziehbar sein');
+  assert.equal(history.filter(x=>x.art==='mangel').length,1);
+  assert.equal(history.filter(x=>x.art==='freigabe').length,1);
+  assert.match(history.find(x=>x.art==='freigabe').verantwortlich,/Fachprüferin/);
 });
