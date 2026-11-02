@@ -354,4 +354,69 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(history.filter(x=>x.art==='mangel').length,1);
   assert.equal(history.filter(x=>x.art==='freigabe').length,1);
   assert.match(history.find(x=>x.art==='freigabe').verantwortlich,/Fachprüferin/);
+
+  // Ein kleiner Hinweis löst weder eine Sperre noch einen Mängelalarm aus.
+  const extraStation=await adminPost('/api/admin/pruefung/stationen',{name:'Hinweistest Bouldermatte'});
+  assert.equal(extraStation.status,201);
+  const extraId=(await extraStation.json()).id;
+  const siteCode=async()=>{
+    const answer=await adminPost('/api/admin/pruefung/code',{});
+    assert.equal(answer.status,201);
+    const c=(await answer.json()).code;
+    assert.equal((await userPost('/api/pruefung/freischalten',{code:c})).status,200);
+  };
+  await siteCode();
+  const hintData={programm:'Vorabkontrolle Bouldern',beginn:day1+'T10:00',
+    pruefungen:[{stationId:extraId,zustand:'hinweis',
+      beschreibung:'Stationsschild ist verblasst, Befestigung aber unauffällig'}]};
+  const hintReport=await userPost('/api/pruefung/berichte',hintData);
+  assert.equal(hintReport.status,201);
+  const hintResult=await hintReport.json();
+  assert.equal(hintResult.hatMangel,false);
+  assert.equal(hintResult.hatHinweis,true);
+  assert.equal(hintResult.status,'hinweis_offen');
+  assert.equal(hintResult.benachrichtigung,'kein_mangel');
+  assert.deepEqual(hintResult.gesperrteStationen,[]);
+  assert.equal((await stationList()).find(x=>x.id===extraId).gesperrt_am,null,
+    'Ein kleiner Hinweis darf die Station nicht automatisch sperren');
+  const hintsResponse=await fetch(root+'/api/admin/pruefung/hinweise',{headers:{Cookie:cookie}});
+  assert.equal(hintsResponse.status,200);
+  const hint=(await hintsResponse.json()).find(x=>x.bericht_id===hintResult.id);
+  assert.ok(hint,'Der Hinweis muss in der Admin-Nachprüfliste erscheinen');
+  assert.equal(hint.station_id,extraId);
+  assert.equal(hint.erledigt_am,null);
+  const hintReportList=await (await fetch(root+'/api/admin/pruefung/berichte',{headers:{Cookie:cookie}})).json();
+  assert.equal(hintReportList.find(x=>x.id===hintResult.id).hat_hinweis,true);
+  const hintResolvePath='/api/admin/pruefung/hinweise/'+hint.id+'/erledigen';
+  assert.equal((await fetch(root+hintResolvePath,{method:'POST'})).status,401);
+  assert.equal((await fetch(root+hintResolvePath,{method:'POST',
+    headers:{Origin:root,Cookie:cookie,'Content-Type':'application/json'},
+    body:JSON.stringify({pruefer:'CI Prüferin',ergebnis:'Stationsschild ausgetauscht und geprüft',
+      geprueft:true})})).status,403);
+  assert.equal((await adminPost(hintResolvePath,{
+    pruefer:'CI Prüferin',ergebnis:'noch zu kurz',geprueft:true})).status,400);
+  const hintResolved=await adminPost(hintResolvePath,{
+    pruefer:'CI Prüferin',ergebnis:'Stationsschild erneuert, Beschriftung wieder gut lesbar.',
+    geprueft:true
+  });
+  assert.equal(hintResolved.status,200);
+  assert.equal((await adminPost(hintResolvePath,{
+    pruefer:'CI Prüferin',ergebnis:'Wiederholte Erledigung ist nicht zulässig',geprueft:true})).status,409);
+  const afterHint=(await (await fetch(root+'/api/admin/pruefung/hinweise',
+    {headers:{Cookie:cookie}})).json()).find(x=>x.id===hint.id);
+  assert.ok(afterHint.erledigt_am);
+  assert.match(afterHint.erledigt_notiz,/Beschriftung/);
+  assert.equal((await stationList()).find(x=>x.id===extraId).gesperrt_am,null,
+    'Auch die Erledigung des Hinweises darf den Sperrstatus nicht verändern');
+
+  // Wenn dieselbe Station später einen echten Sicherheitsmangel aufweist,
+  // wird unabhängig vom bereits erledigten Hinweis sofort gesperrt.
+  await siteCode();
+  const urgent=await userPost('/api/pruefung/berichte',{programm:'Bouldermatte Sicherheit',
+    beginn:day1+'T10:00',pruefungen:[
+      {stationId:extraId,zustand:'mangel',
+        beschreibung:'Befestigung der Bouldermatte ist sicherheitsrelevant beschädigt'}]});
+  assert.equal(urgent.status,201);
+  assert.equal((await urgent.json()).hatMangel,true);
+  assert.ok((await stationList()).find(x=>x.id===extraId).gesperrt_am);
 });
