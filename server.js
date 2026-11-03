@@ -2369,6 +2369,18 @@ await pool.query(`
       }catch(error){
         console.warn('Zeitgesteuerter Mängelmail-Wiederholungsversuch nicht gestartet:',error.message);
       }
+      try{
+        await pool.query('SELECT ablauf FROM brilon_pruef_sessions LIMIT 0');
+        await pool.query('SELECT id FROM brilon_pruef_codes LIMIT 0');
+        await pool.query('SELECT verwendet_am FROM brilon_pruef_tablet_kopplungen LIMIT 0');
+        const credentialCleanupTimer=setInterval(()=>{
+          pruefungApi.bereinigeAbgelaufeneZugaenge().catch(error=>
+            console.error('Bereinigung abgelaufener Prüfsitzungen und Codes fehlgeschlagen:',error.message));
+        },60_000);
+        credentialCleanupTimer.unref();
+      }catch(error){
+        console.warn('Bereinigung abgelaufener Prüfsitzungen und Codes nicht gestartet:',error.message);
+      }
     }
     console.log('PostgreSQL verbunden');
   }else{
