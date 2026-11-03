@@ -791,3 +791,35 @@ line-height:1.25;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
   color: #65766f;
   opacity: 1;
 }
+
+
+/* Admin-Bereiche: helle Flächen mit dunkler, gut lesbarer Schrift */
+.admin-page .booking,
+.admin-page form:not(.payment-entry) {
+  background: #f0f2ef;
+  color: #173e35;
+  border-color: #d5dfd8;
+}
+.admin-page .booking h2,
+.admin-page .booking h3,
+.admin-page .booking legend,
+.admin-page form:not(.payment-entry) h2,
+.admin-page form:not(.payment-entry) h3,
+.admin-page form:not(.payment-entry) legend,
+.admin-page form:not(.payment-entry) label {
+  color: #173e35;
+}
+.admin-page .booking p,
+.admin-page form:not(.payment-entry) p,
+.admin-page form:not(.payment-entry) .hint,
+.admin-page form:not(.payment-entry) small {
+  color: #40594f;
+}
+.admin-page .gps-station-editor {
+  background: #fff;
+  border-color: #c8d5cc;
+}
+.admin-page .gps-station-editor legend,
+.admin-page .gps-station-editor label {
+  color: #173e35;
+}
