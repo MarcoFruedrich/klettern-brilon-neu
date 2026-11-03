@@ -20,6 +20,7 @@ function datumIstGesperrt(datum){
 const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 const angebotAuswahl = document.getElementById('angebot-auswahl');
+const standortAuswahl = document.getElementById('buchungs-standort');
 let angeboteCache=[];
 let verfuegbarkeitsAnfrage=0;
 let sonderaktionsPrefix='';
@@ -90,7 +91,7 @@ async function belegteUhrzeitenLaden() {
   if(!angebot){
     uhrzeitenAnzeigen();
     uhrzeitAuswahl.disabled=true;
-    uhrzeitHinweis.textContent='Bitte zuerst ein Programm auswählen.';
+    uhrzeitHinweis.textContent='Bitte zuerst Standort und Angebot auswählen.';
     return;
   }
   const vorherigeAuswahl = uhrzeitAuswahl.value;
@@ -473,6 +474,10 @@ function sonderaktionAnfragen(aktion){
     angeboteCache.find(a=>String(a.id)===String(aktion.programm_id));
   // A special action can be independent of the programme catalogue. Avoid
   // silently retaining a programme selected for an earlier special.
+  if(standortAuswahl){
+    standortAuswahl.value=programm?.veranstaltungsort||'';
+    standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+  }
   angebotAuswahl.value=programm?.name||'';
   angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
   const verfuegbar=programm?.verfuegbare_termine;
@@ -570,29 +575,56 @@ specials();
 
 async function angeboteLaden() {
   const auswahl = document.getElementById('angebot-auswahl');
-  if (!auswahl) return;
+  if (!auswahl || !standortAuswahl) return;
+
+  function angeboteFuerStandortAnzeigen(){
+    const standort=standortAuswahl.value;
+    const passend=angeboteCache.filter(angebot=>angebot.veranstaltungsort===standort);
+    auswahl.replaceChildren();
+    const platzhalter=document.createElement('option');
+    platzhalter.value='';
+    platzhalter.textContent=!standort?'Bitte zuerst den Veranstaltungsort auswählen':
+      passend.length?'Bitte Angebot auswählen':'Für diesen Ort sind derzeit keine buchbaren Angebote verfügbar';
+    auswahl.append(platzhalter);
+    for(const angebot of passend){
+      const option=document.createElement('option');
+      option.value=angebot.name;
+      option.textContent=angebot.name;
+      auswahl.append(option);
+    }
+    auswahl.value='';
+    auswahl.disabled=!standort||!passend.length;
+    einzelplatzFormAktualisieren();
+    buchungsdauerBerechnen();
+    belegteUhrzeitenLaden();
+  }
+
+  auswahl.addEventListener('change',()=>{
+    einzelplatzFormAktualisieren();
+    buchungsdauerBerechnen();
+    belegteUhrzeitenLaden();
+  });
+  standortAuswahl.addEventListener('change',angeboteFuerStandortAnzeigen);
 
   try {
-    const res = await fetch('/api/angebote');
-    if (!res.ok) throw new Error('Angebote nicht erreichbar');
-
-    const angebote = await res.json();
-    angeboteCache=angebote;
-
-    for (const angebot of angebote) {
-      const option = document.createElement('option');
-      option.value = angebot.name;
-      option.textContent = angebot.name;
-      auswahl.appendChild(option);
+    const [angeboteAntwort,orteAntwort]=await Promise.all([
+      fetch('/api/angebote'),fetch('/api/orte')
+    ]);
+    if(!angeboteAntwort.ok)throw new Error('Angebote nicht erreichbar');
+    if(!orteAntwort.ok)throw new Error('Veranstaltungsorte nicht erreichbar');
+    angeboteCache=await angeboteAntwort.json();
+    const orte=await orteAntwort.json();
+    for(const ort of orte){
+      const option=document.createElement('option');
+      option.value=ort.name;
+      option.textContent=ort.name;
+      standortAuswahl.append(option);
     }
-    auswahl.addEventListener('change',()=>{
-      einzelplatzFormAktualisieren();
-      buchungsdauerBerechnen();
-      belegteUhrzeitenLaden();
-    });
+    angeboteFuerStandortAnzeigen();
     einzelplatzFormAktualisieren();
   } catch (fehler) {
-    console.error('Erlebnisangebote konnten nicht geladen werden:', fehler);
+    console.error('Erlebnisangebote oder Veranstaltungsorte konnten nicht geladen werden:', fehler);
+    uhrzeitHinweis.textContent='Standorte und Angebote konnten nicht geladen werden. Bitte lade die Seite erneut.';
   }
 }
 
