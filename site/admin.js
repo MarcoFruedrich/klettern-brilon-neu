@@ -1,5 +1,6 @@
 
 const login = document.getElementById('login');
+const loginStatus = document.getElementById('login-status');
 const workspace = document.getElementById('workspace');
 const status = document.getElementById('status');
 let refreshSequenz=0;
@@ -560,6 +561,7 @@ c.append(bildBereich);
   } catch (e) {
     login.hidden = false;
     workspace.hidden = true;
+    if(loginStatus)loginStatus.textContent=e.message;
     status.textContent = e.message;
   }
 }
@@ -956,6 +958,7 @@ document.getElementById('payment-overview-next')?.addEventListener('click',()=>{
 
 login.onsubmit = async e => {
   e.preventDefault();
+  if(loginStatus)loginStatus.textContent='';
 
   try {
     await api('/api/admin/login', {
@@ -973,7 +976,8 @@ login.onsubmit = async e => {
     status.textContent = '';
     refresh();
   } catch (err) {
-    status.textContent = err.message;
+    if(loginStatus)loginStatus.textContent=err.message;
+    else status.textContent=err.message;
   }
 };
 
