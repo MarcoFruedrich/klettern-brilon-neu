@@ -913,7 +913,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         ergebnis.buchung.data.bestaetigungsEmail=await buchungsbestaetigungsEmail({
           buchungId:ergebnis.buchung.id,email:data.email,
           betreff:'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
-          text:'Hallo '+(data.name||'')+'\n\n'+bestaetigungsText+angeboteText+'\n\nGut Seil!\nKlettern & Abenteuer Brilon'});
+          text:'Hallo '+(data.name||'')+',\n\n'+bestaetigungsText+angeboteText+'\n\nGut Seil!\nKlettern & Abenteuer Brilon'});
         if(process.env.BOOKING_NOTIFY_EMAIL)brevoMail(
           process.env.BOOKING_NOTIFY_EMAIL,'Buchung bestätigt – Zahlungseingang erfasst',
           bestaetigungsText+'\n\nKundin/Kunde: '+(data.name||'')+' · '+(data.email||'')
