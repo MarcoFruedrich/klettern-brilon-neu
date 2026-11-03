@@ -255,6 +255,18 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.match(confirmation.textContent,/Anzahlung \(25 %\): 25,00 €/);
   assert.match(confirmation.textContent,/Tatsächlich erfasst: 25,00 €/);
   assert.match(confirmation.textContent,/Offener Restbetrag: 75,00 €/);
+  let tracking=null;
+  for(let attempt=0;attempt<20;attempt++){
+    const response=await fetch(root+'/api/admin/buchungen?suche='+encodeURIComponent('MUELLER-MAX-150327-02')+
+      '&status=bestaetigt',{headers:{Cookie:cookie}});
+    const result=await response.json();
+    const rows=Array.isArray(result)?result:(result.buchungen||[]);
+    tracking=rows.find(item=>item.id===adjacentData.id)?.data?.bestaetigungsEmail||null;
+    if(tracking?.status==='angenommen')break;
+    await new Promise(resolve=>setTimeout(resolve,10));
+  }
+  assert.equal(tracking?.status,'angenommen','Annahme durch den E-Mail-Anbieter wird bei der Buchung gespeichert');
+  assert.ok(Number.isFinite(Date.parse(tracking.angenommenAm)),'Zeitpunkt der Anbieterannahme wird gespeichert');
   const bookingExportResponse=await fetch(root+`/api/admin/buchungen/${adjacentData.id}/export`,{headers:{Cookie:cookie}});
   assert.equal(bookingExportResponse.status,200);
   assert.match(bookingExportResponse.headers.get('content-disposition'),/attachment; filename="buchung-/);
