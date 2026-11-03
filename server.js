@@ -835,6 +835,38 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       });
     }
 
+    const kontaktRoute=route.match(/^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})\/kontakt$/);
+    if(kontaktRoute&&req.method==='POST'){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht verfügbar.'});
+      if(!limit('admin-kontakt:'+kontaktRoute[1],10,600000))
+        return reply(res,429,{error:'Bitte mit weiteren E-Mails kurz warten.'});
+      const d=await body(req,6000);
+      const nachricht=typeof d?.nachricht==='string'?d.nachricht.trim():'';
+      if(nachricht.length<3||nachricht.length>3000)
+        return reply(res,400,{error:'Bitte eine Nachricht mit 3 bis 3.000 Zeichen eingeben.'});
+      const buchungAbfrage=await pool.query(
+        'SELECT id,data,buchungsnummer FROM brilon_buchungen WHERE id=$1',
+        [kontaktRoute[1]]
+      );
+      if(!buchungAbfrage.rowCount)return reply(res,404,{error:'Buchungsanfrage nicht gefunden.'});
+      const buchung=buchungAbfrage.rows[0],kunde=buchung.data||{};
+      const email=safeText(kunde.email,180);
+      if(!/^\S+@\S+\.\S+$/.test(email))
+        return reply(res,400,{error:'Für diese Buchung ist keine gültige Kunden-E-Mail hinterlegt.'});
+      const name=safeText(kunde.name,120)||'';
+      const betreff='Rückfrage zu deiner Buchung'+(buchung.buchungsnummer?' '+safeText(buchung.buchungsnummer,40):'')+' – Klettern & Abenteuer Brilon';
+      const inhalt=(name?'Hallo '+name+',':'Hallo,')+'\n\n'+nachricht+'\n\nGut Seil!\nKlettern & Abenteuer Brilon';
+      try{
+        await brevoMail(email,betreff,inhalt);
+        return reply(res,200,{success:true,empfaenger:email,
+          message:'Der Versanddienst hat die E-Mail angenommen. Die Zustellung im Postfach ist damit nicht bestätigt.'});
+      }catch(fehler){
+        console.error('Direkte Kunden-E-Mail fehlgeschlagen:',fehler?.message||'unbekannter Fehler');
+        return reply(res,502,{error:'Die E-Mail konnte nicht versendet werden.'});
+      }
+    }
+
     const zahlungenRoute = route.match(/^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})\/zahlungen$/);
     if(zahlungenRoute&&req.method==='POST'){
       if(!await admin(req,res))return;

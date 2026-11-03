@@ -314,6 +314,56 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
   }
 
   c.append(zahlungsInfo, zahlungsformular);
+
+  const kundenkontaktForm=document.createElement('form');
+  kundenkontaktForm.className='payment-entry customer-contact';
+  kundenkontaktForm.style.gridTemplateColumns='1fr';
+  const kundenkontaktTitel=el('strong','Direktnachricht an den Kunden');
+  const kundenkontaktInfo=el('p',b.data.email
+    ? 'Wird per E-Mail an '+b.data.email+' gesendet. Betreff: Rückfrage zu deiner Buchung.'
+    : 'Für diese Buchung ist keine Kunden-E-Mail hinterlegt.');
+  kundenkontaktInfo.className='customer-contact-info';
+  const kundenkontaktText=document.createElement('textarea');
+  kundenkontaktText.name='nachricht';
+  kundenkontaktText.rows=5;
+  kundenkontaktText.minLength=3;
+  kundenkontaktText.maxLength=3000;
+  kundenkontaktText.required=true;
+  kundenkontaktText.placeholder='Zum Beispiel: Die Anzahlung ist noch nicht vollständig eingegangen. Bitte melde dich kurz bei uns.';
+  kundenkontaktText.setAttribute('aria-label','Nachricht an den Kunden');
+  const kundenkontaktSenden=el('button','E-Mail an Kunden senden');
+  kundenkontaktSenden.type='submit';
+  kundenkontaktSenden.className='btn secondary';
+  const kundenkontaktStatus=el('p');
+  kundenkontaktStatus.setAttribute('role','status');
+  kundenkontaktStatus.setAttribute('aria-live','polite');
+  kundenkontaktForm.append(kundenkontaktTitel,kundenkontaktInfo);
+  if(b.data.email){
+    const kundenkontaktLabel=el('label','Deine Nachricht');
+    kundenkontaktLabel.append(kundenkontaktText);
+    kundenkontaktForm.append(kundenkontaktLabel,kundenkontaktSenden);
+  }
+  kundenkontaktForm.append(kundenkontaktStatus);
+  kundenkontaktForm.addEventListener('submit',async event=>{
+    event.preventDefault();
+    if(!b.data.email||!kundenkontaktForm.reportValidity())return;
+    kundenkontaktSenden.disabled=true;
+    kundenkontaktStatus.textContent='E-Mail wird gesendet …';
+    try{
+      const result=await api('/api/admin/buchungen/'+encodeURIComponent(b.id)+'/kontakt',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({nachricht:kundenkontaktText.value})
+      });
+      kundenkontaktStatus.textContent=result.message+' Empfänger: '+result.empfaenger+'.';
+      kundenkontaktText.value='';
+    }catch(error){
+      kundenkontaktStatus.textContent='E-Mail konnte nicht versendet werden: '+error.message;
+    }finally{
+      kundenkontaktSenden.disabled=false;
+    }
+  });
+  c.append(kundenkontaktForm);
 }
 
       const statusZeile = el(
