@@ -2,6 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben } = require('../lib/sicherheitszustand');
+const { createTotpStepStore } = require('../lib/admin-totp-steps');
 
 test('Rate-Limits zählen pro Schlüssel und verfallen nach dem Zeitfenster', () => {
   let jetzt = 1000;
@@ -41,4 +42,28 @@ test('Sitzungsbereinigung entfernt nur abgelaufene oder ungültige Ablaufwerte',
   const sessions = new Map([['expired', 99], ['active', 101], ['invalid', NaN]]);
   abgelaufeneEintraegeEntfernen(sessions, 100);
   assert.deepEqual([...sessions.keys()], ['active']);
+});
+
+test('TOTP-Wiederverwendungsmarker bleiben im gültigen Zeitfenster erhalten und veraltete werden entfernt',async()=>{
+  let jetzt=3_000_000;
+  const steps=new Map([['veraltet',98],['vorheriger-schritt',99]]);
+  const store=createTotpStepStore({steps,uhr:()=>jetzt});
+  assert.equal(await store.einmalig('faktor',100),true);
+  assert.equal(steps.has('veraltet'),false);
+  assert.equal(steps.get('vorheriger-schritt'),99,'Der noch akzeptierte vorherige TOTP-Schritt bleibt geschützt');
+  assert.equal(await store.einmalig('faktor',100),false,'Ein benutzter Code bleibt im gültigen Zeitfenster gesperrt');
+  jetzt=3_030_000;
+  assert.equal(await store.einmalig('faktor',101),true);
+  assert.equal(steps.has('vorheriger-schritt'),false,'Ein nicht mehr akzeptierter Schritt wird entfernt');
+});
+
+test('PostgreSQL-TOTP-Bereinigung und Einmalverwendung erfolgen in einem Statement',async()=>{
+  let sql,args;
+  const store=createTotpStepStore({pool:{async query(statement,values){
+    sql=statement;args=values;return {rowCount:1};
+  }},uhr:()=>3_000_000});
+  assert.equal(await store.einmalig('faktor-hash',100),true);
+  assert.match(sql,/DELETE FROM brilon_admin_totp_steps WHERE factor_id<>\$1 AND last_step<\$3/);
+  assert.match(sql,/ON CONFLICT\(factor_id\) DO UPDATE/);
+  assert.deepEqual(args,['faktor-hash',100,99]);
 });
