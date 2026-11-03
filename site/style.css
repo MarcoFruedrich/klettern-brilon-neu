@@ -772,3 +772,22 @@ line-height:1.25;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .tablet-page .tablet-connection{text-align:right;font-size:14px;padding:10px 28px;opacity:.8}
 @media(max-width:600px){.tablet-page .tablet-top{padding:16px;flex-direction:column}
 .tablet-page #tablet-digits{font-size:clamp(45px,12vw,72px);letter-spacing:.06em}}
+
+
+/* Admin-Formulare: Kontrast auf dunklen Feldern */
+.admin-page form:not(.payment-entry) label,
+.admin-page form:not(.payment-entry) h2,
+.admin-page form:not(.payment-entry) h3,
+.admin-page form:not(.payment-entry) legend {
+  color: #f8fbf9;
+}
+.admin-page form:not(.payment-entry) p,
+.admin-page form:not(.payment-entry) .hint,
+.admin-page form:not(.payment-entry) small {
+  color: #d5e1dd;
+}
+.admin-page form:not(.payment-entry) input::placeholder,
+.admin-page form:not(.payment-entry) textarea::placeholder {
+  color: #65766f;
+  opacity: 1;
+}
