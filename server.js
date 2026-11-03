@@ -2166,6 +2166,12 @@ if (route === '/api/angebote' && req.method === 'GET') {
 async function start(){
   if(pool){
     await pool.query('SELECT 1');
+    // Explicit, narrow opt-in used only to initialize the admin session store.
+    if(process.env.RUN_ADMIN_SESSION_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (\n        token_hash CHAR(64) PRIMARY KEY,\n        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n        expires_at TIMESTAMPTZ NOT NULL\n      )`);
+      await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
+      console.log('Admin-Sitzungstabelle geprüft (RUN_ADMIN_SESSION_MIGRATION=true)');
+    }
     // Schema changes are opt-in. A normal server start must not alter a live database.
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){
     await pool.query(
