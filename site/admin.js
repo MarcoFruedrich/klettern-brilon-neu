@@ -309,7 +309,7 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
 
   for (const z of zahlungen) {
     const cent = Number(z.betragCent || 0);
-    zahlungsInfo.append(el('small', new Date(z.erhaltenAm).toLocaleString('de-DE') +
+    zahlungsInfo.append(el('p', new Date(z.erhaltenAm).toLocaleString('de-DE') +
       ' · ' + euro(cent) + ' · ' + z.methode + (z.notiz ? ' · ' + z.notiz : '')));
   }
 
