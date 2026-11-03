@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 31173)
+Total output lines: 2422
+
 
 // Klettern & Abenteuer Brilon – Node.js / PostgreSQL
 'use strict';
@@ -1069,140 +1072,7 @@ if (!buchungAbfrage.rows.length) {
 const buchung = buchungAbfrage.rows[0];
 const kunde = buchung.data;
 if(kunde.buchungsmodus==='einzelplatz')
-  return reply(res,409,{error:'Für Einzelplatzreservierungen werden keine Anzahlungsinformationen versendet.'});
-
-if (
-  typeof kunde.gesamtpreis !== 'number' ||
-  !Number.isFinite(kunde.gesamtpreis) ||
-  kunde.gesamtpreis < 0
-) {
-  return reply(res, 400, {
-    error: 'Für diese Buchung ist kein gültiger Gesamtpreis hinterlegt.'
-  });
-}  
-     if (!process.env.BANK_NAME || !process.env.BANK_IBAN) {
-  return reply(res, 503, {
-    error: 'Bankverbindung ist noch nicht vollständig eingerichtet.'
-  });
-} 
-     const zahlungstext=zahlungsinformationenText(kunde,{
-       bankName:process.env.BANK_NAME,iban:process.env.BANK_IBAN,
-       bookingId:buchung.buchungsnummer||buchungsId
-     });
-  if (!kunde.email) {
-  return reply(res, 400, {
-    error: 'Für diese Buchung ist keine Kunden-E-Mail hinterlegt.'
-  });
-}
-
-try {
-  await brevoMail(
-    kunde.email,
-    'Zahlungsinformationen – Klettern & Abenteuer Brilon',
-    zahlungstext
-  );
-  
-await pool.query(
-  `UPDATE brilon_buchungen
-   SET zahlungsinfo_gesendet_am = NOW()
-   WHERE id = $1`,
-  [buchungsId]
-);
-
-
-  return reply(res, 200, {
-    success: true,
-    message: 'Zahlungsinformationen wurden versendet.'
-  });
-} catch (fehler) {
-  console.error('Zahlungs-E-Mail fehlgeschlagen:', fehler);
-
-  return reply(res, 502, {
-    error: 'Die Zahlungs-E-Mail konnte nicht versendet werden.'
-  });
-}
-}
-    if(route==='/api/admin/kalender'&&req.method==='GET'){
-      if(!await admin(req,res))return;
-      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
-      const q=await pool.query(
-        'SELECT id,titel,datum::text AS datum,enddatum::text AS enddatum,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,typ,beschreibung FROM brilon_kalender ORDER BY datum,uhrzeit NULLS LAST LIMIT 1000'
-      );
-      return reply(res,200,q.rows);
-    }
-
-    if(route==='/api/admin/kalender'&&req.method==='POST'){
-      if(!await admin(req,res))return;
-      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
-
-      const d=await body(req);
-      if(!d||typeof d!=='object'||Array.isArray(d))
-        return reply(res,400,{error:'Ungültige Eingabe.'});
-
-      const titel=safeText(d.titel,120);
-      const datum=safeText(d.datum,10);
-      const enddatum=safeText(d.enddatum,10)||null;
-      const uhrzeit=safeText(d.uhrzeit,5)||null;
-      const endzeit=safeText(d.endzeit,5)||null;
-      const typ=safeText(d.typ,20);
-      const beschreibung=safeText(d.beschreibung,1000),
-preis=safeText(d.preis,50);
-
-      const gueltigesDatum=v=>{
-        if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
-        const t=new Date(v+'T12:00:00Z');
-        return !Number.isNaN(t.getTime())&&
-          t.toISOString().slice(0,10)===v;
-      };
-
-      if(!titel||!gueltigesDatum(datum)||
-         (enddatum&&(!gueltigesDatum(enddatum)||enddatum<datum))||
-         (uhrzeit&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(uhrzeit))||
-         (endzeit&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(endzeit))||
-         !['termin','sperrzeit'].includes(typ))
-        return reply(res,400,{error:'Ungültige Kalenderdaten.'});
-
-      const q=await pool.query(
-        'INSERT INTO brilon_kalender(titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-        [titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung]
-      );
-      return reply(res,201,{id:q.rows[0].id});
-    }
-
-    if(/^\/api\/admin\/kalender\/[0-9a-fA-F-]{36}$/.test(route)&&req.method==='DELETE'){
-      if(!await admin(req,res))return;
-      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
-
-      const id=route.split('/').pop();
-      const q=await pool.query(
-        'DELETE FROM brilon_kalender WHERE id=$1 RETURNING id',[id]
-      );
-      if(!q.rowCount)
-        return reply(res,404,{error:'Kalendereintrag nicht gefunden.'});
-      return reply(res,200,{success:true});
-    }
-
-    if(/^\/api\/admin\/kalender\/[0-9a-fA-F-]{36}$/.test(route)&&req.method==='PATCH'){
-      if(!await admin(req,res))return;
-      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
-
-      const id=route.split('/').pop();
-      const d=await body(req);
-      if(!d||typeof d!=='object'||Array.isArray(d))
-        return reply(res,400,{error:'Ungültige Eingabe.'});
-
-      const titel=safeText(d.titel,120);
-      const datum=safeText(d.datum,10);
-      const enddatum=safeText(d.enddatum,10)||null;
-      const uhrzeit=safeText(d.uhrzeit,5)||null;
-      const endzeit=safeText(d.endzeit,5)||null;
-      const typ=safeText(d.typ,20);
-      const beschreibung=safeText(d.beschreibung,1000);
-
-      const gueltigesDatum=v=>{
-        if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
-        const t=new Date(v+'T12:00:00Z');
-        return !Number.isNaN(t.getTime())&&t.toISOString().slice(0,10)===v;
+  return reply(res,409,{error:'Für Einzelplatzreservi…1173 tokens truncated…umber.isNaN(t.getTime())&&t.toISOString().slice(0,10)===v;
       };
 
       if(!titel||!gueltigesDatum(datum)||
@@ -2156,9 +2026,14 @@ if (route === '/api/angebote' && req.method === 'GET') {
     });
   }catch(e){
     console.error('Anfragefehler:',e.message);
-    reply(res,e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?400:500,{
+    const placesSchemaMissing=route==='/api/admin/orte'&&e.code==='42P01';
+    const statusCode=e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?400:
+      placesSchemaMissing?503:500;
+    reply(res,statusCode,{
       error:e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?
-        e.message:'Interner Serverfehler.'
+        e.message:placesSchemaMissing?
+          'Die Veranstaltungsort-Tabelle fehlt. Einmalig RUN_PLACES_MIGRATION=true setzen und den Server neu starten.':
+          'Interner Serverfehler.'
     });
   }
 }
@@ -2171,6 +2046,15 @@ async function start(){
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (\n        token_hash CHAR(64) PRIMARY KEY,\n        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n        expires_at TIMESTAMPTZ NOT NULL\n      )`);
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
       console.log('Admin-Sitzungstabelle geprüft (RUN_ADMIN_SESSION_MIGRATION=true)');
+    }
+    // Separate, explicit one-time opt-in for the venue settings table.
+    // This stays independent of both session initialization and broad schema migrations.
+    if(process.env.RUN_PLACES_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_orte(
+        id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+      await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon') ON CONFLICT(name) DO NOTHING`);
+      console.log('Veranstaltungsort-Tabelle geprüft (RUN_PLACES_MIGRATION=true)');
     }
     // Targeted opt-in: only columns needed by the admin dashboard's first queries.
     if(process.env.RUN_ADMIN_DASHBOARD_MIGRATION==='true'){

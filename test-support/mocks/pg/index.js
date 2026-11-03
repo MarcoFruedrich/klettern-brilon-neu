@@ -8,6 +8,7 @@ class Pool {
     this.guests = JSON.parse(process.env.MOCK_GUESTBOOK || '[]');
     this.calendar = JSON.parse(process.env.MOCK_CALENDAR || '[]');
     this.places = JSON.parse(process.env.MOCK_PLACES || '[]');
+    this.placesTableReady=process.env.MOCK_PLACES_TABLE!=='missing';
     this.gpsTours = JSON.parse(process.env.MOCK_GPS_TOURS || '[]');
     this.nextOfferId = this.offers.reduce((next,offer)=>Math.max(next,Number(offer.id)||0),0)+1;
     this.adminSessions = new Map();
@@ -42,6 +43,20 @@ class Pool {
       throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
     if (process.env.MOCK_ADMIN_TOTP_FAIL==='1'&&sql.includes('brilon_admin_totp_steps'))
       throw new Error('Test-double: TOTP-Zählertabelle fehlt');
+    if(/CREATE TABLE IF NOT EXISTS brilon_orte/i.test(sql)){
+      this.placesTableReady=true;
+      return {rows:[],rowCount:0};
+    }
+    if(!this.placesTableReady&&/(?:FROM|INTO)\s+brilon_orte\b/i.test(sql)){
+      const error=new Error('relation "brilon_orte" does not exist');
+      error.code='42P01';
+      throw error;
+    }
+    if(sql.includes("INSERT INTO brilon_orte(name) VALUES('Brilon')")){
+      if(!this.places.some(place=>place.name==='Brilon'))
+        this.places.push({id:this.places.length+1,name:'Brilon',aktiv:true});
+      return {rows:[],rowCount:1};
+    }
     if(sql.includes('INSERT INTO brilon_angebote(name,beschreibung,dauer,preise,aktiv)')){
       const [name,beschreibung,dauer,rawPrices,aktiv]=params;
       const offer={id:this.nextOfferId++,name,beschreibung,dauer,preise:JSON.parse(rawPrices),aktiv};

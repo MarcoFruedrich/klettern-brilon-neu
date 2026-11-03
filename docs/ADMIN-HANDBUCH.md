@@ -92,6 +92,12 @@ zugehörigen Eintrag.
   werden.
 - Orte zuerst unter „Einstellungen · Veranstaltungsorte“ ergänzen. Das
   Hinzufügen eines Orts ändert vorhandene Programme und Buchungen nicht.
+- Wenn Laden oder Speichern mit einem internen Fehler scheitert, kann in der
+  Datenbank die Tabelle `brilon_orte` fehlen. Für die einmalige, eng begrenzte
+  Einrichtung `RUN_PLACES_MIGRATION=true` setzen und den Server neu starten;
+  dabei wird nur diese Tabelle angelegt und „Brilon“ als Startort ergänzt.
+  Anschließend die Variable wieder entfernen. Die allgemeine
+  `RUN_SCHEMA_MIGRATIONS`-Option ist dafür nicht erforderlich.
 - Sonder- und Tagesangebote separat im gleichnamigen Bereich erfassen. Vor
   einer Veröffentlichung Titel, Datum, Beschreibung und Preis kontrollieren.
 
