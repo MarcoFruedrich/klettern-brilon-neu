@@ -12,8 +12,6 @@ const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpssp
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 const { sameOriginMutation } = require('./lib/sicherheit');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben } = require('./lib/sicherheitszustand');
-const { decodeBase32:totpSecretDecode, verifyTotp } = require('./lib/totp');
-const { createTotpStepStore } = require('./lib/admin-totp-steps');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
@@ -33,7 +31,7 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');
 const dbConfig=datenbankKonfiguration(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT,process.env.DATABASE_SSL_MODE);
 const pool=dbConfig?new Pool(dbConfig):null;
-const sessions=new Map(),totpStepStore=createTotpStepStore({pool}),rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.json':'application/manifest+json'};
+const sessions=new Map(),rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.json':'application/manifest+json'};
 const securityHeaders={
   'X-Content-Type-Options':'nosniff',
   'X-Frame-Options':'DENY',
@@ -693,9 +691,6 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
             password=process.env.ADMIN_PASSWORD;
       if(!username||!password)
         return reply(res,503,{error:'Admin-Zugang nicht eingerichtet.'});
-      const totpSecret=process.env.ADMIN_TOTP_SECRET_BASE32;
-      try{totpSecretDecode(totpSecret);}catch{return reply(res,503,{error:'Zweiter Faktor ist nicht sicher eingerichtet.'});}
-
       const a=Buffer.from(String(d.username||'')),
             b=Buffer.from(username),
             c=Buffer.from(String(d.password||'')),
@@ -703,14 +698,6 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(a.length!==b.length||c.length!==e.length||
          !crypto.timingSafeEqual(a,b)||!crypto.timingSafeEqual(c,e))
         return reply(res,401,{error:'Zugangsdaten nicht korrekt.'});
-
-      const totpStep=verifyTotp(totpSecret,typeof d.totp==='string'?d.totp:'');
-      if(totpStep===null)return reply(res,401,{error:'Zugangsdaten oder Authenticator-Code nicht korrekt.'});
-      try{
-        const factorId=gpsTokenHash(totpSecret);
-        if(!await totpStepStore.einmalig(factorId,totpStep))
-          return reply(res,401,{error:'Authenticator-Code wurde bereits verwendet.'});
-      }catch{return reply(res,503,{error:'Speicher für den zweiten Faktor ist nicht initialisiert.'});}
 
       const token=crypto.randomBytes(32).toString('hex');
       const ablauf=new Date(Date.now()+8*3600000);
@@ -2190,10 +2177,6 @@ async function start(){
       expires_at TIMESTAMPTZ NOT NULL
     )`);
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_totp_steps (
-      factor_id CHAR(64) PRIMARY KEY,
-      last_step BIGINT NOT NULL
-    )`);
     await pool.query(
       "ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'offen'"
     );

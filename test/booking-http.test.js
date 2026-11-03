@@ -6,9 +6,6 @@ const { spawn } = require('node:child_process');
 const net = require('node:net');
 const path = require('node:path');
 const { erzeugeZugang } = require('../lib/anschlussangebote');
-const {totpCode}=require('../lib/totp');
-
-const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
 test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Referenzen', async t => {
   const probe=net.createServer();
@@ -67,7 +64,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     RUN_SCHEMA_MIGRATIONS:'false',MOCK_BREVO_EMAILS:'1',BREVO_API_KEY:'test-only-mail-key',
     BREVO_SENDER_EMAIL:'sender@example.test',BOOKING_NOTIFY_EMAIL:'operator@example.test',
     SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',BOOKING_OFFER_SECRET:offerSecret,
-    ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password',ADMIN_TOTP_SECRET_BASE32:totpSecret
+    ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password'
   }});
   child.on('message',message=>{
     if(message?.type==='mock-brevo-email')mailMessages.push(message.message);
@@ -160,13 +157,12 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(adjacentData.buchungsnummer,'MUELLER-MAX-150327-02');
   await waitForEmails(4);
 
-  const otp=totpCode(totpSecret,Math.floor(Date.now()/30000));
   const login=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
-    body:JSON.stringify({username:'test-admin',password:'test-only-password',totp:otp})});
+    body:JSON.stringify({username:'test-admin',password:'test-only-password'})});
   assert.equal(login.status,200);
   const replayedLogin=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:root,'Content-Type':'application/json'},
-    body:JSON.stringify({username:'test-admin',password:'test-only-password',totp:otp})});
-  assert.equal(replayedLogin.status,401,'Auch der persistente Datenbankzähler muss einen bereits genutzten Code ablehnen');
+    body:JSON.stringify({username:'test-admin',password:'test-only-password'})});
+  assert.equal(replayedLogin.status,200,'Gültige Zugangsdaten dürfen eine weitere Sitzung öffnen');
   const cookie=login.headers.get('set-cookie').split(';',1)[0];
   const loginData=await login.json();
   const unauthCalendar=await fetch(root+'/api/admin/kalenderbuchungen?monat=2026-01');

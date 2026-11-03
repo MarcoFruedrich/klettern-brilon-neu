@@ -42,7 +42,7 @@ function fakeAdminApi(page) {
     const readBody=()=>JSON.parse(request.postData()||'{}');
     if(endpoint==='/api/admin/login'&&method==='POST'){
       const credentials=readBody();
-      if(credentials.username!=='test-admin'||credentials.totp!=='123456')
+      if(credentials.username!=='test-admin'||credentials.password!=='Nur-Test-Passwort')
         return json(401,{error:'Test-Anmeldung fehlgeschlagen'});
       state.signedIn=true;return json(200,{success:true,csrfToken:state.csrf});
     }
@@ -282,7 +282,6 @@ async function login(page,root){
   await page.goto(root+'/admin.html');
   await page.locator('#username').fill('test-admin');
   await page.locator('#password').fill('Nur-Test-Passwort');
-  await page.locator('#totp-code').fill('123456');
   await page.locator('#login button').click();
   await page.locator('#workspace').waitFor({state:'visible',timeout:15000});
   await page.locator('#angebote-admin-liste').getByText('Klettertest').first().waitFor();

@@ -101,4 +101,4 @@ Der aktuelle Entwicklungsstand und die Prüfergebnisse stehen in [`docs/STATUS-E
 
 Es gibt keine Zahlungsanbieterintegration. Zahlungen werden manuell als tatsächliche Zahlungseingänge erfasst. Vor einem produktiven Einsatz sind unter anderem Integrations- und Browserprüfungen, Datenschutz-/Löschkonzept, Sitzungsschutz und eine lokale Prüfung der GPS-Route erforderlich.
 
-Die Arbeit liegt ausschließlich auf `entwicklung/phase-1-buchungen-sonderangebote-gps`. Sie ist nicht veröffentlicht. Keine produktive Migration, Veröffentlichung oder Zusammenführung mit `main` ohne ausdrückliche Freigabe.
+Die Arbeit liegt ausschließlich auf `entwicklung/phase-1-buchungen-sonderangebote-gps`. Dieser Branch wurde nach ausdrücklicher Freigabe auf Render unter `https://klettern-brilon-neu.onrender.com` bereitgestellt. `main` wurde nicht verändert. Es wurden keine produktiven Datenbankmigrationen ausgeführt. Die Render-Adresse ist öffentlich erreichbar.

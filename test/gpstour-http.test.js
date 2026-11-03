@@ -5,7 +5,6 @@ const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
 const net=require('node:net');
 const path=require('node:path');
-const {totpCode}=require('../lib/totp');
 
 test('HTTP: GPS-Touren sind geschützt, speicherbar und geben keine Kontrollcodes heraus',async t=>{
   const probe=net.createServer();
@@ -14,13 +13,12 @@ test('HTTP: GPS-Touren sind geschützt, speicherbar und geben keine Kontrollcode
   await new Promise(resolve=>probe.close(resolve));
   const repo=path.resolve(__dirname,'..');
   const preload=path.join(repo,'test-support','mocks','force-mock-modules.js');
-  const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(repo,'test-support','mocks'),
     NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:'[]',MOCK_GPS_TOURS:'[]',MOCK_PLACES:'[]',
     RUN_SCHEMA_MIGRATIONS:'false',ADMIN_USER:'tour-admin',ADMIN_PASSWORD:'test-only-password',
-    ADMIN_TOTP_SECRET_BASE32:totpSecret,GPS_CODE_SECRET:'test-gps-code-secret-with-32-or-more-characters',
+    GPS_CODE_SECRET:'test-gps-code-secret-with-32-or-more-characters',
     SUPABASE_URL:'',SUPABASE_SECRET_KEY:''
   }});
   let serverErrors='';child.stderr.setEncoding('utf8');child.stderr.on('data',chunk=>serverErrors+=chunk);
@@ -37,7 +35,7 @@ test('HTTP: GPS-Touren sind geschützt, speicherbar und geben keine Kontrollcode
   assert.equal(privateRead.status,401,'GPS-Touren erfordern eine Admin-Sitzung');
   const origin=root;
   const login=await fetch(root+'/api/admin/login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},
-    body:JSON.stringify({username:'tour-admin',password:'test-only-password',totp:totpCode(totpSecret,Math.floor(Date.now()/30000))})});
+    body:JSON.stringify({username:'tour-admin',password:'test-only-password'})});
   assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie').split(';',1)[0];
   const loginData=await login.json();

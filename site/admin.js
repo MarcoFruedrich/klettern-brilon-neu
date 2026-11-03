@@ -965,17 +965,14 @@ login.onsubmit = async e => {
       },
       body: JSON.stringify({
         username: document.getElementById('username').value,
-        password: document.getElementById('password').value,
-        totp: document.getElementById('totp-code').value
+        password: document.getElementById('password').value
       })
     });
 
     document.getElementById('password').value = '';
-    document.getElementById('totp-code').value = '';
     status.textContent = '';
     refresh();
   } catch (err) {
-    document.getElementById('totp-code').value = '';
     status.textContent = err.message;
   }
 };

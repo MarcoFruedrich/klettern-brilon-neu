@@ -8,9 +8,6 @@ const path = require('node:path');
 const sharp = require('sharp');
 const { fotoBereinigen } = require('../lib/stationspruefung');
 const { heuteInBerlin } = require('../lib/kalendertag');
-const { totpCode } = require('../lib/totp');
-const { createTotpStepStore } = require('../lib/admin-totp-steps');
-const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
 const integrationUrl = process.env.PG_INTEGRATION_URL;
 
@@ -22,16 +19,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     throw new Error('Integrationstests dürfen nur die lokale Datenbank brilon_test mit Benutzer brilon_ci verwenden.');
   const { Pool } = require('pg');
   const pool = new Pool({ connectionString: integrationUrl, ssl: false });
-  const totpTestIds=['expired','valid','login'].map(label=>crypto.createHash('sha256')
-    .update(`ci-totp-${crypto.randomUUID()}-${label}`).digest('hex'));
-  let totpRowsInserted=false;
   t.after(async () => {
-    try {
-      if(totpRowsInserted)
-        await pool.query('DELETE FROM brilon_admin_totp_steps WHERE factor_id IN ($1,$2,$3)',totpTestIds);
-    } finally {
-      await pool.end();
-    }
+    await pool.end();
   });
   const probe = net.createServer();
   await new Promise((resolve, reject) => {
@@ -48,7 +37,6 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
       BREVO_API_KEY: '', BREVO_SENDER_EMAIL: '', BOOKING_NOTIFY_EMAIL: '',
       SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_PATH: '', MOCK_PG: '', MOCK_MALWARE_SCAN: '1',
       ADMIN_USER: 'brilon-ci', ADMIN_PASSWORD: 'local-only-password',
-      ADMIN_TOTP_SECRET_BASE32: totpSecret,
       STATION_CHECK_SECRET: 'ci-only-check-code-secret-000000000000000000000000',
       PRUEF_MANGEL_EMAIL: ''
     }
@@ -64,25 +52,6 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     catch { if (child.exitCode !== null) break; await new Promise(resolve => setTimeout(resolve, 50)); }
   }
   assert.ok(ready, `PostgreSQL-Testserver konnte nicht starten: ${errors}`);
-
-  const totpNow=1_800_000_000_000;
-  const currentStep=Math.floor(totpNow/30000);
-  await pool.query(`INSERT INTO brilon_admin_totp_steps(factor_id,last_step) VALUES
-    ($1,$3),($2,$4)`,[
-    totpTestIds[0],totpTestIds[1],currentStep-5,currentStep-1
-  ]);
-  totpRowsInserted=true;
-  const totpStore=createTotpStepStore({pool,uhr:()=>totpNow});
-  assert.equal(await totpStore.einmalig(totpTestIds[2],currentStep),true,
-    'PostgreSQL accepts a new TOTP step and prunes expired markers atomically');
-  const totpRows=await pool.query('SELECT factor_id,last_step FROM brilon_admin_totp_steps WHERE factor_id IN ($1,$2,$3)',
-    totpTestIds);
-  assert.deepEqual(totpRows.rows.map(row=>[row.factor_id.trim(),Number(row.last_step)]).sort(),[
-    [totpTestIds[1],currentStep-1],
-    [totpTestIds[2],currentStep]
-  ],'Only markers outside the accepted window are removed');
-  assert.equal(await totpStore.einmalig(totpTestIds[2],currentStep),false,
-    'PostgreSQL rejects replay of the same TOTP step');
 
   const programName = 'CI-Postgres-Klettern-' + crypto.randomUUID();
   await pool.query(`INSERT INTO brilon_angebote
@@ -150,10 +119,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
       'CI-MASS-'||lpad(i::text,3,'0'), '2027-01-01T10:00:00Z'::timestamptz
     FROM generate_series(1,125) AS i`,[day1,programName]);
 
-  const otp=totpCode(totpSecret,Math.floor(Date.now()/30000));
   const login=await fetch(root+'/api/admin/login',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
-    body:JSON.stringify({username:'brilon-ci',password:'local-only-password',totp:otp})});
+    body:JSON.stringify({username:'brilon-ci',password:'local-only-password'})});
   assert.equal(login.status,200,'Der Admin-Zugang muss mit isoliertem PostgreSQL funktionieren');
   const cookie=login.headers.get('set-cookie')?.split(';',1)[0];
   assert.ok(cookie,'Geschützte Testabfragen benötigen das Session-Cookie');

@@ -1,38 +1,32 @@
 # Administrationsbereich – Bedienungsanleitung
 
-Diese Anleitung beschreibt den aktuellen Entwicklungsstand im Branch
-`entwicklung/phase-1-buchungen-sonderangebote-gps`. Die Seite ist nicht
-veröffentlicht. Vor einem Betrieb müssen die offenen Prüfungen in
-`STATUS-ENTWICKLUNG.md` abgeschlossen und eine ausdrückliche Freigabe erteilt
-werden.
+Diese Anleitung beschreibt den aktuellen Stand im Branch
+`entwicklung/phase-1-buchungen-sonderangebote-gps`. Der Branch ist auf Render
+unter `https://klettern-brilon-neu.onrender.com` zur Ansicht bereitgestellt.
+Die URL ist öffentlich erreichbar. Offene Prüfungen und Einschränkungen stehen
+in `STATUS-ENTWICKLUNG.md`.
 
 ## Anmeldung und sichere Testumgebung
 
 1. Node.js 20 oder neuer und die Projektabhängigkeiten bereitstellen.
 2. Für einen lokalen Test ausschließlich Zugangsdaten und eine Datenbank aus
    einer isolierten Testumgebung konfigurieren. Keine Produktivzugänge
-   verwenden. Zusätzlich `ADMIN_TOTP_SECRET_BASE32` als zufälligen Base32-Schlüssel
-   mit mindestens 160 Bit im Secret-Store der Laufzeitumgebung setzen und in
-   einer Authenticator-App hinterlegen. Ohne gültigen Schlüssel bleibt die
-   Anmeldung gesperrt; den Schlüssel niemals in Git speichern.
-3. Schemaänderungen sind standardmäßig ausgeschaltet. Vor Tests, die eine
-   Schemaänderung benötigen, zuerst die Migration prüfen und nur eine eigens
-   angelegte Testdatenbank verwenden. Für PostgreSQL-gestützte Admin-Sitzungen
-   und den Schutz vor wiederverwendeten Authenticator-Codes muss die
-   kontrollierte Migration die Tabellen `brilon_admin_sessions` und
-   `brilon_admin_totp_steps` anlegen. Die Migration wird nicht automatisch
-   ausgeführt.
-4. `npm start` starten und `/admin.html` öffnen. Bei PostgreSQL muss die
-   Sitzungstabelle und TOTP-Zählertabelle über die kontrollierte Migration
-   angelegt sein; andernfalls bleibt der Admin-Login gesperrt. Zur Anmeldung
-   Benutzername, Passwort und den aktuellen sechsstelligen Authenticator-Code
-   eingeben. Codes sind nur einmal nutzbar. Nach der Anmeldung über „Abmelden“
-   die Sitzung beenden.
-5. Bei Verlust oder Wechsel des Authenticator-Schlüssels muss die Identität
-   administrativ geprüft, ein neuer zufälliger Schlüssel im Secret-Store
-   hinterlegt und der zugehörige alte TOTP-Zähler kontrolliert zurückgesetzt
-   werden. Den alten Schlüssel nicht weiterverwenden und keinen Notfallzugang
-   im Repository hinterlegen.
+   verwenden. Benutzername und starkes Passwort im Secret-Store der
+   Laufzeitumgebung hinterlegen, niemals in Git.
+3. TOTP ist in der aktuellen Version auf Wunsch des Betreibers deaktiviert.
+   Die Verwaltungsanmeldung verwendet Benutzername und Passwort; die vorhandene
+   Begrenzung von Anmeldeversuchen, Same-Origin-Prüfung und Sitzungs-/CSRF-Schutz
+   bleiben aktiv. Die vorherige TOTP-Implementierung kann aus dem Git-Verlauf
+   vor Commit `6b6d8d9cdad7495695498104051d75d770dc464a` wieder eingebunden
+   werden.
+4. Schemaänderungen sind standardmäßig ausgeschaltet. Für PostgreSQL-gestützte
+   Admin-Sitzungen muss die kontrollierte Migration die Tabelle
+   `brilon_admin_sessions` anlegen. Die Migration wird nicht automatisch
+   ausgeführt und darf nur nach Prüfung auf einer dafür vorgesehenen Datenbank
+   gestartet werden.
+5. `npm start` starten und `/admin.html` öffnen. Zur Anmeldung Benutzername
+   und Passwort eingeben. Nach der Anmeldung über „Abmelden“ die Sitzung
+   beenden.
 
 ## Buchungen und Zahlungen
 
