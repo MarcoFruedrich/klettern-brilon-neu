@@ -226,6 +226,30 @@ async function refresh() {
           new Date(b.created_at).toLocaleString('de-DE'))
       );
 
+      if(b.status==='bestaetigt'){
+        const protokoll=b.data.bestaetigungsEmail;
+        const versand=el('p');
+        versand.className='booking-email-status';
+        if(protokoll?.status==='angenommen'&&protokoll.angenommenAm){
+          versand.textContent='Bestätigungs-E-Mail vom Anbieter angenommen am '+
+            new Date(protokoll.angenommenAm).toLocaleString('de-DE')+
+            ' (Zustellung nicht bestätigt).';
+        }else if(protokoll?.status==='fehlgeschlagen'){
+          versand.textContent='Bestätigungs-E-Mail fehlgeschlagen am '+
+            new Date(protokoll.versuchtAm).toLocaleString('de-DE')+': '+
+            (protokoll.fehler||'Unbekannter Versandfehler');
+        }else if(protokoll?.status==='ungeklaert'){
+          versand.textContent='Versandstatus der Bestätigungs-E-Mail ungeklärt seit '+
+            new Date(protokoll.versuchtAm).toLocaleString('de-DE')+'. '+
+            (protokoll.fehler||'Bitte Anbieterprotokoll prüfen; nicht automatisch erneut senden.');
+        }else if(protokoll?.status==='wird_versendet'){
+          versand.textContent='Bestätigungs-E-Mail wird versendet …';
+        }else{
+          versand.textContent='Für diese Buchung ist noch kein Versandstatus der Bestätigungs-E-Mail gespeichert.';
+        }
+        c.append(versand);
+      }
+
       const gesamtpreis = Number(b.data.gesamtpreis);
 
 if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
