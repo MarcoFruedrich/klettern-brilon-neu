@@ -212,4 +212,43 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     assert.deepEqual(pageErrors, [], 'Die Buchungsseite darf keine JavaScript-Laufzeitfehler erzeugen');
     await page.close();
   });
+
+  await t.test('Individualklettern: ein Einzelplatz, Restplätze und Anzahlungshinweis',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    let submitted;
+    await fakePublicApi(page);
+    await page.route('**/api/angebote',route=>route.fulfill({status:200,contentType:'application/json',
+      body:JSON.stringify([{id:3,name:'Individualklettern',beschreibung:'Offene Klettergruppe',dauer:90,
+        kapazitaet:12,aktiv:true,buchbar:true,veroeffentlicht:true,verfuegbare_termine:[],
+        buchungsmodus:'einzelplatz',mindestteilnehmer:5,preis_pro_person:18}])}));
+    await page.route('**/api/belegte-zeiten?*',route=>route.fulfill({status:200,contentType:'application/json',
+      body:JSON.stringify({zeiten:[{uhrzeit:'10:00',belegt:false,freie_plaetze:11,angemeldet:1,mindestteilnehmer:5}]})}));
+    await page.route('**/api/buchungen',route=>{
+      submitted=JSON.parse(route.request().postData());
+      return route.fulfill({status:201,contentType:'application/json',
+        body:JSON.stringify({success:true,buchungsnummer:'EINZELPLATZ-TEST',einzelplatz:true,mindestteilnehmer:5})});
+    });
+    await page.goto(root+'/#buchung');
+    await page.locator('#angebot-auswahl option[value="Individualklettern"]').waitFor({state:'attached'});
+    await page.locator('#angebot-auswahl').selectOption('Individualklettern');
+    const participants=page.locator('#buchungs-teilnehmer');
+    await page.waitForFunction(()=>document.getElementById('buchungs-modus-hinweis')?.textContent.includes('Einzelplatzreservierung'));
+    assert.equal(await participants.inputValue(),'1');
+    assert.equal(await participants.getAttribute('readonly'),'');
+    assert.match(await page.locator('#angebots-preis').textContent(),/18,00\s*€ pro Person/);
+    await page.locator('input[name="datum"]').fill('2027-03-18');
+    await page.locator('input[name="datum"]').dispatchEvent('change');
+    await page.waitForFunction(()=>!document.getElementById('buchungs-uhrzeit')?.disabled);
+    assert.match(await page.locator('#buchungs-uhrzeit option[value="10:00"]').textContent(),/noch 11 Plätze/);
+    await page.locator('#buchungs-uhrzeit').selectOption('10:00');
+    await page.locator('input[name="vorname"]').fill('Einzel');
+    await page.locator('input[name="nachname"]').fill('Test');
+    await page.locator('input[name="email"]').fill('individual@example.test');
+    await page.locator('input[name="datenschutz"]').check();
+    await page.locator('#booking button[type=submit]').click();
+    await page.waitForFunction(()=>document.getElementById('booking-status')?.textContent.includes('EINZELPLATZ-TEST'));
+    assert.equal(submitted.teilnehmer,'1');
+    assert.match(await page.locator('#booking-status').textContent(),/Keine Anzahlung erforderlich/);
+    await page.close();
+  });
 });

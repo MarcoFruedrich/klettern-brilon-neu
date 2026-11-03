@@ -75,6 +75,33 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(saved.rowCount, 2, 'In der echten Datenbank dürfen nur zwei Testbuchungen gespeichert sein');
   assert.equal(new Set(saved.rows.map(row => row.buchungsnummer)).size, 2,
     'Buchungsnummern bleiben eindeutig');
+  const individualName='CI-Individualklettern-'+crypto.randomUUID();
+  await pool.query(`INSERT INTO brilon_angebote
+    (name,beschreibung,dauer,preise,aktiv,kapazitaet,buchbar,veroeffentlicht,
+     buchungsmodus,mindestteilnehmer,preis_pro_person)
+    VALUES ($1,'Isolierter Einzelplatztest',90,'{}'::jsonb,true,12,true,true,'einzelplatz',5,18)`,
+    [individualName]);
+  await pool.query(`INSERT INTO brilon_buchungen(id,data,status,buchungsnummer)
+    SELECT gen_random_uuid(),jsonb_build_object('vorname','CISeed'||i,'nachname','Postgres',
+      'email','seed'||i||'@example.test','datum',$2::text,'angebot',$1,'teilnehmer',1,
+      'uhrzeit','14:00','buchungsmodus','einzelplatz','gesamtpreis',18),
+      'offen','CI-INDIVIDUAL-SEED-'||i
+    FROM generate_series(1,10) AS i`,[individualName,day1]);
+  const individualBook=index=>fetch(root+'/api/buchungen',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({vorname:'CIIndividual'+index,
+      nachname:'Postgres',email:`individual${index}@example.test`,datum:day1,uhrzeit:'14:00',
+      teilnehmer:1,angebot:individualName,datenschutz:'on'})});
+  const individualResults=await Promise.all(Array.from({length:2},(_,i)=>individualBook(i+1)));
+  assert.ok(individualResults.every(response=>response.status===201),
+    'Gleichzeitige Einzelanmeldungen dürfen denselben Termin teilen und je einen Platz reservieren');
+  const individualAvailability=await fetch(root+'/api/belegte-zeiten?'+new URLSearchParams({
+    datum:day1,teilnehmer:'1',angebot:individualName
+  }));
+  assert.equal(individualAvailability.status,200);
+  const fullSlot=(await individualAvailability.json()).zeiten.find(item=>item.uhrzeit==='14:00');
+  assert.equal(fullSlot.angemeldet,12);
+  assert.equal(fullSlot.freie_plaetze,0);
+  assert.equal(fullSlot.belegt,true);
   await assert.rejects(() => pool.query(`INSERT INTO brilon_buchungen
     (id,data,status,buchungsnummer) VALUES ($1,'{}'::jsonb,'offen',$2)`,
     [crypto.randomUUID(), saved.rows[0].buchungsnummer]),

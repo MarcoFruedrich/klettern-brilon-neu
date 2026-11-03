@@ -73,6 +73,10 @@ werden.
   Zielgruppe, Ort, Kapazität, optionale verfügbare Daten und Hinweise eintragen.
   „Buchbar“ steuert die Annahme von Anfragen; „Auf der Website
   veröffentlichen“ steuert die öffentliche Anzeige.
+- Für Individualklettern „Einzelplätze reservieren“ wählen und Mindestanmeldungen,
+  Kapazität (5–12 Plätze) sowie Preis pro Person festlegen. Eine Anmeldung
+  reserviert einen Platz ohne Anzahlung. Der Termin findet ab der eingestellten
+  Mindestzahl statt; das Formular zeigt Anmeldestand und freie Plätze.
 - Orte zuerst unter „Einstellungen · Veranstaltungsorte“ ergänzen. Das
   Hinzufügen eines Orts ändert vorhandene Programme und Buchungen nicht.
 - Sonder- und Tagesangebote separat im gleichnamigen Bereich erfassen. Vor

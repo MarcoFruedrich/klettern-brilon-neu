@@ -22,6 +22,9 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
       kategorie:'Klettern',zielgruppe:'Alle',veranstaltungsort:'Brilon',hinweise:''},
     {id:2,name:'Bouldern',preise:{'1-4':150,'5-10':200},kapazitaet:20,aktiv:true,
       verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60}
+    ,{id:3,name:'Individualklettern',preise:{},kapazitaet:5,aktiv:true,
+      verfuegbare_termine:['2027-03-18'],buchbar:true,veroeffentlicht:true,dauer:90,
+      buchungsmodus:'einzelplatz',mindestteilnehmer:5,preis_pro_person:18}
   ];
   const archivedBookings=Array.from({length:55},(_,i)=>({
     id:`archive-${i+1}`,status:'offen',buchungsnummer:`ARCHIV-${String(i+1).padStart(3,'0')}`,
@@ -331,6 +334,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.ok(restoredParent.data.preisanpassungen.length>=2);
   const linkedParentDelete=await fetch(root+`/api/admin/buchungen/${adjacentData.id}`,{method:'DELETE',headers:adminHeaders});
   assert.equal(linkedParentDelete.status,409,'Elternbuchungen mit Anschlussverlauf müssen erhalten bleiben');
+
   const firstDelete=await fetch(root+`/api/admin/buchungen/${firstData.id}`,{method:'DELETE',headers:adminHeaders});
   assert.equal(firstDelete.status,200);
   assert.equal((await firstDelete.json()).gpsSpieleGeloescht,1,'Zugehörige GPS-Spieldaten müssen gemeinsam gelöscht werden');

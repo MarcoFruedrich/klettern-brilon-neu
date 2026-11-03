@@ -369,6 +369,11 @@ zahlungsButtonAktualisieren();
 
 zahlungSenden.type = 'button';
 zahlungSenden.disabled = false;
+if(b.data.buchungsmodus==='einzelplatz'){
+  zahlungSenden.disabled=true;
+  zahlungSenden.textContent='Keine Anzahlung erforderlich';
+  zahlungSenden.title='Für diese Einzelplatzreservierung wird keine Anzahlung angefordert.';
+}
   zahlungSenden.onclick = async () => {
   const bestaetigt = confirm(
     'Möchtest du die Zahlungsinformationen wirklich an diesen Kunden senden?'
@@ -1434,6 +1439,8 @@ if (neuesAngebotForm) {
     daten.verfuegbare_termine=(daten.verfuegbare_termine||'').split('\n').map(x=>x.trim()).filter(Boolean);
     daten.buchbar=neuesAngebotForm.elements.buchbar.checked;
     daten.veroeffentlicht=neuesAngebotForm.elements.veroeffentlicht.checked;
+    daten.mindestteilnehmer=Number(daten.mindestteilnehmer||5);
+    daten.preis_pro_person=Number(daten.preis_pro_person||0);
 
     try {
       await api('/api/admin/angebote', {
@@ -1541,6 +1548,16 @@ beschreibung.style.width = '100%';
       kapazitaet.min='1';kapazitaet.max='500';
       const termine=feld('Verfügbare Termine (ein Datum je Zeile)',(angebot.verfuegbare_termine||[]).join('\n'),'verfuegbare_termine','textarea');
       const hinweise=feld('Besondere Hinweise',angebot.hinweise,'hinweise','textarea');
+      const modusLabel=document.createElement('label');modusLabel.textContent='Buchungsart';
+      const modus=document.createElement('select');
+      for(const [value,label] of [['gruppe','Gruppenanfrage'],['einzelplatz','Einzelplätze reservieren']]){
+        const option=el('option',label);option.value=value;modus.append(option);
+      }
+      modus.value=angebot.buchungsmodus||'gruppe';modusLabel.append(modus);metadaten.append(modusLabel);
+      const mindest=feld('Mindestanmeldungen für Durchführung',angebot.mindestteilnehmer||5,'mindestteilnehmer','number');
+      mindest.min='5';mindest.max='12';
+      const einzelpreis=feld('Preis pro Person (€)',angebot.preis_pro_person||'','preis_pro_person','number');
+      einzelpreis.min='0.01';einzelpreis.step='0.01';
       const bookable=document.createElement('input');bookable.type='checkbox';bookable.checked=angebot.buchbar===true;
       const publish=document.createElement('input');publish.type='checkbox';publish.checked=angebot.veroeffentlicht===true;
       const check=(labelText,input)=>{const l=document.createElement('label');l.className='check';const s=el('span',labelText);l.append(input,s);metadaten.append(l);};
@@ -1555,6 +1572,9 @@ beschreibung.style.width = '100%';
 
       
 const preisbereich = document.createElement('div');
+const einzelPreisHinweis=el('p','Einzelplatzmodus: Preis gilt pro Person; Anmeldungen reservieren je einen Platz und der Termin findet ab der Mindestzahl statt.');
+einzelPreisHinweis.className='hint';
+const preiseGruppe=new Set();
 
 const gruppen = [
   ['1-4', '1–4 Personen'],
@@ -1579,7 +1599,18 @@ for (const [schluessel, bezeichnung] of gruppen) {
 
   label.appendChild(eingabe);
   preisbereich.appendChild(label);
+  preiseGruppe.add(label);
 }
+function preisEingabenAktualisieren(){
+  const einzel=modus.value==='einzelplatz';
+  for(const label of preiseGruppe)label.hidden=einzel;
+  einzelPreisHinweis.hidden=!einzel;
+  mindest.parentElement.hidden=!einzel;
+  einzelpreis.parentElement.hidden=!einzel;
+}
+modus.addEventListener('change',preisEingabenAktualisieren);
+preisbereich.append(einzelPreisHinweis);
+preisEingabenAktualisieren();
 
 
 
@@ -1689,6 +1720,7 @@ preisButton.addEventListener('click', async () => {
         veranstaltungsort:veranstaltungsort.value,dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
         verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),
         hinweise:hinweise.value,buchbar:bookable.checked,veroeffentlicht:publish.checked
+        ,buchungsmodus:modus.value,mindestteilnehmer:Number(mindest.value),preis_pro_person:Number(einzelpreis.value||0)
 })
     });
 

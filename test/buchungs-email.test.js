@@ -23,6 +23,26 @@ test('Buchungsanfrage berechnet die Preisanteile centgenau, wenn sie nicht gespe
   assert.match(details,/Restbetrag \(75 %\): 59,99 €/);
 });
 
+test('Einzelplatz-Anmeldung nennt Preis pro Person und verlangt keine Anzahlung',()=>{
+  const details=buchungsDetails({buchungsnummer:'MUSTER-1',angebot:'Individualklettern',
+    buchungsmodus:'einzelplatz',mindestteilnehmer:5,gesamtpreis:18,anzahlung:0,restbetrag:18});
+  assert.match(details,/Einzelplatzpreis: 18,00 €/);
+  assert.match(details,/Keine Anzahlung erforderlich/);
+  assert.match(details,/findet ab 5 Anmeldungen statt/);
+  assert.doesNotMatch(details,/25 %|Anzahlung \(25 %\)/);
+});
+
+test('Bestätigung einer Einzelplatzreservierung enthält keine Anzahlungsregel',()=>{
+  const message=buchungsstatusNachricht('bestaetigt',{
+    buchungsmodus:'einzelplatz',mindestteilnehmer:5,buchungsnummer:'MUSTER-1'
+  },null);
+  assert.match(message.betreff,/Kletterplatz ist bestätigt/);
+  assert.match(message.text,/Anzahlung ist nicht erforderlich/i);
+  assert.match(message.text,/ab 5 Anmeldungen/);
+  assert.match(message.text,/Buchungsnummer: MUSTER-1/);
+  assert.doesNotMatch(message.text,/25 %/);
+});
+
 test('Bestätigungsnachricht enthält Referenznummer und tatsächlichen Zahlungsstand',()=>{
   const message=buchungsstatusNachricht('bestaetigt',{buchungsnummer:'MUELLER-MAX-151126'},
     {gesamtCent:12050,anzahlungCent:3013,erhaltenCent:3013,offenCent:9037});

@@ -119,6 +119,8 @@ async function belegteUhrzeitenLaden() {
       daten.zeiten.filter(eintrag => eintrag.belegt)
         .map(eintrag => eintrag.uhrzeit)
     );
+    const platzDaten=new Map(daten.zeiten.filter(e=>Number.isInteger(e.freie_plaetze))
+      .map(e=>[e.uhrzeit,e]));
 
     uhrzeitenAnzeigen();
 
@@ -126,6 +128,12 @@ async function belegteUhrzeitenLaden() {
       if (belegteZeiten.has(option.value)) {
         option.disabled = true;
         option.textContent = option.value + ' Uhr – Belegt';
+      }else if(platzDaten.has(option.value)){
+        const platz=platzDaten.get(option.value);
+        const status=platz.angemeldet>=platz.mindestteilnehmer
+          ?`${platz.angemeldet} angemeldet`
+          :`${platz.angemeldet}/${platz.mindestteilnehmer} angemeldet`;
+        option.textContent=`${option.value} Uhr · noch ${platz.freie_plaetze} Plätze · ${status}`;
       }
     }
 
@@ -400,8 +408,9 @@ form.addEventListener('submit', async e => {
       throw new Error(json.error || 'Übertragung fehlgeschlagen');
     }
 
-    status.textContent =
-      '✓ BUCHUNGSANFRAGE ERFOLGREICH! Deine Buchungsnummer: ' + json.buchungsnummer + '. Dein gewünschter Termin wurde vorläufig reserviert. Wir melden uns persönlich bei dir.';
+    status.textContent = json.einzelplatz
+      ? `✓ Platz reserviert. Buchungsnummer: ${json.buchungsnummer}. Keine Anzahlung erforderlich. Der Termin findet ab ${json.mindestteilnehmer} Anmeldungen statt.`
+      : '✓ BUCHUNGSANFRAGE ERFOLGREICH! Deine Buchungsnummer: ' + json.buchungsnummer + '. Dein gewünschter Termin wurde vorläufig reserviert. Wir melden uns persönlich bei dir.';
 
     status.style.color = '#167c3a';
     status.style.fontWeight = 'bold';
@@ -577,9 +586,11 @@ async function angeboteLaden() {
       auswahl.appendChild(option);
     }
     auswahl.addEventListener('change',()=>{
+      einzelplatzFormAktualisieren();
       buchungsdauerBerechnen();
       belegteUhrzeitenLaden();
     });
+    einzelplatzFormAktualisieren();
   } catch (fehler) {
     console.error('Erlebnisangebote konnten nicht geladen werden:', fehler);
   }
@@ -645,6 +656,10 @@ async function preisanzeigeStarten() {
       date.onchange=()=>date.setCustomValidity(termine.length&&!termine.includes(date.value)
         ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
 
+      if(angebot.buchungsmodus==='einzelplatz'){
+        anzeige.textContent=`${Number(angebot.preis_pro_person).toLocaleString('de-DE',{style:'currency',currency:'EUR'})} pro Person · keine Anzahlung`;
+        return;
+      }
       let gruppe = '';
 
       if (anzahl >= 1 && anzahl <= 4) gruppe = '1-4';
@@ -672,6 +687,21 @@ async function preisanzeigeStarten() {
 
   } catch (fehler) {
     console.error('Preisanzeige:', fehler);
+  }
+}
+
+function einzelplatzFormAktualisieren(){
+  const angebot=angeboteCache.find(a=>a.name===angebotAuswahl?.value);
+  const input=document.getElementById('buchungs-teilnehmer');
+  const hinweis=document.getElementById('buchungs-modus-hinweis');
+  if(!input)return;
+  const einzel=angebot?.buchungsmodus==='einzelplatz';
+  input.readOnly=einzel;
+  if(einzel){input.value='1';input.min='1';input.max='1';
+    if(hinweis)hinweis.textContent=`Einzelplatzreservierung. Der Termin findet ab ${Number(angebot.mindestteilnehmer)||5} Anmeldungen statt.`;
+  }else{
+    input.min='1';input.max=String(Math.min(150,Number(angebot?.kapazitaet)||150));
+    if(hinweis)hinweis.textContent='';
   }
 }
 
