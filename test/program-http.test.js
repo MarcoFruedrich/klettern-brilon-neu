@@ -19,7 +19,7 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(repo,'test-support','mocks'),
     NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
-    DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:'[]',
+    DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_MALWARE_SCAN:'1',MOCK_OFFERS:'[]',
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),RUN_SCHEMA_MIGRATIONS:'false',
     ADMIN_USER:'program-admin',ADMIN_PASSWORD:'test-only-password',ADMIN_TOTP_SECRET_BASE32:totpSecret,
     SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',BREVO_API_KEY:'',BREVO_SENDER_EMAIL:''

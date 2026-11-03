@@ -16,8 +16,11 @@ Schemaänderungen sind standardmäßig deaktiviert. `RUN_SCHEMA_MIGRATIONS=true`
 - Buchungsdatenbank: `DATABASE_URL`
 - Admin: `ADMIN_USER`, `ADMIN_PASSWORD`
 - Mailversand: `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, optional `BOOKING_NOTIFY_EMAIL`
+- Bild-Malware-Prüfung: `CLAMD_HOST`, optional `CLAMD_PORT` (Standard 3310); ohne erreichbaren ClamAV-Dienst werden Bilder nicht gespeichert
 - Personalisierte Anschlusslinks: `PUBLIC_BASE_URL` (HTTPS) und `BOOKING_OFFER_SECRET` (mindestens 32 Zeichen)
 - GPS-Kontrollcodes: `GPS_CODE_SECRET` (mindestens 32 Zeichen)
+
+ClamAV muss über ein privates, vertrauenswürdiges Netzwerk erreichbar sein. `clamd`-TCP-Verbindungen verschlüsseln oder authentifizieren den Datenstrom nicht. Der Dienst muss mindestens 5 MB pro `INSTREAM`-Anfrage zulassen und aktuelle Signaturen verwenden. `MOCK_MALWARE_SCAN=1` ist ausschließlich für automatisierte Tests gedacht.
 
 Für Mailtests nur ein isoliertes Testpostfach und einen Test-Maildienst verwenden. Die gewöhnlichen Unit- und HTTP-Tests verwenden ausschließlich lokale Test-Doubles und keine produktiven Datenbank-, Supabase- oder E-Mail-Dienste.
 

@@ -18,6 +18,7 @@ const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild } = require('./lib/bilddatei');
+const { createClamScanner } = require('./lib/malware-scanner');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 const BUCHUNGS_DATENSCHUTZ_VERSION='2026-11-03-v1';
 
@@ -38,7 +39,16 @@ const securityHeaders={
   'Referrer-Policy':'strict-origin-when-cross-origin'
 };
 const brevoMail=createBrevoMailer();
+const scanForMalware=process.env.MOCK_MALWARE_SCAN==='1'
+  ?async()=>({sauber:true}):createClamScanner();
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
+function malwareScanReply(res,error){
+  const detected=error?.code==='MALWARE_FOUND';
+  console.error('Bildprüfung abgebrochen:',error?.code||'unbekannter Fehler');
+  return reply(res,detected?422:503,{error:detected?
+    'Die Bilddatei wurde als Schadsoftware erkannt und abgewiesen.':
+    'Bildprüfung ist nicht verfügbar. Die Bilddatei wurde nicht gespeichert.'});
+}
 async function body(req,maxBytes=16000){const chunks=[];let total=0;for await(const chunk of req){total+=chunk.length;if(total>maxBytes)throw Error('Anfrage zu groß');chunks.push(chunk)}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){return rateLimiter.erlauben(key,max,window)}
 async function totpStepEinmalig(factorId,step){
@@ -316,7 +326,7 @@ async function anschlussApi(req,res,url,route,ip){
   return reply(res,404,{error:'Nicht gefunden.'});
 }
 
-const pruefungApi=createPruefungApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
+const pruefungApi=createPruefungApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail,scanForMalware});
 
 async function main(req,res){
   const u=new URL(req.url,'http://localhost'),
@@ -1951,6 +1961,11 @@ if (bildRoute && req.method === 'POST') {
     });
   }
 
+  try{
+    const verdict=await scanForMalware(bild);
+    if(verdict?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
+  }catch(error){return malwareScanReply(res,error);}
+
   const vorhanden = await pool.query(
     'SELECT id FROM brilon_angebote WHERE id = $1',
     [angebotId]
@@ -2052,6 +2067,11 @@ if (aktionsBildRoute && req.method === 'POST') {
       error: 'Ungültige oder zu große Bilddatei. Erlaubt sind vollständige JPG-, PNG- und WebP-Bilder bis 40 Megapixel.'
     });
   }
+
+  try{
+    const verdict=await scanForMalware(bild);
+    if(verdict?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
+  }catch(error){return malwareScanReply(res,error);}
 
   const vorhanden = await pool.query(
     'SELECT id FROM brilon_aktionen WHERE id = $1',
