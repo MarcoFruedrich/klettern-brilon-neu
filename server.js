@@ -14,6 +14,7 @@ const { sameOriginMutation } = require('./lib/sicherheit');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben } = require('./lib/sicherheitszustand');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
+const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild } = require('./lib/bilddatei');
@@ -38,6 +39,7 @@ const securityHeaders={
   'Referrer-Policy':'strict-origin-when-cross-origin'
 };
 const brevoMail=createBrevoMailer();
+const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
@@ -908,15 +910,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           (ergebnis.elternRabatt?.angewendet?'\nDer 10-%-Anschlussrabatt wurde auch auf deine ursprüngliche Buchung angewendet.':'');
         const offerLink=anschlussLink(ergebnis.buchung.id);
         const angeboteText=offerLink?`\n\nPassende Anschlussprogramme mit 10 % Rabatt findest du hier:\n${offerLink}`:'';
-        const mails=[brevoMail(data.email,'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
-          `Hallo ${data.name || ''},\n\n${bestaetigungsText}${angeboteText}\n\nGut Seil!\nKlettern & Abenteuer Brilon`)];
-        if(process.env.BOOKING_NOTIFY_EMAIL)mails.push(brevoMail(
+        ergebnis.buchung.data.bestaetigungsEmail=await buchungsbestaetigungsEmail({
+          buchungId:ergebnis.buchung.id,email:data.email,
+          betreff:'Deine Buchung ist bestätigt – Klettern & Abenteuer Brilon',
+          text:'Hallo '+(data.name||'')+'\n\n'+bestaetigungsText+angeboteText+'\n\nGut Seil!\nKlettern & Abenteuer Brilon'});
+        if(process.env.BOOKING_NOTIFY_EMAIL)brevoMail(
           process.env.BOOKING_NOTIFY_EMAIL,'Buchung bestätigt – Zahlungseingang erfasst',
-          `${bestaetigungsText}\n\nKundin/Kunde: ${data.name || ''} · ${data.email || ''}`
-        ));
-        Promise.allSettled(mails).then(results=>results.forEach(result=>{
-          if(result.status==='rejected')console.error('Buchungsbestätigung konnte nicht versendet werden.');
-        }));
+          bestaetigungsText+'\n\nKundin/Kunde: '+(data.name||'')+' · '+(data.email||'')
+        ).catch(fehler=>console.error('Betreiberhinweis nach Bestätigung fehlgeschlagen:',fehler.message));
       }
       return reply(res,201,ergebnis);
     }
@@ -1034,10 +1035,13 @@ if (
       `Bei Fragen antworte bitte auf diese E-Mail.\n\n` +
       `Gut Seil!\nKlettern & Abenteuer Brilon`;
 
-    brevoMail(empfaenger, nachricht.betreff, inhalt)
-      .catch(fehler => {
-        console.error('Status-E-Mail fehlgeschlagen:', fehler);
-      });
+    if(status==='bestaetigt'){
+      ergebnis.buchung.data.bestaetigungsEmail=await buchungsbestaetigungsEmail({
+        buchungId:ergebnis.buchung.id,email:empfaenger,betreff:nachricht.betreff,text:inhalt});
+    }else{
+      brevoMail(empfaenger,nachricht.betreff,inhalt)
+        .catch(fehler=>console.error('Status-E-Mail fehlgeschlagen:',fehler.message));
+    }
   }
 }
 
