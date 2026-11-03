@@ -1619,6 +1619,31 @@ preis=safeText(d.preis,50);
         return reply(res,201,{id:q.rows[0].id});
       }
 
+      const specialProgramme=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/programm$/);
+      if(specialProgramme&&req.method==='PATCH'){
+        const d=await body(req);
+        const programmId=String(d.programm_id||'').trim();
+        if(programmId&&!/^[1-9]\d{0,15}$/.test(programmId))
+          return reply(res,400,{error:'Ungültige Programm-ID.'});
+        const action=await pool.query(
+          "SELECT id,data->>'datum' AS datum FROM brilon_aktionen WHERE id=$1",
+          [specialProgramme[1]]);
+        if(!action.rowCount)return reply(res,404,{error:'Sonderaktion nicht gefunden.'});
+        if(programmId){
+          const p=await pool.query(
+            'SELECT verfuegbare_termine FROM brilon_angebote WHERE id=$1 AND aktiv=true AND buchbar=true AND veroeffentlicht=true',
+            [programmId]);
+          if(!p.rowCount)return reply(res,400,{error:'Das Programm ist nicht veröffentlicht und buchbar.'});
+          const dates=p.rows[0].verfuegbare_termine;
+          if(action.rows[0].datum&&Array.isArray(dates)&&dates.length&&!dates.includes(action.rows[0].datum))
+            return reply(res,400,{error:'Der Aktionstag ist für das verknüpfte Programm nicht freigegeben.'});
+        }
+        const q=await pool.query(
+          "UPDATE brilon_aktionen SET data=CASE WHEN $2::text='' THEN data-'programm_id' ELSE jsonb_set(data,'{programm_id}',to_jsonb($2::text),true) END WHERE id=$1 RETURNING id,data->>'programm_id' AS programm_id",
+          [specialProgramme[1],programmId]);
+        return reply(res,200,q.rows[0]);
+      }
+
       const m=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})$/);
       if(m&&req.method==='DELETE'){
         await pool.query('DELETE FROM brilon_aktionen WHERE id=$1',[m[1]]);
