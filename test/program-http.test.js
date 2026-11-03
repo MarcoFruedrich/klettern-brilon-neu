@@ -63,12 +63,15 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
     body:fs.readFileSync(path.join(repo,'site/klettern-brilon-icon.png'))});
   assert.equal(echtesPng.status,503,'Ohne Malware-Scannerkonfiguration wird das Bild vor dem Speichern abgewiesen');
   assert.match((await echtesPng.json()).error,/Bildprüfung ist nicht verfügbar/);
-  for(let attempt=0;attempt<17;attempt++){
+  for(let attempt=0;attempt<16;attempt++){
     const rejected=await fetch(bildUrl,{method:'POST',headers:zuGross,body:Buffer.alloc(0)});
     assert.equal(rejected.status,400,'Leere Bilder werden innerhalb des Upload-Limits normal validiert');
   }
-  const uploadLimit=await fetch(bildUrl,{method:'POST',headers:zuGross,body:Buffer.alloc(0)});
-  assert.equal(uploadLimit.status,429,'Bild-Uploads werden nach 20 Versuchen je IP und zehn Minuten begrenzt');
+  const aktionsBildUrl=root+'/api/admin/aktionen/11111111-1111-4111-8111-111111111111/bild';
+  const aktionsBild=await fetch(aktionsBildUrl,{method:'POST',headers:zuGross,body:Buffer.alloc(0)});
+  assert.equal(aktionsBild.status,400,'Sonderaktionsbilder teilen das Upload-Limit mit Angebotsbildern');
+  const uploadLimit=await fetch(aktionsBildUrl,{method:'POST',headers:zuGross,body:Buffer.alloc(0)});
+  assert.equal(uploadLimit.status,429,'Gemeinsames Bild-Upload-Limit gilt nach 20 Versuchen je IP und zehn Minuten');
 
   assert.equal((await (await fetch(root+'/api/angebote')).json()).length,0,
     'Neu angelegte Programme bleiben zunächst deaktiviert und unsichtbar');
