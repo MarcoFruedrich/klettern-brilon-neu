@@ -239,6 +239,16 @@ function fakeAdminApi(page) {
       const item={...readBody(),id:'550e8400-e29b-41d4-a716-446655443333'};
       state.specials.push(item);return json(201,{id:item.id});
     }
+    const specialChange=endpoint.match(/^\/api\/admin\/aktionen\/([^/]+)\/programm$/);
+    if(specialChange&&method==='PATCH'){
+      const special=state.specials.find(x=>x.id===specialChange[1]);
+      if(!special)return json(404,{error:'Aktion nicht gefunden'});
+      const next=String(readBody().programm_id||'');
+      if(next&&!state.programs.some(p=>String(p.id)===next&&p.aktiv&&p.buchbar&&p.veroeffentlicht))
+        return json(400,{error:'Programm nicht buchbar'});
+      special.programm_id=next||null;
+      return json(200,{id:special.id,programm_id:special.programm_id});
+    }
     if(endpoint==='/api/admin/orte'&&method==='GET')return json(200,state.places);
     if(endpoint==='/api/admin/orte'&&method==='POST'){
       const name=readBody().name;
@@ -772,6 +782,17 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.match(await page.locator('#special-list').textContent(),
       /Explizit verknüpft mit Programm-ID: 11/);
     assert.equal(state.mutations.filter(x=>x.endpoint==='/api/admin/aktionen').length,1);
+    const specialCard=page.locator('#special-list .booking').first();
+    await specialCard.getByRole('button',{name:'Programmzuordnung speichern'}).waitFor();
+    await specialCard.locator('select').selectOption('');
+    await specialCard.getByRole('button',{name:'Programmzuordnung speichern'}).click();
+    await page.waitForFunction(()=>document.querySelector('#special-list')?.textContent?.includes('Unabhängige Aktion'));
+    assert.equal(state.specials[0].programm_id,null);
+    await page.locator('#special-list .booking select').selectOption('11');
+    await page.locator('#special-list .booking').first()
+      .getByRole('button',{name:'Programmzuordnung speichern'}).click();
+    await page.waitForFunction(()=>document.querySelector('#special-list')?.textContent?.includes('Explizit verknüpft mit Programm-ID: 11'));
+    assert.equal(state.specials[0].programm_id,'11');
     await page.close();
   });
 
