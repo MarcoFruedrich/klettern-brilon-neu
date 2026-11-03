@@ -1751,16 +1751,17 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const mindestteilnehmer=Number(d.mindestteilnehmer??5);
   const preisProPerson=Number(d.preis_pro_person??0);
 
-  if (!name || !Number.isInteger(dauer) ||
-      dauer < 15 || dauer > 1440 || !Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500||
-      termine.some(t=>!gueltigesDatum(t)) ||
-      (buchungsmodus==='einzelplatz'&&(!Number.isInteger(kapazitaet)||kapazitaet<5||kapazitaet>12||
-        !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<5||mindestteilnehmer>kapazitaet||
-        !Number.isFinite(preisProPerson)||preisProPerson<=0))) {
-    return reply(res, 400, {
-      error: 'Bitte Name, Dauer, Kapazität und gültige Termine eingeben.'
-    });
-  }
+  if(!name)return reply(res,400,{error:'Bitte einen Namen für das Angebot eingeben.'});
+  if(!Number.isInteger(dauer)||dauer<15||dauer>1440)
+    return reply(res,400,{error:'Bitte eine Dauer zwischen 15 und 1440 Minuten eingeben.'});
+  if(!Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500)
+    return reply(res,400,{error:'Bitte eine Kapazität zwischen 1 und 500 Teilnehmenden eingeben.'});
+  if(termine.some(t=>!gueltigesDatum(t)))
+    return reply(res,400,{error:'Bitte nur gültige Termine im Format JJJJ-MM-TT eingeben.'});
+  if(buchungsmodus==='einzelplatz'&&(kapazitaet<5||kapazitaet>12||
+     !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<5||mindestteilnehmer>kapazitaet||
+     !Number.isFinite(preisProPerson)||preisProPerson<=0))
+    return reply(res,400,{error:'Bei Einzelplätzen müssen Kapazität und Mindestanmeldungen zwischen 5 und 12 liegen. Der Preis pro Person muss größer als 0 € sein.'});
 
   const place=await pool.query('SELECT id FROM brilon_orte WHERE name=$1 AND aktiv=true',[veranstaltungsort]);
   if(!place.rowCount)return reply(res,400,{error:'Veranstaltungsort ist nicht angelegt.'});
@@ -2194,6 +2195,26 @@ async function start(){
         ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
         ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false`);
       console.log('Admin-Dashboard-Spalten geprüft (RUN_ADMIN_DASHBOARD_MIGRATION=true)');
+    }
+    // Narrow, one-time opt-in for columns used by offer administration and booking.
+    // It is separate from the broad schema migration to avoid changing unrelated tables.
+    if(process.env.RUN_PROGRAM_FIELDS_MIGRATION==='true'){
+      await pool.query(`ALTER TABLE brilon_angebote
+        ADD COLUMN IF NOT EXISTS bild_url TEXT,
+        ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
+        ADD COLUMN IF NOT EXISTS zielgruppe TEXT NOT NULL DEFAULT '',
+        ADD COLUMN IF NOT EXISTS veranstaltungsort TEXT NOT NULL DEFAULT 'Brilon',
+        ADD COLUMN IF NOT EXISTS kapazitaet INTEGER NOT NULL DEFAULT 20,
+        ADD COLUMN IF NOT EXISTS verfuegbare_termine JSONB NOT NULL DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS hinweise TEXT NOT NULL DEFAULT '',
+        ADD COLUMN IF NOT EXISTS buchbar BOOLEAN NOT NULL DEFAULT true,
+        ADD COLUMN IF NOT EXISTS veroeffentlicht BOOLEAN NOT NULL DEFAULT true,
+        ADD COLUMN IF NOT EXISTS buchungsmodus TEXT NOT NULL DEFAULT 'gruppe',
+        ADD COLUMN IF NOT EXISTS mindestteilnehmer INTEGER NOT NULL DEFAULT 1,
+        ADD COLUMN IF NOT EXISTS preis_pro_person NUMERIC(10,2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS sortierung INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false`);
+      console.log('Angebotsfelder geprüft (RUN_PROGRAM_FIELDS_MIGRATION=true)');
     }
     // Schema changes are opt-in. A normal server start must not alter a live database.
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){
