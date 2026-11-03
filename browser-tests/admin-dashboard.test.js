@@ -284,7 +284,12 @@ async function login(page,root){
   await page.locator('#password').fill('Nur-Test-Passwort');
   await page.locator('#login button').click();
   await page.locator('#workspace').waitFor({state:'visible',timeout:15000});
-  await page.locator('#angebote-admin-liste').getByText('Klettertest').first().waitFor();
+  await page.locator('#angebote-admin-liste').getByText('Klettertest').first().waitFor({state:'attached'});
+}
+
+async function openAdminView(page,href){
+  await page.locator('.admin-navigation a[href="'+href+'"]').click();
+  await page.locator(href).waitFor({state:'visible'});
 }
 
 test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen',async t=>{
@@ -329,11 +334,43 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     }
   });
 
+  await t.test('Linke Navigation zeigt einzeln verlinkbare Verwaltungsbereiche',async()=>{
+    const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    await login(page,root);
+    const navigation=page.locator('.admin-navigation');
+    const visibleViews=()=>page.locator('[data-admin-view]:visible').count();
+    assert.equal(await visibleViews(),1,'Nach Anmeldung soll genau ein Bereich sichtbar sein');
+    assert.equal(await page.locator('#bookings-section').isVisible(),true);
+    assert.equal(await navigation.locator('[aria-current="page"]').getAttribute('href'),'#bookings-section');
+    assert.equal(await page.locator('.admin-layout').evaluate(node=>getComputedStyle(node).display),'grid');
+    assert.equal(await navigation.evaluate(node=>getComputedStyle(node).flexDirection),'column');
+
+    await navigation.locator('a[href="#payment-overview-section"]').click();
+    await page.waitForFunction(()=>location.hash==='#payment-overview-section');
+    assert.equal(await visibleViews(),1);
+    assert.equal(await page.locator('#payment-overview-section').isVisible(),true);
+    assert.equal(await page.locator('#bookings-section').isVisible(),false);
+    assert.equal(await navigation.locator('[aria-current="page"]').getAttribute('href'),'#payment-overview-section');
+
+    await page.goBack();
+    await page.waitForFunction(()=>location.hash==='');
+    assert.equal(await page.locator('#bookings-section').isVisible(),true,
+      'Browser-Zurück soll die vorherige Ansicht wiederherstellen');
+
+    await page.setViewportSize({width:390,height:844});
+    assert.equal(await navigation.evaluate(node=>getComputedStyle(node).flexDirection),'row',
+      'Auf schmalen Displays soll das Menü horizontal wischbar sein');
+    assert.ok(state.signedIn);
+    await page.close();
+  });
+
   await t.test('Programm erstellen, editieren und aktivieren mit CSRF-Token',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
     const state=fakeAdminApi(page);
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.accept();});
     await login(page,root);
+    await openAdminView(page,'#angebote-verwaltung');
     const form=page.locator('#neues-angebot-form');
     await form.locator('[name="name"]').fill('Bouldern Kinder');
     await form.locator('[name="beschreibung"]').fill('Browsertestangebot');
@@ -402,6 +439,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('1 Buchung(en) gefunden'));
     assert.equal(await page.locator('#bookings .booking').count(),1);
     assert.match(await page.locator('#bookings .booking').first().textContent(),/MASSENTEST-120/);
+    await openAdminView(page,'#payment-overview-section');
     await page.waitForFunction(()=>document.getElementById('payment-overview-page-info')?.textContent.includes('Seite 1 / 3'));
     assert.equal(await page.locator('#payment-overview-list .payment-record').count(),50);
     await page.locator('#payment-overview-next').evaluate(node=>node.scrollIntoView({block:'center'}));
@@ -435,6 +473,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     }));
     const calls=[];page.on('request',r=>{if(r.url().includes('/api/admin/gps/buchungen'))calls.push(r.url());});
     await login(page,root);
+    await openAdminView(page,'#gps-verwaltung');
     await page.locator('#gps-game-form [name="tourId"]').selectOption(tourId);
     await page.waitForFunction(()=>document.getElementById('gps-booking-results')?.textContent.includes('passende bestätigte'));
     const eligible=state.bookings.filter(b=>b.status==='bestaetigt'&&b.data.angebot===name);
@@ -480,6 +519,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     }));
     const alerts=[];page.on('dialog',async d=>{alerts.push(d.message());await d.accept();});
     await login(page,root);
+    await openAdminView(page,'#gps-verwaltung');
     await page.waitForFunction(()=>document.getElementById('gps-access-status')?.textContent.includes('65 ausgestellte'));
     assert.equal(await page.locator('#gps-access-list article').count(),30);
     assert.equal(await page.locator('#gps-access-page-info').textContent(),'Seite 1 / 3');
@@ -516,6 +556,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       }else await d.accept();
     });
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     await page.locator('#pruef-station-list article').getByText('GESPERRT – NICHT BENUTZEN').waitFor();
     const release=page.locator('#pruef-station-list article')
       .getByRole('button',{name:'Nach fachlicher Prüfung freigeben'});
@@ -556,6 +597,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       else await dialog.accept();
     });
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     await page.locator('#pruef-hinweis-list').getByText(/Offener Hinweis: Kletterwand Test/).waitFor();
     assert.match(await page.locator('#pruef-hinweis-status').textContent(),/1 offene/);
     assert.equal(state.inspectionStations[0].gesperrt_am,null);
@@ -583,6 +625,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     }];
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.type());await dialog.accept();});
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     await page.locator('#pruef-mail-list').getByText('Versand fehlgeschlagen').waitFor();
     await page.locator('#pruef-mail-list')
       .getByRole('button',{name:'Mängelmeldung erneut senden'}).click();
@@ -606,6 +649,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       gekoppelt_am:'2027-01-01T12:00:00Z',zuletzt_gesehen_am:'2027-01-01T12:05:00Z'
     }];
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     await page.locator('#tablet-admin-list').getByText(/Keine aktuelle Verbindung/).waitFor();
     assert.match(await page.locator('#tablet-admin-list').textContent(),/0?1\.0?1\.2027/);
     state.inspectionTablets[0].online=true;
@@ -631,6 +675,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     ];
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.type());await dialog.accept();});
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     const standby=page.locator('#tablet-admin-list article').filter({hasText:'Ersatz-Werbetablet'});
     await standby.getByText('Nur Werbeanzeige – keine Prüfcodes').waitFor();
     await standby.getByRole('button',{name:'Als Prüfdisplay auswählen'}).click();
@@ -653,6 +698,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       zuletzt_gesehen_am:'2027-01-01T12:05:00Z'}];
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.type());await dialog.accept();});
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     await page.locator('#tablet-admin-list')
       .getByRole('button',{name:'Tablet ersetzen / neu koppeln'}).click();
     await page.locator('#tablet-pair-code').getByText(/00654321/).waitFor();
@@ -672,6 +718,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     state.inspectionStaff=[{id,name:'CI Fachkraft',email:'ci@example.test',aktiv:true}];
     page.on('dialog',async d=>d.accept());
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     const card=page.locator('#pruef-personal-list article').first();
     await card.getByText('Zugang aktiv').waitFor();
     await card.getByRole('button',{name:'Zugang deaktivieren'}).click();
@@ -702,6 +749,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       else await d.accept();
     });
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     const card=page.locator('#pruef-station-list article').first();
     await card.getByText('GESPERRT – NICHT BENUTZEN').waitFor();
     await card.getByRole('button',{name:'Station deaktivieren'}).click();
@@ -741,6 +789,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       stand:'2027-01-01T16:00:00Z'
     };
     await login(page,root);
+    await openAdminView(page,'#stationspruefung');
     const summary=page.locator('#pruef-uebersicht');
     await summary.getByText('Sicherheitsgesperrte Stationen: 1').waitFor();
     assert.match(await summary.textContent(),/Stillgelegte Stationen: 1/);
@@ -768,6 +817,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     state.programs[0].aktiv=true;
     state.programs[0].veroeffentlicht=true;
     await login(page,root);
+    await openAdminView(page,'#special-offers-view');
     const selected=page.locator('#special-program-select');
     await selected.locator('option[value="11"]').waitFor({state:'attached'});
     await selected.selectOption('11');
@@ -819,6 +869,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.waitForFunction(()=>document.querySelector('#bookings .booking')?.textContent.includes('Bearbeitungsstatus: Bestätigt'),null,{timeout:5000});
     assert.equal(state.bookings[0].bearbeitungsnotiz,'Test: Rückruf erfolgreich');
 
+    await openAdminView(page,'#settings-section');
     const placeForm=page.locator('#admin-place-form');
     await placeForm.locator('[name="name"]').fill('Rüthen');
     await placeForm.locator('button[type="submit"]').click();

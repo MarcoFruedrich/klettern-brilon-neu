@@ -10,9 +10,14 @@ test('Admin-Sprungnavigation verweist auf vorhandene Verwaltungsbereiche',()=>{
   assert.ok(nav,'Verwaltungsnavigation muss vorhanden sein');
   const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]));
   const targets=[...nav.matchAll(/href="#([^"]+)"/g)].map(match=>match[1]);
+  const views=new Set([...html.matchAll(/<[^>]*\bid="([^"]+)"[^>]*\bdata-admin-view(?:\s|>)/g)]
+    .map(match=>match[1]));
   assert.ok(targets.length>=5,'wichtige Verwaltungsbereiche sollen direkt erreichbar sein');
   assert.equal(new Set(targets).size,targets.length,'Sprungziele sollen eindeutig sein');
-  for(const target of targets)assert.ok(ids.has(target),`Sprungziel #${target} fehlt`);
+  for(const target of targets){
+    assert.ok(ids.has(target),`Sprungziel #${target} fehlt`);
+    assert.ok(views.has(target),`Sprungziel #${target} muss eine eigene Ansicht öffnen`);
+  }
 });
 
 test('GPS-Touren nutzen Stationskarten mit Reihenfolge statt eines JSON-Textfelds',()=>{
