@@ -726,6 +726,7 @@ footer a {
 .admin-page .payment-record details { margin-top: 10px; }
 .admin-page .payment-record summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--pine); font-weight: 700; }
 .admin-page .payment-record details p { overflow-wrap: anywhere; }
+.admin-page .booking .payment-entry-row { display:block; width:100%; margin:5px 0; }
 @media(max-width:600px) {
   .admin-page .admin-navigation { top: 64px; margin: 14px -12px 24px; border-radius: 0; }
   .admin-page .calendar-navigation { justify-content: center; }

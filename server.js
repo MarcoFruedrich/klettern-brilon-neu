@@ -1632,6 +1632,7 @@ preis=safeText(d.preis,50);
         /^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})$/
       );
       if(buchungLoeschen&&req.method==='DELETE'){
+        if(!await admin(req,res))return;
         if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
         const id=buchungLoeschen[1];
         const loeschung=await reservierungsTransaktion(async client=>{
@@ -1643,7 +1644,10 @@ preis=safeText(d.preis,50);
           );
           if(data.anschlussElternId||data.anschlussRabattQuelleId||kindBuchung.rowCount)
             return {anschlussVerknuepft:true};
-          const gps=await client.query('DELETE FROM brilon_gps_spiele WHERE buchung_id=$1',[id]);
+          const gpsTabelle=await client.query("SELECT to_regclass('brilon_gps_spiele') AS relation");
+          const gps=gpsTabelle.rows[0]?.relation
+            ?await client.query('DELETE FROM brilon_gps_spiele WHERE buchung_id=$1',[id])
+            :{rowCount:0};
           const entfernt=await client.query('DELETE FROM brilon_buchungen WHERE id=$1 RETURNING id',[id]);
           return {geloescht:entfernt.rowCount===1,gpsSpieleGeloescht:gps.rowCount};
         });
