@@ -857,14 +857,65 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const name=safeText(kunde.name,120)||'';
       const betreff='Rückfrage zu deiner Buchung'+(buchung.buchungsnummer?' '+safeText(buchung.buchungsnummer,40):'')+' – Klettern & Abenteuer Brilon';
       const inhalt=(name?'Hallo '+name+',':'Hallo,')+'\n\n'+nachricht+'\n\nGut Seil!\nKlettern & Abenteuer Brilon';
+      const buchungsId=kontaktRoute[1];
+      const kontaktEintrag={id:crypto.randomUUID(),empfaenger:email,betreff,inhalt,
+        versuchtAm:new Date().toISOString(),status:'wird_versendet'};
+
+      const protokollAktualisieren=update=>reservierungsTransaktion(async client=>{
+        const aktuell=await client.query(
+          'SELECT data FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[buchungsId]
+        );
+        if(!aktuell.rowCount)return null;
+        const data=aktuell.rows[0].data&&typeof aktuell.rows[0].data==='object'&&!Array.isArray(aktuell.rows[0].data)
+          ?{...aktuell.rows[0].data}:{};
+        const historie=Array.isArray(data.kundenkontakt)?data.kundenkontakt:[];
+        const index=historie.findIndex(eintrag=>eintrag?.id===kontaktEintrag.id);
+        if(index<0)historie.push({...kontaktEintrag,...update});
+        else historie[index]={...historie[index],...update};
+        data.kundenkontakt=historie;
+        await client.query(
+          'UPDATE brilon_buchungen SET data=$2::jsonb,updated_at=NOW() WHERE id=$1',
+          [buchungsId,JSON.stringify(data)]
+        );
+        return historie;
+      });
+
+      try{
+        const vorgemerkt=await protokollAktualisieren({});
+        if(!vorgemerkt)return reply(res,404,{error:'Buchungsanfrage nicht gefunden.'});
+      }catch(fehler){
+        console.error('Kunden-E-Mail konnte nicht protokolliert werden; Versand abgebrochen:',fehler?.message||'unbekannter Fehler');
+        return reply(res,503,{error:'Die Nachricht konnte nicht sicher vorgemerkt werden. Es wurde keine E-Mail versendet.'});
+      }
+
       try{
         await brevoMail(email,betreff,inhalt);
-        return reply(res,200,{success:true,empfaenger:email,
-          message:'Der Versanddienst hat die E-Mail angenommen. Die Zustellung im Postfach ist damit nicht bestätigt.'});
       }catch(fehler){
         console.error('Direkte Kunden-E-Mail fehlgeschlagen:',fehler?.message||'unbekannter Fehler');
-        return reply(res,502,{error:'Die E-Mail konnte nicht versendet werden.'});
+        const fehlgeschlagenAm=new Date().toISOString();
+        let eintrag={...kontaktEintrag,status:'fehlgeschlagen',fehlgeschlagenAm};
+        try{
+          const historie=await protokollAktualisieren({status:'fehlgeschlagen',fehlgeschlagenAm});
+          eintrag=historie?.find(item=>item.id===kontaktEintrag.id)||eintrag;
+        }catch(protokollFehler){
+          console.error('Fehlerstatus der Kunden-E-Mail konnte nicht gespeichert werden:',protokollFehler?.message||'unbekannter Fehler');
+        }
+        return reply(res,502,{error:'Die E-Mail konnte nicht versendet werden.',eintrag});
       }
+
+      const angenommenAm=new Date().toISOString();
+      let eintrag={...kontaktEintrag,status:'angenommen',angenommenAm};
+      try{
+        const historie=await protokollAktualisieren({status:'angenommen',angenommenAm});
+        eintrag=historie?.find(item=>item.id===kontaktEintrag.id)||eintrag;
+      }catch(protokollFehler){
+        console.error('Versand angenommen, Abschluss des E-Mail-Protokolls fehlgeschlagen:',protokollFehler?.message||'unbekannter Fehler');
+        eintrag={...eintrag,status:'ungeklaert',protokollHinweis:'Der Versanddienst hat die Nachricht angenommen; der Abschlussstatus konnte nicht gespeichert werden.'};
+      }
+      return reply(res,200,{success:true,empfaenger:email,eintrag,
+        message:eintrag.status==='angenommen'
+          ?'Der Versanddienst hat die E-Mail angenommen. Die Zustellung im Postfach ist damit nicht bestätigt.'
+          :'Der Versanddienst hat die E-Mail angenommen, aber der Abschlussstatus konnte nicht im Verlauf gespeichert werden.'});
     }
 
     const zahlungenRoute = route.match(/^\/api\/admin\/buchungen\/([0-9a-fA-F-]{36})\/zahlungen$/);

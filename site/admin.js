@@ -76,7 +76,11 @@ async function api(path, options = {}) {
     headers
   });
   const j = await r.json();
-  if (!r.ok) throw Error(j.error || 'Fehler');
+  if (!r.ok) {
+    const fehler=Error(j.error||'Fehler');
+    fehler.data=j;
+    throw fehler;
+  }
   if(path==='/api/admin/login')csrfToken=j.csrfToken||null;
   if(path==='/api/admin/logout')csrfToken=null;
   return j;
@@ -346,11 +350,48 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
     kundenkontaktForm.append(kundenkontaktLabel,kundenkontaktSenden);
   }
   kundenkontaktForm.append(kundenkontaktStatus);
+
+  const kundenkontaktHistorie=el('section');
+  kundenkontaktHistorie.className='customer-contact-history';
+  const kundenkontaktHistorieTitel=el('h3','E-Mail-Verlauf');
+  const kundenkontaktHistorieListe=el('div');
+  kundenkontaktHistorie.append(kundenkontaktHistorieTitel,kundenkontaktHistorieListe);
+  function kundenkontaktHistorieRendern(){
+    kundenkontaktHistorieListe.replaceChildren();
+    const eintraege=Array.isArray(b.data.kundenkontakt)?[...b.data.kundenkontakt].reverse():[];
+    if(!eintraege.length){
+      kundenkontaktHistorieListe.append(el('p','Noch keine E-Mails aus dieser Buchung versendet.'));
+      return;
+    }
+    const statusText={
+      angenommen:'vom Versanddienst angenommen (Zustellung nicht bestätigt)',
+      fehlgeschlagen:'Versand fehlgeschlagen',
+      wird_versendet:'Versand begonnen; Ergebnis noch offen',
+      ungeklaert:'Versand angenommen; Protokollstatus ungeklärt'
+    };
+    for(const eintrag of eintraege){
+      const details=document.createElement('details');
+      details.className='customer-contact-entry';
+      const zeitpunkt=eintrag.angenommenAm||eintrag.fehlgeschlagenAm||eintrag.versuchtAm;
+      const datum=zeitpunkt?new Date(zeitpunkt):null;
+      const datumText=datum&&!Number.isNaN(datum.getTime())
+        ?datum.toLocaleString('de-DE'):'Zeitpunkt nicht hinterlegt';
+      details.append(el('summary',datumText+' · '+(statusText[eintrag.status]||'Status unbekannt')));
+      details.append(el('p','Empfänger: '+(eintrag.empfaenger||b.data.email||'unbekannt')));
+      details.append(el('p','Betreff: '+(eintrag.betreff||'nicht hinterlegt')));
+      const inhalt=el('p',eintrag.inhalt||'Nachrichteninhalt nicht hinterlegt.');
+      inhalt.className='customer-contact-content';
+      details.append(inhalt);
+      kundenkontaktHistorieListe.append(details);
+    }
+  }
+  kundenkontaktHistorieRendern();
+
   kundenkontaktForm.addEventListener('submit',async event=>{
     event.preventDefault();
     if(!b.data.email||!kundenkontaktForm.reportValidity())return;
     kundenkontaktSenden.disabled=true;
-    kundenkontaktStatus.textContent='E-Mail wird gesendet …';
+    kundenkontaktStatus.textContent='E-Mail wird protokolliert und gesendet …';
     try{
       const result=await api('/api/admin/buchungen/'+encodeURIComponent(b.id)+'/kontakt',{
         method:'POST',
@@ -358,14 +399,31 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
         body:JSON.stringify({nachricht:kundenkontaktText.value})
       });
       kundenkontaktStatus.textContent=result.message+' Empfänger: '+result.empfaenger+'.';
+      if(result.eintrag){
+        const historie=Array.isArray(b.data.kundenkontakt)?b.data.kundenkontakt:[];
+        const index=historie.findIndex(item=>item.id===result.eintrag.id);
+        if(index<0)historie.push(result.eintrag);
+        else historie[index]=result.eintrag;
+        b.data.kundenkontakt=historie;
+        kundenkontaktHistorieRendern();
+      }
       kundenkontaktText.value='';
     }catch(error){
       kundenkontaktStatus.textContent='E-Mail konnte nicht versendet werden: '+error.message;
+      const eintrag=error.data?.eintrag;
+      if(eintrag){
+        const historie=Array.isArray(b.data.kundenkontakt)?b.data.kundenkontakt:[];
+        const index=historie.findIndex(item=>item.id===eintrag.id);
+        if(index<0)historie.push(eintrag);
+        else historie[index]=eintrag;
+        b.data.kundenkontakt=historie;
+        kundenkontaktHistorieRendern();
+      }
     }finally{
       kundenkontaktSenden.disabled=false;
     }
   });
-  c.append(kundenkontaktForm);
+  c.append(kundenkontaktForm,kundenkontaktHistorie);
 }
 
       const statusZeile = el(

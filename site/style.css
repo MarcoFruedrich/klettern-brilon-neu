@@ -727,6 +727,14 @@ footer a {
 .admin-page .payment-record summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--pine); font-weight: 700; }
 .admin-page .payment-record details p { overflow-wrap: anywhere; }
 .admin-page .booking .payment-entry-row { display:block; width:100%; margin:5px 0; }
+.admin-page .customer-contact-history {
+  margin-top: 12px; padding: 14px; background: #fff;
+  border: 1px solid #c8d5cc; border-radius: 10px;
+}
+.admin-page .customer-contact-history h3 { margin: 0 0 8px; color: var(--pine); }
+.admin-page .customer-contact-entry { padding: 10px 0; border-top: 1px solid #dfe5dd; }
+.admin-page .customer-contact-entry summary { cursor: pointer; color: var(--pine); font-weight: 700; }
+.admin-page .customer-contact-content { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media(max-width:600px) {
   .admin-page .admin-navigation { top: 64px; margin: 14px -12px 24px; border-radius: 0; }
   .admin-page .calendar-navigation { justify-content: center; }
