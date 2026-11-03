@@ -46,6 +46,7 @@ test('Ablehnung des Maildienstes wird an den Aufrufer zurückgegeben',async()=>{
   await assert.rejects(send('kunde@example.test','Test','Text',{idempotencyKey:key}),error=>{
     assert.match(error.message,/Brevo HTTP 429 nach drei Versuchen/);
     assert.equal(error.uncertain,false);
+    assert.equal(error.retryable,true);
     return true;
   });
   assert.equal(calls,3);

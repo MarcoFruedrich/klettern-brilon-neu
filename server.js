@@ -2351,6 +2351,18 @@ await pool.query(`
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }
+    if(process.env.MOCK_PG!=='1'){
+      try{
+        await pool.query('SELECT bericht_id FROM brilon_pruef_meldungen LIMIT 0');
+        const rateLimitRetryTimer=setInterval(()=>{
+          pruefungApi.retryRateLimited().catch(error=>
+            console.error('Zeitgesteuerter Mängelmail-Wiederholungsversuch fehlgeschlagen:',error.message));
+        },60_000);
+        rateLimitRetryTimer.unref();
+      }catch(error){
+        console.warn('Zeitgesteuerter Mängelmail-Wiederholungsversuch nicht gestartet:',error.message);
+      }
+    }
     console.log('PostgreSQL verbunden');
   }else{
     console.warn('DATABASE_URL fehlt: Datenbankfunktionen nicht verfügbar');

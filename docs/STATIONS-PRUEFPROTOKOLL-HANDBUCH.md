@@ -97,7 +97,7 @@ Jede Sicherheitsmangelmeldung wird dauerhaft in der isolierten Testdatenbank als
 
 Unter **Stationsprüfungen → Mängelmeldungen – E-Mail-Versand** sieht die berechtigte Verwaltung nicht bestätigte Meldungen. Bei `fehlgeschlagen` oder `nicht_konfiguriert` kann nach ausdrücklicher Kontrolle und Bestätigung ein neuer Versandversuch gestartet werden. Dabei sollte zuvor geprüft werden, ob die Nachricht trotz Fehlermeldung angekommen ist. Wurde sie vom Anbieter bereits angenommen, sperrt das System den Neuversand. Sicherheitsmangel-Mails verwenden für höchstens drei kurzfristige Versuche denselben Anbieter-Idempotenzschlüssel. Bleibt die Anbieterantwort unklar, wird der Vorgang gesperrt und muss vor Ort im Anbieterprotokoll geprüft werden; er wird nicht blind erneut versucht.
 
-**Bei sicherheitsrelevanten Mängeln und jeder ausgefallenen Benachrichtigung:** Verantwortliche Person zusätzlich unmittelbar kontaktieren; der E-Mail-Ausgang ist kein Ersatz für notwendige Gefahrenabwehr. Kleine nicht sicherheitsrelevante Hinweise erzeugen keine Sicherheitsmangel-E-Mail. Ein automatischer zeitgesteuerter Neuversand ist noch nicht vorhanden.
+**Bei sicherheitsrelevanten Mängeln und jeder ausgefallenen Benachrichtigung:** Verantwortliche Person zusätzlich unmittelbar kontaktieren; der E-Mail-Ausgang ist kein Ersatz für notwendige Gefahrenabwehr. Kleine nicht sicherheitsrelevante Hinweise erzeugen keine Sicherheitsmangel-E-Mail. Nach einer Brevo-Rate-Limit-Antwort (HTTP 429) plant das System genau einen automatischen Wiederholungsversuch etwa zwei Minuten später ein. Netzwerkfehler und unklare Anbieterantworten werden nicht automatisch erneut gesendet.
 
 ## Sicherheits- und Datenschutzgrenzen
 
