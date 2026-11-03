@@ -19,6 +19,7 @@ const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild } = require('./lib/bilddatei');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
+const BUCHUNGS_DATENSCHUTZ_VERSION='2026-11-03-v1';
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -378,7 +379,9 @@ buchungsmodus: einzelplatz?'einzelplatz':'gruppe',
 mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
-       nachricht:safeText(d.nachricht,2000),dauer:programm.dauer
+       nachricht:safeText(d.nachricht,2000),dauer:programm.dauer,
+       datenschutz:'on',datenschutzBestaetigtAm:new Date().toISOString(),
+       datenschutzTextVersion:BUCHUNGS_DATENSCHUTZ_VERSION
       };
 
       if(!/^(09|1[0-9]):00$/.test(data.uhrzeit))
@@ -1582,6 +1585,10 @@ preis=safeText(d.preis,50);
                   .map(z=>({betragCent:z.betragCent,methode:z.methode||null,erhaltenAm:z.erhaltenAm||null})),
                 preisanpassungen:Array.isArray(data.preisanpassungen)?data.preisanpassungen:[]},
               datenschutzangabe:data.datenschutz||null,
+              datenschutznachweis:data.datenschutz==='on'?{
+                bestaetigtAm:data.datenschutzBestaetigtAm||null,
+                textVersion:data.datenschutzTextVersion||null
+              }:null,
               gpsSpiele:gps.rows.filter(spiel=>spiel.buchung_id===row.id)
                 .map(spiel=>({tour:spiel.tour||null,gestartetAm:spiel.gestartet_am||null,
                   abgeschlossenAm:spiel.abgeschlossen_am||null,spielzeitSekunden:spiel.spielzeit_sekunden??null,

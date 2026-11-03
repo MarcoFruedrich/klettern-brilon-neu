@@ -268,6 +268,10 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const adjacentExport=bookingExport.buchungen.find(entry=>entry.buchung.referenz===adjacentData.buchungsnummer);
   const firstExport=bookingExport.buchungen.find(entry=>entry.buchung.referenz===firstData.buchungsnummer);
   assert.equal(adjacentExport.kunde.email,'max@example.test');
+  assert.equal(adjacentExport.datenschutzangabe,'on');
+  assert.equal(adjacentExport.datenschutznachweis.textVersion,'2026-11-03-v1');
+  assert.ok(Number.isFinite(Date.parse(adjacentExport.datenschutznachweis.bestaetigtAm)),
+    'Zeitpunkt der Datenschutzbestätigung wird serverseitig gespeichert');
   assert.equal(adjacentExport.zahlung.zahlungen[0].betragCent,2500);
   assert.equal(adjacentExport.gpsSpiele.length,1);
   assert.equal(adjacentExport.gpsSpiele[0].tour,'Brilon-Rätseltour');
