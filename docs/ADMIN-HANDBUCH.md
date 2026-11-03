@@ -28,6 +28,16 @@ in `STATUS-ENTWICKLUNG.md`.
    und Passwort eingeben. Nach der Anmeldung über „Abmelden“ die Sitzung
    beenden.
 
+## Navigation in der Verwaltung
+
+Nach der Anmeldung nutzt die Verwaltung am Desktop die Bildschirmbreite. Die
+Bereiche stehen links in einer senkrechten Navigation; ein Klick zeigt jeweils
+nur den gewählten Arbeitsbereich. Die Auswahl bleibt als URL-Fragment erhalten
+und kann deshalb direkt verlinkt oder nach dem Neuladen wieder geöffnet werden.
+Auf schmalen Bildschirmen wird die Navigation zu einer horizontal wischbaren
+Leiste. Innerhalb der Bereiche führen Sprungschaltflächen weiterhin direkt zum
+zugehörigen Eintrag.
+
 ## Buchungen und Zahlungen
 
 - In „Buchungen & Zahlungen“ nach Name, Buchungsnummer, E-Mail oder Angebot

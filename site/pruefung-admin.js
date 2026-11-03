@@ -51,6 +51,7 @@
       button.type='button';button.className='btn secondary';
       button.addEventListener('click',()=>{
         const section=find(id);
+        window.adminNavigateToElement?.(id);
         section?.scrollIntoView({behavior:'smooth',block:'start'});
         if(section)section.setAttribute('tabindex','-1');
         section?.focus({preventScroll:true});

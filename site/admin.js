@@ -9,6 +9,52 @@ let zahlungsPage=1,zahlungsLadeSequenz=0;
 let csrfToken=null;
 let adminBuchbareProgramme=[];
 
+const adminViews=Array.from(document.querySelectorAll('[data-admin-view]'));
+const adminViewLinks=Array.from(document.querySelectorAll('[data-admin-view-link]'));
+function adminViewFinden(target){
+  const element=typeof target==='string'?document.getElementById(target):target;
+  return element?.matches?.('[data-admin-view]')?element:element?.closest?.('[data-admin-view]')||null;
+}
+function adminAnsichtAnzeigen(target,{hash=false,focus=false}={}){
+  const view=adminViewFinden(target)||document.getElementById('bookings-section');
+  if(!view)return;
+  for(const item of adminViews)item.hidden=item!==view;
+  for(const link of adminViewLinks){
+    const active=link.hash==='#'+view.id;
+    if(active)link.setAttribute('aria-current','page');
+    else link.removeAttribute('aria-current');
+  }
+  if(hash&&location.hash!=='#'+view.id)history.pushState(null,'','#'+view.id);
+  if(focus){
+    const heading=view.querySelector('h2')||view;
+    if(!heading.hasAttribute('tabindex'))heading.setAttribute('tabindex','-1');
+    heading.focus({preventScroll:true});
+    heading.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+}
+function adminAnsichtAusHash(){
+  const target=location.hash.slice(1);
+  adminAnsichtAnzeigen(target||'bookings-section');
+}
+window.adminNavigateToElement=id=>{
+  const element=document.getElementById(id);
+  const view=adminViewFinden(element);
+  if(view)adminAnsichtAnzeigen(view,{hash:true});
+  if(element){
+    element.scrollIntoView({behavior:'smooth',block:'start'});
+    if(!element.hasAttribute('tabindex'))element.setAttribute('tabindex','-1');
+    element.focus({preventScroll:true});
+  }
+};
+for(const link of adminViewLinks){
+  link.addEventListener('click',event=>{
+    event.preventDefault();
+    adminAnsichtAnzeigen(link.hash.slice(1),{hash:true,focus:true});
+  });
+}
+window.addEventListener('hashchange',adminAnsichtAusHash);
+window.addEventListener('popstate',adminAnsichtAusHash);
+
 async function adminCsrfTokenLaden(){
   if(csrfToken)return csrfToken;
   const r=await fetch('/api/admin/csrf',{credentials:'same-origin'});
@@ -129,6 +175,7 @@ async function refresh() {
 
     login.hidden = true;
     workspace.hidden = false;
+    adminAnsichtAusHash();
     
     await erlebnisangeboteLaden();
     await orteLaden();
@@ -743,7 +790,7 @@ async function gpsTourenLaden() {
       gaeste.onclick=async()=>{
         if(gaestelistenTour)gaestelistenTour.value=tour.id;
         await adminGaestelisteLaden();
-        document.getElementById('admin-guestbook-section')?.scrollIntoView({behavior:'smooth',block:'start'});
+        window.adminNavigateToElement('admin-guestbook-section');
       };
       const qr=el('details');const summary=el('summary','QR-Zieladressen anzeigen');qr.append(summary);
       for(const station of tour.stationen){

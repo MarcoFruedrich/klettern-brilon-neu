@@ -9,15 +9,15 @@
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
-  <header>
+  <header class="admin-topbar">
     <a class="logo" href="/">
       🧗 Klettern <span>& Abenteuer</span>
       <small>Verwaltung</small>
     </a>
-    <nav><a href="/">Zur Website</a></nav>
+    <a class="admin-back-link" href="/">Zur Website</a>
   </header>
 
-  <main class="narrow" id="main-content" tabindex="-1">
+  <main class="narrow admin-main" id="main-content" tabindex="-1">
     <h1 style="font-size:42px">Verwaltung</h1>
     <p>Geschützter Bereich für Anfragen und Sonderangebote.</p>
 
@@ -34,23 +34,26 @@
     <p id="login-status" role="status" aria-live="polite"></p>
 
     <div id="workspace" hidden>
-      <button id="logout" class="btn secondary">Abmelden</button>
+      <div class="admin-layout">
+        <aside class="admin-sidebar" aria-label="Verwaltung">
+          <button id="logout" class="btn secondary">Abmelden</button>
+          <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
+            <a href="#bookings-section" data-admin-view-link>Buchungen</a>
+            <a href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
+            <a href="#calendar-view" data-admin-view-link>Kalender</a>
+            <a href="#angebote-verwaltung" data-admin-view-link>Programme</a>
+            <a href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
+            <a href="#anschlussrabatt-section" data-admin-view-link>Anschlussrabatte</a>
+            <a href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
+            <a href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
+            <a href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
+            <a href="#settings-section" data-admin-view-link>Einstellungen</a>
+          </nav>
+        </aside>
+        <div class="admin-content">
 
-      <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
-        <a href="#bookings-section">Buchungen</a>
-        <a href="#payment-overview-section">Zahlungsübersicht</a>
-        <a href="#calendar-section">Kalender</a>
-        <a href="#angebote-verwaltung">Programme</a>
-        <a href="#special-offers-section">Tagesangebote</a>
-        <a href="#anschlussrabatt-section">Anschlussrabatte</a>
-        <a href="#admin-guestbook-section">Gästeliste</a>
-        <a href="#gps-verwaltung">GPS-Touren</a>
-        <a href="#stationspruefung">Stationsprüfungen</a>
-        <a href="#settings-section">Einstellungen</a>
-      </nav>
-
-      <section id="payment-overview-section" class="booking admin-anchor">
-        <h2>Zahlungsübersicht</h2>
+      <section id="payment-overview-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="payment-overview-heading">
+        <h2 id="payment-overview-heading">Zahlungsübersicht</h2>
         <p>Gesamtsummen über alle Buchungen; gefilterte Einträge werden seitenweise angezeigt. Gutschriften werden getrennt ausgewiesen; Auszahlungen bleiben manuell zu bearbeiten.</p>
         <div id="payment-overview-summary" class="admin-grid payment-summary-grid" aria-live="polite"></div>
         <label class="payment-overview-filter">Einträge filtern
@@ -70,7 +73,8 @@
         </nav>
       </section>
 
-      <h2 id="bookings-section" class="admin-anchor">Buchungen &amp; Zahlungen</h2>
+      <section id="bookings-section" class="admin-view" data-admin-view aria-labelledby="bookings-heading">
+      <h2 id="bookings-heading" class="admin-anchor">Buchungen &amp; Zahlungen</h2>
       <div class="admin-booking-filters">
         <label>Suche nach Name, Nummer, E-Mail oder Angebot
           <input id="bookings-search" type="search" autocomplete="off">
@@ -92,8 +96,10 @@
         <button type="button" id="bookings-next" class="btn secondary">Weitere →</button>
       </nav>
       <div id="bookings" class="admin-grid"></div>
+      </section>
 
-      <h2>Buchungskalender</h2>
+      <section id="calendar-view" class="admin-view" data-admin-view aria-labelledby="calendar-view-heading">
+      <h2 id="calendar-view-heading">Kalender &amp; Sperrzeiten</h2>
       <p>Übersicht der angefragten und bestätigten Klettertermine.</p>
 
       <section id="calendar-section" class="booking">
@@ -177,9 +183,10 @@
 
 <h3>Meine eingetragenen Termine und Sperrzeiten</h3>
 <div id="calendar-entries" class="admin-grid"></div>
+      </section>
 
-      <section id="anschlussrabatt-section" class="booking">
-        <h2>Anschlussrabatt berechnen</h2>
+      <section id="anschlussrabatt-section" class="booking admin-view" data-admin-view aria-labelledby="anschlussrabatt-heading">
+        <h2 id="anschlussrabatt-heading">Anschlussrabatt berechnen</h2>
         <p>Unverbindliche Vorschau: Bei direkt aufeinanderfolgenden Programmen
           werden beide Programme um 10 % reduziert. Ein Programm erhaelt
           den Rabatt auch bei zwei Anschluessen nur einmal.</p>
@@ -196,6 +203,7 @@
         <div id="anschlussrabatt-ergebnis" role="status" aria-live="polite"></div>
       </section>
 
+      <section id="special-offers-view" class="admin-view" data-admin-view aria-labelledby="special-offers-section">
       <h2 id="special-offers-section" class="admin-anchor">Sonder- und Tagesangebote verwalten</h2>
       <form id="special-form">
         <label>Titel
@@ -221,9 +229,10 @@
       </form>
 
       <div id="special-list" class="admin-grid"></div>
+      </section>
 
-<section id="angebote-verwaltung">
-  <h2>Angebote &amp; Preise verwalten</h2>
+<section id="angebote-verwaltung" class="admin-view" data-admin-view aria-labelledby="programs-heading">
+  <h2 id="programs-heading">Angebote &amp; Preise verwalten</h2>
   <p>
     Hier kannst du Kletterangebote, Kindergeburtstage,
     Kistenklettern, Baumklettern und weitere Programme
@@ -272,8 +281,8 @@
   <div id="angebote-admin-liste"></div>
 </section>
 
-<section id="settings-section" class="booking admin-anchor">
-  <h2>Einstellungen · Veranstaltungsorte</h2>
+<section id="settings-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="settings-heading">
+  <h2 id="settings-heading">Einstellungen · Veranstaltungsorte</h2>
   <p>Orte hier ergänzen. Neue Programme können anschließend einen der aktiven Orte auswählen. Bestehende Programme und Buchungen werden durch das Ergänzen nicht verändert.</p>
   <form id="admin-place-form">
     <label>Neuer Veranstaltungsort
@@ -285,8 +294,8 @@
   <div id="admin-place-list" class="admin-grid"></div>
 </section>
 
-<section id="admin-guestbook-section" class="booking admin-anchor">
-  <h2>Teilnahme-Gästeliste</h2>
+<section id="admin-guestbook-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="guestbook-heading">
+  <h2 id="guestbook-heading">Teilnahme-Gästeliste</h2>
   <p>Angezeigt werden nur abgeschlossene Touren, für die eine ausdrückliche Veröffentlichungseinwilligung vorliegt.</p>
   <div class="admin-booking-filters">
     <label>GPS-Tour
@@ -298,8 +307,8 @@
   <div id="admin-guestbook-list" class="admin-grid"></div>
 </section>
 
-<section id="gps-verwaltung">
-  <h2>GPS-Schatzsuchen</h2>
+<section id="gps-verwaltung" class="admin-view" data-admin-view aria-labelledby="gps-heading">
+  <h2 id="gps-heading">GPS-Schatzsuchen</h2>
   <p>Touren verwalten, Kontrollcodes ändern und Zugänge für bestätigte Buchungen ausstellen.</p>
   <form id="gps-tour-form">
     <input name="id" type="hidden">
@@ -364,8 +373,8 @@
 </section>
 
     
-    <section id="stationspruefung" class="booking admin-anchor">
-      <h2>Stationsprüfungen – Verwaltung</h2>
+    <section id="stationspruefung" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="inspection-heading">
+      <h2 id="inspection-heading">Stationsprüfungen – Verwaltung</h2>
       <p>Für die dokumentierte Kontrolle vor jedem Programm. <a href="/pruefung.html">Prüfformular für Mitarbeitende öffnen</a>.</p>
       <section id="pruef-uebersicht" aria-label="Sicherheitsübersicht der Kletterstationen">
         <h3>Aktuelle Sicherheitsübersicht</h3>
@@ -420,6 +429,8 @@
     </section>
 
     <p id="status" role="status"></p>
+        </div>
+      </div>
       </div>
   </main>
 
