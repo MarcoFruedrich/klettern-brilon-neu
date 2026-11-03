@@ -112,9 +112,13 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(paymentPrivate.status,401,'Zahlungsdetails müssen vor unberechtigtem Zugriff geschützt sein');
   const exportPrivate=await fetch(root+`/api/admin/buchungen/${guestId}/export`);
   assert.equal(exportPrivate.status,401,'Kundendatenexport muss geschützt sein');
-  const anfrage=(uhrzeit,datum='2027-03-15')=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+  const publicPlaces=await fetch(root+'/api/orte');
+  assert.equal(publicPlaces.status,200);
+  assert.deepEqual(await publicPlaces.json(),[{id:1,name:'Brilon',aktiv:true}],
+    'Buchbare Veranstaltungsorte werden für die Anfrage öffentlich bereitgestellt');
+  const anfrage=(uhrzeit,datum='2027-03-15',veranstaltungsort='Brilon')=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     vorname:'Max',nachname:'Mueller',email:'max@example.test',datum,uhrzeit,
-    teilnehmer:4,angebot:'Klettern',datenschutz:'on'
+    teilnehmer:4,angebot:'Klettern',veranstaltungsort,datenschutz:'on'
   })});
   const blockedDates=await fetch(root+'/api/sperrzeiten');
   assert.equal(blockedDates.status,200);
@@ -124,6 +128,8 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.match((await blockedStart.json()).error,/gesperrt/);
   const blockedEnd=await anfrage('10:00','2027-03-17');
   assert.equal(blockedEnd.status,409,'Auch der letzte Tag des Sperrzeitraums muss gesperrt bleiben');
+  const wrongPlace=await anfrage('10:00','2027-03-15','Sundern');
+  assert.equal(wrongPlace.status,409,'Ein Angebot kann nicht an einem abweichenden Veranstaltungsort angefragt werden');
   const first=await anfrage('10:00');
   assert.equal(first.status,201);
   const firstData=await first.json();
