@@ -248,6 +248,12 @@ class Pool {
       return {rows:item?[{id:item.id,data:item.data,status:item.status,buchungsnummer:item.buchungsnummer,
         created_at:item.created_at||new Date(0),updated_at:item.updated_at||null,zahlungsinfo_gesendet_am:null}]:[],rowCount:item?1:0};
     }
+    if(sql.includes("UPDATE brilon_buchungen")&&sql.includes("COALESCE(data,'{}'::jsonb)||$1::jsonb")&&sql.includes('WHERE id=$2 RETURNING id')){
+      const [raw,id]=params,item=this.bookings.find(entry=>entry.id===id);
+      if(!item)return {rows:[],rowCount:0};
+      item.data={...item.data,...JSON.parse(raw)};
+      return {rows:[{id}],rowCount:1};
+    }
     if(sql.includes('SELECT id,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE')){
       const item=this.bookings.find(entry=>entry.id===params[0]);
       return {rows:item?[{id:item.id,data:item.data}]:[],rowCount:item?1:0};
