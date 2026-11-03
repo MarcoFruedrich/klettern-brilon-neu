@@ -2172,6 +2172,15 @@ async function start(){
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
       console.log('Admin-Sitzungstabelle geprüft (RUN_ADMIN_SESSION_MIGRATION=true)');
     }
+    // Targeted opt-in: only columns needed by the admin dashboard's first queries.
+    if(process.env.RUN_ADMIN_DASHBOARD_MIGRATION==='true'){
+      await pool.query('ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS buchungsnummer TEXT');
+      await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_buchungen_buchungsnummer_unique ON brilon_buchungen (buchungsnummer)');
+      await pool.query(`ALTER TABLE brilon_angebote
+        ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
+        ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false`);
+      console.log('Admin-Dashboard-Spalten geprüft (RUN_ADMIN_DASHBOARD_MIGRATION=true)');
+    }
     // Schema changes are opt-in. A normal server start must not alter a live database.
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){
     await pool.query(
