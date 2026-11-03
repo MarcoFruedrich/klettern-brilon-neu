@@ -17,7 +17,7 @@ const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
-const { analysiereBild } = require('./lib/bilddatei');
+const { bereinigeBild } = require('./lib/bilddatei');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 
 const { createClient } = require('@supabase/supabase-js');
@@ -1936,9 +1936,9 @@ if (bildRoute && req.method === 'POST') {
     });
   }
 
-  const bild = Buffer.concat(teile);
+  let bild = Buffer.concat(teile);
 
-  try{analysiereBild(bild,dateityp);}catch{
+  try{bild=await bereinigeBild(bild,dateityp);}catch{
     return reply(res, 400, {
       error: 'Ungültige oder zu große Bilddatei. Erlaubt sind vollständige JPG-, PNG- und WebP-Bilder bis 40 Megapixel.'
     });
@@ -2038,9 +2038,9 @@ if (aktionsBildRoute && req.method === 'POST') {
     });
   }
 
-  const bild = Buffer.concat(teile);
+  let bild = Buffer.concat(teile);
 
-  try{analysiereBild(bild,dateityp);}catch{
+  try{bild=await bereinigeBild(bild,dateityp);}catch{
     return reply(res, 400, {
       error: 'Ungültige oder zu große Bilddatei. Erlaubt sind vollständige JPG-, PNG- und WebP-Bilder bis 40 Megapixel.'
     });

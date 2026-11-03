@@ -5,6 +5,8 @@ const { spawn } = require('node:child_process');
 const crypto = require('node:crypto');
 const net = require('node:net');
 const path = require('node:path');
+const sharp = require('sharp');
+const { fotoBereinigen } = require('../lib/stationspruefung');
 const { heuteInBerlin } = require('../lib/kalendertag');
 const { totpCode } = require('../lib/totp');
 const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
@@ -282,8 +284,10 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const stations=await fetch(root+'/api/pruefung/stationen',{headers:{Cookie:staffCookie}});
   assert.equal(stations.status,200);
   assert.equal((await stations.json()).stationen.some(p=>p.id===stationId),true);
-  const fotoBytes=Buffer.concat([Buffer.from([255,216,255]),Buffer.alloc(95,0),Buffer.from([255,217])]);
+  const fotoBytes=await sharp({create:{width:12,height:8,channels:3,background:'#4382aa'}})
+    .jpeg().withExif({IFD0:{ImageDescription:'private location data'}}).toBuffer();
   const foto='data:image/jpeg;base64,'+fotoBytes.toString('base64');
+  const bereinigtesFoto=await fotoBereinigen(foto);
   const input={programm:'Klettern Klasse CI',beginn:day1+'T10:00',
     pruefungen:[{stationId,zustand:'mangel',foto,
       beschreibung:'Karabiner lässt sich nicht ordnungsgemäß schließen'}]};
@@ -321,7 +325,11 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(image.status,200);
   assert.match(image.headers.get('content-type'),/image\/jpeg/);
   assert.match(image.headers.get('content-disposition'),/attachment/);
-  assert.deepEqual(Buffer.from(await image.arrayBuffer()),fotoBytes);
+  const heruntergeladenesFoto=Buffer.from(await image.arrayBuffer());
+  assert.deepEqual(heruntergeladenesFoto,
+    Buffer.from(bereinigtesFoto.slice('data:image/jpeg;base64,'.length),'base64'));
+  assert.equal((await sharp(heruntergeladenesFoto).metadata()).exif,undefined,
+    'Mängelfotos werden ohne EXIF-Daten gespeichert');
 
   const stationList=async ()=>(await (await fetch(root+'/api/admin/pruefung/stationen',
     {headers:{Cookie:cookie}})).json());

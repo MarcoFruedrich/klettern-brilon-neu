@@ -2,7 +2,8 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
-const {emailGueltig,passwortHash,passwortPruefen,codeHash,programmPruefen,pruefFoto}=require('../lib/stationspruefung');
+const sharp=require('sharp');
+const {emailGueltig,passwortHash,passwortPruefen,codeHash,programmPruefen,pruefFoto,fotoBereinigen}=require('../lib/stationspruefung');
 
 test('Prüfpersonal: Passwörter werden gesalzen gehasht und konstant verglichen',()=>{
   const hash=passwortHash('Pruefung-Local-Secret-2026!');
@@ -54,6 +55,23 @@ test('Mängelfoto: nur kleine JPEG-Belege für defekte Stationen',()=>{
   const broken={...base,pruefungen:[{stationId:'a',zustand:'mangel',
     beschreibung:'Karabiner am oberen Umlenkpunkt beschädigt',foto:jpeg}]};
   assert.equal(programmPruefen(broken,['a'],new Date('2026-11-02T11:00:00Z')).pruefungen[0].foto,jpeg);
+});
+
+test('Mängelfoto wird serverseitig auf 640 Pixel begrenzt und von Metadaten bereinigt',async()=>{
+  const input=await sharp({create:{width:1200,height:900,channels:3,background:'#3870a0'}})
+    .jpeg().withExif({IFD0:{ImageDescription:'private location data'}}).toBuffer();
+  const source='data:image/jpeg;base64,'+input.toString('base64');
+  assert.ok((await sharp(input).metadata()).exif);
+  const sanitized=await fotoBereinigen(source);
+  const result=Buffer.from(sanitized.slice('data:image/jpeg;base64,'.length),'base64');
+  const metadata=await sharp(result).metadata();
+  assert.equal(metadata.width,640);
+  assert.equal(metadata.height,480);
+  assert.equal(metadata.exif,undefined);
+  assert.ok(result.length<=80_000);
+  await assert.rejects(fotoBereinigen('data:image/jpeg;base64,'+
+    Buffer.concat([Buffer.from([255,216,255]),Buffer.alloc(95,0),Buffer.from([255,217])]).toString('base64')),
+  /sicher bereinigt/);
 });
 
 test('Nicht sicherheitsrelevanter Hinweis bleibt eine Nachprüfung ohne Stationssperre',()=>{
