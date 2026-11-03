@@ -6,6 +6,7 @@ let refreshSequenz=0;
 let bookingPage=1;
 let zahlungsPage=1,zahlungsLadeSequenz=0;
 let csrfToken=null;
+let adminBuchbareProgramme=[];
 
 async function adminCsrfTokenLaden(){
   if(csrfToken)return csrfToken;
@@ -420,6 +421,39 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
           ' (Verfügbarkeit wird bei Anfragen neu geprüft)':
           'Unabhängige Aktion – kein Programm automatisch ausgewählt')
       );
+
+      const offerLabel=el('label','Buchbares Programm der Aktion');
+      const offerSelect=document.createElement('select');
+      const emptyOption=el('option','Kein Programm automatisch auswählen');
+      emptyOption.value='';offerSelect.append(emptyOption);
+      for(const program of adminBuchbareProgramme){
+        const option=el('option',program.name+' · '+program.veranstaltungsort);
+        option.value=String(program.id);offerSelect.append(option);
+      }
+      const current=String(a.programm_id||'');
+      if(current&&!adminBuchbareProgramme.some(p=>String(p.id)===current)){
+        const unavailable=el('option','Bisheriger Programmbezug ist nicht mehr buchbar');
+        unavailable.value=current;unavailable.disabled=true;
+        offerSelect.append(unavailable);
+      }
+      offerSelect.value=current;offerLabel.append(offerSelect);
+      const saveLink=el('button','Programmzuordnung speichern');
+      saveLink.type='button';saveLink.className='btn secondary';
+      const saveStatus=el('p');saveStatus.setAttribute('role','status');
+      saveLink.addEventListener('click',async()=>{
+        saveLink.disabled=true;
+        try{
+          await api('/api/admin/aktionen/'+encodeURIComponent(a.id)+'/programm',{
+            method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({programm_id:offerSelect.value})
+          });
+          saveStatus.textContent='Programmzuordnung gespeichert.';
+          await refresh();
+        }catch(error){
+          saveStatus.textContent='Zuordnung nicht gespeichert: '+error.message;
+        }finally{saveLink.disabled=false;}
+      });
+      c.append(offerLabel,saveLink,saveStatus);
 
       const bildBereich = document.createElement('div');
 
@@ -1456,6 +1490,7 @@ async function erlebnisangeboteLaden() {
 
   try {
     const angebote = await api('/api/admin/angebote');
+    adminBuchbareProgramme=angebote.filter(a=>a.aktiv&&a.buchbar&&a.veroeffentlicht);
     const specialSelect=document.getElementById('special-program-select');
     if(specialSelect){
       const selected=specialSelect.value;
