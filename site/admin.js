@@ -359,6 +359,7 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
 
       const speichern = el('button', 'Änderungen speichern');
       speichern.type = 'button';
+      speichern.className = 'btn secondary';
 
       const meldung = el('p');
       meldung.setAttribute('role', 'status');
@@ -410,13 +411,17 @@ loeschen.onclick = async () => {
   meldung.textContent = 'Buchungsanfrage wird gelöscht ...';
 
   try {
-    await api('/api/admin/buchungen/' + encodeURIComponent(b.id), {
+    const ergebnis = await api('/api/admin/buchungen/' + encodeURIComponent(b.id), {
       method: 'DELETE'
     });
-
-  
+    if (!ergebnis.success) throw Error('Buchungsanfrage wurde nicht gelöscht.');
     c.remove();
-    await kalenderLaden();
+    await refresh();
+    try {
+      await kalenderLaden();
+    } catch (kalenderFehler) {
+      meldung.textContent = 'Buchungsanfrage gelöscht; Kalender konnte nicht aktualisiert werden.';
+    }
   } catch (err) {
 
     meldung.textContent = 'Fehler beim Löschen: ' + err.message;
@@ -425,6 +430,7 @@ loeschen.onclick = async () => {
 };
 
      const zahlungSenden = el('button', 'Zahlungsinformationen senden');
+zahlungSenden.className = 'btn secondary';
       
 function zahlungsButtonAktualisieren() {
   const gesendet = Boolean(b.zahlungsinfo_gesendet_am);
@@ -457,14 +463,14 @@ if(b.data.buchungsmodus==='einzelplatz'){
   meldung.textContent = 'Zahlungsinformationen werden gesendet ...';
 
   try {
-    await api('/api/admin/buchungen/' + encodeURIComponent(b.id) + '/zahlung', {
+    const ergebnis = await api('/api/admin/buchungen/' + encodeURIComponent(b.id) + '/zahlung', {
       method: 'POST'
     });
 
-    meldung.textContent = 'Zahlungsinformationen erfolgreich versendet.';
-    
-b.zahlungsinfo_gesendet_am = new Date().toISOString();
-zahlungsButtonAktualisieren();
+    b.zahlungsinfo_gesendet_am = ergebnis.zahlungsinfoGesendetAm;
+    zahlungsButtonAktualisieren();
+    meldung.textContent = 'Zahlungsinformationen versendet und Versandzeit gespeichert.';
+    await refresh();
 
   } catch (fehler) {
     meldung.textContent = 'Fehler beim Zahlungsversand: ' + fehler.message;
@@ -478,7 +484,11 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
       exportLink.className='btn secondary';
       exportLink.setAttribute('download','');
       exportLink.title='Alle Buchungen mit derselben Kontakt-E-Mail und zugehörige GPS-Teilnahmedaten exportieren; Zugangsdaten und interne Notizen bleiben ausgeschlossen';
-    c.append(speichern, zahlungSenden, exportLink, loeschen, meldung);
+    const bookingActions=el('div');
+    bookingActions.className='booking-actions';
+    loeschen.className='btn danger';
+    bookingActions.append(speichern,zahlungSenden,exportLink,loeschen);
+    c.append(bookingActions,meldung);
       box.append(c);
     }
 

@@ -455,8 +455,44 @@ p {
   background: #c8eb68;
 }
 
+.booking-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.booking-actions > button,
+.booking-actions > a {
+  display: flex;
+  width: 100%;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  text-align: center;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.booking-actions > .btn.danger {
+  background: #b53f46;
+  color: #fff !important;
+}
+
+.booking-actions > .btn.danger:hover {
+  background: #963138;
+}
+
 .split {
   gap: 40px;
+}
+
+@media (max-width: 560px) {
+  .booking-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 #buchung form {

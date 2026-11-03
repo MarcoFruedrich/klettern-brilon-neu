@@ -1109,17 +1109,20 @@ try {
     zahlungstext
   );
   
-await pool.query(
+const versandProtokoll=await pool.query(
   `UPDATE brilon_buchungen
    SET zahlungsinfo_gesendet_am = NOW()
-   WHERE id = $1`,
+   WHERE id = $1
+   RETURNING zahlungsinfo_gesendet_am`,
   [buchungsId]
 );
-
+if(!versandProtokoll.rowCount)
+  return reply(res,404,{error:'Buchungsanfrage nicht gefunden.'});
 
   return reply(res, 200, {
     success: true,
-    message: 'Zahlungsinformationen wurden versendet.'
+    message: 'Zahlungsinformationen wurden versendet und der Versandzeitpunkt gespeichert.',
+    zahlungsinfoGesendetAm:versandProtokoll.rows[0].zahlungsinfo_gesendet_am
   });
 } catch (fehler) {
   console.error('Zahlungs-E-Mail fehlgeschlagen:', fehler);
