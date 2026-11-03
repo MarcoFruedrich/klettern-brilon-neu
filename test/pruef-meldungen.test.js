@@ -40,7 +40,7 @@ const bericht='550e8400-e29b-41d4-a716-446655440011';
 test('Sicherheitsmangel-Mail: eine Annahme, keine Duplikate bei parallelen Versuchen',async()=>{
   const {pool,state}=mockOutbox();
   const deliveries=[];
-  const mail=async(to,subject,body)=>{state.mailCalls++;deliveries.push({to,subject,body});};
+  const mail=async(to,subject,body,options)=>{state.mailCalls++;deliveries.push({to,subject,body,options});};
   const service=createPruefMeldungen({pool,brevoMail:mail,
     env:{PRUEF_MANGEL_EMAIL:'sicherheit@example.test'}});
   const [a,b]=await Promise.all([service.send(bericht),service.send(bericht)]);
@@ -50,6 +50,7 @@ test('Sicherheitsmangel-Mail: eine Annahme, keine Duplikate bei parallelen Versu
   assert.equal((await service.send(bericht)).status,'gesendet');
   assert.equal(state.mailCalls,1);
   assert.match(deliveries[0].body,/Sicherungsseil beschädigt/);
+  assert.equal(deliveries[0].options.idempotencyKey,bericht);
   assert.doesNotMatch(deliveries[0].body,/Beschriftung verblasst/,
     'Hinweise sind keine sicherheitsrelevanten Mängelmeldungen');
 });
@@ -79,4 +80,17 @@ test('Akzeptierte Mail mit DB-Fehler bleibt ungeklärt und wird nicht blind erne
   assert.equal(state.record.status,'sendet');
   assert.equal((await service.send(bericht)).status,'versand_ungeklaert');
   assert.equal(count,1);
+});
+
+test('Unklare Anbieterantwort bleibt gesperrt und wird nicht erneut versucht',async()=>{
+  const {pool,state}=mockOutbox();let count=0;
+  const service=createPruefMeldungen({pool,brevoMail:async()=>{
+    count++;
+    const error=Error('timeout');error.uncertain=true;throw error;
+  },env:{PRUEF_MANGEL_EMAIL:'pruefung@example.test'}});
+  assert.equal((await service.send(bericht)).status,'versand_ungeklaert');
+  assert.equal(state.record.status,'sendet');
+  assert.equal((await service.send(bericht)).status,'versand_ungeklaert');
+  assert.equal(count,1);
+  assert.equal(state.record.versuche,1);
 });
