@@ -77,6 +77,11 @@ werden.
   Kapazität (5–12 Plätze) sowie Preis pro Person festlegen. Eine Anmeldung
   reserviert einen Platz ohne Anzahlung. Der Termin findet ab der eingestellten
   Mindestzahl statt; das Formular zeigt Anmeldestand und freie Plätze.
+- Angebote mit „Nach oben“ und „Nach unten“ sortieren. „Angebot archivieren“
+  nimmt es aus der öffentlichen Auswahl und erhält vorhandene Buchungen und
+  deren Verlauf. Archivierte Angebote lassen sich in der Verwaltung
+  wiederherstellen. Eine verknüpfte GPS-Tour muss vor dem Archivieren deaktiviert
+  werden.
 - Orte zuerst unter „Einstellungen · Veranstaltungsorte“ ergänzen. Das
   Hinzufügen eines Orts ändert vorhandene Programme und Buchungen nicht.
 - Sonder- und Tagesangebote separat im gleichnamigen Bereich erfassen. Vor

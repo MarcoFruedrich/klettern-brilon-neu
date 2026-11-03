@@ -1497,14 +1497,14 @@ async function erlebnisangeboteLaden() {
 
   try {
     const angebote = await api('/api/admin/angebote');
-    adminBuchbareProgramme=angebote.filter(a=>a.aktiv&&a.buchbar&&a.veroeffentlicht);
+    adminBuchbareProgramme=angebote.filter(a=>!a.archiviert&&a.aktiv&&a.buchbar&&a.veroeffentlicht);
     const specialSelect=document.getElementById('special-program-select');
     if(specialSelect){
       const selected=specialSelect.value;
       specialSelect.replaceChildren();
       const empty=el('option','Unabhängige Sonderaktion – keine automatische Programmauswahl');
       empty.value='';specialSelect.append(empty);
-      for(const offer of angebote.filter(a=>a.aktiv&&a.buchbar&&a.veroeffentlicht)){
+      for(const offer of angebote.filter(a=>!a.archiviert&&a.aktiv&&a.buchbar&&a.veroeffentlicht)){
         const option=el('option',offer.name+' · '+offer.veranstaltungsort);
         option.value=String(offer.id);
         specialSelect.append(option);
@@ -1519,12 +1519,60 @@ async function erlebnisangeboteLaden() {
       return;
     }
 
-    for (const angebot of angebote.filter(a=>!a.name.startsWith('GPS-Schatzsuche:'))) {
+    const aktiveAngebote=angebote.filter(a=>!a.archiviert);
+    for (const angebot of angebote) {
       const eintrag = document.createElement('div');
       eintrag.className = 'card';
 
       const titel = document.createElement('h3');
       titel.textContent = angebot.name;
+
+      if(angebot.archiviert){
+        titel.textContent='Archiviert · '+angebot.name;
+        const wiederherstellen=document.createElement('button');
+        wiederherstellen.type='button';wiederherstellen.textContent='Wiederherstellen';
+        wiederherstellen.addEventListener('click',async()=>{
+          wiederherstellen.disabled=true;
+          try{await api(`/api/admin/angebote/${angebot.id}/archivieren`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({archiviert:false})});await erlebnisangeboteLaden();}
+          catch(error){wiederherstellen.disabled=false;alert('Wiederherstellen fehlgeschlagen: '+error.message);}
+        });
+        eintrag.append(titel,el('p','Archivierte Angebote bleiben für bisherige Buchungen und deren Verlauf gespeichert.'),wiederherstellen);
+        liste.append(eintrag);
+        continue;
+      }
+
+      const reihenfolge=aktiveAngebote.findIndex(item=>String(item.id)===String(angebot.id));
+      const bewegen=async richtung=>{
+        const next=[...aktiveAngebote];
+        const ziel=reihenfolge+richtung;
+        if(ziel<0||ziel>=next.length)return;
+        [next[reihenfolge],next[ziel]]=[next[ziel],next[reihenfolge]];
+        try{
+          await api('/api/admin/angebote/reihenfolge',{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ids:next.map(item=>item.id)})});
+          await erlebnisangeboteLaden();
+        }catch(error){alert('Reihenfolge konnte nicht gespeichert werden: '+error.message);}
+      };
+      const aufwaerts=document.createElement('button');aufwaerts.type='button';aufwaerts.textContent='↑ Nach oben';
+      aufwaerts.disabled=reihenfolge<=0;aufwaerts.setAttribute('aria-label',angebot.name+' nach oben verschieben');
+      aufwaerts.addEventListener('click',()=>bewegen(-1));
+      const abwaerts=document.createElement('button');abwaerts.type='button';abwaerts.textContent='↓ Nach unten';
+      abwaerts.disabled=reihenfolge===aktiveAngebote.length-1;abwaerts.setAttribute('aria-label',angebot.name+' nach unten verschieben');
+      abwaerts.addEventListener('click',()=>bewegen(1));
+      eintrag.append(aufwaerts,abwaerts);
+
+      if(angebot.name.startsWith('GPS-Schatzsuche:')){
+        eintrag.append(titel,el('p','GPS-Angebot · Inhalt und Aktivierung werden im GPS-Bereich verwaltet.'));
+        const archivieren=document.createElement('button');archivieren.type='button';archivieren.textContent='Archivieren';
+        archivieren.addEventListener('click',async()=>{
+          if(!confirm('GPS-Angebot archivieren? Eine aktive GPS-Tour muss zuerst deaktiviert werden.'))return;
+          try{await api(`/api/admin/angebote/${angebot.id}/archivieren`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({archiviert:true})});await erlebnisangeboteLaden();}
+          catch(error){alert('Archivieren fehlgeschlagen: '+error.message);}
+        });
+        eintrag.append(archivieren);liste.append(eintrag);continue;
+      }
 
      const beschreibung = document.createElement('textarea');
 beschreibung.value = angebot.beschreibung || '';
@@ -1800,6 +1848,19 @@ aktivButton.addEventListener('click', async () => {
 eintrag.appendChild(aktivButton);
     
 eintrag.appendChild(preisButton);
+
+const archivierenButton=document.createElement('button');
+archivierenButton.type='button';archivierenButton.textContent='Angebot archivieren';
+archivierenButton.addEventListener('click',async()=>{
+  if(!confirm(`„${angebot.name}“ archivieren? Bestehende Buchungen bleiben erhalten.`))return;
+  archivierenButton.disabled=true;
+  try{
+    await api(`/api/admin/angebote/${angebot.id}/archivieren`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({archiviert:true})});
+    await erlebnisangeboteLaden();
+  }catch(error){archivierenButton.disabled=false;alert('Archivieren fehlgeschlagen: '+error.message);}
+});
+eintrag.appendChild(archivierenButton);
 
       liste.appendChild(eintrag);
     }

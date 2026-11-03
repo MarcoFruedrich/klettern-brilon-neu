@@ -49,9 +49,10 @@ class Pool {
     }
     if(/INSERT INTO brilon_angebote\s*\(name,beschreibung,dauer,preise,aktiv,kategorie/.test(sql)){
       const [name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,kapazitaet,rawDates,hinweise,buchbar,veroeffentlicht,buchungsmodus='gruppe',mindestteilnehmer=1,preis_pro_person=0]=params;
+      const sortierung=Math.max(0,...this.offers.map(item=>Number(item.sortierung)||0))+1;
       const offer={id:this.nextOfferId++,name,beschreibung,dauer,preise:{},aktiv:false,kategorie,zielgruppe,
         veranstaltungsort,kapazitaet,verfuegbare_termine:JSON.parse(rawDates),hinweise,buchbar,veroeffentlicht,
-        buchungsmodus,mindestteilnehmer,preis_pro_person};
+        buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert:false};
       this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
     }
     if(sql.includes('INSERT INTO brilon_gps_touren(id,angebot_id,data,aktiv)')){
@@ -61,6 +62,10 @@ class Pool {
     }
     if(sql.includes('FROM brilon_gps_touren')&&sql.includes('ORDER BY erstellt_am DESC'))
       return {rows:[...this.gpsTours].reverse(),rowCount:this.gpsTours.length};
+    if(sql.includes('SELECT id FROM brilon_gps_touren WHERE angebot_id=$1 AND aktiv=true')){
+      const tour=this.gpsTours.find(item=>String(item.angebot_id)===String(params[0])&&item.aktiv===true);
+      return {rows:tour?[{id:tour.id}]:[],rowCount:tour?1:0};
+    }
     if(sql.includes('UPDATE brilon_gps_touren SET aktiv=$1,aktualisiert_am=NOW()')){
       const [aktiv,id]=params,tour=this.gpsTours.find(item=>item.id===id);
       if(!tour)return {rows:[],rowCount:0};
@@ -126,9 +131,24 @@ class Pool {
       let offers=sql.includes('WHERE id=$1')
         ?this.offers.filter(item=>String(item.id)===String(params[0]))
         :params[0]?this.offers.filter(item=>item.name===params[0]):this.offers;
-      if(sql.includes('WHERE aktiv=true AND buchbar=true AND veroeffentlicht=true'))
+      if(sql.includes('aktiv=true AND buchbar=true AND veroeffentlicht=true'))
         offers=offers.filter(item=>item.aktiv===true&&item.buchbar===true&&item.veroeffentlicht===true);
-      return { rows:offers, rowCount:offers.length };
+      if(sql.includes('archiviert=false'))offers=offers.filter(item=>item.archiviert!==true);
+      if(sql.includes('ORDER BY archiviert ASC,sortierung ASC,id DESC'))
+        offers.sort((a,b)=>Number(a.archiviert)-Number(b.archiviert)||(a.sortierung||0)-(b.sortierung||0)||b.id-a.id);
+      if(sql.includes('ORDER BY sortierung ASC,name ASC'))
+        offers.sort((a,b)=>(a.sortierung||0)-(b.sortierung||0)||a.name.localeCompare(b.name));
+      return { rows:offers.slice(), rowCount:offers.length };
+    }
+    if(sql.includes('UPDATE brilon_angebote AS angebot SET sortierung=')){
+      const ids=params[0].map(Number),changed=[];
+      ids.forEach((id,index)=>{const offer=this.offers.find(item=>item.id===id&&!item.archiviert);if(offer){offer.sortierung=index;changed.push({id});}});
+      return {rows:changed,rowCount:changed.length};
+    }
+    if(sql.includes('UPDATE brilon_angebote SET archiviert=$1')){
+      const offer=this.offers.find(item=>String(item.id)===String(params[1]));
+      if(!offer)return {rows:[],rowCount:0};
+      offer.archiviert=params[0];return {rows:[{id:offer.id,archiviert:offer.archiviert}],rowCount:1};
     }
     if (sql.includes('FROM brilon_orte')) {
       const rows=this.places.filter(item=>item.aktiv===true).sort((a,b)=>a.name.localeCompare(b.name,'de'));

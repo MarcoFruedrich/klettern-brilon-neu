@@ -71,4 +71,35 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   assert.equal(reactivate.status,200);
   publicOffers=await (await fetch(root+'/api/angebote')).json();
   assert.equal(publicOffers.length,1,'Aktivierte Programme lassen sich wieder veröffentlichen');
+
+  const secondCreated=await fetch(root+'/api/admin/angebote',{method:'POST',headers,
+    body:JSON.stringify({...program,name:'Bouldern am Turm'})});
+  assert.equal(secondCreated.status,201);
+  const secondId=(await secondCreated.json()).id;
+  const secondActivate=await fetch(root+`/api/admin/angebote/${secondId}`,{method:'PATCH',headers,
+    body:JSON.stringify({...fields,name:'Bouldern am Turm',aktiv:true})});
+  assert.equal(secondActivate.status,200);
+  const badOrder=await fetch(root+'/api/admin/angebote/reihenfolge',{method:'PATCH',headers,
+    body:JSON.stringify({ids:[id,id]})});
+  assert.equal(badOrder.status,400,'Doppelte Programm-IDs werden in der Reihenfolge abgelehnt');
+  const reorder=await fetch(root+'/api/admin/angebote/reihenfolge',{method:'PATCH',headers,
+    body:JSON.stringify({ids:[secondId,id]})});
+  assert.equal(reorder.status,200);
+  publicOffers=await (await fetch(root+'/api/angebote')).json();
+  assert.deepEqual(publicOffers.map(item=>item.name),['Bouldern am Turm','Klettern am Turm']);
+
+  const archived=await fetch(root+`/api/admin/angebote/${id}/archivieren`,{method:'PATCH',headers,
+    body:JSON.stringify({archiviert:true})});
+  assert.equal(archived.status,200);
+  assert.equal((await archived.json()).archiviert,true);
+  publicOffers=await (await fetch(root+'/api/angebote')).json();
+  assert.deepEqual(publicOffers.map(item=>item.name),['Bouldern am Turm'],
+    'Archivierte Angebote werden nicht mehr öffentlich buchbar angezeigt');
+  const archivedAdmin=(await (await fetch(root+'/api/admin/angebote',{headers:{Cookie:cookie}})).json())
+    .find(item=>item.id===id);
+  assert.equal(archivedAdmin.archiviert,true,'Archivierte Programme bleiben in der Verwaltung erhalten');
+  const restore=await fetch(root+`/api/admin/angebote/${id}/archivieren`,{method:'PATCH',headers,
+    body:JSON.stringify({archiviert:false})});
+  assert.equal(restore.status,200);
+  assert.equal((await restore.json()).archiviert,false);
 });
