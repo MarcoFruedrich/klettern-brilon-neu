@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const net = require('node:net');
 const path = require('node:path');
 const sharp = require('sharp');
-const { fotoBereinigen } = require('../lib/stationspruefung');
+const { fotoBereinigen,passwortHash } = require('../lib/stationspruefung');
 const { heuteInBerlin } = require('../lib/kalendertag');
 
 const integrationUrl = process.env.PG_INTEGRATION_URL;
@@ -34,6 +34,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     cwd: repo, stdio: ['ignore', 'ignore', 'pipe'], env: {
       ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: integrationUrl,
       DATABASE_SSL_MODE: 'disable', RUN_SCHEMA_MIGRATIONS: 'true',
+      PUBLIC_BASE_URL:`http://127.0.0.1:${port}`,
       BREVO_API_KEY: '', BREVO_SENDER_EMAIL: '', BOOKING_NOTIFY_EMAIL: '',
       SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_PATH: '', MOCK_PG: '', MOCK_MALWARE_SCAN: '1',
       ADMIN_USER: 'brilon-ci', ADMIN_PASSWORD: 'local-only-password',
@@ -254,16 +255,89 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const adminPost=(url,data)=>fetch(root+url,{method:'POST',headers:{
     Origin:root,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf
   },body:JSON.stringify(data)});
-  const staffData={name:'CI Prüferin',email:'inspektion@example.test',
-    passwort:'CI-Fachkraft-Passwort-2026!'};
+  const staffData={name:'CI Prüferin',email:'inspektion@example.test'};
   const employee=await adminPost('/api/admin/pruefung/mitarbeitende',staffData);
-  assert.equal(employee.status,201,'Mitarbeiterkonto soll im Test anlegbar sein');
-  const savedEmployee=await employee.json();
-  assert.ok(savedEmployee.id);
-  assert.ok(!JSON.stringify(savedEmployee).includes('passwort'));
-  const station=await adminPost('/api/admin/pruefung/stationen',{name:'Kletterwand CI'});
+  assert.equal(employee.status,201,'Einladung soll im Test angelegt werden');
+  const invitation=await employee.json();
+  assert.equal(invitation.emailVersand,'fehlgeschlagen','Ohne Mailkonfiguration wird kein Versand behauptet');
+  assert.ok(invitation.registrierungsLink.startsWith(root+'/mitarbeiter-registrierung.html?token='));
+  const invitationToken=new URL(invitation.registrierungsLink).searchParams.get('token');
+  const invitationDetails=await fetch(root+'/api/pruefung/einladung?token='+encodeURIComponent(invitationToken));
+  assert.equal(invitationDetails.status,200);
+  assert.equal((await invitationDetails.json()).email,staffData.email);
+  const disposableInvite=await adminPost('/api/admin/pruefung/mitarbeitende',{
+    name:'CI Einladungstest',email:'einladungstest@example.test'});
+  assert.equal(disposableInvite.status,201);
+  const disposableInviteData=await disposableInvite.json();
+  const oldInviteToken=new URL(disposableInviteData.registrierungsLink).searchParams.get('token');
+  const renewedInvite=await adminPost('/api/admin/pruefung/mitarbeitende',{
+    name:'CI Einladungstest',email:'einladungstest@example.test'});
+  assert.equal(renewedInvite.status,201,'Verwaltung kann einen frischen Einladungslink ausstellen');
+  const renewedInviteData=await renewedInvite.json();
+  const renewedInviteToken=new URL(renewedInviteData.registrierungsLink).searchParams.get('token');
+  assert.equal((await fetch(root+'/api/pruefung/einladung?token='+encodeURIComponent(oldInviteToken))).status,410,
+    'Erneuerte Einladung macht den zuvor ausgegebenen Link ungültig');
+  const revokeInvite=await fetch(root+'/api/admin/pruefung/mitarbeitende/'+renewedInviteData.id+'/einladung',{
+    method:'DELETE',headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
+  assert.equal(revokeInvite.status,200,'Verwaltung kann offene Einladungen widerrufen');
+  assert.equal((await fetch(root+'/api/pruefung/einladung?token='+encodeURIComponent(renewedInviteToken))).status,410,
+    'Widerruf macht den Registrierungslink sofort ungültig');
+  const staffDataPassword='CI-Fachkraft-Passwort-2026!';
+  const certificateBytes=await sharp({create:{width:900,height:1200,channels:3,background:'#fafafa'}})
+    .jpeg().toBuffer();
+  const certificatePhoto='data:image/jpeg;base64,'+certificateBytes.toString('base64');
+  const registration=await fetch(root+'/api/pruefung/registrieren',{method:'POST',
+    headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({token:invitationToken,name:staffData.name,telefon:'+49 123 456',
+      strasse:'Musterstraße 12',plz:'59929',wohnort:'Brilon',
+      qualifikationen:'Erste Hilfe\nKletterqualifikation',
+      bescheinigungen:[{bezeichnung:'Kletterqualifikation',dateiname:'Kletterschein.png',daten:certificatePhoto}],
+      passwort:staffDataPassword})});
+  assert.equal(registration.status,201,'Einladung muss zur Registrierung führen');
+  assert.equal((await registration.json()).status,'freigabe_ausstehend');
+  assert.equal((await fetch(root+'/api/pruefung/registrieren',{method:'POST',
+    headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({token:invitationToken,name:staffData.name,passwort:staffDataPassword})})).status,410,
+  'Einladungslink ist nach der Registrierung verbraucht');
+  const pendingLogin=await fetch(root+'/api/pruefung/login',{method:'POST',
+    headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({email:staffData.email,passwort:staffDataPassword})});
+  assert.equal(pendingLogin.status,401,'Registrierte Mitarbeitende warten vor der Freigabe');
+  const staffListResponse=await fetch(root+'/api/admin/pruefung/mitarbeitende',{headers:{Cookie:cookie}});
+  const staffList=await staffListResponse.json();
+  const pendingStaff=staffList.find(person=>person.email===staffData.email);
+  assert.equal(pendingStaff.status,'freigabe_ausstehend');
+  assert.equal(pendingStaff.telefon,'+49 123 456');
+  assert.equal(pendingStaff.qualifikationen,'Erste Hilfe\nKletterqualifikation');
+  assert.equal(pendingStaff.strasse,'Musterstraße 12');
+  assert.equal(pendingStaff.plz,'59929');
+  assert.deepEqual(pendingStaff.bescheinigungen.map(x=>x.bezeichnung),['Kletterqualifikation']);
+  const bypassApproval=await fetch(root+'/api/admin/pruefung/mitarbeitende/'+pendingStaff.id+'/reaktivieren',{
+    method:'PATCH',headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},
+    body:JSON.stringify({passwort:'Umgehung-Unmoeglich-2026!'})});
+  assert.equal(bypassApproval.status,409,'Eine offene Registrierung darf nicht als Reaktivierung freigeschaltet werden');
+  const authorizedPlace=await pool.query('SELECT id FROM brilon_orte WHERE aktiv=true ORDER BY id LIMIT 1');
+  assert.ok(authorizedPlace.rowCount,'Die Testmigration muss Standardstandorte anlegen');
+  const approvedPlaceId=Number(authorizedPlace.rows[0].id);
+  const invalidApproval=await fetch(root+'/api/admin/pruefung/mitarbeitende/'+pendingStaff.id+'/freigeben',{
+    method:'PATCH',headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},
+    body:JSON.stringify({standorte:[approvedPlaceId],qualifikationen:['Nicht nachgewiesen']})});
+  assert.equal(invalidApproval.status,400,'Nicht angegebene oder nicht belegte Qualifikationen dürfen nicht freigegeben werden');
+  const approval=await fetch(root+'/api/admin/pruefung/mitarbeitende/'+pendingStaff.id+'/freigeben',{
+    method:'PATCH',headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},
+    body:JSON.stringify({standorte:[approvedPlaceId],qualifikationen:['Kletterqualifikation']})});
+  assert.equal(approval.status,200,'Verwaltung kann einen registrierten Zugang freigeben');
+  const station=await adminPost('/api/admin/pruefung/stationen',{
+    name:'Kletterwand CI',ortId:approvedPlaceId,qualifikation:'Kletterqualifikation'});
   assert.equal(station.status,201);
   const stationId=(await station.json()).id;
+  const certificateDownload=await fetch(root+'/api/admin/pruefung/mitarbeitende/'+pendingStaff.id+
+    '/bescheinigungen/'+pendingStaff.bescheinigungen[0].id,{headers:{Cookie:cookie}});
+  assert.equal(certificateDownload.status,200,'Bescheinigungsfoto ist nur über die Adminroute abrufbar');
+  assert.match(certificateDownload.headers.get('content-type'),/image\/jpeg/);
+  assert.equal((await fetch(root+'/api/admin/pruefung/mitarbeitende/'+pendingStaff.id+
+    '/bescheinigungen/'+pendingStaff.bescheinigungen[0].id)).status,401,
+    'Bescheinigungsfoto darf ohne Verwaltungssitzung nicht abgerufen werden');
   const unauthorizedCode=await fetch(root+'/api/admin/pruefung/code',{method:'POST'});
   assert.equal(unauthorizedCode.status,401,'Codeanzeige ist nur dem Administrator erlaubt');
   const issued=await adminPost('/api/admin/pruefung/code',{});
@@ -272,7 +346,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.match(code,/^[0-9]{6}$/);
   const credentials=await fetch(root+'/api/pruefung/login',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
-    body:JSON.stringify({email:staffData.email,passwort:staffData.passwort})});
+    body:JSON.stringify({email:staffData.email,passwort:staffDataPassword})});
   assert.equal(credentials.status,200);
   const staffCookie=credentials.headers.get('set-cookie')?.split(';',1)[0];
   assert.ok(staffCookie);
@@ -305,6 +379,32 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     'Tests dürfen keine realen Mangel-E-Mails versenden');
   assert.equal((await userPost('/api/pruefung/berichte',input)).status,403,
     'Jede weitere Prüfung benötigt eine neue Freischaltung');
+  const ownHistoryResponse=await fetch(root+'/api/pruefung/berichte',{headers:{Cookie:staffCookie}});
+  assert.equal(ownHistoryResponse.status,200,'Mitarbeitende können ihren eigenen Verlauf lesen');
+  const ownHistory=await ownHistoryResponse.json();
+  const ownReport=ownHistory.find(p=>p.id===receipt.id);
+  assert.ok(ownReport,'Der gespeicherte Bericht erscheint im persönlichen Verlauf');
+  assert.equal(ownReport.pruefungen[0].zustand,'mangel');
+  assert.equal(ownReport.pruefungen[0].foto,undefined,
+    'Der persönliche Verlauf gibt keine Fotodaten zurück');
+  const secondStaffData={name:'Zweite CI-Prüferin',email:'inspektion-zwei@example.test',
+    passwort:'CI-Fachkraft-Passwort-2026-zwei!' };
+  await pool.query(`INSERT INTO brilon_pruef_mitarbeitende
+    (id,name,email,passwort_hash,aktiv,registriert_am,freigabe_am)
+    VALUES($1,$2,$3,$4,true,NOW(),NOW())`,
+  [crypto.randomUUID(),secondStaffData.name,secondStaffData.email,passwortHash(secondStaffData.passwort)]);
+  const secondLogin=await fetch(root+'/api/pruefung/login',{method:'POST',
+    headers:{Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({email:secondStaffData.email,passwort:secondStaffData.passwort})});
+  assert.equal(secondLogin.status,200);
+  const secondStaffSessionCookie=secondLogin.headers.get('set-cookie')?.split(';',1)[0];
+  const secondStations=await fetch(root+'/api/pruefung/stationen',{headers:{Cookie:secondStaffSessionCookie}});
+  assert.deepEqual((await secondStations.json()).stationen,[],
+    'Ein aktives Mitarbeiterkonto ohne Standort- und Qualifikationsfreigabe sieht keine Stationen');
+  const secondHistory=await fetch(root+'/api/pruefung/berichte',{
+    headers:{Cookie:secondStaffSessionCookie}});
+  assert.deepEqual(await secondHistory.json(),[],
+    'Ein anderes Mitarbeiterkonto erhält keine fremden Prüfprotokolle');
   const reportResponse=await fetch(root+'/api/admin/pruefung/berichte',{headers:{Cookie:cookie}});
   assert.equal(reportResponse.status,200);
   const reports=await reportResponse.json();
@@ -389,7 +489,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.match(history.find(x=>x.art==='freigabe').verantwortlich,/Fachprüferin/);
 
   // Ein kleiner Hinweis löst weder eine Sperre noch einen Mängelalarm aus.
-  const extraStation=await adminPost('/api/admin/pruefung/stationen',{name:'Hinweistest Bouldermatte'});
+  const extraStation=await adminPost('/api/admin/pruefung/stationen',{
+    name:'Hinweistest Bouldermatte',ortId:approvedPlaceId,qualifikation:'Kletterqualifikation'});
   assert.equal(extraStation.status,201);
   const extraId=(await extraStation.json()).id;
   const siteCode=async()=>{
@@ -574,8 +675,10 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   // without bypassing the production three-requests-per-ten-minutes rate limit.
   const extraStaff={name:'CI Zweitprüfer',email:'zweitpruefer@example.test',
     passwort:'Zweites-Prueferpasswort-2026!'};
-  const extraAccount=await adminPost('/api/admin/pruefung/mitarbeitende',extraStaff);
-  assert.equal(extraAccount.status,201);
+  await pool.query(`INSERT INTO brilon_pruef_mitarbeitende
+    (id,name,email,passwort_hash,aktiv,registriert_am,freigabe_am)
+    VALUES($1,$2,$3,$4,true,NOW(),NOW())`,
+  [crypto.randomUUID(),extraStaff.name,extraStaff.email,passwortHash(extraStaff.passwort)]);
   const extraLogin=await fetch(root+'/api/pruefung/login',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({email:extraStaff.email,passwort:extraStaff.passwort})});
@@ -690,7 +793,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     'Historische Prüfberichte müssen auch nach Stationsstilllegung erhalten bleiben');
 
   // Staff credentials must never revive with the old password or old sessions.
-  const employeePath='/api/admin/pruefung/mitarbeitende/'+savedEmployee.id;
+  const employeePath='/api/admin/pruefung/mitarbeitende/'+pendingStaff.id;
   assert.equal((await patchAdmin(employeePath+'/reaktivieren',
     {passwort:'Ohne-Vorherige-Deaktivierung'})).status,409);
   assert.equal((await patchAdmin(employeePath+'/passwort-setzen',{passwort:'short'})).status,400);
@@ -704,7 +807,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const tryLogin=(passwort)=>fetch(root+'/api/pruefung/login',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({email:staffData.email,passwort})});
-  assert.equal((await tryLogin(staffData.passwort)).status,401);
+  assert.equal((await tryLogin(staffDataPassword)).status,401);
   const freshLogin=await tryLogin('Aktualisiert-Sicher-2026-!');
   assert.equal(freshLogin.status,200);
   const freshCookie=freshLogin.headers.get('set-cookie').split(';')[0];
@@ -772,7 +875,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.ok(overview.meldungen.some(x=>x.bericht_id===receipt.id));
   assert.equal(JSON.stringify(overview).includes(foto),false,
     'Never include inspection photo bytes in the admin dashboard.');
-  assert.equal(JSON.stringify(overview).includes(staffData.passwort),false);
+  assert.equal(JSON.stringify(overview).includes(staffDataPassword),false);
   assert.equal((await stationList()).find(x=>x.id===extraId).aktiv,false,
     'Reading the overview must not reactivate or release a station.');
   assert.ok((await stationList()).find(x=>x.id===extraId).gesperrt_am);

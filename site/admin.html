@@ -47,7 +47,7 @@
             <a href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
             <a href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
             <a href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
-            <a href="#settings-section" data-admin-view-link>Einstellungen</a>
+            <a href="#standorte-section" data-admin-view-link>Standorte</a>
           </nav>
         </aside>
         <div class="admin-content">
@@ -281,14 +281,14 @@
   <div id="angebote-admin-liste"></div>
 </section>
 
-<section id="settings-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="settings-heading">
-  <h2 id="settings-heading">Einstellungen · Veranstaltungsorte</h2>
-  <p>Orte hier ergänzen. Neue Programme können anschließend einen der aktiven Orte auswählen. Bestehende Programme und Buchungen werden durch das Ergänzen nicht verändert.</p>
+<section id="standorte-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="standorte-heading">
+  <h2 id="standorte-heading">Standorte</h2>
+  <p>Standorte verwalten. Aktive Standorte können neuen Programmen zugeordnet werden. Inaktive Standorte bleiben bei bestehenden Programmen und Buchungen erhalten.</p>
   <form id="admin-place-form">
-    <label>Neuer Veranstaltungsort
+    <label>Neuer Standort
       <input name="name" maxlength="80" placeholder="z. B. Sundern" required>
     </label>
-    <button class="btn" type="submit">Veranstaltungsort hinzufügen</button>
+    <button class="btn" type="submit">Standort hinzufügen</button>
   </form>
   <p id="admin-place-status" role="status" aria-live="polite"></p>
   <div id="admin-place-list" class="admin-grid"></div>
@@ -385,18 +385,20 @@
         <div id="pruef-uebersicht-inhalt"></div>
       </section>
       <form id="pruef-personal-form">
-        <h3>Mitarbeiterzugang anlegen</h3>
+        <h3>Mitarbeiter zur Registrierung einladen</h3>
+        <p class="hint">Die Verwaltung sendet einen persönlichen Registrierungslink. Nach der Eingabe der Kontaktdaten und Qualifikationen bleibt der Zugang gesperrt, bis die Verwaltung ihn ausdrücklich freigibt.</p>
         <label>Name<input name="name" maxlength="120" required></label>
         <label>E-Mail<input name="email" type="email" maxlength="180" required></label>
-        <label>Persönliches Startpasswort (mindestens 12 Zeichen)
-          <input name="passwort" type="password" minlength="12" autocomplete="new-password" required></label>
-        <button class="btn" type="submit">Mitarbeiter anlegen</button>
+        <button class="btn" type="submit">Registrierungslink senden</button>
       </form>
-      <p id="pruef-personal-status" role="status"></p>
+      <p id="pruef-personal-status" role="status" aria-live="polite"></p>
+      <h3>Mitarbeiter und offene Einladungen</h3>
       <div id="pruef-personal-list"></div>
       <form id="pruef-station-form">
         <h3>Station anlegen</h3>
         <label>Stationsbezeichnung<input name="name" maxlength="100" required placeholder="Kletterwand links"></label>
+        <label>Standort<select id="pruef-station-ort" name="ortId" required></select></label>
+        <label>Erforderliche Qualifikation<input name="qualifikation" maxlength="100" required placeholder="z. B. Kletterprüfung"></label>
         <button class="btn secondary" type="submit">Station speichern</button>
       </form>
       <p id="pruef-station-status" role="status"></p>

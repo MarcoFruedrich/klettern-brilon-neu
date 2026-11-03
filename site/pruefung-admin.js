@@ -4,8 +4,18 @@
   const find=id=>document.getElementById(id);
   const elt=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n;};
   let initialized=false;
+  let activePlaces=[];
   async function refresh(){
     if(!initialized||find('workspace')?.hidden)return;
+    try{activePlaces=(await api('/api/admin/orte')).filter(place=>place.aktiv);}
+    catch{activePlaces=[];}
+    const stationPlace=find('pruef-station-ort');
+    if(stationPlace){
+      const current=stationPlace.value;stationPlace.replaceChildren();
+      const empty=elt('option','Standort auswählen');empty.value='';stationPlace.append(empty);
+      for(const place of activePlaces){const option=elt('option',place.name);option.value=String(place.id);stationPlace.append(option);}
+      if(activePlaces.some(place=>String(place.id)===current))stationPlace.value=current;
+    }
     for(const [url,container,statusId,render] of [
       ['/api/admin/pruefung/uebersicht','pruef-uebersicht-inhalt','pruef-uebersicht-status',renderSafetyOverview],
       ['/api/admin/pruefung/mitarbeitende','pruef-personal-list','pruef-personal-status',renderStaff],
@@ -15,7 +25,7 @@
       ['/api/admin/pruefung/meldungen','pruef-mail-list','pruef-mail-status',renderMailStatus],
       ['/api/admin/pruefung/tablets','tablet-admin-list','tablet-admin-status',renderTablets]
     ]){
-      try{render(find(container),await api(url));}
+      try{render(find(container),await api(url),activePlaces);}
       catch(err){find(statusId).textContent='Laden fehlgeschlagen: '+err.message;}
     }
   }
@@ -93,12 +103,124 @@
       target.append(box);
     }
   }
-  function renderStaff(target,people){
+  function zeigeEinladungslink(status,result){
+    if(result.emailVersand==='gesendet'){
+      status.textContent='Neue Einladung an '+result.email+' versandt. Der Mailanbieter hat die Nachricht angenommen; eine Zustellung ist damit nicht bestätigt.';
+      return;
+    }
+    status.textContent=result.emailVersand==='versand_ungeklaert'?
+      'Versandstatus unklar. Bitte zuerst den Postausgang prüfen. Der neue Link ist sieben Tage gültig:':
+      'E-Mail konnte nicht versandt werden. Den neuen Link sicher an '+result.email+' weitergeben:';
+    const link=elt('a',result.registrierungsLink);link.href=result.registrierungsLink;
+    link.className='invite-link';link.style.display='block';link.style.overflowWrap='anywhere';
+    const copy=elt('button','Registrierungslink kopieren');copy.type='button';copy.className='btn secondary';
+    copy.addEventListener('click',async()=>{
+      try{await navigator.clipboard.writeText(result.registrierungsLink);copy.textContent='Link kopiert';}
+      catch{status.append(elt('p','Kopieren nicht verfügbar. Den Link über den Linktext öffnen und aus der Adresszeile kopieren.'));}
+    });
+    status.append(link,copy);
+  }
+  async function einladungSenden(name,email){
+    const status=find('pruef-personal-status');status.replaceChildren();
+    try{
+      const result=await api('/api/admin/pruefung/mitarbeitende',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email})});
+      zeigeEinladungslink(status,result);
+      await refresh();
+      return true;
+    }catch(error){status.textContent='Einladung fehlgeschlagen: '+error.message;return false;}
+  }
+  function renderStaff(target,people,places=activePlaces){
     target.replaceChildren();
     for(const person of people){
       const card=elt('article');card.className='booking';
-      card.append(elt('strong',person.name+' · '+person.email),
-        elt('p',person.aktiv?'Zugang aktiv':'Zugang deaktiviert'));
+      card.append(elt('strong',person.name+' · '+person.email));
+      const statusText=person.status==='eingeladen'?'Einladung offen – Registrierung noch ausstehend':
+        person.status==='freigabe_ausstehend'?'Registrierung abgeschlossen – Freigabe erforderlich':
+        person.aktiv?'Zugang aktiv':'Zugang deaktiviert';
+      card.append(elt('p',statusText));
+      if(person.ablauf){
+        const expiry=new Date(person.ablauf);
+        card.append(elt('p','Einladung gültig bis '+expiry.toLocaleString('de-DE')));
+      }
+      if(person.telefon)card.append(elt('p','Telefon: '+person.telefon));
+      if(person.strasse||person.plz||person.wohnort)
+        card.append(elt('p','Anschrift: '+[person.strasse,[person.plz,person.wohnort].filter(Boolean).join(' ')].filter(Boolean).join(', ')));
+      if(person.qualifikationen)card.append(elt('p','Qualifikationen / Erfahrung: '+person.qualifikationen));
+      for(const certificate of person.bescheinigungen||[]){
+        const item=elt('div');item.className='certificate-review';
+        const image=document.createElement('img');
+        image.src='/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+
+          '/bescheinigungen/'+encodeURIComponent(certificate.id);
+        image.alt='Foto der Bescheinigung: '+certificate.bezeichnung;image.loading='lazy';
+        image.className='certificate-preview';item.append(image);
+        const link=elt('a',certificate.bezeichnung+' · '+certificate.dateiname);
+        link.href=image.src;link.download=certificate.dateiname;item.append(link);card.append(item);
+      }
+      if((person.freigaben||[]).length)
+        card.append(elt('p','Zugewiesene Freigaben: '+person.freigaben.map(item=>item.ort+' · '+item.qualifikation+
+          (item.ortAktiv===false?' (Standort inaktiv)':'')).join('; ')));
+      if(person.status==='freigabe_ausstehend'||person.freigegeben){
+        const pending=person.status==='freigabe_ausstehend';
+        const grantPanel=elt('div');grantPanel.className='staff-grants';
+        grantPanel.append(elt('h4',pending?'Standorte und geprüfte Qualifikationen freigeben':'Standort- und Qualifikationsfreigaben verwalten'));
+        const placeField=elt('fieldset');placeField.append(elt('legend','Standorte (mehrere auswählbar)'));
+        const assignedPlaces=(person.freigaben||[]).filter(grant=>!places.some(place=>Number(place.id)===Number(grant.ortId)))
+          .map(grant=>({id:grant.ortId,name:grant.ort,aktiv:grant.ortAktiv}));
+        const availablePlaces=[...places,...assignedPlaces];
+        for(const place of availablePlaces){
+          const label=elt('label');label.className='check';
+          const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(place.id);
+          checkbox.checked=(person.freigaben||[]).some(grant=>Number(grant.ortId)===Number(place.id));
+          checkbox.className='staff-grant-place';label.append(checkbox,elt('span',place.name));placeField.append(label);
+        }
+        if(!availablePlaces.length)placeField.append(elt('p','Keine aktiven Standorte vorhanden.'));
+        grantPanel.append(placeField);
+        const qualifications=[...(person.qualifikationen||'').split(/[\r\n,;]+/),
+          ...(person.bescheinigungen||[]).map(item=>item.bezeichnung),
+          ...(person.freigaben||[]).map(item=>item.qualifikation)]
+          .map(value=>value.trim()).filter(Boolean);
+        const uniqueQualifications=[...new Set(qualifications)];
+        const qualificationField=elt('fieldset');qualificationField.append(elt('legend','Geprüfte Qualifikationen'));
+        for(const qualification of uniqueQualifications){
+          const label=elt('label');label.className='check';
+          const checkbox=document.createElement('input');checkbox.type='checkbox';
+          checkbox.value=qualification;checkbox.className='staff-grant-qualification';
+          checkbox.checked=(person.freigaben||[]).some(grant=>grant.qualifikation===qualification);
+          label.append(checkbox,elt('span',qualification));qualificationField.append(label);
+        }
+        if(!uniqueQualifications.length)qualificationField.append(elt('p','Keine Qualifikationen oder Bescheinigungen eingetragen.'));
+        grantPanel.append(qualificationField);
+        const approve=elt('button',pending?'Auswahl freigeben und Zugang aktivieren':'Freigaben speichern');
+        approve.type='button';approve.className='btn';approve.disabled=!availablePlaces.length||!uniqueQualifications.length;
+        approve.addEventListener('click',async()=>{
+          const standorte=[...grantPanel.querySelectorAll('.staff-grant-place:checked')].map(input=>Number(input.value));
+          const qualifikationen=[...grantPanel.querySelectorAll('.staff-grant-qualification:checked')].map(input=>input.value);
+          if(pending&&(!standorte.length||!qualifikationen.length)){
+            find('pruef-personal-status').textContent='Mindestens einen Standort und eine geprüfte Qualifikation auswählen.';return;
+          }
+          const confirmation=pending?'Ausgewählte Standorte und Qualifikationen freigeben und Mitarbeiterzugang aktivieren?':
+            standorte.length&&qualifikationen.length?'Freigaben durch die ausgewählten Standorte und Qualifikationen ersetzen?':
+            'Alle Standort- und Qualifikationsfreigaben entziehen? Laufende Sitzungen werden beendet.';
+          if(!confirm(confirmation))return;
+          approve.disabled=true;
+          try{
+            const result=await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+
+              (pending?'/freigeben':'/freigaben'),{
+              method:pending?'PATCH':'PUT',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({standorte,qualifikationen})
+            });
+            find('pruef-personal-status').textContent=pending?result.emailVersand==='gesendet'?
+              'Ausgewählte Freigaben erstellt und Mitarbeiterzugang aktiviert. Der Mailanbieter hat die Nachricht angenommen; eine Zustellung ist damit nicht bestätigt.':
+              'Ausgewählte Freigaben erstellt und Mitarbeiterzugang aktiviert. Die Benachrichtigung konnte nicht bestätigt werden; bitte die Person direkt informieren.':
+              standorte.length?'Freigaben aktualisiert. Alle laufenden Mitarbeitersitzungen wurden beendet.':'Alle Freigaben entzogen. Alle laufenden Mitarbeitersitzungen wurden beendet.';
+            await refresh();
+          }catch(err){find('pruef-personal-status').textContent='Freigabe fehlgeschlagen: '+err.message;approve.disabled=false;}
+        });
+        grantPanel.append(approve);
+        if(!pending)grantPanel.append(elt('p','Änderungen beenden alle laufenden Mitarbeitersitzungen. Inaktive Standorte bleiben sichtbar, gewähren aber keinen Zugriff.'));
+        card.append(grantPanel);
+      }
       if(person.aktiv){
         const stop=elt('button','Zugang deaktivieren');stop.type='button';stop.className='btn secondary';
         stop.addEventListener('click',async()=>{
@@ -110,6 +232,32 @@
           }catch(err){find('pruef-personal-status').textContent='Fehler: '+err.message;stop.disabled=false;}
         });
         card.append(stop);
+      }
+      if(person.art==='einladung'){
+        const resend=elt('button','Neue Einladung senden');resend.type='button';resend.className='btn secondary';
+        resend.addEventListener('click',async()=>{
+          if(!confirm('Eine neue Einladung an '+person.email+' senden? Der bisherige Link wird ungültig.'))return;
+          resend.disabled=true;
+          if(!await einladungSenden(person.name,person.email))resend.disabled=false;
+        });
+        const revoke=elt('button','Einladung widerrufen');revoke.type='button';revoke.className='btn secondary';
+        revoke.addEventListener('click',async()=>{
+          if(!confirm('Einladung für '+person.email+' widerrufen? Der Link kann danach nicht mehr verwendet werden.'))return;
+          revoke.disabled=true;
+          try{
+            await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/einladung',{method:'DELETE'});
+            find('pruef-personal-status').textContent='Einladung für '+person.email+' wurde widerrufen.';
+            await refresh();
+          }catch(error){
+            find('pruef-personal-status').textContent='Einladung konnte nicht widerrufen werden: '+error.message;
+            revoke.disabled=false;
+          }
+        });
+        card.append(resend,revoke);
+        target.append(card);continue;
+      }
+      if(person.status==='freigabe_ausstehend'){
+        target.append(card);continue;
       }
       const field=elt('label',person.aktiv?'Neues Passwort (alle Sitzungen beenden)':
         'Neues Startpasswort für die Reaktivierung');
@@ -142,6 +290,12 @@
       card.append(button);target.append(card);
     }
   }
+  function standortAuswahl(selectedId){
+    const select=document.createElement('select');
+    const empty=elt('option','Standort auswählen');empty.value='';select.append(empty);
+    for(const place of activePlaces){const option=elt('option',place.name);option.value=String(place.id);select.append(option);}
+    select.value=selectedId?String(selectedId):'';return select;
+  }
   function renderStations(target,stations){
     target.replaceChildren();
     for(const station of stations){
@@ -150,6 +304,31 @@
       panel.append(elt('strong',station.name),
         elt('p',!station.aktiv?'STATION DEAKTIVIERT – NICHT BENUTZEN':
           blocked?'GESPERRT – NICHT BENUTZEN':'Nicht gesperrt – Station aktiv'));
+      panel.append(elt('p',station.ort&&station.qualifikation?
+        'Standort: '+station.ort+' · Erforderliche Qualifikation: '+station.qualifikation:
+        'Noch keinem Standort und keiner Qualifikation zugeordnet. Mitarbeitende können diese Station bis zur Zuordnung nicht prüfen.'));
+      const assignment=document.createElement('form');assignment.className='station-assignment-form';
+      const placeLabel=elt('label','Standort');
+      const placeSelect=standortAuswahl(station.ort_id);placeSelect.required=true;placeLabel.append(placeSelect);
+      const qualificationLabel=elt('label','Erforderliche Qualifikation');
+      const qualificationInput=document.createElement('input');qualificationInput.type='text';
+      qualificationInput.maxLength=100;qualificationInput.required=true;
+      qualificationInput.value=station.qualifikation||'';qualificationInput.placeholder='z. B. Kletterprüfung';
+      qualificationLabel.append(qualificationInput);
+      const save=elt('button','Zuordnung speichern');save.type='submit';save.className='btn secondary';
+      assignment.append(placeLabel,qualificationLabel,save);
+      assignment.addEventListener('submit',async event=>{
+        event.preventDefault();save.disabled=true;
+        try{
+          await api('/api/admin/pruefung/stationen/'+encodeURIComponent(station.id)+'/zuordnung',{
+            method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ortId:placeSelect.value,qualifikation:qualificationInput.value})
+          });
+          find('pruef-station-status').textContent='Standort- und Qualifikationszuordnung für '+station.name+' gespeichert.';
+          await refresh();
+        }catch(error){find('pruef-station-status').textContent='Zuordnung fehlgeschlagen: '+error.message;save.disabled=false;}
+      });
+      panel.append(assignment);
       if(blocked){
         panel.append(elt('p','Grund: '+(station.sperrgrund||'Nicht angegeben')));
         const button=elt('button','Nach fachlicher Prüfung freigeben');
@@ -404,7 +583,8 @@
         elt('p','Prüfer: '+report.pruefer+' · Ergebnis: '+(report.hat_mangel?'Sicherheitsmangel – gesperrte Station prüfen':
           report.hat_hinweis?'Hinweis(e) zur Prüfung vorgemerkt':'Kein Mangel gemeldet')));
       for(const p of report.pruefungen){
-        article.append(elt('p',(p.station||'Station')+': '+
+        article.append(elt('p',(p.station||'Station')+
+          (p.ort?' · '+p.ort:'')+(p.qualifikation?' · '+p.qualifikation:'')+': '+
           (p.zustand==='ok'?'In Ordnung':p.zustand==='hinweis'?
           'Hinweis – zur Prüfung vorgemerkt: '+p.beschreibung:'Sicherheitsmangel – '+p.beschreibung)));
         if(p.hatFoto){
@@ -421,20 +601,19 @@
   find('pruef-personal-form')?.addEventListener('submit',async event=>{
     event.preventDefault();const form=event.currentTarget;
     const status=find('pruef-personal-status');
-    try{
-      await api('/api/admin/pruefung/mitarbeitende',{method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(Object.fromEntries(new FormData(form)))});
-      form.reset();status.textContent='Mitarbeiter angelegt. Passwort sicher übermitteln.';
-      await refresh();
-    }catch(err){status.textContent='Fehler: '+err.message;}
+    const submit=form.querySelector('button[type="submit"]');
+    status.replaceChildren();submit.disabled=true;
+    const values=Object.fromEntries(new FormData(form));
+    try{if(await einladungSenden(values.name,values.email))form.reset();}
+    finally{submit.disabled=false;}
   });
   find('pruef-station-form')?.addEventListener('submit',async event=>{
     event.preventDefault();const form=event.currentTarget;
     try{
       await api('/api/admin/pruefung/stationen',{method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(Object.fromEntries(new FormData(form)))});
+        body:JSON.stringify({...Object.fromEntries(new FormData(form)),ortId:form.elements.ortId.value,
+          qualifikation:form.elements.qualifikation.value})});
       form.reset();find('pruef-station-status').textContent='Station gespeichert.';
       await refresh();
     }catch(err){find('pruef-station-status').textContent='Fehler: '+err.message;}

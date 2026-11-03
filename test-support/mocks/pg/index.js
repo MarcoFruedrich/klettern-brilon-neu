@@ -26,7 +26,7 @@ class Pool {
 
   async run(sql, params, client=null) {
     if(process.env.RUN_PROGRAM_FIELDS_MIGRATION==='true'&&
-       /^\\s*ALTER TABLE brilon_angebote\\b/i.test(sql))
+       /^\s*ALTER TABLE brilon_angebote\b/i.test(sql))
       return {rows:[],rowCount:0};
     if(/^\s*BEGIN\b/i.test(sql))return {rows:[],rowCount:0};
     if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql)){

@@ -1676,13 +1676,20 @@ async function orteLaden(){
   if(!select&&!liste)return;
   try{
     const orte=await api('/api/admin/orte');
-    if(select){select.replaceChildren();for(const ort of orte){const o=el('option',ort.name);o.value=ort.name;select.append(o);}}
+    if(select){select.replaceChildren();for(const ort of orte.filter(item=>item.aktiv)){const o=el('option',ort.name);o.value=ort.name;select.append(o);}}
     if(liste){
       liste.replaceChildren();
-      if(!orte.length)liste.append(el('p','Noch keine Veranstaltungsorte angelegt.'));
-      for(const ort of orte){const card=el('article');card.className='booking';card.append(el('strong',ort.name),el('p','Aktiv und für neue Programme auswählbar'));liste.append(card);}
+      if(!orte.length)liste.append(el('p','Noch keine Standorte angelegt.'));
+      for(const ort of orte){
+        const card=el('article');card.className='booking';
+        const details=el('div');details.append(el('strong',ort.name),el('p',ort.aktiv?'Aktiv · für neue Programme auswählbar':'Inaktiv · bestehende Programme und Buchungen bleiben erhalten'));
+        const actions=el('div');actions.className='button-row';
+        const toggle=el('button',ort.aktiv?'Deaktivieren':'Aktivieren');toggle.type='button';toggle.className='btn secondary';toggle.dataset.placeAction='toggle';toggle.dataset.placeId=ort.id;toggle.dataset.active=String(ort.aktiv);
+        const remove=el('button','Löschen');remove.type='button';remove.className='btn danger';remove.dataset.placeAction='delete';remove.dataset.placeId=ort.id;
+        actions.append(toggle,remove);card.append(details,actions);liste.append(card);
+      }
     }
-  }catch(error){status.textContent='Veranstaltungsorte konnten nicht geladen werden: '+error.message;}
+  }catch(error){const message=document.getElementById('admin-place-status');if(message)message.textContent='Standorte konnten nicht geladen werden: '+error.message;}
 }
 
 document.getElementById('admin-place-form')?.addEventListener('submit',async event=>{
@@ -1694,8 +1701,33 @@ document.getElementById('admin-place-form')?.addEventListener('submit',async eve
       body:JSON.stringify({name:form.elements.name.value})});
     await orteLaden();
     const select=document.getElementById('angebot-ort');if(select)select.value=result.name;
-    form.reset();message.textContent=`Veranstaltungsort „${result.name}“ ist jetzt auswählbar.`;
-  }catch(error){message.textContent='Ort konnte nicht gespeichert werden: '+error.message;}
+    form.reset();message.textContent=`Standort „${result.name}“ ist jetzt auswählbar.`;
+  }catch(error){message.textContent='Standort konnte nicht gespeichert werden: '+error.message;}
+  finally{button.disabled=false;}
+});
+
+document.getElementById('admin-place-list')?.addEventListener('click',async event=>{
+  const button=event.target.closest('button[data-place-action]');
+  if(!button)return;
+  const message=document.getElementById('admin-place-status');
+  button.disabled=true;
+  try{
+    if(button.dataset.placeAction==='toggle'){
+      const aktiv=button.dataset.active!=='true';
+      const result=await api(`/api/admin/orte/${encodeURIComponent(button.dataset.placeId)}`,{
+        method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({aktiv})
+      });
+      await orteLaden();
+      message.textContent=`Standort „${result.name}“ wurde ${aktiv?'aktiviert':'deaktiviert'}.`;
+    }else if(button.dataset.placeAction==='delete'){
+      const card=button.closest('article');
+      const name=card?.querySelector('strong')?.textContent||'diesen Standort';
+      if(!window.confirm(`Standort „${name}“ endgültig löschen? Das ist nur möglich, wenn kein Programm ihn verwendet.`))return;
+      await api(`/api/admin/orte/${encodeURIComponent(button.dataset.placeId)}`,{method:'DELETE'});
+      await orteLaden();
+      message.textContent=`Standort „${name}“ wurde gelöscht.`;
+    }
+  }catch(error){message.textContent='Standort konnte nicht geändert werden: '+error.message;}
   finally{button.disabled=false;}
 });
 

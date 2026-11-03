@@ -9,7 +9,7 @@ Responsive Website, Buchungsanfragen, PostgreSQL-Anbindung und Verwaltungsbereic
 3. `npm start` starten und `http://localhost:3000` öffnen. Die Verwaltung liegt unter `/admin.html`.
 4. Automatisierte Fachtests mit `npm test` ausführen.
 
-Schemaänderungen sind standardmäßig deaktiviert. `RUN_SCHEMA_MIGRATIONS=true` darf nur in einer eigens angelegten Testdatenbank und nach Prüfung des Schemas gesetzt werden.
+Schemaänderungen sind standardmäßig deaktiviert. `RUN_SCHEMA_MIGRATIONS=true` darf nur in einer eigens angelegten Testdatenbank und nach Prüfung des Schemas gesetzt werden. Für den Mitarbeiter- und Stationsprüfungsbereich gibt es zusätzlich `RUN_PRUEF_SCHEMA_MIGRATION=true`; dieser einmalige Schalter legt nur die dafür benötigten Standort-, Mitarbeiter- und Prüfprotokolltabellen an. Nach erfolgreichem Start ist der Schalter wieder zu entfernen.
 
 ## Konfiguration
 
@@ -17,7 +17,7 @@ Schemaänderungen sind standardmäßig deaktiviert. `RUN_SCHEMA_MIGRATIONS=true`
 - Admin: `ADMIN_USER`, `ADMIN_PASSWORD`
 - Mailversand: `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, optional `BOOKING_NOTIFY_EMAIL`
 - Bild-Malware-Prüfung: `CLAMD_HOST`, optional `CLAMD_PORT` (Standard 3310); ohne erreichbaren ClamAV-Dienst werden Bilder nicht gespeichert
-- Personalisierte Anschlusslinks: `PUBLIC_BASE_URL` (HTTPS) und `BOOKING_OFFER_SECRET` (mindestens 32 Zeichen)
+- Personalisierte Anschluss- und Mitarbeiterregistrierungslinks: `PUBLIC_BASE_URL` (HTTPS) und `BOOKING_OFFER_SECRET` (mindestens 32 Zeichen)
 - GPS-Kontrollcodes: `GPS_CODE_SECRET` (mindestens 32 Zeichen)
 
 ClamAV muss über ein privates, vertrauenswürdiges Netzwerk erreichbar sein. `clamd`-TCP-Verbindungen verschlüsseln oder authentifizieren den Datenstrom nicht. Der Dienst muss mindestens 5 MB pro `INSTREAM`-Anfrage zulassen und aktuelle Signaturen verwenden. Pro Serverprozess laufen höchstens vier Bildscans gleichzeitig; bei voller Auslastung wird der Upload abgewiesen und kann erneut versucht werden. `MOCK_MALWARE_SCAN=1` ist ausschließlich für automatisierte Tests gedacht.
@@ -83,7 +83,9 @@ Der Code ist nur **120 Sekunden** und **einmalig** nutzbar. Nach der Eingabe kan
 
 Die Aufgabenübersicht ist **keine betriebliche Prüffristen- oder Terminplanung**. Aus dem Vorliegen eines älteren Protokolls wird keine überfällige Prüfung abgeleitet, und vor **jedem** Programm bleibt eine neue fachlich erforderliche Vorabkontrolle notwendig. Sicherheitsmängel bleiben gesperrt, bis die reguläre dokumentierte Fachfreigabe durchgeführt wurde; kleinere Hinweise können geprüft werden, ohne automatisch eine Sperre auszulösen.
 
-**Vollständigere Mitarbeiter- und Stationsverwaltung:** Unter `/admin.html#stationspruefung` kann die Verwaltung Mitarbeiterzugänge deaktivieren und ihre Sitzungen sofort widerrufen. Eine Reaktivierung erfordert aus Sicherheitsgründen ein **neues persönliches Passwort** (mindestens zwölf Zeichen); das bisherige Passwort und alle früheren Sitzungen bleiben ungültig. Auch bei einem aktiven Konto kann die Verwaltung ein neues Passwort vergeben, wobei alle bisherigen Sitzungen beendet werden. Die API speichert ausschließlich einen scrypt-Passwort-Hash. Bestehende Prüfberichte werden beim Deaktivieren oder Reaktivieren des Kontos nicht entfernt.
+**Mitarbeiter einladen und freigeben:** Unter `/admin.html#stationspruefung` trägt die Verwaltung Name und E-Mail ein und verschickt einen persönlichen Registrierungslink. Der sieben Tage gültige Link ist einmal nutzbar. Die eingeladene Person ergänzt ihren Namen, ihre Telefonnummer und Qualifikationen/Erfahrung und legt ein eigenes Passwort fest. Das Konto bleibt danach gesperrt, bis die Verwaltung die Angaben geprüft und **„Registrierung freigeben und Zugang aktivieren“** gewählt hat. Für den Versand muss `PUBLIC_BASE_URL` auf die HTTPS-Adresse der Website zeigen. Wenn der E-Mail-Versand nicht bestätigt wird, zeigt die Verwaltung den Link zur sicheren manuellen Weitergabe an. Persönliche Passwörter werden nur als scrypt-Hash gespeichert.
+
+**Mitarbeiter- und Stationsverwaltung:** Die Verwaltung kann aktive Mitarbeiterzugänge deaktivieren und ihre Sitzungen sofort widerrufen. Eine Reaktivierung erfordert ein neues persönliches Passwort (mindestens zwölf Zeichen); das alte Passwort und alle früheren Sitzungen bleiben ungültig. Ein Passwortreset beendet ebenfalls alle bestehenden Sitzungen. Bestehende Prüfberichte bleiben beim Deaktivieren oder Reaktivieren erhalten.
 
 Stationen können **mit schriftlich dokumentiertem Grund stillgelegt und wieder aktiviert** werden. Der Vorgang wird in einer separaten Statushistorie inklusive verantwortlicher Verwaltungsperson gespeichert, ohne die ursprünglichen Prüf- und Mängelprotokolle zu verändern. Eine deaktivierte Station steht im mobilen Prüfformular nicht mehr zur Auswahl und wird beim Speichern eines Prüfberichts erneut auf aktive Freigabe geprüft. Ihre fachliche **Sicherheitsmängelsperre bleibt beim erneuten Aktivieren erhalten** und darf nur über den bisherigen Nachkontroll- und Freigabeprozess beseitigt werden. Die neue Audit-Tabelle `brilon_pruef_stationsstatus` wird ausschließlich in der isolierten Entwicklungs-/Testumgebung angelegt, nicht produktiv migriert.
 

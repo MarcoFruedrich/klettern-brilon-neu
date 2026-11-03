@@ -19,8 +19,7 @@ test('HTTP: Angebotsfelder lassen sich separat und ohne allgemeine Schemaänderu
     NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:'[]',MOCK_PLACES:'[]',
     RUN_PROGRAM_FIELDS_MIGRATION:'true',RUN_SCHEMA_MIGRATIONS:'false',
-    RUN_ADMIN_SESSION_MIGRATION:'false',RUN_PLACES_MIGRATION:'false',
-    RUN_ADMIN_DASHBOARD_MIGRATION:'false',SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',
+    RUN_ADMIN_SESSION_MIGRATION:'false',SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',
     ADMIN_USER:'migration-admin',ADMIN_PASSWORD:'test-only-password'
   }});
   let output='',errors='';

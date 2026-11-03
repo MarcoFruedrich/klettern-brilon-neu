@@ -1780,7 +1780,7 @@ preis=safeText(d.preis,50);
      
   
 if(route==='/api/admin/orte'&&req.method==='GET'){
-  const q=await pool.query('SELECT id,name,aktiv FROM brilon_orte WHERE aktiv=true ORDER BY name');
+  const q=await pool.query('SELECT id,name,aktiv FROM brilon_orte ORDER BY name');
   return reply(res,200,q.rows);
 }
 if(route==='/api/admin/orte'&&req.method==='POST'){
@@ -1790,6 +1790,27 @@ if(route==='/api/admin/orte'&&req.method==='POST'){
     `INSERT INTO brilon_orte(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET aktiv=true RETURNING id,name,aktiv`,[name]
   );
   return reply(res,201,q.rows[0]);
+}
+const placeRoute=route.match(/^\/api\/admin\/orte\/(\d+)$/);
+if(placeRoute&&req.method==='PATCH'){
+  const d=await body(req);
+  if(typeof d.aktiv!=='boolean')return reply(res,400,{error:'Der Aktiv-Status muss angegeben werden.'});
+  const q=await pool.query('UPDATE brilon_orte SET aktiv=$1 WHERE id=$2 RETURNING id,name,aktiv',[d.aktiv,placeRoute[1]]);
+  if(!q.rowCount)return reply(res,404,{error:'Standort nicht gefunden.'});
+  return reply(res,200,q.rows[0]);
+}
+if(placeRoute&&req.method==='DELETE'){
+  const place=await pool.query('SELECT id,name FROM brilon_orte WHERE id=$1',[placeRoute[1]]);
+  if(!place.rowCount)return reply(res,404,{error:'Standort nicht gefunden.'});
+  const usage=await pool.query(`SELECT
+    (SELECT COUNT(*) FROM brilon_angebote WHERE veranstaltungsort=$1)+
+    (SELECT COUNT(*) FROM brilon_pruef_stationen WHERE ort_id=$2)+
+    (SELECT COUNT(*) FROM brilon_pruef_freigaben WHERE ort_id=$2) AS anzahl`,
+    [place.rows[0].name,placeRoute[1]]);
+  if(Number(usage.rows[0]?.anzahl||0)>0)
+    return reply(res,409,{error:'Dieser Standort wird noch von Programmen oder Stationsfreigaben verwendet. Deaktiviere ihn stattdessen, damit bestehende Zuordnungen und Buchungen erhalten bleiben.'});
+  await pool.query('DELETE FROM brilon_orte WHERE id=$1',[placeRoute[1]]);
+  return reply(res,200,{success:true});
 }
 
 if (route === '/api/admin/angebote' && req.method === 'GET') {
@@ -2277,7 +2298,11 @@ async function start(){
     await pool.query('SELECT 1');
     // Explicit, narrow opt-in used only to initialize the admin session store.
     if(process.env.RUN_ADMIN_SESSION_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (\n        token_hash CHAR(64) PRIMARY KEY,\n        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n        expires_at TIMESTAMPTZ NOT NULL\n      )`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (
+        token_hash CHAR(64) PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL
+      )`);
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
       console.log('Admin-Sitzungstabelle geprüft (RUN_ADMIN_SESSION_MIGRATION=true)');
     }
@@ -2318,6 +2343,128 @@ async function start(){
         ADD COLUMN IF NOT EXISTS sortierung INTEGER NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false`);
       console.log('Angebotsfelder geprüft (RUN_PROGRAM_FIELDS_MIGRATION=true)');
+    }
+    // One-time, narrowly scoped migration for the employee and station-inspection area.
+    // This does not run the booking, offers, or GPS schema migrations.
+    if(process.env.RUN_PRUEF_SCHEMA_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_orte(
+        id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+      await pool.query('ALTER TABLE brilon_orte ADD COLUMN IF NOT EXISTS aktiv BOOLEAN NOT NULL DEFAULT true');
+      await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon') ON CONFLICT(name) DO NOTHING`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (
+        token_hash CHAR(64) PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL
+      )`);
+      await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
+    // Stations-Prüfprotokoll: gezielte Migration für den Mitarbeiter- und Prüfbereich.
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_mitarbeitende (
+      id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,
+      passwort_hash TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS telefon TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS strasse TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS plz TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS wohnort TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS qualifikationen TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS registriert_am TIMESTAMPTZ');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS freigabe_am TIMESTAMPTZ');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_personaldokumente (
+      id UUID PRIMARY KEY,
+      mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+      bezeichnung TEXT NOT NULL,dateiname TEXT NOT NULL,mime_type TEXT NOT NULL CHECK(mime_type='image/jpeg'),
+      daten BYTEA NOT NULL,bytegroesse INTEGER NOT NULL CHECK(bytegroesse>0 AND bytegroesse<=512000),
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_personaldokumente_mitarbeiter_idx ON brilon_pruef_personaldokumente(mitarbeiter_id,erstellt_am)');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_freigaben (
+      id UUID PRIMARY KEY,
+      mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+      ort_id BIGINT NOT NULL REFERENCES brilon_orte(id),
+      qualifikation TEXT NOT NULL,erstellt_von TEXT NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(mitarbeiter_id,ort_id,qualifikation))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_einladungen (
+      id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,
+      token_hash CHAR(64) NOT NULL UNIQUE,ablauf TIMESTAMPTZ NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),verwendet_am TIMESTAMPTZ,
+      widerrufen_am TIMESTAMPTZ)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_einladungen_offen_email_idx
+      ON brilon_pruef_einladungen(email) WHERE verwendet_am IS NULL AND widerrufen_am IS NULL`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationen (
+      id UUID PRIMARY KEY,name TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
+    await pool.query("ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS qualifikation TEXT NOT NULL DEFAULT ''");
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_sessions (
+      token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
+      ablauf TIMESTAMPTZ NOT NULL,entsperrt_bis TIMESTAMPTZ)`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_sessions_ablauf_idx ON brilon_pruef_sessions(ablauf)');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_codes (
+      id UUID PRIMARY KEY,code_hash CHAR(64) NOT NULL,ablauf TIMESTAMPTZ NOT NULL,
+      verbraucht_am TIMESTAMPTZ,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_berichte (
+      id UUID PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
+      programm TEXT NOT NULL,beginn TEXT NOT NULL,pruefungen JSONB NOT NULL,
+      hat_mangel BOOLEAN NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    // Sperren bleiben bis zu einer gesondert protokollierten fachlichen Freigabe bestehen.
+    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
+    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS sperrgrund TEXT');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationsereignisse (
+      id UUID PRIMARY KEY,
+      station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
+      bericht_id UUID REFERENCES brilon_pruef_berichte(id),
+      art TEXT NOT NULL CHECK(art IN ('mangel','freigabe')),
+      notiz TEXT NOT NULL,
+      verantwortlich TEXT NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsereignisse_station_idx ON brilon_pruef_stationsereignisse(station_id,erstellt_am DESC)');
+    // Administrative station changes do not alter the historic defect/release log.
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationsstatus (
+      id UUID PRIMARY KEY,
+      station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
+      art TEXT NOT NULL CHECK(art IN ('deaktiviert','reaktiviert')),
+      begruendung TEXT NOT NULL,
+      verantwortlich TEXT NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsstatus_station_idx ON brilon_pruef_stationsstatus(station_id,erstellt_am DESC)');
+    await pool.query('ALTER TABLE brilon_pruef_berichte ADD COLUMN IF NOT EXISTS hat_hinweis BOOLEAN NOT NULL DEFAULT false');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_hinweise(
+      id UUID PRIMARY KEY,station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
+      bericht_id UUID NOT NULL REFERENCES brilon_pruef_berichte(id),
+      beschreibung TEXT NOT NULL,erstellt_von TEXT NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      erledigt_am TIMESTAMPTZ,erledigt_von TEXT,erledigt_notiz TEXT,
+      UNIQUE(bericht_id,station_id))`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_hinweise_offen_idx ON brilon_pruef_hinweise(erstellt_am DESC) WHERE erledigt_am IS NULL');
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_meldungen (
+      bericht_id UUID PRIMARY KEY REFERENCES brilon_pruef_berichte(id),
+      status TEXT NOT NULL DEFAULT 'ausstehend'
+        CHECK(status IN ('ausstehend','sendet','angenommen','fehlgeschlagen','nicht_konfiguriert')),
+      versuche INTEGER NOT NULL DEFAULT 0 CHECK(versuche>=0),
+      letzter_versuch TIMESTAMPTZ,angenommen_am TIMESTAMPTZ,
+      letzter_fehler TEXT,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_meldungen_status_idx ON brilon_pruef_meldungen(status,erstellt_am DESC)');
+    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS code_verschluesselt TEXT');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_tablet_kopplungen(
+      id UUID PRIMARY KEY,code_hash CHAR(64) NOT NULL,
+      ablauf TIMESTAMPTZ NOT NULL,verwendet_am TIMESTAMPTZ,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_tablets(
+      id UUID PRIMARY KEY,name TEXT NOT NULL,token_hash CHAR(64) NOT NULL UNIQUE,
+      aktiv BOOLEAN NOT NULL DEFAULT true,gekoppelt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_aktiv_idx ON brilon_pruef_tablets(aktiv)');
+    // Letztes Lebenszeichen dient ausschließlich der aktuellen Verbindungserkennung.
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS zuletzt_gesehen_am TIMESTAMPTZ');
+    // Pro Prüfstandort ist genau ein Administrations-Tablet als Codeanzeige ausgewählt.
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets((1)) WHERE pruefdisplay=true');
+    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
+      console.log('Mitarbeiter- und Stationsschema geprüft (RUN_PRUEF_SCHEMA_MIGRATION=true)');
     }
     // Schema changes are opt-in. A normal server start must not alter a live database.
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){
@@ -2431,9 +2578,39 @@ await pool.query(`
       id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,
       passwort_hash TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
       erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS telefon TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS strasse TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS plz TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS wohnort TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS qualifikationen TEXT');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS registriert_am TIMESTAMPTZ');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS freigabe_am TIMESTAMPTZ');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_personaldokumente (
+      id UUID PRIMARY KEY,
+      mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+      bezeichnung TEXT NOT NULL,dateiname TEXT NOT NULL,mime_type TEXT NOT NULL CHECK(mime_type='image/jpeg'),
+      daten BYTEA NOT NULL,bytegroesse INTEGER NOT NULL CHECK(bytegroesse>0 AND bytegroesse<=512000),
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_personaldokumente_mitarbeiter_idx ON brilon_pruef_personaldokumente(mitarbeiter_id,erstellt_am)');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_freigaben (
+      id UUID PRIMARY KEY,
+      mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+      ort_id BIGINT NOT NULL REFERENCES brilon_orte(id),
+      qualifikation TEXT NOT NULL,erstellt_von TEXT NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(mitarbeiter_id,ort_id,qualifikation))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_einladungen (
+      id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,
+      token_hash CHAR(64) NOT NULL UNIQUE,ablauf TIMESTAMPTZ NOT NULL,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),verwendet_am TIMESTAMPTZ,
+      widerrufen_am TIMESTAMPTZ)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_einladungen_offen_email_idx
+      ON brilon_pruef_einladungen(email) WHERE verwendet_am IS NULL AND widerrufen_am IS NULL`);
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationen (
       id UUID PRIMARY KEY,name TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
       erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
+    await pool.query("ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS qualifikation TEXT NOT NULL DEFAULT ''");
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_sessions (
       token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
       ablauf TIMESTAMPTZ NOT NULL,entsperrt_bis TIMESTAMPTZ)`);

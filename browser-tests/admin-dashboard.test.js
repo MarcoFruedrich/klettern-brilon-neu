@@ -11,7 +11,8 @@ function fakeAdminApi(page) {
   const state = {
     signedIn: false, csrf: 'a'.repeat(64), mutations: [],
     tours: [], games: [], specials: [],
-    inspectionEvents: [], inspectionStatusEvents: [], inspectionStaff: [],
+    inspectionEvents: [], inspectionStatusEvents: [], inspectionStaff: [], invitations: [],
+    nextInvite: 0,
     inspectionHints: [],
     inspectionMails: [],
     inspectionOverview: {zaehler:{gesperrt:0,stillgelegt:0,nicht_nutzbar:0,
@@ -73,7 +74,31 @@ function fakeAdminApi(page) {
       return json(200,{id:device.id,pruefdisplay:true});
     }
     if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='GET')
-      return json(200,state.inspectionStaff);
+      return json(200,[...state.inspectionStaff,...state.invitations]);
+    if(endpoint==='/api/admin/pruefung/mitarbeitende'&&method==='POST'){
+      const values=readBody();state.invitations=state.invitations.filter(x=>x.email!==values.email);
+      const invitation={id:'invite-'+(++state.nextInvite),name:values.name,email:values.email,
+        status:'eingeladen',art:'einladung',aktiv:false,ablauf:'2027-01-08T12:00:00Z'};
+      state.invitations.push(invitation);
+      return json(201,{...invitation,emailVersand:'fehlgeschlagen',
+        registrierungsLink:'https://example.test/mitarbeiter-registrierung.html?token='+String(state.nextInvite).padStart(64,'0')});
+    }
+    const staffApproval=endpoint.match(/^\/api\/admin\/pruefung\/mitarbeitende\/([^/]+)\/freigeben$/);
+    if(staffApproval&&method==='PATCH'){
+      const user=state.inspectionStaff.find(x=>x.id===staffApproval[1]);
+      if(!user)return json(404,{error:'Mitarbeiter nicht gefunden'});
+      const selection=readBody();user.aktiv=true;user.status='aktiv';
+      user.freigaben=selection.standorte.flatMap(ortId=>selection.qualifikationen.map(qualifikation=>({
+        ort:state.places.find(place=>String(place.id)===String(ortId))?.name,qualifikation
+      })));
+      return json(200,{id:user.id,name:user.name,email:user.email,emailVersand:'fehlgeschlagen'});
+    }
+    const revokeInvite=endpoint.match(/^\/api\/admin\/pruefung\/mitarbeitende\/([^/]+)\/einladung$/);
+    if(revokeInvite&&method==='DELETE'){
+      const index=state.invitations.findIndex(x=>x.id===revokeInvite[1]);
+      if(index<0)return json(404,{error:'Offene Einladung nicht gefunden'});
+      state.invitations.splice(index,1);return json(200,{success:true});
+    }
     const staffAction=endpoint.match(/^\/api\/admin\/pruefung\/mitarbeitende\/([^/]+)\/(deaktivieren|reaktivieren|passwort-setzen)$/);
     if(staffAction&&method==='PATCH'){
       const user=state.inspectionStaff.find(x=>x.id===staffAction[1]);
@@ -877,6 +902,51 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(state.places.some(ort=>ort.name==='Rüthen'),true);
     assert.equal(await page.locator('#angebot-ort').inputValue(),'Rüthen');
     assert.ok(state.mutations.every(item=>['POST','PATCH','DELETE'].includes(item.method)));
+    await page.close();
+  });
+
+  await t.test('Mitarbeitereinladung neu ausstellen oder widerrufen',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844}});
+    const state=fakeAdminApi(page);
+    page.on('dialog',dialog=>dialog.accept());
+    await login(page,root);
+    const form=page.locator('#pruef-personal-form');
+    await form.locator('[name="name"]').fill('Neue Fachkraft');
+    await form.locator('[name="email"]').fill('fachkraft@example.test');
+    await form.locator('button[type="submit"]').click();
+    await page.locator('#pruef-personal-status a.invite-link').waitFor();
+    assert.match(await page.locator('#pruef-personal-status').textContent(),/E-Mail konnte nicht versandt werden/);
+    const card=page.locator('#pruef-personal-list .booking').filter({hasText:'fachkraft@example.test'});
+    await card.getByRole('button',{name:'Neue Einladung senden'}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('#pruef-personal-list .booking').length===1);
+    assert.equal(state.invitations.length,1);
+    assert.equal(state.nextInvite,2,'Neue Einladung ersetzt den vorherigen Link');
+    await page.locator('#pruef-personal-list .booking').getByRole('button',{name:'Einladung widerrufen'}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('#pruef-personal-list .booking').length===0);
+    assert.equal(state.invitations.length,0,'Widerruf entfernt die offene Einladung aus der Verwaltung');
+    assert.ok(state.mutations.some(item=>item.method==='DELETE'&&item.endpoint.endsWith('/einladung')));
+    await page.close();
+  });
+
+  await t.test('Mitarbeiterfreigabe speichert mehrere Standorte und geprüfte Qualifikationen',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844}});
+    const state=fakeAdminApi(page);page.on('dialog',dialog=>dialog.accept());
+    state.places.push({id:2,name:'Rüthen',aktiv:true});
+    state.inspectionStaff.push({id:'pending-staff',name:'Geprüfte Fachkraft',email:'geprueft@example.test',
+      aktiv:false,status:'freigabe_ausstehend',art:'konto',telefon:'+49 170 111111',
+      strasse:'Musterstraße 4',plz:'59929',wohnort:'Brilon',
+      qualifikationen:'Kletterqualifikation\nErste Hilfe',bescheinigungen:[],freigaben:[]});
+    await login(page,root);
+    const grant=page.locator('#pruef-personal-list .booking').filter({hasText:'geprueft@example.test'});
+    await grant.locator('.staff-grant-place').nth(0).check();
+    await grant.locator('.staff-grant-place').nth(1).check();
+    await grant.locator('.staff-grant-qualification').nth(0).check();
+    await grant.getByRole('button',{name:'Auswahl freigeben und Zugang aktivieren'}).click();
+    await page.waitForFunction(()=>document.getElementById('pruef-personal-status')?.textContent.includes('Freigaben erstellt'));
+    const saved=state.mutations.find(item=>item.endpoint.endsWith('/freigeben'));
+    assert.deepEqual(saved.body.standorte,[1,2]);
+    assert.deepEqual(saved.body.qualifikationen,['Kletterqualifikation']);
+    assert.equal(state.inspectionStaff[0].freigaben.length,2);
     await page.close();
   });
 });

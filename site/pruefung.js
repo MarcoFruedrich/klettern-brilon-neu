@@ -9,10 +9,43 @@ async function request(url,options={}){
 }
 function notice(message){$('pruefung-status').textContent=message;}
 function hideForm(){ $('station-inspection').hidden=true; }
+async function loadOwnReports(){
+  const status=$('staff-reports-status'),target=$('staff-reports-list');
+  if(!status||!target)return;
+  status.textContent='Verlauf wird geladen …';
+  try{
+    const reports=await request('/api/pruefung/berichte');
+    target.replaceChildren();
+    if(!reports.length){status.textContent='Für dieses Konto sind noch keine Prüfprotokolle gespeichert.';return;}
+    for(const report of reports){
+      const article=text('article','');article.className='booking';
+      const date=new Date(report.erstellt_am);
+      const dateText=Number.isNaN(date.valueOf())?'Zeitpunkt nicht verfügbar':date.toLocaleString('de-DE');
+      article.append(text('h3',report.programm+' · '+dateText));
+      const statusText=report.hat_mangel?'Sicherheitsmangel gemeldet – betroffene Station gesperrt':
+        report.hat_hinweis?'Hinweis zur Nachprüfung gemeldet':'Kein Mangel gemeldet';
+      article.append(text('p','Geplanter Beginn: '+report.beginn+' · '+statusText));
+      const list=text('ul','');
+      for(const item of report.pruefungen||[]){
+        const result=item.zustand==='mangel'?'Sicherheitsmangel':
+          item.zustand==='hinweis'?'Hinweis – Nachprüfung vorgemerkt':'In Ordnung';
+        const detail=item.beschreibung?' – '+item.beschreibung:'';
+        list.append(text('li',(item.station||'Station')+': '+result+detail));
+      }
+      article.append(list);target.append(article);
+    }
+    status.textContent='Es werden '+reports.length+' persönliche Prüfprotokolle angezeigt.';
+  }catch(error){
+    target.replaceChildren();status.textContent='Verlauf konnte nicht geladen werden: '+error.message;
+  }
+}
 function stationControl(station){
   const fieldset=text('fieldset');
   fieldset.className='booking pruefung-station';fieldset.dataset.id=station.id;
   const legend=text('legend',station.name);fieldset.append(legend);
+  if(station.ort||station.qualifikation)
+    fieldset.append(text('p','Standort: '+(station.ort||'unbekannt')+
+      ' · Qualifikation: '+(station.qualifikation||'nicht angegeben')));
   if(station.gesperrt_am){
     const warning=text('p','STATION GESPERRT – NICHT BENUTZEN. '+
       (station.sperrgrund||'Nachprüfung und schriftliche Freigabe erforderlich.'));
@@ -78,13 +111,14 @@ async function loadStations(){
   $('pruefung-person').textContent=data.mitarbeiter;
   const target=$('pruefung-stationen');target.replaceChildren();
   data.stationen.forEach(s=>target.append(stationControl(s)));
-  if(!data.stationen.length)notice('Noch keine Stationen eingerichtet. Bitte die Verwaltung informieren.');
+  if(!data.stationen.length)notice('Für deinen Zugang sind noch keine passenden Standorte und Qualifikationen freigegeben. Bitte die Verwaltung informieren.');
   if(data.entsperrtBis&&new Date(data.entsperrtBis)>new Date()){
     $('onsite-unlock').hidden=true;$('station-inspection').hidden=false;
   }
 }
 async function signedIn(){
   $('staff-login').hidden=true;$('pruefung-workspace').hidden=false;
+  await loadOwnReports();
   await loadStations();
 }
 $('staff-login').addEventListener('submit',async event=>{
@@ -146,6 +180,7 @@ $('station-inspection').addEventListener('submit',async event=>{
       data.benachrichtigung==='nicht_konfiguriert'?' ACHTUNG: Mängelpostfach nicht eingerichtet! Verantwortliche direkt informieren.':
       data.benachrichtigung==='versand_ungeklaert'?' ACHTUNG: Versandstatus ungeklärt! Verantwortliche direkt informieren und Verwaltung benachrichtigen.':'';
     notice(status+' Prüfnummer: '+data.id+'.'+mail);
+    await loadOwnReports();
   }catch(e){notice('Bericht nicht gespeichert: '+e.message);}
   finally{submit.disabled=false;}
 });
@@ -155,9 +190,11 @@ $('staff-logout').addEventListener('click',async()=>{
   $('pruefung-workspace').hidden=true;$('staff-login').hidden=false;
   hideForm();$('onsite-unlock').hidden=false;notice('Abgemeldet.');
 });
+ $('staff-reports-refresh')?.addEventListener('click',loadOwnReports);
 request('/api/pruefung/stationen').then(async data=>{
   $('staff-login').hidden=true;$('pruefung-workspace').hidden=false;
   $('pruefung-person').textContent=data.mitarbeiter;
+  await loadOwnReports();
   const target=$('pruefung-stationen');target.replaceChildren();
   data.stationen.forEach(s=>target.append(stationControl(s)));
   if(data.entsperrtBis&&new Date(data.entsperrtBis)>new Date()){

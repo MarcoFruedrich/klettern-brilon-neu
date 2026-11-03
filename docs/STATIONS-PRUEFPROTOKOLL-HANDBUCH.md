@@ -4,12 +4,15 @@
 
 ## Ablauf vor jedem Programm
 
-1. Die verantwortliche Person erfasst im Adminbereich unter **Stationsprüfungen** alle zu kontrollierenden Stationen und die Mitarbeiterkonten.
-2. Die Fachkraft meldet sich auf ihrem Smartphone an und tippt **„Code am Tablet anzeigen“**. Der neue sechsstellige Code erscheint nur auf einem bereits gekoppelten Tablet am Standort. Er bleibt höchstens 120 Sekunden gültig und kann nur einmal verwendet werden.
-3. Die Fachkraft liest den Code am Tablet ab und trägt ihn auf ihrem Smartphone unter `/pruefung.html` ein.
-4. Sie gibt Programm und geplanten Programmbeginn an. Alle **tatsächlich verwendeten** Stationen müssen ausgewählt werden; jede wird auf **In Ordnung**, **Hinweis / kleiner Mangel** oder **Sicherheitsmangel** gesetzt.
-5. Bei Hinweisen und Mängeln sind eine konkrete Beschreibung und bei Bedarf bis zu drei Fotos möglich. Die Bildverarbeitung erfolgt auf dem Gerät (max. 640 Pixel Kantenlänge und 80 KB JPEG pro Foto). Personen möglichst nicht abbilden.
-6. Der Bericht wird gespeichert. Eine neue Prüfung erfordert einen neuen Code. Der Bericht kann in der Verwaltung eingesehen werden. Fotobelege werden separat und nur für angemeldete Administratoren ausgegeben.
+1. Die Verwaltung trägt Name und E-Mail der Person ein und sendet ihr eine Einladung. Der persönliche Link ist sieben Tage gültig und nur einmal verwendbar. Er setzt `PUBLIC_BASE_URL` sowie den E-Mail-Versand voraus; wenn der Mailversand nicht bestätigt wird, zeigt die Verwaltung den Link zur sicheren manuellen Weitergabe an.
+2. Die eingeladene Person öffnet den Link und ergänzt Namen, Telefonnummer, vollständige Anschrift und Qualifikationen/Erfahrung. Sie kann bis zu fünf Bescheinigungen als Foto hochladen und setzt ihr eigenes Passwort. Die E-Mail-Adresse ist an die Einladung gebunden.
+3. Nach dem Absenden bleibt das Konto **gesperrt**. Die Verwaltung prüft die persönlichen Angaben und Fotos, wählt mindestens einen aktiven Standort und eine oder mehrere belegte Qualifikationen und klickt **„Auswahl freigeben und Zugang aktivieren“**. Erst danach kann sich die Person anmelden; die Benachrichtigung nennt den freigegebenen Umfang.
+4. Die Fachkraft meldet sich auf ihrem Smartphone an und tippt **„Code am Tablet anzeigen“**. Der neue sechsstellige Code erscheint nur auf einem bereits gekoppelten Tablet am Standort. Er bleibt höchstens 120 Sekunden gültig und kann nur einmal verwendet werden.
+5. Die Fachkraft liest den Code am Tablet ab und trägt ihn auf ihrem Smartphone unter `/pruefung.html` ein.
+6. Sie gibt Programm und geplanten Programmbeginn an. Alle **tatsächlich verwendeten** Stationen müssen ausgewählt werden; jede wird auf **In Ordnung**, **Hinweis / kleiner Mangel** oder **Sicherheitsmangel** gesetzt.
+7. Bei Hinweisen und Mängeln sind eine konkrete Beschreibung und bei Bedarf bis zu drei Fotos möglich. Die Bildverarbeitung erfolgt auf dem Gerät (max. 640 Pixel Kantenlänge und 80 KB JPEG pro Foto). Personen möglichst nicht abbilden.
+8. Der Bericht wird gespeichert. Eine neue Prüfung erfordert einen neuen Code. Der Bericht kann in der Verwaltung eingesehen werden. Fotobelege werden separat und nur für angemeldete Administratoren ausgegeben.
+9. Im Abschnitt **„Meine letzten Prüfprotokolle“** sieht die angemeldete Fachkraft bis zu 20 eigene Berichte mit Ergebnis und Stationen. Andere Mitarbeiterkonten und Fotodateien sind dort nicht zugänglich.
 
 **Wichtige Sicherheitsregel:** Bei einem Mangel ist die betroffene Station **nicht zu verwenden**, bis eine fachlich verantwortliche Person ihre Sicherheit geprüft und die Nutzung ausdrücklich freigegeben hat. Eine elektronische Dokumentation ist keine automatische Betriebsfreigabe.
 
@@ -74,6 +77,10 @@ Jeder Eintrag hat eine Schaltfläche, die zum jeweiligen Verwaltungsbereich füh
 **Wichtig:** Dies ist eine Übersicht offener Vorgänge, kein automatischer Wartungsplan und keine Bestätigung der sicheren Benutzbarkeit. Vor jedem Kletterprogramm müssen alle tatsächlich verwendeten Stationen weiterhin auf die fachlich vorgeschriebene Weise geprüft werden. Für kalendarische Prüfintervalle, Prüffristen und Verantwortlichkeiten ist zunächst ein gesondertes fachlich freigegebenes Wartungs- und Prüfschema erforderlich.
 
 ## Mitarbeiterzugänge und Stationen verwalten
+
+Neue Mitarbeitende werden über **„Mitarbeiter zur Registrierung einladen“** mit Name und E-Mail-Adresse eingeladen. Sie vervollständigen ihre Anschrift, Telefonnummer und Qualifikationen über den persönlichen, sieben Tage gültigen Link, laden bis zu fünf Bescheinigungsfotos hoch und vergeben ihr eigenes Passwort. Fotos werden auf dem Server neu codiert, von Metadaten bereinigt und vor dem Speichern auf Schadsoftware geprüft. Bis zur Prüfung und Freigabe durch die Verwaltung bleibt das Konto gesperrt. Offene Einladungen können neu ausgestellt werden; dabei wird der alte Link ungültig. Noch nicht verwendete Einladungen lassen sich widerrufen. Wird eine E-Mail nicht bestätigt versandt, zeigt die Verwaltung den Link zur sicheren Weitergabe an.
+
+Bei der Freigabe prüft die Verwaltung die Angaben und Bescheinigungen. Sie wählt mindestens einen aktiven Standort und eine oder mehrere nachgewiesene Qualifikationen aus. Die Mitarbeiter-App zeigt anschließend nur Stationen, deren Standort und erforderliche Qualifikation der Person zugewiesen wurden. Jede Station benötigt dafür in der Verwaltung eine Standort- und Qualifikationszuordnung. Nicht zugeordnete Stationen sind für Mitarbeitende nicht prüfbar.
 
 In der geschützten Verwaltung kann ein Mitarbeiterzugang mit **„Zugang deaktivieren“** umgehend gesperrt werden. Damit werden alle noch aktiven Sitzungen dieses Mitarbeiters widerrufen; die Person kann sich nicht mehr anmelden oder eine Prüfung durchführen. Die vorhandenen und früher unterzeichneten Prüfberichte bleiben unverändert erhalten.
 
