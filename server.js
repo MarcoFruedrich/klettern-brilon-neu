@@ -334,6 +334,7 @@ async function main(req,res){
             email=safeText(d.email,180),
             datum=safeText(d.datum,10),
             angebot=safeText(d.angebot,120),
+            angefragterStandort=safeText(d.veranstaltungsort,80),
             teilnehmer=Number(d.teilnehmer);
 
       if(!vorname||!nachname||!/^\S+@\S+\.\S+$/.test(email)||
@@ -345,13 +346,15 @@ async function main(req,res){
       let gesamtpreis = null;
       const preisAbfrage = await pool.query(
         `SELECT preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
-                buchungsmodus,mindestteilnehmer,preis_pro_person
+                veranstaltungsort,buchungsmodus,mindestteilnehmer,preis_pro_person
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
          LIMIT 1`,[angebot]
       );
       if(!preisAbfrage.rows.length)return reply(res,409,{error:'Dieses Programm ist derzeit nicht buchbar.'});
       const programm=preisAbfrage.rows[0];
+      if(angefragterStandort&&angefragterStandort!==programm.veranstaltungsort)
+        return reply(res,409,{error:'Das ausgewählte Angebot gehört nicht zum gewählten Veranstaltungsort.'});
       const einzelplatz=programm.buchungsmodus==='einzelplatz';
       if(einzelplatz&&teilnehmer!==1)return reply(res,400,{error:'Für dieses Angebot kannst du nur einen Einzelplatz pro Anmeldung reservieren.'});
       const verfuegbareTermine=Array.isArray(programm.verfuegbare_termine)?programm.verfuegbare_termine:[];
@@ -366,7 +369,7 @@ async function main(req,res){
       if(preisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
       gesamtpreis=preisCent/100;
       const data={
-       name,vorname,nachname,email,datum,angebot,teilnehmer,
+       name,vorname,nachname,email,datum,angebot,veranstaltungsort:programm.veranstaltungsort,teilnehmer,
 gesamtpreis,
 anzahlung: einzelplatz ? 0 : Math.round(gesamtpreis * 25) / 100,
 restbetrag: einzelplatz ? gesamtpreis : Math.round(gesamtpreis * 75) / 100,
@@ -2112,6 +2115,12 @@ if (speicherung.rowCount !== 1) {
 
 
    
+if (route === '/api/orte' && req.method === 'GET') {
+  if (!pool) return reply(res,503,{error:'Veranstaltungsorte derzeit nicht verfügbar.'});
+  const q=await pool.query('SELECT id,name FROM brilon_orte WHERE aktiv=true ORDER BY name');
+  return reply(res,200,q.rows);
+}
+
 if (route === '/api/angebote' && req.method === 'GET') {
   if (!pool) {
     return reply(res, 503, {
