@@ -1478,6 +1478,24 @@ const neuesAngebotForm =
   document.getElementById('neues-angebot-form');
 
 if (neuesAngebotForm) {
+  const angebotsModus = neuesAngebotForm.elements.buchungsmodus;
+  const angebotsKapazitaet = neuesAngebotForm.elements.kapazitaet;
+  const angebotsKapazitaetLabel = angebotsKapazitaet.closest('label');
+  function angebotsKapazitaetPruefen() {
+    const einzelplaetze = angebotsModus.value === 'einzelplatz';
+    angebotsKapazitaet.min = einzelplaetze ? '5' : '1';
+    angebotsKapazitaet.max = einzelplaetze ? '12' : '500';
+    angebotsKapazitaetLabel.querySelector('.field-hint')?.remove();
+    if (einzelplaetze) {
+      const hinweis = document.createElement('span');
+      hinweis.className = 'field-hint';
+      hinweis.textContent = 'Bei Einzelplätzen sind 5 bis 12 Teilnehmende möglich.';
+      angebotsKapazitaetLabel.append(hinweis);
+    }
+  }
+  angebotsModus.addEventListener('change', angebotsKapazitaetPruefen);
+  angebotsKapazitaetPruefen();
+
   neuesAngebotForm.addEventListener('submit', async (event) => {
     event.preventDefault();
 
