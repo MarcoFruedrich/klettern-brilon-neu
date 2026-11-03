@@ -2,6 +2,7 @@
 
 const test=require('node:test');
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const {spawn}=require('node:child_process');
 const net=require('node:net');
 const path=require('node:path');
@@ -13,9 +14,11 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   const port=probe.address().port;
   await new Promise(resolve=>probe.close(resolve));
   const repo=path.resolve(__dirname,'..');
+  const preload=path.join(repo,'test-support','mocks','force-mock-modules.js');
   const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(repo,'test-support','mocks'),
+    NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:'[]',
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),RUN_SCHEMA_MIGRATIONS:'false',
     ADMIN_USER:'program-admin',ADMIN_PASSWORD:'test-only-password',ADMIN_TOTP_SECRET_BASE32:totpSecret,
@@ -46,6 +49,20 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   const createdText=await created.text();
   assert.equal(created.status,201,createdText);
   const id=JSON.parse(createdText).id;
+
+  const bildUrl=root+`/api/admin/angebote/${id}/bild`;
+  const jpegHeaders={Cookie:cookie,Origin:root,'X-CSRF-Token':loginData.csrfToken,'Content-Type':'image/jpeg'};
+  const fakeJpeg=await fetch(bildUrl,{method:'POST',headers:jpegHeaders,body:Buffer.from([0xff,0xd8,0xff])});
+  assert.equal(fakeJpeg.status,400,'Ein JPEG-Signaturpräfix ohne Bildinhalt wird abgewiesen');
+  const zuGrossesPng=Buffer.from(fs.readFileSync(path.join(repo,'site/klettern-brilon-icon.png')));
+  zuGrossesPng.writeUInt32BE(7000,16);zuGrossesPng.writeUInt32BE(7000,20);
+  const zuGross={...jpegHeaders,'Content-Type':'image/png'};
+  const imageBomb=await fetch(bildUrl,{method:'POST',headers:zuGross,body:zuGrossesPng});
+  assert.equal(imageBomb.status,400,'Bilder über 40 Megapixel werden vor dem Speichern abgewiesen');
+  const echtesPng=await fetch(bildUrl,{method:'POST',headers:zuGross,
+    body:fs.readFileSync(path.join(repo,'site/klettern-brilon-icon.png'))});
+  assert.equal(echtesPng.status,503,'Ein geprüftes PNG erreicht die fehlende Speicher-Konfiguration, ohne hochgeladen zu werden');
+
   assert.equal((await (await fetch(root+'/api/angebote')).json()).length,0,
     'Neu angelegte Programme bleiben zunächst deaktiviert und unsichtbar');
 

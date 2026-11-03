@@ -15,6 +15,7 @@ test('HTTP: vergangene Buchungstage sind auch über alte Anschlusslinks nicht bu
   const port = probe.address().port;
   await new Promise(resolve => probe.close(resolve));
   const repo = path.resolve(__dirname, '..');
+  const preload = path.join(repo, 'test-support', 'mocks', 'force-mock-modules.js');
   const secret = 'isolated-booking-link-test-secret-123456789';
   const parentId = '550e8400-e29b-41d4-a716-446655440000';
   const child = spawn(process.execPath, ['server.js'], {
@@ -22,6 +23,7 @@ test('HTTP: vergangene Buchungstage sind auch über alte Anschlusslinks nicht bu
     env: {
       ...process.env, PORT: String(port),
       NODE_PATH: path.join(repo, 'test-support', 'mocks'),
+      NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${preload}`].filter(Boolean).join(' '),
       DATABASE_URL: 'mock-test-database', MOCK_PG: '1',
       MOCK_OFFERS: JSON.stringify([
         { id: 1, name: 'Klettern', preise: { '1-4': 100 }, kapazitaet: 10, dauer: 60,

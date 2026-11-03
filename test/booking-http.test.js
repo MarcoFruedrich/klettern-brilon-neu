@@ -42,9 +42,10 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const guestTokenHash=crypto.createHash('sha256').update(guestToken).digest('hex');
   const mailMessages=[];
   const preload=path.join(repo,'test-support','mocks','brevo-fetch.js');
+  const modulePreload=path.join(repo,'test-support','mocks','force-mock-modules.js');
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe','ipc'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
-    NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
+    NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${modulePreload}`,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),
     MOCK_BOOKINGS:JSON.stringify(archivedBookings),
     MOCK_CALENDAR:JSON.stringify([{id:'123e4567-e89b-12d3-a456-426614174002',titel:'Test-Sperrzeit',

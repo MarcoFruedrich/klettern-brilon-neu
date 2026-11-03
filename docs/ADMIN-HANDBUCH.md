@@ -73,6 +73,10 @@ werden.
   Zielgruppe, Ort, Kapazität, optionale verfügbare Daten und Hinweise eintragen.
   „Buchbar“ steuert die Annahme von Anfragen; „Auf der Website
   veröffentlichen“ steuert die öffentliche Anzeige.
+- Angebots- und Aktionsbilder können als JPG, PNG oder WebP bis 5 MB hochgeladen
+  werden. Der Server prüft tatsächliche Dateisignatur, Grundstruktur und
+  Bildabmessungen; animierte PNG- und WebP-Dateien sowie Bilder über 40
+  Megapixel werden abgelehnt.
 - Für Individualklettern „Einzelplätze reservieren“ wählen und Mindestanmeldungen,
   Kapazität (5–12 Plätze) sowie Preis pro Person festlegen. Eine Anmeldung
   reserviert einen Platz ohne Anzahlung. Der Termin findet ab der eingestellten

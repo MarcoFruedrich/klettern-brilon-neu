@@ -124,8 +124,10 @@ test('HTTP: DB-Admin-Login verweigert Sitzungen ohne vorbereitete Tabelle', asyn
   const port=probe.address().port;
   await new Promise(resolve=>probe.close(resolve));
   const repo=path.resolve(__dirname,'..');
+  const preload=path.join(repo,'test-support','mocks','force-mock-modules.js');
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:'ignore',env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
+    NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_ADMIN_SESSION_FAIL:'1',
     RUN_SCHEMA_MIGRATIONS:'false',SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',
     ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password',ADMIN_TOTP_SECRET_BASE32:totpSecret
@@ -151,8 +153,10 @@ test('HTTP: DB-Admin-Login verweigert Anmeldung ohne TOTP-Zählertabelle', async
   const port=probe.address().port;
   await new Promise(resolve=>probe.close(resolve));
   const repo=path.resolve(__dirname,'..');
+  const preload=path.join(repo,'test-support','mocks','force-mock-modules.js');
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:'ignore',env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(__dirname,'..','test-support','mocks'),
+    NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_ADMIN_TOTP_FAIL:'1',RUN_SCHEMA_MIGRATIONS:'false',
     SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',ADMIN_USER:'test-admin',ADMIN_PASSWORD:'test-only-password',
     ADMIN_TOTP_SECRET_BASE32:totpSecret

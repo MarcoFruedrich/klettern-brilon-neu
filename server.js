@@ -17,6 +17,7 @@ const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
+const { analysiereBild } = require('./lib/bilddatei');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 
 const { createClient } = require('@supabase/supabase-js');
@@ -1937,21 +1938,9 @@ if (bildRoute && req.method === 'POST') {
 
   const bild = Buffer.concat(teile);
 
-  const signaturen = {
-    jpg: bild.length >= 3 &&
-      bild[0] === 0xff && bild[1] === 0xd8 && bild[2] === 0xff,
-    png: bild.length >= 8 &&
-      bild.subarray(0, 8).equals(
-        Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
-      ),
-    webp: bild.length >= 12 &&
-      bild.toString('ascii', 0, 4) === 'RIFF' &&
-      bild.toString('ascii', 8, 12) === 'WEBP'
-  };
-
-  if (!signaturen[endung]) {
+  try{analysiereBild(bild,dateityp);}catch{
     return reply(res, 400, {
-      error: 'Ungültige Bilddatei.'
+      error: 'Ungültige oder zu große Bilddatei. Erlaubt sind vollständige JPG-, PNG- und WebP-Bilder bis 40 Megapixel.'
     });
   }
 
@@ -2051,20 +2040,9 @@ if (aktionsBildRoute && req.method === 'POST') {
 
   const bild = Buffer.concat(teile);
 
-  const gueltig =
-    (endung === 'jpg' && bild.length >= 3 &&
-      bild[0] === 0xff && bild[1] === 0xd8 && bild[2] === 0xff) ||
-    (endung === 'png' && bild.length >= 8 &&
-      bild.subarray(0, 8).equals(
-        Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
-      )) ||
-    (endung === 'webp' && bild.length >= 12 &&
-      bild.toString('ascii', 0, 4) === 'RIFF' &&
-      bild.toString('ascii', 8, 12) === 'WEBP');
-
-  if (!gueltig) {
+  try{analysiereBild(bild,dateityp);}catch{
     return reply(res, 400, {
-      error: 'Ungültige Bilddatei.'
+      error: 'Ungültige oder zu große Bilddatei. Erlaubt sind vollständige JPG-, PNG- und WebP-Bilder bis 40 Megapixel.'
     });
   }
 

@@ -12,10 +12,12 @@ test('HTTP: parallele Anfragen überschreiten weder Zeitfenster noch Tageskapazi
   const port=probe.address().port;
   await new Promise(resolve=>probe.close(resolve));
   const repo=path.resolve(__dirname,'..');
+  const preload=path.join(repo,'test-support','mocks','force-mock-modules.js');
   const offers=[{id:1,name:'Klettern',preise:{'1-4':75},kapazitaet:5,aktiv:true,
     verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60}];
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
     ...process.env,PORT:String(port),NODE_PATH:path.join(repo,'test-support','mocks'),
+    NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:JSON.stringify(offers),MOCK_BOOKINGS:'[]',
     MOCK_CALENDAR:'[]',RUN_SCHEMA_MIGRATIONS:'false',BREVO_API_KEY:'',BREVO_SENDER_EMAIL:'',
     SUPABASE_URL:'',SUPABASE_SECRET_KEY:''
