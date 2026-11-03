@@ -134,14 +134,14 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const pages=[];
   for(let pageNumber=1;pageNumber<=3;pageNumber++){
     const result=await query({seite:String(pageNumber)});
-    assert.equal(result.anzahl,127);
+    assert.equal(result.anzahl,139);
     assert.equal(result.proSeite,50);
     pages.push(result.buchungen);
   }
-  assert.deepEqual(pages.map(rows=>rows.length),[50,50,27],
-    '127 echte Testbuchungen müssen auf drei Seiten verteilt sein');
+  assert.deepEqual(pages.map(rows=>rows.length),[50,50,39],
+    '139 echte Testbuchungen müssen auf drei Seiten verteilt sein');
   const ids=pages.flat().map(row=>row.id);
-  assert.equal(new Set(ids).size,127,
+  assert.equal(new Set(ids).size,139,
     'Bei identischen Erstellungszeiten darf keine Buchung mehrfach erscheinen');
   const firstPageAgain=await query({seite:'1'});
   assert.deepEqual(firstPageAgain.buchungen.map(row=>row.id),pages[0].map(row=>row.id),
