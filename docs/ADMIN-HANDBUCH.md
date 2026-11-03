@@ -47,6 +47,11 @@ zugehörigen Eintrag.
   genutzt werden.
 - In einer Buchung den Status prüfen beziehungsweise aktualisieren. Die
   unterstützten Status sind offen, bestätigt, abgelehnt und storniert.
+- Bei bestätigten Buchungen zeigt die Karte den Versandversuch der
+  Bestätigungs-E-Mail mit Zeitstempel und Fehlergrund. „Vom Anbieter angenommen“
+  bedeutet, dass Brevo die Nachricht akzeptiert hat; die tatsächliche Zustellung
+  ist damit nicht bestätigt. Ein ungeklärter Versand wird nicht automatisch
+  wiederholt, um Doppel-E-Mails zu vermeiden.
 - Das dauerhafte Löschen entfernt auch verknüpfte GPS-Spiele. Buchungen mit
   Anschlussrabatt-Bezug lassen sich nicht löschen; dort bitte „storniert“
   verwenden, damit der Rabatt- und Zahlungsverlauf erhalten bleibt.
