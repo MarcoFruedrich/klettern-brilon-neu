@@ -39,7 +39,7 @@ const securityHeaders={
   'Referrer-Policy':'strict-origin-when-cross-origin'
 };
 const brevoMail=createBrevoMailer();
-const scanForMalware=process.env.MOCK_MALWARE_SCAN==='1'
+const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
 function malwareScanReply(res,error){

@@ -17,7 +17,7 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   const preload=path.join(repo,'test-support','mocks','force-mock-modules.js');
   const totpSecret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
   const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],env:{
-    ...process.env,PORT:String(port),NODE_PATH:path.join(repo,'test-support','mocks'),
+    ...process.env,PORT:String(port),NODE_ENV:'production',MOCK_MALWARE_SCAN:'1',NODE_PATH:path.join(repo,'test-support','mocks'),
     NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:'[]',
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),RUN_SCHEMA_MIGRATIONS:'false',

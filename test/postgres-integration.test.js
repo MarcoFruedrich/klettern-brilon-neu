@@ -32,7 +32,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const repo = path.resolve(__dirname, '..');
   const child = spawn(process.execPath, ['server.js'], {
     cwd: repo, stdio: ['ignore', 'ignore', 'pipe'], env: {
-      ...process.env, PORT: String(port), DATABASE_URL: integrationUrl,
+      ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: integrationUrl,
       DATABASE_SSL_MODE: 'disable', RUN_SCHEMA_MIGRATIONS: 'true',
       BREVO_API_KEY: '', BREVO_SENDER_EMAIL: '', BOOKING_NOTIFY_EMAIL: '',
       SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_PATH: '', MOCK_PG: '', MOCK_MALWARE_SCAN: '1',
