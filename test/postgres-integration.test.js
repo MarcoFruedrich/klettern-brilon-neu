@@ -789,4 +789,27 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   // Keep other integration assertions unaffected by the temporary programme.
   await pool.query('UPDATE brilon_angebote SET verfuegbare_termine=$2::jsonb WHERE id=$1',
     [linkedId,'[]']);
+
+  // Existing actions may be re-assigned or deliberately left independent.
+  const assocPath=root+'/api/admin/aktionen/'+savedActionId+'/programm';
+  const assocPatch=(data,headers={})=>fetch(assocPath,{method:'PATCH',
+    headers:{Origin:root,Cookie:cookie,'Content-Type':'application/json',
+      'X-CSRF-Token':csrf,...headers},
+    body:JSON.stringify(data)});
+  assert.equal((await fetch(assocPath,{method:'PATCH'})).status,401);
+  assert.equal((await fetch(assocPath,{method:'PATCH',headers:{
+    Origin:root,Cookie:cookie,'Content-Type':'application/json'},
+    body:JSON.stringify({programm_id:''})})).status,403);
+  assert.equal((await assocPatch({programm_id:'wrong-id'})).status,400);
+  assert.equal((await assocPatch({programm_id:'999999999'})).status,400);
+  assert.equal((await assocPatch({programm_id:''})).status,200);
+  assert.equal((await publicActions()).find(x=>x.id===savedActionId).programm_id,null);
+  const linkedAgain=await assocPatch({programm_id:linkedId});
+  assert.equal(linkedAgain.status,200);
+  assert.equal((await linkedAgain.json()).programm_id,linkedId);
+  assert.equal(String((await publicActions()).find(x=>x.id===savedActionId).programm_id),linkedId);
+  assert.equal((await pool.query(
+    "SELECT data->>'titel' AS titel FROM brilon_aktionen WHERE id=$1",[savedActionId]
+  )).rows[0].titel,'Herbst-Erlebnisaktion',
+    'Changing a programme association must not rewrite other action properties.');
 });
