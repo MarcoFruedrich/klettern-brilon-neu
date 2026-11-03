@@ -36,7 +36,7 @@ test('HTTP: Angebotsfelder lassen sich separat und ohne allgemeine Schemaänderu
   assert.equal(ready,true,`Testserver startet nicht: ${errors}`);
   for(let i=0;i<40&&!output.includes('Angebotsfelder geprüft');i++)
     await new Promise(resolve=>setTimeout(resolve,25));
-  assert.match(output,/Angebotsfelder geprüft \\(RUN_PROGRAM_FIELDS_MIGRATION=true\\)/);
+  assert.match(output,/Angebotsfelder geprüft \(RUN_PROGRAM_FIELDS_MIGRATION=true\)/);
   assert.match(output,/Schemaänderungen übersprungen/);
   assert.doesNotMatch(errors,/SQL im Test-Double nicht implementiert/);
 });
