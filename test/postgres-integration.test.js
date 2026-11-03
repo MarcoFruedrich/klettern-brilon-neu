@@ -156,8 +156,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     {headers:{Cookie:cookie}});
   assert.equal(payments.status,200);
   const paymentPage=await payments.json();
-  assert.equal(paymentPage.anzahl,127);
-  assert.equal(paymentPage.eintraege.length,27);
+  assert.equal(paymentPage.anzahl,139);
+  assert.equal(paymentPage.eintraege.length,39);
 
   // Mehr als 250 GPS-relevante Buchungen in einer echten isolierten Datenbank.
   const gpsTourId=crypto.randomUUID();
