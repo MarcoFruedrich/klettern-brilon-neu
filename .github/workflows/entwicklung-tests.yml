@@ -46,6 +46,8 @@ jobs:
           node-version: '22'
       - name: Abhängigkeiten ohne Installationsskripte installieren
         run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Laufzeit-Abhängigkeiten auf bekannte hohe Sicherheitslücken prüfen
+        run: npm audit --audit-level=high
       - name: Alle Tests einschließlich isolierter PostgreSQL-Integration
         env:
           NODE_OPTIONS: --require=./test-support/mocks/force-mock-modules.js

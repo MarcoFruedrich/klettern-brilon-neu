@@ -1,4 +1,3 @@
-
 {
   "name": "klettern-brilon",
   "version": "2.0.0",
@@ -12,9 +11,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "pg": "^8.13.1",
-    "nodemailer": "^7.0.0",
     "@supabase/supabase-js": "^2.0.0",
+    "pg": "^8.13.1",
     "sharp": "^0.35.5"
   }
 }
