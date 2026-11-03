@@ -1912,6 +1912,8 @@ const q = await pool.query(
 );
 
 if (bildRoute && req.method === 'POST') {
+  if(!limit('image-upload:'+ip,20,600000))
+    return reply(res,429,{error:'Zu viele Bild-Uploads. Bitte später erneut versuchen.'});
   const angebotId = Number(bildRoute[1]);
 
   const erlaubteTypen = {
@@ -2021,6 +2023,8 @@ if (speicherung.rowCount !== 1) {
 );
 
 if (aktionsBildRoute && req.method === 'POST') {
+  if(!limit('image-upload:'+ip,20,600000))
+    return reply(res,429,{error:'Zu viele Bild-Uploads. Bitte später erneut versuchen.'});
   const aktionsId = aktionsBildRoute[1];
 
   const erlaubteTypen = {

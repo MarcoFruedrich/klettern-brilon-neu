@@ -63,6 +63,12 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
     body:fs.readFileSync(path.join(repo,'site/klettern-brilon-icon.png'))});
   assert.equal(echtesPng.status,503,'Ohne Malware-Scannerkonfiguration wird das Bild vor dem Speichern abgewiesen');
   assert.match((await echtesPng.json()).error,/Bildprüfung ist nicht verfügbar/);
+  for(let attempt=0;attempt<17;attempt++){
+    const rejected=await fetch(bildUrl,{method:'POST',headers:zuGross,body:Buffer.alloc(0)});
+    assert.equal(rejected.status,400,'Leere Bilder werden innerhalb des Upload-Limits normal validiert');
+  }
+  const uploadLimit=await fetch(bildUrl,{method:'POST',headers:zuGross,body:Buffer.alloc(0)});
+  assert.equal(uploadLimit.status,429,'Bild-Uploads werden nach 20 Versuchen je IP und zehn Minuten begrenzt');
 
   assert.equal((await (await fetch(root+'/api/angebote')).json()).length,0,
     'Neu angelegte Programme bleiben zunächst deaktiviert und unsichtbar');
