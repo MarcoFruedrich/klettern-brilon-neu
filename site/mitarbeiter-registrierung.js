@@ -107,7 +107,7 @@ form.addEventListener('submit',async event=>{
         wohnort:form.elements.wohnort.value,
         bescheinigungen:bescheinigungen.map(({file,daten,bezeichnung})=>({
           dateiname:file.name,bezeichnung,daten
-        })),passwort})});
+        })),passwort:password})});
     form.hidden=true;
     bescheinigungen.length=0;renderCertificates();
     intro.textContent='Vielen Dank. Deine Registrierung wurde übermittelt.';

@@ -274,15 +274,15 @@
       const field=elt('label',person.aktiv?'Neues Passwort (alle Sitzungen beenden)':
         'Neues Startpasswort für die Reaktivierung');
       const password=document.createElement('input');password.type='password';
-      password.autocomplete='new-password';password.minLength=12;
-      password.placeholder='Mindestens 12 Zeichen';
+      password.autocomplete='new-password';password.minLength=6;
+      password.placeholder='Mindestens 6 Zeichen';
       field.append(password);card.append(field);
       const action=person.aktiv?'passwort-setzen':'reaktivieren';
       const button=elt('button',person.aktiv?'Passwort zurücksetzen':'Zugang reaktivieren');
       button.type='button';button.className='btn secondary';
       button.addEventListener('click',async()=>{
-        if(password.value.length<12){
-          find('pruef-personal-status').textContent='Mindestens 12 Zeichen für das neue Passwort erforderlich.';return;
+        if(password.value.length<6){
+          find('pruef-personal-status').textContent='Mindestens 6 Zeichen für das neue Passwort erforderlich.';return;
         }
         if(!confirm(person.aktiv?'Passwort zurücksetzen und bisherige Sitzungen sperren?':
           'Mitarbeiterzugang mit neuem Passwort aktivieren?'))return;
