@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
-  <link rel="stylesheet" href="/style.css?v=20261103-customer-email-history">
+  <link rel="stylesheet" href="/style.css?v=20261105-feedback">
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -39,6 +39,7 @@
           <button id="logout" class="btn secondary">Abmelden</button>
           <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
             <a href="#bookings-section" data-admin-view-link>Buchungen</a>
+            <a href="#feedback-admin-section" data-admin-view-link>Feedback</a>
             <a href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
             <a href="#calendar-view" data-admin-view-link>Kalender</a>
             <a href="#angebote-verwaltung" data-admin-view-link>Programme</a>
@@ -76,7 +77,15 @@
         </nav>
       </section>
 
-      <section id="bookings-section" class="admin-view" data-admin-view aria-labelledby="bookings-heading">
+      <section id="feedback-admin-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="feedback-admin-heading">
+  <h2 id="feedback-admin-heading">Kundenfeedback</h2>
+  <p>Alle Rückmeldungen sind nur in der Verwaltung sichtbar. Die öffentliche Website zeigt ausschließlich Durchschnittswerte.</p>
+  <p id="feedback-admin-status" role="status" aria-live="polite"></p>
+  <div id="feedback-admin-summary" class="admin-grid"></div>
+  <div id="feedback-admin-list" class="admin-grid"></div>
+</section>
+
+<section id="bookings-section" class="admin-view" data-admin-view aria-labelledby="bookings-heading">
       <h2 id="bookings-heading" class="admin-anchor">Buchungen &amp; Zahlungen</h2>
       <div class="admin-booking-filters">
         <label>Suche nach Name, Nummer, E-Mail oder Angebot
@@ -476,5 +485,6 @@
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261104-employee-portal"></script>
   <script src="/pruefung-admin.js"></script>
+  <script src="/feedback-admin.js"></script>
 </body>
 </html>

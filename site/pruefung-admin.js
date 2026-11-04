@@ -148,9 +148,11 @@
       const card=elt('article');card.className='booking';
       card.append(elt('strong',person.name+' · '+person.email));
       const statusText=person.status==='eingeladen'?'Einladung offen – Registrierung noch ausstehend':
+        person.status==='geloescht'?'Konto gelöscht – Prüfprotokolle anonymisiert erhalten':
         person.status==='freigabe_ausstehend'?'Registrierung abgeschlossen – Freigabe erforderlich':
         person.aktiv?'Zugang aktiv':'Zugang deaktiviert';
       card.append(elt('p',statusText));
+      if(person.status==='geloescht'){target.append(card);continue;}
       if(person.ablauf){
         const expiry=new Date(person.ablauf);
         card.append(elt('p','Einladung gültig bis '+expiry.toLocaleString('de-DE')));
@@ -234,9 +236,9 @@
         card.append(grantPanel);
       }
       if(person.aktiv){
-        const stop=elt('button','Zugang deaktivieren');stop.type='button';stop.className='btn secondary';
+        const stop=elt('button','Zugang pausieren');stop.type='button';stop.className='btn secondary';
         stop.addEventListener('click',async()=>{
-          if(!confirm('Zugang deaktivieren und alle laufenden Mitarbeitersitzungen beenden?'))return;
+          if(!confirm('Zugang pausieren und alle laufenden Mitarbeitersitzungen beenden?'))return;
           stop.disabled=true;
           try{
             await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/deaktivieren',{method:'PATCH'});
@@ -244,6 +246,19 @@
           }catch(err){find('pruef-personal-status').textContent='Fehler: '+err.message;stop.disabled=false;}
         });
         card.append(stop);
+      }
+      if(person.art==='konto'){
+        const remove=elt('button','Mitarbeiterkonto löschen');remove.type='button';remove.className='btn danger';
+        remove.addEventListener('click',async()=>{
+          if(!confirm('Mitarbeiterkonto von '+person.name+' endgültig löschen? Persönliche Daten, Bescheinigungen, Freigaben und Sitzungen werden entfernt. Sicherheits-Prüfprotokolle bleiben anonymisiert erhalten.'))return;
+          remove.disabled=true;
+          try{
+            await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id),{method:'DELETE'});
+            find('pruef-personal-status').textContent='Mitarbeiterkonto gelöscht; Prüfprotokolle anonymisiert erhalten.';
+            await refresh();
+          }catch(error){find('pruef-personal-status').textContent='Mitarbeiterkonto konnte nicht gelöscht werden: '+error.message;remove.disabled=false;}
+        });
+        card.append(remove);
       }
       if(person.art==='einladung'){
         const resend=elt('button','Neue Einladung senden');resend.type='button';resend.className='btn secondary';

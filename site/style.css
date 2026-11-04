@@ -990,3 +990,6 @@ body.admin-page { min-height:100vh; padding-top:70px; }
   .admin-page .admin-navigation a { width:auto; min-height:42px; flex:0 0 auto; white-space:nowrap; }
   .admin-page .admin-view { padding:18px 14px; }
 }
+
+.feedback-form{max-width:760px;margin-top:22px}
+.feedback-summary{display:inline-block;padding:13px 18px;border:1px solid #536b75;border-radius:10px;background:#17242f;color:#f4c447;font-weight:750}
