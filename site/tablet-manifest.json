@@ -1,0 +1,17 @@
+{
+  "name": "Klettern & Abenteuer – Werbetablet",
+  "short_name": "Werbetablet",
+  "start_url": "/tablet.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101923",
+  "theme_color": "#163e35",
+  "description": "Angebotswerbung und kurzzeitige Stationsprüfcodes – kein Adminzugriff",
+  "icons": [
+    {
+      "src": "/klettern-brilon-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

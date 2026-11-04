@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#163e35">
+  <title>Buchungsanfragen mobil | Klettern & Abenteuer Brilon</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#193b33;background:#f7f8f3}
+    *{box-sizing:border-box}body{margin:0}header{background:#163e35;color:#fff;padding:20px 16px}header strong{font-size:1.12rem}header p{margin:5px 0 0;color:#d7f37e;font-size:.9rem}main{max-width:650px;margin:auto;padding:18px 14px 45px}h1{font-size:1.5rem;margin:5px 0 15px}h2{font-size:1.1rem;margin:0 0 12px}.card{background:white;border:1px solid #dbe3da;border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 2px 8px #102a2110}.details{line-height:1.7;overflow-wrap:anywhere}label{display:block;font-weight:600;margin:12px 0 6px}input{width:100%;padding:14px;border:1px solid #a9b7af;border-radius:9px;font:inherit}button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:14px 15px;min-height:48px;font-weight:650}button:disabled{opacity:.55;cursor:wait}.primary{background:#d7f37e;color:#17392f;width:100%}.secondary{background:#e7ede7;color:#17392f}.toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}.toolbar button{padding:10px 12px}.muted{color:#52635b;font-size:.91rem}.tag{display:inline-block;background:#fff3c2;border-radius:99px;padding:5px 10px;font-size:.8rem;font-weight:700}.notice{padding:12px;background:#f1f6ed;border-radius:9px;font-size:.92rem;margin:12px 0}.feedback{min-height:1.5em;margin:10px 0;font-weight:600}a{color:inherit}#workspace[hidden],#login[hidden]{display:none}#logout{font-size:.9rem}
+  </style>
+</head>
+<body>
+<header><strong>🧗 Klettern & Abenteuer Brilon</strong><p>Mobile Buchungsanfragen</p></header>
+<main>
+  <form id="login" class="card">
+    <h1>Anmelden</h1>
+    <label for="username">Benutzername</label><input id="username" autocomplete="username" required>
+    <label for="password">Passwort</label><input id="password" type="password" autocomplete="current-password" required>
+    <p><button class="primary" type="submit">Anmelden</button></p>
+  </form>
+  <div id="workspace" hidden>
+    <div class="toolbar"><h1>Offene Anfragen</h1><button class="secondary" id="logout" type="button">Abmelden</button></div>
+    <p class="muted">Prüfe den Termin in deinem persönlichen Kalender. Anschließend kannst du die bereits eingerichteten Zahlungsinformationen versenden.</p>
+    <button class="secondary" type="button" id="reload">↻ Anfragen aktualisieren</button>
+    <div id="bookings" aria-live="polite"></div>
+    <p class="notice">Der Versand der Zahlungsinformationen allein macht den Termin nicht verbindlich. Maßgeblich ist der Eingang und die Erfassung der erforderlichen Anzahlung gemäß deinen Buchungsbedingungen.</p>
+    <p class="muted"><a href="/admin.html">Zur vollständigen Verwaltung</a></p>
+  </div>
+  <p id="status" class="feedback" role="status" aria-live="polite"></p>
+</main>
+<script>
+'use strict';
+const login = document.getElementById('login');
+const workspace = document.getElementById('workspace');
+const status = document.getElementById('status');
+const bookings = document.getElementById('bookings');
+async function api(path, options = {}) {
+  const response = await fetch(path, {credentials:'same-origin', cache:'no-store', ...options});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Anfrage fehlgeschlagen');
+  return data;
+}
+function line(parent, label, value) {
+  if (value === undefined || value === null || value === '') return;
+  const p = document.createElement('p');
+  const strong = document.createElement('strong');
+  strong.textContent = label + ': ';
+  p.append(strong, document.createTextNode(String(value)));
+  parent.append(p);
+}
+async function load() {
+  try {
+    status.textContent = '';
+    const all = await api('/api/admin/buchungen');
+    login.hidden = true;
+    workspace.hidden = false;
+    bookings.replaceChildren();
+    const pending = all.filter(b => (b.status || 'offen') === 'offen' && !b.zahlungsinfo_gesendet_am);
+    if (!pending.length) {
+      const p = document.createElement('p');
+      p.className = 'card';
+      p.textContent = 'Aktuell keine offenen Anfragen ohne versendete Zahlungsinformationen.';
+      bookings.append(p);
+      return;
+    }
+    for (const b of pending) {
+      const card = document.createElement('section');
+      card.className = 'card';
+      const title = document.createElement('h2');
+      title.textContent = b.data?.name || 'Neue Buchungsanfrage';
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = 'Offen';
+      const details = document.createElement('div');
+      details.className = 'details';
+      line(details, 'Datum', b.data?.datum);
+      line(details, 'Uhrzeit', b.data?.uhrzeit);
+      line(details, 'Angebot', b.data?.angebot);
+      line(details, 'Teilnehmer', b.data?.teilnehmer);
+      line(details, 'E-Mail', b.data?.email);
+      line(details, 'Telefon', b.data?.telefon);
+      line(details, 'Nachricht', b.data?.nachricht);
+      const note = document.createElement('p');
+      note.className = 'muted';
+      note.textContent = 'Die vorhandene Zahlungs-E-Mail wird über dein bestehendes System verschickt.';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'primary';
+      button.textContent = 'Zahlungsinformationen senden';
+      const feedback = document.createElement('p');
+      feedback.className = 'feedback';
+      feedback.setAttribute('role', 'status');
+      button.onclick = async () => {
+        if (!confirm('Hast du den Termin geprüft und möchtest du jetzt die Zahlungsinformationen an diesen Kunden senden?')) return;
+        button.disabled = true;
+        feedback.textContent = 'E-Mail wird versendet ...';
+        try {
+          await api('/api/admin/buchungen/' + encodeURIComponent(b.id) + '/zahlung', {method:'POST'});
+          feedback.textContent = 'Zahlungsinformationen erfolgreich versendet.';
+          button.textContent = '✓ Zahlungsinformationen versendet';
+          // Keep the success message visible until the next manual refresh.
+        } catch (error) {
+          feedback.textContent = 'Versand fehlgeschlagen: ' + error.message;
+          button.disabled = false;
+        }
+      };
+      card.append(title, tag, details, note, button, feedback);
+      bookings.append(card);
+    }
+  } catch (error) {
+    if (/401|403|nicht angemeldet|unauthor|anmelden|login|sitzung/i.test(error.message)) {
+      login.hidden = false;
+      workspace.hidden = true;
+    }
+    status.textContent = 'Laden fehlgeschlagen: ' + error.message;
+  }
+}
+login.onsubmit = async event => {
+  event.preventDefault();
+  status.textContent = 'Anmeldung läuft ...';
+  try {
+    await api('/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:document.getElementById('username').value,password:document.getElementById('password').value})});
+    document.getElementById('password').value = '';
+    await load();
+  } catch(error) { status.textContent = 'Anmeldung fehlgeschlagen: ' + error.message; }
+};
+document.getElementById('reload').onclick = load;
+document.getElementById('logout').onclick = async () => {
+  try { await api('/api/admin/logout', {method:'POST'}); location.reload(); }
+  catch(error) { status.textContent = error.message; }
+};
+load();
+</script>
+</body>
+</html>
