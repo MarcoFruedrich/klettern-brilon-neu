@@ -108,9 +108,21 @@
       status.textContent='Neue Einladung an '+result.email+' versandt. Der Mailanbieter hat die Nachricht angenommen; eine Zustellung ist damit nicht bestätigt.';
       return;
     }
+    const diagnosis={
+      MAIL_NOT_CONFIGURED:'Brevo-API-Schlüssel oder Absenderadresse fehlt in der Serverkonfiguration.',
+      MAIL_UNAVAILABLE:'Der E-Mail-Dienst ist auf dem Server nicht verfügbar.',
+      BREVO_HTTP_400:'Brevo lehnt die Anfrage ab (HTTP 400). Absenderadresse und Empfängerdaten prüfen.',
+      BREVO_HTTP_401:'Brevo lehnt den API-Schlüssel ab (HTTP 401). API-Schlüssel in Render erneuern.',
+      BREVO_HTTP_403:'Brevo verweigert den Versand (HTTP 403). Konto- und Absenderfreigabe prüfen.',
+      BREVO_HTTP_429:'Das Brevo-Versandlimit ist erreicht (HTTP 429). Später erneut versuchen.',
+      BREVO_CONNECTION_UNCERTAIN:'Die Verbindung wurde unterbrochen; zuerst Brevo auf eine bereits angenommene Nachricht prüfen.',
+      MAIL_UNEXPECTED_ERROR:'Unerwarteter Fehler beim E-Mail-Versand. Render-Logs prüfen.'
+    };
+    const match=/^BREVO_HTTP_(408|5\d\d)$/.exec(result.emailFehler||'');
+    const detail=diagnosis[result.emailFehler]||(match?'Brevo ist vorübergehend nicht erreichbar (HTTP '+match[1]+').':'');
     status.textContent=result.emailVersand==='versand_ungeklaert'?
-      'Versandstatus unklar. Bitte zuerst den Postausgang prüfen. Der neue Link ist sieben Tage gültig:':
-      'E-Mail konnte nicht versandt werden. Den neuen Link sicher an '+result.email+' weitergeben:';
+      'Versandstatus unklar. Bitte zuerst den Postausgang prüfen. '+(detail?detail+' ':'')+'Der neue Link ist sieben Tage gültig:':
+      'E-Mail konnte nicht versandt werden. '+(detail?detail+' ':'')+'Den neuen Link sicher an '+result.email+' weitergeben:';
     const link=elt('a',result.registrierungsLink);link.href=result.registrierungsLink;
     link.className='invite-link';link.style.display='block';link.style.overflowWrap='anywhere';
     const copy=elt('button','Registrierungslink kopieren');copy.type='button';copy.className='btn secondary';
