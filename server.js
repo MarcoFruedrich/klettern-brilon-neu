@@ -1813,6 +1813,100 @@ if(placeRoute&&req.method==='DELETE'){
   return reply(res,200,{success:true});
 }
 
+if(route==='/api/admin/mitarbeiterbereiche'&&req.method==='GET'){
+  const q=await pool.query(`SELECT a.id,a.titel,a.inhalt,a.aktiv,a.sortierung,a.art,a.aktualisiert_am,
+      COALESCE((SELECT json_agg(json_build_object('id',o.id,'name',o.name) ORDER BY o.name)
+        FROM brilon_mitarbeiterbereich_orte ao JOIN brilon_orte o ON o.id=ao.ort_id
+        WHERE ao.bereich_id=a.id),'[]'::json) AS standorte
+    FROM brilon_mitarbeiterbereiche a ORDER BY a.sortierung,a.titel,a.id`);
+  return reply(res,200,q.rows);
+}
+if(route==='/api/admin/mitarbeiterbereiche'&&req.method==='POST'){
+  const d=await body(req);
+  if(!d||typeof d!=='object'||Array.isArray(d))
+    return reply(res,400,{error:'Bereichsdaten sind ungültig.'});
+  const titel=typeof d.titel==='string'?d.titel.trim():'',
+    inhalt=typeof d.inhalt==='string'?d.inhalt.trim():'',
+    art=typeof d.art==='string'?d.art:'allgemein',
+    standorte=Array.isArray(d.standorte)?[...new Set(d.standorte.map(Number))]:[];
+  if(!titel||titel.length>100||!inhalt||inhalt.length>20000||typeof d.aktiv!=='boolean'||
+     !['allgemein','standort','partner','programm'].includes(art)||standorte.length>50||
+     standorte.some(id=>!Number.isSafeInteger(id)||id<1)||
+     (['standort','programm'].includes(art)&&!standorte.length)||
+     (art==='allgemein'&&standorte.length))
+    return reply(res,400,{error:'Bitte Titel, Inhalt, Bereichsart und passende Standorte angeben.'});
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    if(standorte.length){
+      const places=await client.query('SELECT id FROM brilon_orte WHERE id=ANY($1::bigint[]) AND aktiv=true',[standorte]);
+      if(places.rowCount!==standorte.length){await client.query('ROLLBACK');return reply(res,400,{error:'Mindestens ein gewählter Standort ist inaktiv oder nicht vorhanden.'});}
+    }
+    const id=crypto.randomUUID();
+    const q=await client.query(`INSERT INTO brilon_mitarbeiterbereiche(id,titel,inhalt,aktiv,sortierung,art)
+      VALUES($1,$2,$3,$4,COALESCE((SELECT MAX(sortierung)+1 FROM brilon_mitarbeiterbereiche),0),$5)
+      RETURNING id,titel,inhalt,aktiv,sortierung,art,aktualisiert_am`,[id,titel,inhalt,d.aktiv,art]);
+    for(const ortId of standorte)await client.query(
+      'INSERT INTO brilon_mitarbeiterbereich_orte(bereich_id,ort_id) VALUES($1,$2)',[id,ortId]);
+    await client.query('COMMIT');
+    const places=await pool.query('SELECT id,name FROM brilon_orte WHERE id=ANY($1::bigint[]) ORDER BY name',[standorte]);
+    return reply(res,201,{...q.rows[0],standorte:places.rows});
+  }catch(error){await client.query('ROLLBACK');throw error;}
+  finally{client.release();}
+}
+const staffArea=route.match(/^\/api\/admin\/mitarbeiterbereiche\/([0-9a-f-]{36})$/i);
+if(staffArea&&req.method==='PATCH'){
+  const d=await body(req);
+  if(!d||typeof d!=='object'||Array.isArray(d))
+    return reply(res,400,{error:'Änderungen sind ungültig.'});
+  const titel=typeof d.titel==='string'?d.titel.trim():null,
+    inhalt=typeof d.inhalt==='string'?d.inhalt.trim():null,
+    art=typeof d.art==='string'?d.art:null,
+    standorte=Array.isArray(d.standorte)?[...new Set(d.standorte.map(Number))]:null;
+  if(titel!==null&&(!titel||titel.length>100)||inhalt!==null&&(!inhalt||inhalt.length>20000)||
+     d.aktiv!==undefined&&typeof d.aktiv!=='boolean'||art!==null&&!['allgemein','standort','partner','programm'].includes(art)||
+     standorte&& (standorte.length>50||standorte.some(id=>!Number.isSafeInteger(id)||id<1))||
+     art===null&&standorte===null&&titel===null&&inhalt===null&&d.aktiv===undefined)
+    return reply(res,400,{error:'Änderungen sind ungültig.'});
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const current=await client.query('SELECT art FROM brilon_mitarbeiterbereiche WHERE id=$1 FOR UPDATE',[staffArea[1]]);
+    if(!current.rowCount){await client.query('ROLLBACK');return reply(res,404,{error:'Mitarbeiterbereich nicht gefunden.'});}
+    const nextArt=art||current.rows[0].art;
+    const existingPlaces=await client.query('SELECT ort_id FROM brilon_mitarbeiterbereich_orte WHERE bereich_id=$1',[staffArea[1]]);
+    const nextPlaces=nextArt==='allgemein'?[]:standorte===null?existingPlaces.rows.map(row=>Number(row.ort_id)):standorte;
+    if((['standort','programm'].includes(nextArt)&&!nextPlaces.length)||
+       (standorte!==null&&nextArt==='allgemein'&&standorte.length)){
+      await client.query('ROLLBACK');return reply(res,400,{error:'Für Standort- und Programmbereiche ist eine passende Standortauswahl erforderlich.'});
+    }
+    if(nextPlaces.length){
+      const places=await client.query('SELECT id FROM brilon_orte WHERE id=ANY($1::bigint[]) AND aktiv=true',[nextPlaces]);
+      if(places.rowCount!==nextPlaces.length){await client.query('ROLLBACK');return reply(res,400,{error:'Mindestens ein gewählter Standort ist inaktiv oder nicht vorhanden.'});}
+    }
+    const q=await client.query(`UPDATE brilon_mitarbeiterbereiche SET
+      titel=COALESCE($2,titel),inhalt=COALESCE($3,inhalt),aktiv=COALESCE($4,aktiv),art=$5,
+      aktualisiert_am=NOW() WHERE id=$1
+      RETURNING id,titel,inhalt,aktiv,sortierung,art,aktualisiert_am`,
+    [staffArea[1],titel,inhalt,d.aktiv===undefined?null:d.aktiv,nextArt]);
+    if(standorte!==null||nextArt==='allgemein'){
+      await client.query('DELETE FROM brilon_mitarbeiterbereich_orte WHERE bereich_id=$1',[staffArea[1]]);
+      for(const ortId of nextPlaces)await client.query(
+        'INSERT INTO brilon_mitarbeiterbereich_orte(bereich_id,ort_id) VALUES($1,$2)',[staffArea[1],ortId]);
+    }
+    await client.query('COMMIT');
+    const places=await pool.query(`SELECT o.id,o.name FROM brilon_mitarbeiterbereich_orte ao
+      JOIN brilon_orte o ON o.id=ao.ort_id WHERE ao.bereich_id=$1 ORDER BY o.name`,[staffArea[1]]);
+    return reply(res,200,{...q.rows[0],standorte:places.rows});
+  }catch(error){await client.query('ROLLBACK');throw error;}
+  finally{client.release();}
+}
+if(staffArea&&req.method==='DELETE'){
+  const q=await pool.query('DELETE FROM brilon_mitarbeiterbereiche WHERE id=$1 RETURNING id',[staffArea[1]]);
+  if(!q.rowCount)return reply(res,404,{error:'Mitarbeiterbereich nicht gefunden.'});
+  return reply(res,200,{success:true});
+}
+
 if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
     `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
@@ -2465,6 +2559,22 @@ async function start(){
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets((1)) WHERE pruefdisplay=true');
     await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
       console.log('Mitarbeiter- und Stationsschema geprüft (RUN_PRUEF_SCHEMA_MIGRATION=true)');
+    }
+    // Optional employee portal content; independent from staff and inspection tables.
+    if(process.env.RUN_EMPLOYEE_AREAS_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_mitarbeiterbereiche(
+        id UUID PRIMARY KEY,titel TEXT NOT NULL CHECK(length(titel) BETWEEN 1 AND 100),
+        inhalt TEXT NOT NULL CHECK(length(inhalt) BETWEEN 1 AND 20000),
+        aktiv BOOLEAN NOT NULL DEFAULT false,sortierung INTEGER NOT NULL DEFAULT 0,
+        art TEXT NOT NULL DEFAULT 'allgemein' CHECK(art IN ('allgemein','standort','partner','programm')),
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+      await pool.query(`ALTER TABLE brilon_mitarbeiterbereiche ADD COLUMN IF NOT EXISTS art TEXT NOT NULL DEFAULT 'allgemein'`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_mitarbeiterbereich_orte(
+        bereich_id UUID NOT NULL REFERENCES brilon_mitarbeiterbereiche(id) ON DELETE CASCADE,
+        ort_id BIGINT NOT NULL REFERENCES brilon_orte(id) ON DELETE RESTRICT,
+        PRIMARY KEY(bereich_id,ort_id))`);
+      await pool.query('CREATE INDEX IF NOT EXISTS brilon_mitarbeiterbereich_orte_ort_idx ON brilon_mitarbeiterbereich_orte(ort_id,bereich_id)');
+      console.log('Mitarbeiterbereiche-Tabelle geprüft (RUN_EMPLOYEE_AREAS_MIGRATION=true)');
     }
     // Schema changes are opt-in. A normal server start must not alter a live database.
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){

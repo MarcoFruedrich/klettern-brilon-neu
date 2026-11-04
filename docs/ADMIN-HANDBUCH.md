@@ -118,6 +118,35 @@ Für kundenindividuelle Anschlussangebote benötigt der Server
 am bestätigten Ausgangsprogramm erfolgen erst, wenn eine passende
 Zusatzbuchung bestätigt wird.
 
+## Mitarbeiter einladen und Zugänge freigeben
+
+1. Unter „Neue Mitarbeiter“ Name und E-Mail-Adresse eintragen und den
+   persönlichen Registrierungslink senden. Die eingeladene Person erhält den
+   Link per E-Mail. Er ist sieben Tage gültig und kann einmal verwendet werden.
+2. Bei ausstehendem oder fehlgeschlagenem E-Mail-Versand den angezeigten Link
+   nur direkt an die eingeladene Person weitergeben. Eine neue Einladung ersetzt
+   einen noch offenen älteren Link; offene Einladungen können widerrufen werden.
+3. Die eingeladene Person ergänzt Anschrift, Telefonnummer, Qualifikationen und
+   Erfahrung, kann bis zu fünf Bescheinigungsfotos hochladen und setzt ein
+   eigenes Passwort. Bis zur Verwaltungsfreigabe kann sie sich nicht anmelden.
+4. Unter „Mitarbeiter“ Angaben und Bescheinigungen prüfen. Bei der Freigabe
+   mindestens einen aktiven Standort sowie die belegten Qualifikationen
+   auswählen. Erst dann wird der Zugang aktiviert und die zugehörigen
+   Stationsberechtigungen werden erteilt. Zugänge lassen sich dort auch
+   deaktivieren; bestehende Sitzungen werden dabei widerrufen.
+
+## Inhalte im Mitarbeiterportal veröffentlichen
+
+Die Navigation „Mitarbeiterkontakte“ wird automatisch aus aktiven Mitarbeiterkonten aufgebaut und zeigt Name, eingeladene E-Mail-Adresse und Telefonnummer. Mitarbeitende können Name und Telefonnummer selbst aktualisieren; die Kontaktliste übernimmt die Änderung direkt. Privatanschriften werden nicht angezeigt.
+
+Unter „Mitarbeiterbereiche“ einen Titel und Inhalt eintragen. Aktivierte
+Bereiche erscheinen nach der Anmeldung als eigene Navigation im
+Mitarbeiterportal unter `/mitarbeiterbereich.html`; deaktivierte Bereiche
+bleiben in der Verwaltung gespeichert, sind aber für Mitarbeiter nicht
+sichtbar. Inhalte sind für alle angemeldeten Mitarbeiter gemeinsam sichtbar.
+Derzeit werden Inhalte als reiner Text angezeigt. Keine Zugangsdaten oder
+sonstigen vertraulichen Einzelinformationen dort eintragen.
+
 ## GPS-Schatzsuchen
 
 - Eine Tour benötigt Titel, Schwierigkeitsgrad, Altersgruppe, Startpunkt, Ziel,

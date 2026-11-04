@@ -121,7 +121,7 @@
     status.append(link,copy);
   }
   async function einladungSenden(name,email){
-    const status=find('pruef-personal-status');status.replaceChildren();
+    const status=find('pruef-einladung-status')||find('pruef-personal-status');status.replaceChildren();
     try{
       const result=await api('/api/admin/pruefung/mitarbeitende',{method:'POST',
         headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email})});
@@ -600,7 +600,7 @@
   }
   find('pruef-personal-form')?.addEventListener('submit',async event=>{
     event.preventDefault();const form=event.currentTarget;
-    const status=find('pruef-personal-status');
+    const status=find('pruef-einladung-status')||find('pruef-personal-status');
     const submit=form.querySelector('button[type="submit"]');
     status.replaceChildren();submit.disabled=true;
     const values=Object.fromEntries(new FormData(form));

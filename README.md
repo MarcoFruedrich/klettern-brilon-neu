@@ -11,6 +11,8 @@ Responsive Website, Buchungsanfragen, PostgreSQL-Anbindung und Verwaltungsbereic
 
 Schemaänderungen sind standardmäßig deaktiviert. `RUN_SCHEMA_MIGRATIONS=true` darf nur in einer eigens angelegten Testdatenbank und nach Prüfung des Schemas gesetzt werden. Für den Mitarbeiter- und Stationsprüfungsbereich gibt es zusätzlich `RUN_PRUEF_SCHEMA_MIGRATION=true`; dieser einmalige Schalter legt nur die dafür benötigten Standort-, Mitarbeiter- und Prüfprotokolltabellen an. Nach erfolgreichem Start ist der Schalter wieder zu entfernen.
 
+Die Tabellen für zusätzliche Mitarbeiterportal-Inhalte und deren Standortzuordnungen werden separat und nur mit `RUN_EMPLOYEE_AREAS_MIGRATION=true` angelegt. Dafür muss `brilon_orte` bereits vorhanden sein (zum Beispiel über `RUN_PLACES_MIGRATION=true` oder `RUN_PRUEF_SCHEMA_MIGRATION=true`). Aktivierte Inhalte erscheinen nur nach Mitarbeiteranmeldung. Programme lassen sich mehreren Standorten zuordnen und werden dort als Unterpunkte angezeigt; Standortinfos und zugeordnete Partner erscheinen in der jeweiligen Standortübersicht. Die Erweiterung ist noch nicht veröffentlicht; die Migration wurde nicht produktiv ausgeführt.
+
 ## Konfiguration
 
 - Buchungsdatenbank: `DATABASE_URL`
@@ -84,6 +86,8 @@ Der Code ist nur **120 Sekunden** und **einmalig** nutzbar. Nach der Eingabe kan
 Die Aufgabenübersicht ist **keine betriebliche Prüffristen- oder Terminplanung**. Aus dem Vorliegen eines älteren Protokolls wird keine überfällige Prüfung abgeleitet, und vor **jedem** Programm bleibt eine neue fachlich erforderliche Vorabkontrolle notwendig. Sicherheitsmängel bleiben gesperrt, bis die reguläre dokumentierte Fachfreigabe durchgeführt wurde; kleinere Hinweise können geprüft werden, ohne automatisch eine Sperre auszulösen.
 
 **Mitarbeiter einladen und freigeben:** Unter `/admin.html#stationspruefung` trägt die Verwaltung Name und E-Mail ein und verschickt einen persönlichen Registrierungslink. Der sieben Tage gültige Link ist einmal nutzbar. Die eingeladene Person ergänzt ihren Namen, ihre Telefonnummer und Qualifikationen/Erfahrung und legt ein eigenes Passwort fest. Das Konto bleibt danach gesperrt, bis die Verwaltung die Angaben geprüft und **„Registrierung freigeben und Zugang aktivieren“** gewählt hat. Für den Versand muss `PUBLIC_BASE_URL` auf die HTTPS-Adresse der Website zeigen. Wenn der E-Mail-Versand nicht bestätigt wird, zeigt die Verwaltung den Link zur sicheren manuellen Weitergabe an. Persönliche Passwörter werden nur als scrypt-Hash gespeichert.
+
+**Mitarbeiterportal-Inhalte (in Entwicklung):** Die Verwaltung kann zusätzliche gemeinsame Textbereiche anlegen, bearbeiten, deaktivieren oder löschen. Aktivierte Bereiche werden nach Anmeldung unter `/mitarbeiterbereich.html` sichtbar. Die Kontaktliste wird automatisch aus aktiven Mitarbeiterkonten erstellt; Name und Telefonnummer können Mitarbeitende selbst aktualisieren. Standort-/Netzwerkpartnerdaten und standortbezogene Programm-Untermenüs folgen als nächste Erweiterung.
 
 **Mitarbeiter- und Stationsverwaltung:** Die Verwaltung kann aktive Mitarbeiterzugänge deaktivieren und ihre Sitzungen sofort widerrufen. Eine Reaktivierung erfordert ein neues persönliches Passwort (mindestens zwölf Zeichen); das alte Passwort und alle früheren Sitzungen bleiben ungültig. Ein Passwortreset beendet ebenfalls alle bestehenden Sitzungen. Bestehende Prüfberichte bleiben beim Deaktivieren oder Reaktivieren erhalten.
 

@@ -715,6 +715,47 @@ footer a {
   outline-offset: 1px;
   background: #eaf0e9;
 }
+.admin-page .admin-navigation a.employee-area-link {
+  background: #e3f5a3;
+  border: 1px solid #bfdc73;
+  color: #123f32;
+}
+.admin-page .admin-navigation a.employee-area-link:hover,
+.admin-page .admin-navigation a.employee-area-link:focus-visible {
+  background: #d0ee79;
+  outline-color: #123f32;
+}
+.staff-portal-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+.staff-profile-panel { margin:14px 0 22px; padding:14px 18px; border:1px solid #cbd6cb; border-radius:12px; background:#f7f9f6; }
+.staff-profile-panel summary { cursor:pointer; color:var(--pine); font-weight:750; }
+.staff-profile-panel form { margin-top:12px; }
+.staff-portal-layout { display:grid; grid-template-columns:minmax(210px,260px) minmax(0,1fr); align-items:start; gap:20px; }
+.staff-areas-nav { position:sticky; top:20px; display:grid; gap:8px; padding:12px; background:#eef2ec; border:1px solid #d5dfd6; border-radius:14px; }
+.staff-location-nav-group { display:grid; gap:6px; padding-top:8px; border-top:1px solid #d5dfd6; }
+.staff-location-nav-group > span { padding:3px 8px; color:#52665e; font-size:13px; font-weight:800; }
+.staff-areas-nav .employee-area-link { width:100%; min-height:48px; padding:10px 14px; border:1px solid #bfdc73; border-radius:10px; background:#e3f5a3; color:#123f32; text-align:left; font-weight:750; cursor:pointer; }
+.staff-areas-nav .employee-area-link.staff-subarea-link { min-height:42px; margin-left:12px; width:calc(100% - 12px); background:#fff; border-color:#cbd6cb; font-size:14px; }
+.staff-areas-nav .employee-area-link.staff-subarea-link.active { background:#17483b; border-color:#17483b; color:#fff; }
+.staff-areas-nav .employee-area-link:hover,
+.staff-areas-nav .employee-area-link:focus-visible { background:#d0ee79; outline:2px solid #123f32; outline-offset:1px; }
+.staff-areas-nav .employee-area-link.active { background:#17483b; border-color:#17483b; color:#fff; }
+.staff-area-content { min-height:300px; margin:0; }
+.staff-area-content > h3 { margin:22px 0 10px; }
+.staff-location-section { margin:12px 0; padding:14px 16px; border:1px solid #d5dfd6; border-radius:12px; background:#fff; }
+.staff-location-section h3 { margin:0 0 8px; font-size:1.05rem; }
+.staff-location-section .staff-area-text { line-height:1.7; }
+.staff-area-text { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.7; }
+.staff-contact-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+.staff-contact-card { display:grid; gap:8px; align-content:start; margin:0; overflow-wrap:anywhere; }
+.staff-contact-card a { color:var(--pine); font-weight:650; }
+.staff-area-preview { max-height:8em; overflow:hidden; white-space:pre-wrap; overflow-wrap:anywhere; color:#52665e; }
+.staff-area-admin-card details { margin-top:12px; }
+.staff-area-admin-card summary { cursor:pointer; color:var(--pine); font-weight:750; padding:8px 0; }
+.staff-area-edit-form { margin-top:10px; }
+@media(max-width:700px){
+  .staff-portal-layout { grid-template-columns:1fr; }
+  .staff-areas-nav { position:static; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+}
 .admin-page .admin-anchor,
 .admin-page #calendar-section,
 .admin-page #anschlussrabatt-section,

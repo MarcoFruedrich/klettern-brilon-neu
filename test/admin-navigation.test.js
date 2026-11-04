@@ -20,6 +20,26 @@ test('Admin-Sprungnavigation verweist auf vorhandene Verwaltungsbereiche',()=>{
   }
 });
 
+test('Mitarbeiter und Portal-Inhalte haben eigene Verwaltungsansichten und geschützte Mitarbeiteransicht',()=>{
+  const root=path.join(__dirname,'..','site');
+  const admin=fs.readFileSync(path.join(root,'admin.html'),'utf8');
+  const portal=fs.readFileSync(path.join(root,'mitarbeiterbereich.html'),'utf8');
+  const portalJs=fs.readFileSync(path.join(root,'mitarbeiterbereich.js'),'utf8');
+  const staffApi=fs.readFileSync(path.join(__dirname,'..','lib','stationspruefung-api.js'),'utf8');
+  for(const target of ['mitarbeiter-section','mitarbeiter-einladen-section','mitarbeiterbereiche-admin-section']){
+    assert.match(admin,new RegExp(`<a class="employee-area-link" href="#${target}" data-admin-view-link>`));
+    assert.match(admin,new RegExp(`id="${target}"[^>]*data-admin-view`));
+  }
+  assert.match(portal,/id="staff-login"/);
+  assert.match(portal,/id="staff-profile-form"/);
+  assert.match(portalJs,/\/api\/pruefung\/login/);
+  assert.match(portalJs,/\/api\/pruefung\/profil/);
+  assert.match(staffApi,/WHERE aktiv=true ORDER BY lower\(name\),id/);
+  assert.match(staffApi,/route==='\/api\/pruefung\/profil'&&req\.method==='PATCH'/);
+  assert.match(portalJs,/node\('div',area\.inhalt\)/,'Portaltext muss als Klartext ausgegeben werden');
+  assert.doesNotMatch(portalJs,/innerHTML\s*=\s*area\.inhalt/,'Portalinhalte dürfen nicht als HTML interpretiert werden');
+});
+
 test('GPS-Touren nutzen Stationskarten mit Reihenfolge statt eines JSON-Textfelds',()=>{
   const html=fs.readFileSync(path.join(__dirname,'..','site','admin.html'),'utf8');
   const js=fs.readFileSync(path.join(__dirname,'..','site','admin.js'),'utf8');

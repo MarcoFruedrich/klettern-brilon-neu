@@ -28,6 +28,8 @@ class Pool {
     if(process.env.RUN_PROGRAM_FIELDS_MIGRATION==='true'&&
        /^\s*ALTER TABLE brilon_angebote\b/i.test(sql))
       return {rows:[],rowCount:0};
+    if(/^\s*CREATE TABLE IF NOT EXISTS brilon_mitarbeiterbereiche\b/i.test(sql))
+      return {rows:[],rowCount:0};
     if(/^\s*BEGIN\b/i.test(sql))return {rows:[],rowCount:0};
     if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql)){
       if(client)this.advisoryLockFreigeben(client);
@@ -262,6 +264,8 @@ class Pool {
       const rows=this.bookings.filter(item=>item.data.anschlussElternId===params[0]).map(({id})=>({id}));
       return {rows,rowCount:rows.length};
     }
+    if(sql.includes("SELECT to_regclass('brilon_gps_spiele')"))
+      return {rows:[{relation:'brilon_gps_spiele'}],rowCount:1};
     if(sql.includes('DELETE FROM brilon_gps_spiele WHERE buchung_id=$1')){
       const first=this.bookings.find(item=>item.buchungsnummer==='MUELLER-MAX-150327')?.id;
       const before=this.gpsGames.length;

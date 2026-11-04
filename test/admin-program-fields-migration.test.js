@@ -6,7 +6,7 @@ const {spawn}=require('node:child_process');
 const net=require('node:net');
 const path=require('node:path');
 
-test('HTTP: Angebotsfelder lassen sich separat und ohne allgemeine Schemaänderungen einrichten',async t=>{
+test('HTTP: Angebotsfelder und Mitarbeiterportal-Tabelle lassen sich gezielt einrichten',async t=>{
   const probe=net.createServer();
   await new Promise((resolve,reject)=>{probe.once('error',reject);probe.listen(0,'127.0.0.1',resolve);});
   const port=probe.address().port;
@@ -18,7 +18,7 @@ test('HTTP: Angebotsfelder lassen sich separat und ohne allgemeine Schemaänderu
     NODE_PATH:path.join(repo,'test-support','mocks'),
     NODE_OPTIONS:[process.env.NODE_OPTIONS,`--require=${preload}`].filter(Boolean).join(' '),
     DATABASE_URL:'mock-test-database',MOCK_PG:'1',MOCK_OFFERS:'[]',MOCK_PLACES:'[]',
-    RUN_PROGRAM_FIELDS_MIGRATION:'true',RUN_SCHEMA_MIGRATIONS:'false',
+    RUN_PROGRAM_FIELDS_MIGRATION:'true',RUN_EMPLOYEE_AREAS_MIGRATION:'true',RUN_SCHEMA_MIGRATIONS:'false',
     RUN_ADMIN_SESSION_MIGRATION:'false',SUPABASE_URL:'',SUPABASE_SECRET_KEY:'',
     ADMIN_USER:'migration-admin',ADMIN_PASSWORD:'test-only-password'
   }});
@@ -36,6 +36,7 @@ test('HTTP: Angebotsfelder lassen sich separat und ohne allgemeine Schemaänderu
   for(let i=0;i<40&&!output.includes('Angebotsfelder geprüft');i++)
     await new Promise(resolve=>setTimeout(resolve,25));
   assert.match(output,/Angebotsfelder geprüft \(RUN_PROGRAM_FIELDS_MIGRATION=true\)/);
+  assert.match(output,/Mitarbeiterbereiche-Tabelle geprüft \(RUN_EMPLOYEE_AREAS_MIGRATION=true\)/);
   assert.match(output,/Schemaänderungen übersprungen/);
   assert.doesNotMatch(errors,/SQL im Test-Double nicht implementiert/);
 });

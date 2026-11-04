@@ -183,6 +183,7 @@ async function refresh() {
     
     await erlebnisangeboteLaden();
     await orteLaden();
+    await mitarbeiterbereicheLaden();
     await gpsTourenLaden();
     if(aktuelleSequenz!==refreshSequenz)return;
 
@@ -1730,6 +1731,98 @@ document.getElementById('admin-place-list')?.addEventListener('click',async even
   }catch(error){message.textContent='Standort konnte nicht geändert werden: '+error.message;}
   finally{button.disabled=false;}
 });
+
+const mitarbeiterbereichArten={allgemein:'Allgemeine Information',standort:'Standortinformation',partner:'Netzwerk-/Kooperationspartner',programm:'Programm'};
+async function mitarbeiterbereichStandorteFuellen(select,selected=[]){
+  const places=await api('/api/admin/orte');
+  const chosen=new Set(selected.map(Number));
+  select.replaceChildren();
+  for(const place of places){
+    if(!place.aktiv&&!chosen.has(Number(place.id)))continue;
+    const option=el('option',place.name+(place.aktiv?'':' · inaktiv'));
+    option.value=String(place.id);option.selected=chosen.has(Number(place.id));select.append(option);
+  }
+}
+function mitarbeiterbereichArtSynchronisieren(form){
+  const art=form.elements.art.value,locations=form.elements.standorte;
+  locations.disabled=art==='allgemein';
+  locations.required=art==='standort'||art==='programm';
+  if(art==='allgemein')for(const option of locations.options)option.selected=false;
+}
+function mitarbeiterbereichFormDaten(form){
+  return {titel:form.elements.titel.value,inhalt:form.elements.inhalt.value,
+    art:form.elements.art.value,
+    standorte:[...form.elements.standorte.selectedOptions].map(option=>Number(option.value)),
+    aktiv:form.elements.aktiv.checked};
+}
+
+async function mitarbeiterbereicheLaden(){
+  const list=document.getElementById('mitarbeiterbereiche-list');
+  if(!list)return;
+  const status=document.getElementById('mitarbeiterbereich-status');
+  try{
+    const areas=await api('/api/admin/mitarbeiterbereiche');
+    const createForm=document.getElementById('mitarbeiterbereich-form');
+    const createLocations=createForm?.elements.standorte;
+    if(createLocations){await mitarbeiterbereichStandorteFuellen(createLocations);mitarbeiterbereichArtSynchronisieren(createForm);}
+    list.replaceChildren();
+    if(!areas.length){list.append(el('p','Noch keine Mitarbeiterbereiche angelegt.'));return;}
+    for(const area of areas){
+      const card=el('article');card.className='booking staff-area-admin-card';
+      const locations=(area.standorte||[]).map(place=>place.name).join(', ');
+      card.append(el('strong',area.titel),el('p',(mitarbeiterbereichArten[area.art]||area.art)+
+        (locations?' · '+locations:'')+' · '+(area.aktiv?'Im Mitarbeiterbereich sichtbar':'Deaktiviert · nur in der Verwaltung sichtbar')));
+      const preview=el('p',area.inhalt);preview.className='staff-area-preview';card.append(preview);
+      const details=document.createElement('details'),summary=el('summary','Bereich bearbeiten');
+      const form=document.createElement('form');form.className='staff-area-edit-form';
+      const typeLabel=el('label','Bereichstyp');const type=document.createElement('select');type.name='art';
+      for(const [value,labelText] of Object.entries(mitarbeiterbereichArten)){
+        const option=el('option',labelText);option.value=value;option.selected=area.art===value;type.append(option);
+      }
+      typeLabel.append(type);
+      const titleLabel=el('label','Bezeichnung');const title=document.createElement('input');title.name='titel';title.maxLength=100;title.required=true;title.value=area.titel;titleLabel.append(title);
+      const contentLabel=el('label','Inhalt');const content=document.createElement('textarea');content.name='inhalt';content.maxLength=20000;content.rows=7;content.required=true;content.value=area.inhalt;contentLabel.append(content);
+      const locationsLabel=el('label','Standorte (Mehrfachauswahl möglich)');const locationsSelect=document.createElement('select');locationsSelect.name='standorte';locationsSelect.multiple=true;locationsSelect.size=5;locationsSelect.className='staff-area-locations';
+      await mitarbeiterbereichStandorteFuellen(locationsSelect,(area.standorte||[]).map(place=>place.id));locationsLabel.append(locationsSelect);
+      const activeLabel=el('label');activeLabel.className='check';const active=document.createElement('input');active.type='checkbox';active.name='aktiv';active.checked=area.aktiv;activeLabel.append(active,el('span','Im Mitarbeiterbereich anzeigen'));
+      const save=el('button','Änderungen speichern');save.type='submit';save.className='btn';
+      const remove=el('button','Bereich löschen');remove.type='button';remove.className='btn danger';
+      form.append(typeLabel,titleLabel,contentLabel,locationsLabel,activeLabel,save,remove);
+      type.addEventListener('change',()=>mitarbeiterbereichArtSynchronisieren(form));
+      mitarbeiterbereichArtSynchronisieren(form);
+      form.addEventListener('submit',async event=>{
+        event.preventDefault();save.disabled=true;
+        try{
+          await api('/api/admin/mitarbeiterbereiche/'+encodeURIComponent(area.id),{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify(mitarbeiterbereichFormDaten(form))});
+          status.textContent='Mitarbeiterbereich gespeichert.';await mitarbeiterbereicheLaden();
+        }catch(error){status.textContent='Änderung fehlgeschlagen: '+error.message;save.disabled=false;}
+      });
+      remove.addEventListener('click',async()=>{
+        if(!window.confirm('Mitarbeiterbereich „'+area.titel+'“ endgültig löschen?'))return;
+        remove.disabled=true;
+        try{
+          await api('/api/admin/mitarbeiterbereiche/'+encodeURIComponent(area.id),{method:'DELETE'});
+          status.textContent='Mitarbeiterbereich gelöscht.';await mitarbeiterbereicheLaden();
+        }catch(error){status.textContent='Bereich konnte nicht gelöscht werden: '+error.message;remove.disabled=false;}
+      });
+      details.append(summary,form);card.append(details);list.append(card);
+    }
+  }catch(error){status.textContent='Mitarbeiterbereiche konnten nicht geladen werden: '+error.message;}
+}
+
+document.getElementById('mitarbeiterbereich-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+  const status=document.getElementById('mitarbeiterbereich-status');button.disabled=true;
+  try{
+    await api('/api/admin/mitarbeiterbereiche',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(mitarbeiterbereichFormDaten(form))});
+    form.reset();status.textContent='Mitarbeiterbereich angelegt.';await mitarbeiterbereicheLaden();
+  }catch(error){status.textContent='Mitarbeiterbereich konnte nicht angelegt werden: '+error.message;}
+  finally{button.disabled=false;}
+});
+document.getElementById('mitarbeiterbereich-form')?.elements.art?.addEventListener('change',event=>
+  mitarbeiterbereichArtSynchronisieren(event.currentTarget.form));
 
 /* Gespeicherte Erlebnisangebote anzeigen */
 

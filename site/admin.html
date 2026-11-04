@@ -48,6 +48,9 @@
             <a href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
             <a href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
             <a href="#standorte-section" data-admin-view-link>Standorte</a>
+            <a class="employee-area-link" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiter</a>
+            <a class="employee-area-link" href="#mitarbeiter-einladen-section" data-admin-view-link>Neue Mitarbeiter</a>
+            <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
           </nav>
         </aside>
         <div class="admin-content">
@@ -294,6 +297,48 @@
   <div id="admin-place-list" class="admin-grid"></div>
 </section>
 
+<section id="mitarbeiter-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="mitarbeiter-heading">
+  <h2 id="mitarbeiter-heading">Mitarbeiter</h2>
+  <p>Registrierte Mitarbeiter, ausstehende Freigaben, Qualifikationen und aktive Zugänge verwalten.</p>
+  <p id="pruef-personal-status" role="status" aria-live="polite"></p>
+  <div id="pruef-personal-list" class="admin-grid"></div>
+</section>
+
+<section id="mitarbeiter-einladen-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="mitarbeiter-einladen-heading">
+  <h2 id="mitarbeiter-einladen-heading">Neue Mitarbeiter</h2>
+  <p>Der Zugang bleibt gesperrt, bis die Verwaltung Registrierung und Qualifikationen geprüft und freigegeben hat.</p>
+  <form id="pruef-personal-form">
+    <label>Name<input name="name" maxlength="120" required></label>
+    <label>E-Mail<input name="email" type="email" maxlength="180" required></label>
+    <button class="btn" type="submit">Registrierungslink senden</button>
+  </form>
+  <p id="pruef-einladung-status" role="status" aria-live="polite"></p>
+</section>
+
+<section id="mitarbeiterbereiche-admin-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="mitarbeiterbereiche-heading">
+  <h2 id="mitarbeiterbereiche-heading">Bereiche im Mitarbeiterportal</h2>
+  <p>Aktivierte Textbereiche erscheinen für alle angemeldeten Mitarbeiter. Vertrauliche Einzelinformationen hier nicht veröffentlichen.</p>
+  <form id="mitarbeiterbereich-form">
+    <label>Bereichstyp<select name="art">
+      <option value="allgemein">Allgemeine Information</option>
+      <option value="standort">Standortinformation</option>
+      <option value="partner">Netzwerk-/Kooperationspartner</option>
+      <option value="programm">Programm</option>
+    </select></label>
+    <label>Bezeichnung des Bereichs<input name="titel" maxlength="100" required placeholder="z. B. Ansprechpartner und Netzwerkpartner"></label>
+    <label>Inhalt<textarea name="inhalt" maxlength="20000" rows="8" required placeholder="Informationen und Kontaktdaten"></textarea></label>
+    <label>Standorte zuordnen (Mehrfachauswahl möglich)
+      <select name="standorte" class="staff-area-locations" multiple size="5" aria-describedby="staff-area-location-help"></select>
+    </label>
+    <small id="staff-area-location-help">Für Standortinformationen und Programme ist mindestens ein aktiver Standort erforderlich. Partner können optional einem oder mehreren Standorten zugeordnet werden.</small>
+    <label class="check"><input name="aktiv" type="checkbox"><span>Im Mitarbeiterbereich anzeigen</span></label>
+    <button type="submit" class="btn">Bereich hinzufügen</button>
+  </form>
+  <p id="mitarbeiterbereich-status" role="status" aria-live="polite"></p>
+  <h3>Vorhandene Bereiche</h3>
+  <div id="mitarbeiterbereiche-list" class="admin-grid"></div>
+</section>
+
 <section id="admin-guestbook-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="guestbook-heading">
   <h2 id="guestbook-heading">Teilnahme-Gästeliste</h2>
   <p>Angezeigt werden nur abgeschlossene Touren, für die eine ausdrückliche Veröffentlichungseinwilligung vorliegt.</p>
@@ -384,16 +429,6 @@
         <div id="pruef-uebersicht-zaehler"></div>
         <div id="pruef-uebersicht-inhalt"></div>
       </section>
-      <form id="pruef-personal-form">
-        <h3>Mitarbeiter zur Registrierung einladen</h3>
-        <p class="hint">Die Verwaltung sendet einen persönlichen Registrierungslink. Nach der Eingabe der Kontaktdaten und Qualifikationen bleibt der Zugang gesperrt, bis die Verwaltung ihn ausdrücklich freigibt.</p>
-        <label>Name<input name="name" maxlength="120" required></label>
-        <label>E-Mail<input name="email" type="email" maxlength="180" required></label>
-        <button class="btn" type="submit">Registrierungslink senden</button>
-      </form>
-      <p id="pruef-personal-status" role="status" aria-live="polite"></p>
-      <h3>Mitarbeiter und offene Einladungen</h3>
-      <div id="pruef-personal-list"></div>
       <form id="pruef-station-form">
         <h3>Station anlegen</h3>
         <label>Stationsbezeichnung<input name="name" maxlength="100" required placeholder="Kletterwand links"></label>
@@ -439,7 +474,7 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261103-customer-email-history"></script>
+  <script src="/admin.js?v=20261104-employee-portal"></script>
   <script src="/pruefung-admin.js"></script>
 </body>
 </html>

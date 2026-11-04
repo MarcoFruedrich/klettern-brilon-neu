@@ -34,6 +34,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     cwd: repo, stdio: ['ignore', 'ignore', 'pipe'], env: {
       ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: integrationUrl,
       DATABASE_SSL_MODE: 'disable', RUN_SCHEMA_MIGRATIONS: 'true',
+      RUN_EMPLOYEE_AREAS_MIGRATION: 'true',
       PUBLIC_BASE_URL:`http://127.0.0.1:${port}`,
       BREVO_API_KEY: '', BREVO_SENDER_EMAIL: '', BOOKING_NOTIFY_EMAIL: '',
       SUPABASE_URL: '', SUPABASE_SECRET_KEY: '', NODE_PATH: '', MOCK_PG: '', MOCK_MALWARE_SCAN: '1',
@@ -350,6 +351,19 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(credentials.status,200);
   const staffCookie=credentials.headers.get('set-cookie')?.split(';',1)[0];
   assert.ok(staffCookie);
+  const profileUpdate=await fetch(root+'/api/pruefung/profil',{method:'PATCH',
+    headers:{Cookie:staffCookie,Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({name:'CI Fachkraft Aktualisiert',telefon:'+49 987 654'})});
+  assert.equal(profileUpdate.status,200,'Aktive Mitarbeitende können ihre Kontaktdaten aktualisieren');
+  const profileData=await profileUpdate.json();
+  assert.equal(profileData.email,staffData.email,'Login-Adresse bleibt an die Einladung gebunden');
+  const employeePortal=await fetch(root+'/api/pruefung/mitarbeiterbereiche',{headers:{Cookie:staffCookie}});
+  assert.equal(employeePortal.status,200,'Aktive Mitarbeitende können das geschützte Portal laden');
+  const portalData=await employeePortal.json();
+  assert.equal(portalData.profil.name,'CI Fachkraft Aktualisiert');
+  assert.ok(portalData.kontakte.some(person=>person.email===staffData.email&&
+    person.name==='CI Fachkraft Aktualisiert'&&person.telefon==='+49 987 654'),
+  'Die Kontaktliste liest aktualisierte Kontaktdaten direkt aus Mitarbeiterkonten');
   const userPost=(endpoint,data)=>fetch(root+endpoint,{method:'POST',
     headers:{Cookie:staffCookie,Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify(data)});
