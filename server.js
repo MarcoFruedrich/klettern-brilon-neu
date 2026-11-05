@@ -426,7 +426,13 @@ async function main(req,res){
         :preisFuerTeilnehmer(programm.preise,teilnehmer);
       if(preisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
       gesamtpreis=preisCent/100;
+      const istGast=d.istGast;
+      const gastEinrichtung=safeText(d.gastEinrichtung,120);
+      if(!['ja','nein'].includes(istGast)||(istGast==='ja'&&!gastEinrichtung))
+        return reply(res,400,{error:'Bitte Gästeangabe und gegebenenfalls die Unterkunft angeben.'});
       const data={
+       istGast,gastEinrichtung:istGast==='ja'?gastEinrichtung:null,
+       gaesteRabattStatus:istGast==='ja'?'pruefung_offen':'nicht_beantragt',
        name,vorname,nachname,email,datum,angebot,veranstaltungsort:programm.veranstaltungsort,teilnehmer,
 gesamtpreis,
 anzahlung: einzelplatz ? 0 : Math.round(gesamtpreis * 25) / 100,
