@@ -16,6 +16,7 @@ const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
+const { createEinsatzplanungApi } = require('./lib/einsatzplanung-api');
 const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
 const { createKundenfeedbackApi } = require('./lib/kundenfeedback-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
@@ -323,6 +324,7 @@ async function anschlussApi(req,res,url,route,ip){
 }
 
 const pruefungApi=createPruefungApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail,scanForMalware});
+const einsatzplanungApi=createEinsatzplanungApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,brevoMail});
 const netzwerkpartnerApi=createNetzwerkpartnerApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 const kundenfeedbackApi=createKundenfeedbackApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 
@@ -332,6 +334,8 @@ async function main(req,res){
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    if(route.startsWith('/api/admin/einsatzplanung')||route.startsWith('/api/pruefung/einsatzplanung'))
+      return await einsatzplanungApi(req,res,u,route);
     if(route.startsWith('/api/admin/marketing/kampagnen'))return await marketingCampaignApi(req,res,route);
     if(route.startsWith('/api/pruefung/')||route.startsWith('/api/admin/pruefung/'))
       return await pruefungApi(req,res,u,route,ip);
