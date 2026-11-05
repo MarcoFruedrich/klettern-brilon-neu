@@ -27,3 +27,19 @@ CREATE TABLE IF NOT EXISTS brilon_einsaetze (
 );
 CREATE INDEX IF NOT EXISTS brilon_einsaetze_mitarbeiter_idx ON brilon_einsaetze(mitarbeiter_id,status);
 CREATE INDEX IF NOT EXISTS brilon_einsaetze_buchung_idx ON brilon_einsaetze(buchung_id);
+
+-- Erweiterung für ausdrücklich vertrauenswürdige Mitarbeitende und verzögerte Kundenmails.
+ALTER TABLE brilon_beschaeftigung ADD COLUMN IF NOT EXISTS vertrauensperson BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigungen (
+  buchung_id UUID PRIMARY KEY REFERENCES brilon_buchungen(id) ON DELETE CASCADE,
+  anlass_mitarbeiter_id UUID REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE SET NULL,
+  faellig_ab TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'geplant'
+    CHECK(status IN ('geplant','versand_laeuft','gesendet','abgebrochen','fehler')),
+  erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  versendet_am TIMESTAMPTZ,
+  fehler TEXT
+);
+CREATE INDEX IF NOT EXISTS brilon_kundenbestaetigungen_faellig_idx
+  ON brilon_kundenbestaetigungen(faellig_ab) WHERE status='geplant';
