@@ -40,12 +40,19 @@
       form.append(field('Vertragliche Monatsstunden','monatsstunden',p.monatsstunden));
       form.append(field('Individuelle Minijob-Grenze (€; leer = 2026 gesetzlich)','minijobGrenze',
         p.minijob_grenze_cent==null?'':p.minijob_grenze_cent/100));
+      const trustLabel=el('label');
+      trustLabel.className='check';
+      const trust=document.createElement('input');trust.type='checkbox';trust.name='vertrauensperson';
+      trust.checked=Boolean(p.vertrauensperson);
+      trustLabel.append(trust,el('span','Besonders vertrauenswürdig: Kundenbestätigung nach Mitarbeiterfreigabe zeitversetzt zulassen'));
+      form.append(trustLabel);
       const save=el('button','Vertragsdaten speichern');save.className='btn secondary';save.type='submit';
       const state=el('p');state.setAttribute('role','status');form.append(save,state);
       form.onsubmit=async event=>{
         event.preventDefault();save.disabled=true;state.textContent='Speichere …';
         try{
           const data=Object.fromEntries(new FormData(form).entries());
+          data.vertrauensperson=trust.checked;
           await api('/api/admin/einsatzplanung/vertrag/'+encodeURIComponent(p.id),{
             method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
           state.textContent='Vertragsdaten gespeichert.';await personalAktualisieren();
@@ -67,6 +74,7 @@
   async function personalAktualisieren(){personen=await api('/api/admin/einsatzplanung/personen');}
   function termineAnzeigen(plan){
     const list=document.getElementById('einsatzplanung-termine');list.replaceChildren();
+    const notificationMap=new Map((plan.kundenMails||[]).map(row=>[row.buchung_id,row]));
     const byBooking=new Map();
     for(const e of plan.einsaetze||[]){
       if(!byBooking.has(e.buchung_id))byBooking.set(e.buchung_id,[]);
@@ -81,6 +89,22 @@
       card.append(el('p','Bewerbungen: '+(matches.filter(x=>x.status==='beworben').map(x=>x.name).join(', ')||'keine')));
       card.append(el('p','Eingeteilt: '+(matches.filter(x=>['eingeteilt','bestaetigt','abgeschlossen'].includes(x.status))
         .map(x=>x.name+' ('+x.status+')').join(', ')||'noch niemand')));
+      const pending=notificationMap.get(b.id);
+      if(pending){
+        card.append(el('p','Kundenbestätigung: '+pending.status+
+          (pending.faellig_ab?' · geplant ab '+new Date(pending.faellig_ab).toLocaleString('de-DE'):'') ));
+        if(pending.status==='geplant'){
+          const cancel=el('button','Kundenbestätigung stoppen');cancel.type='button';cancel.className='btn secondary';
+          cancel.onclick=async()=>{
+            cancel.disabled=true;
+            try{await api('/api/admin/einsatzplanung/kundenmail/'+b.id+'/abbrechen',
+              {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+              await laden();
+            }catch(err){alert('Konnte Bestätigung nicht stoppen: '+err.message);cancel.disabled=false;}
+          };
+          card.append(cancel);
+        }
+      }
       const row=el('div');row.className='einsatz-zuweisung';
       const select=document.createElement('select');select.setAttribute('aria-label','Mitarbeiter auswählen');
       const placeholder=document.createElement('option');placeholder.textContent='Mitarbeiter auswählen';placeholder.value='';select.append(placeholder);
@@ -103,6 +127,17 @@
         finally{button.disabled=false;}
       };
       row.append(select,button);card.append(row,status);
+      for(const e of matches.filter(x=>['eingeteilt','bestaetigt'].includes(x.status))){
+        const remove=el('button','Einteilung aufheben: '+e.name);remove.type='button';remove.className='btn secondary';
+        remove.onclick=async()=>{
+          if(!confirm('Einteilung von '+e.name+' wirklich aufheben?'))return;
+          remove.disabled=true;
+          try{await api('/api/admin/einsatzplanung/zuweisen/'+b.id+'/'+e.mitarbeiter_id,{method:'DELETE'});
+            await laden();
+          }catch(err){status.textContent=err.message;remove.disabled=false;}
+        };
+        card.append(remove);
+      }
       for(const e of matches.filter(x=>x.status==='bestaetigt'||x.status==='eingeteilt')){
         const actual=el('div');actual.className='einsatz-zuweisung';
         const label=el('label','Ist-Arbeitszeit (Minuten) – '+e.name);
