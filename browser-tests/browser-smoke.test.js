@@ -211,6 +211,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.locator('input[name="vorname"]').fill('Nur');
     await page.locator('input[name="nachname"]').fill('Test');
     await page.locator('input[name="email"]').fill('browser@example.test');
+    await page.locator('#ist-gast').selectOption('nein');
     await page.locator('#booking input[name="datenschutz"]').check();
     await page.locator('#booking button[type=submit]').click();
     await page.waitForFunction(() => document.getElementById('booking-status')?.textContent?.includes('BROWSERTEST-NUR-LOKAL'));
@@ -243,6 +244,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     assert.equal(await participants.inputValue(),'1');
     assert.equal(await participants.getAttribute('readonly'),'');
     assert.match(await page.locator('#angebots-preis').textContent(),/18,00\s*€ pro Person/);
+    await page.locator('#ist-gast').selectOption('nein');
     await page.locator('input[name="datum"]').fill('2027-03-18');
     await page.locator('input[name="datum"]').dispatchEvent('change');
     await page.waitForFunction(()=>!document.getElementById('buchungs-uhrzeit')?.disabled);
@@ -251,7 +253,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.locator('input[name="vorname"]').fill('Einzel');
     await page.locator('input[name="nachname"]').fill('Test');
     await page.locator('input[name="email"]').fill('individual@example.test');
-    await page.locator('input[name="datenschutz"]').check();
+    await page.locator('#booking input[name="datenschutz"]').check();
     await page.locator('#booking button[type=submit]').click();
     await page.waitForFunction(()=>document.getElementById('booking-status')?.textContent.includes('EINZELPLATZ-TEST'));
     assert.equal(submitted.teilnehmer,'1');
