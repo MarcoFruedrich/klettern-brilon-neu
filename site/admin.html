@@ -149,6 +149,16 @@
 
       <section id="calendar-view" class="admin-view" data-admin-view aria-labelledby="calendar-view-heading">
       <h2 id="calendar-view-heading">Kalender &amp; Sperrzeiten</h2>
+      <section class="booking" aria-labelledby="einsatzplanung-heading">
+        <h3 id="einsatzplanung-heading">Zentrale Einsatzplanung – Bewerbungen und Zuweisungen</h3>
+        <p>Alle Buchungen dieses Monats mit Bewerbern und eingeteilten Mitarbeitern. Die Einteilung prüft die hinterlegten Verträge und Verdienstgrenzen vor dem Speichern.</p>
+        <div class="einsatz-zuweisung">
+          <label>Monat <input id="einsatzplanung-monat" type="month"></label>
+          <button id="einsatzplanung-refresh" class="btn secondary" type="button">Planung aktualisieren</button>
+        </div>
+        <p id="einsatzplanung-status" role="status" aria-live="polite"></p>
+        <div id="einsatzplanung-termine" class="admin-grid"></div>
+      </section>
       <p>Übersicht aller angefragten und bestätigten Termine. Kalendertag auswählen, um Buchungen einzusehen und freigegebene Mitarbeiter zuzuweisen. Mehrere Mitarbeiter sind möglich; bestehende Zuweisungen können jederzeit durch die Verwaltung geändert werden.</p>
 
       <section id="calendar-section" class="booking">
@@ -345,6 +355,11 @@
 
 <section id="mitarbeiter-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="mitarbeiter-heading">
   <h2 id="mitarbeiter-heading">Mitarbeiter</h2>
+  <section class="booking" aria-labelledby="arbeitsvertraege-heading">
+    <h3 id="arbeitsvertraege-heading">Beschäftigungsart und Arbeitszeitkontrolle</h3>
+    <p>Verträge und Stundensätze nur für die Verwaltung sichtbar. Bereits geleistete und geplante Stunden werden gesondert angezeigt.</p>
+    <div id="arbeitsvertraege-admin" class="admin-grid"></div>
+  </section>
   <p>Registrierte Mitarbeiter, ausstehende Freigaben, Qualifikationen und aktive Zugänge verwalten.</p>
   <p id="pruef-personal-status" role="status" aria-live="polite"></p>
   <div id="pruef-personal-list" class="admin-grid"></div>
@@ -549,5 +564,6 @@
   <script src="/admin.js?v=20261105-admin-login-fix"></script>
   <script src="/pruefung-admin.js?v=20261105-network-feedback"></script>
   <script src="/feedback-admin.js"></script>
+  <script src="/einsatzplanung-admin.js?v=20261105-planung"></script>
 </body>
 </html>
