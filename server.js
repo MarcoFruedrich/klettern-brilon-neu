@@ -1437,7 +1437,8 @@ preis=safeText(d.preis,50);
         return reply(res,200,q.rows);
       }
       const planung=route.match(/^\\/api\\/admin\\/kalenderzuweisung\\/([0-9a-f-]{36})$/i);
-      if(planung&&req.method==='PATCH'){
+      if(planung&&req.method==='PATCH')return reply(res,410,{error:'Bitte den neuen Einsatzplanungsbereich verwenden; dort werden Arbeitszeit- und Verdienstgrenzen geprüft.'});
+      if(false&&planung&&req.method==='PATCH'){
         const d=await body(req);
         if(!d||typeof d!=='object'||Array.isArray(d)||
             !Array.isArray(d.mitarbeiterIds)||d.mitarbeiterIds.length>30||
@@ -2521,6 +2522,43 @@ if (route === '/api/angebote' && req.method === 'GET') {
 async function start(){
   if(pool){
     await pool.query('SELECT 1');
+    // Idempotente, eng begrenzte Einsatzplanungs-Migration nach Freigabe.
+    // Nur ausführen, wenn die bestehenden Buchungs- und Mitarbeitertabellen vorhanden sind.
+    const einsatzSchema=await pool.query(`SELECT to_regclass('public.brilon_buchungen') AS buchungen,
+      to_regclass('public.brilon_pruef_mitarbeitende') AS mitarbeitende`);
+    if(einsatzSchema.rows[0]?.buchungen&&einsatzSchema.rows[0]?.mitarbeitende){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_beschaeftigung (
+  mitarbeiter_id UUID PRIMARY KEY REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+  art TEXT NOT NULL DEFAULT 'nicht_hinterlegt' CHECK (art IN ('nicht_hinterlegt','minijob','teilzeit','vollzeit','honorar')),
+  stundenlohn_cent INTEGER CHECK(stundenlohn_cent IS NULL OR stundenlohn_cent BETWEEN 0 AND 100000),
+  wochenstunden NUMERIC(6,2) CHECK(wochenstunden IS NULL OR wochenstunden BETWEEN 0 AND 80),
+  monatsstunden NUMERIC(7,2) CHECK(monatsstunden IS NULL OR monatsstunden BETWEEN 0 AND 350),
+  minijob_grenze_cent INTEGER CHECK(minijob_grenze_cent IS NULL OR minijob_grenze_cent BETWEEN 0 AND 1000000),
+  gueltig_ab DATE,
+  gueltig_bis DATE,
+  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK(gueltig_bis IS NULL OR gueltig_ab IS NULL OR gueltig_bis>=gueltig_ab)
+)`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_einsaetze (
+  buchung_id UUID NOT NULL REFERENCES brilon_buchungen(id) ON DELETE CASCADE,
+  mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK(status IN ('beworben','eingeteilt','bestaetigt','abgelehnt','abgeschlossen')),
+  arbeitsminuten INTEGER CHECK(arbeitsminuten IS NULL OR arbeitsminuten BETWEEN 1 AND 1440),
+  ist_minuten INTEGER CHECK(ist_minuten IS NULL OR ist_minuten BETWEEN 0 AND 1440),
+  bewerbung_am TIMESTAMPTZ,
+  zugewiesen_am TIMESTAMPTZ,
+  bestaetigt_am TIMESTAMPTZ,
+  abgeschlossen_am TIMESTAMPTZ,
+  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY(buchung_id,mitarbeiter_id)
+)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS brilon_einsaetze_mitarbeiter_idx ON brilon_einsaetze(mitarbeiter_id,status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS brilon_einsaetze_buchung_idx ON brilon_einsaetze(buchung_id)`);
+      console.log('Einsatzplanungsschema geprüft');
+    }else{
+      console.warn('Einsatzplanungsschema zurückgestellt: Grundtabellen noch nicht vorhanden.');
+    }
+
     if(process.env.RUN_MARKETING_MIGRATION==='true'){
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_marketing_kampagnen (
         id TEXT PRIMARY KEY,
