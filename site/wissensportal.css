@@ -1,0 +1,43 @@
+
+/* Internes Wissensportal: bewusst im bestehenden hellen Verwaltungsdesign */
+.wiki-admin-layout{display:grid;grid-template-columns:minmax(300px,1.15fr) minmax(260px,1fr);gap:18px;align-items:start;margin-top:16px;}
+.wiki-admin-layout .booking,.wiki-staff-section{background:#f7faf7!important;border:1px solid #d5dfd8!important;color:#173e35!important;border-radius:14px;}
+.wiki-admin-layout h3,.wiki-staff-section h2,.wiki-staff-section h3{color:#173e35;}
+.wiki-admin-layout label,.wiki-staff-section label{color:#254c3a;font-weight:700;}
+.wiki-admin-layout input,.wiki-admin-layout textarea,.wiki-admin-layout select,
+.wiki-staff-section input,.wiki-staff-section select{background:#fff;color:#173e35;border:1px solid #b7cdc1;}
+.wiki-admin-layout input:focus,.wiki-admin-layout textarea:focus,.wiki-admin-layout select:focus,
+.wiki-staff-section input:focus,.wiki-staff-section select:focus{outline:2px solid #12764a;outline-offset:1px;}
+.wiki-admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.wiki-admin-list{display:grid;gap:10px;margin-top:14px;max-height:68vh;overflow-y:auto;}
+.wiki-admin-item{background:#fff;border:1px solid #d3e2d7;border-radius:12px;padding:14px;}
+.wiki-admin-item h4{font-size:16px;margin:0 0 4px;}
+.wiki-admin-item small,.wiki-admin-item p{display:block;color:#526a5c!important;margin:4px 0;}
+.wiki-admin-item .btn{padding:8px 12px;}
+.wiki-staff-section{padding:22px!important;margin:25px 0!important;}
+.wiki-staff-header{display:flex;justify-content:space-between;align-items:center;gap:14px;}
+.wiki-staff-header h2{font-size:clamp(24px,3vw,34px);margin:0 0 8px;}
+.wiki-staff-header p{color:#4e6457;margin:0 0 10px;}
+.wiki-staff-controls{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin:14px 0;}
+.wiki-staff-layout{display:grid;grid-template-columns:minmax(210px,300px) minmax(0,1fr);gap:16px;}
+.wiki-staff-list{display:grid;align-content:start;gap:6px;max-height:650px;overflow-y:auto;padding:8px;background:#eaf1ec;border:1px solid #d1e0d4;border-radius:13px;}
+.wiki-entry{display:flex;flex-direction:column;align-items:flex-start;gap:5px;text-align:left;border:1px solid transparent;padding:12px;border-radius:9px;color:#254433;background:#fff;font:inherit;cursor:pointer;min-width:0;}
+.wiki-entry:hover,.wiki-entry:focus-visible{border-color:#8eae9a;outline:1px solid #8eae9a;}
+.wiki-entry.active{background:#0f754a;color:#fff;}
+.wiki-entry strong{overflow-wrap:anywhere;}
+.wiki-entry small,.wiki-entry span,.wiki-entry em{font-size:12px;line-height:1.35;}
+.wiki-entry em{font-weight:700;font-style:normal;}
+.wiki-staff-content{min-height:320px;background:#fff;border:1px solid #d5e5d9;border-radius:13px;padding:20px;overflow-wrap:anywhere;}
+.wiki-staff-content h3{font-size:clamp(21px,2.6vw,29px);margin:0 0 4px;}
+.wiki-staff-content .wiki-meta{color:#66816d!important;font-size:13px;margin:0 0 18px;}
+.wiki-staff-content p{color:#2a4b3b!important;}
+.wiki-readable-text{margin:18px 0;white-space:pre-wrap;line-height:1.65;}
+.wiki-readable-text p{margin:10px 0;}
+.wiki-staff-content a{display:inline-flex;margin:14px 0;color:#006b49;text-decoration:underline;font-weight:750;}
+.wiki-confirm-panel{margin-top:22px;background:#e9f6eb;padding:14px;border:1px solid #b4d8bc;border-radius:12px;}
+.wiki-confirm-panel p{margin:0 0 10px!important;font-weight:750;}
+.wiki-confirm-panel small{display:block;margin-top:10px;color:#4b6756;}
+.wiki-staff-content .btn,.wiki-admin-layout .btn{background:#116f49;color:#fff!important;}
+.wiki-staff-content .btn.secondary,.wiki-admin-layout .btn.secondary{background:#e2eee5;color:#1b4b31!important;}
+@media(max-width:1000px){.wiki-admin-layout{grid-template-columns:minmax(0,1fr)}.wiki-staff-layout{grid-template-columns:minmax(0,1fr)}.wiki-staff-list{max-height:290px;}}
+@media(max-width:630px){.wiki-staff-controls{grid-template-columns:minmax(0,1fr)}.wiki-staff-header{align-items:flex-start;flex-direction:column}.wiki-staff-section{padding:12px!important}.wiki-staff-content{padding:14px}}
