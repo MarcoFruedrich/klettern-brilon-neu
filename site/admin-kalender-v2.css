@@ -69,7 +69,7 @@
 .ck-month-day {font-size:13px;font-weight:800;}
 .ck-mini-event {font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--ck-strong,#207a65);background:var(--ck-pale,#eff7f3);padding:2px 3px;border-radius:3px;color:#1a3e2b;}
 .ck-agenda {display:grid;gap:10px;padding:14px;}
-.ck-agenda-day {border-bottom:1px solid #e1eae3;padding-bottom:8px;}
+ .ck-agenda-day {border-bottom:1px solid #e1eae3;padding:0 0 8px;}
 .ck-agenda-day h4 {font-size:15px;margin:0 0 6px;}
 .ck-agenda-day button {display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;padding:10px;margin:4px 0;border-radius:8px;border:1px solid var(--ck-line,#d2e5d6);background:var(--ck-pale,#fff);color:#17442c;}
 .ck-agenda-day .ck-empty {color:#7a8980;font-size:12px;margin:2px 0;}
