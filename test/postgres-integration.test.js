@@ -304,7 +304,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     headers:{Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({email:staffData.email,passwort:staffDataPassword})});
   assert.equal(pendingLogin.status,401,'Registrierte Mitarbeitende warten vor der Freigabe');
-  const staffListResponse=await fetch(root+'/api/admin/pruefung/mitarbeitende',{headers:{Cookie:cookie}});
+  const staffListResponse=await fetch(root+'/api/admin/pruefung/mitarbeitende',{
+    headers:{Cookie:cookie,Origin:root}});
+  assert.equal(staffListResponse.status,200,'Verwaltung muss die eingereichte Registrierung einsehen können');
   const staffList=await staffListResponse.json();
   const pendingStaff=staffList.find(person=>person.email===staffData.email);
   assert.equal(pendingStaff.status,'freigabe_ausstehend');

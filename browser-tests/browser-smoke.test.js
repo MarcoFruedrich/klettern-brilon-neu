@@ -211,7 +211,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.locator('input[name="vorname"]').fill('Nur');
     await page.locator('input[name="nachname"]').fill('Test');
     await page.locator('input[name="email"]').fill('browser@example.test');
-    await page.locator('input[name="datenschutz"]').check();
+    await page.locator('#booking input[name="datenschutz"]').check();
     await page.locator('#booking button[type=submit]').click();
     await page.waitForFunction(() => document.getElementById('booking-status')?.textContent?.includes('BROWSERTEST-NUR-LOKAL'));
     assert.deepEqual(pageErrors, [], 'Die Buchungsseite darf keine JavaScript-Laufzeitfehler erzeugen');
@@ -224,6 +224,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await fakePublicApi(page);
     await page.route('**/api/angebote',route=>route.fulfill({status:200,contentType:'application/json',
       body:JSON.stringify([{id:3,name:'Individualklettern',beschreibung:'Offene Klettergruppe',dauer:90,
+        veranstaltungsort:'Brilon',
         kapazitaet:12,aktiv:true,buchbar:true,veroeffentlicht:true,verfuegbare_termine:[],
         buchungsmodus:'einzelplatz',mindestteilnehmer:5,preis_pro_person:18}])}));
     await page.route('**/api/belegte-zeiten?*',route=>route.fulfill({status:200,contentType:'application/json',

@@ -86,6 +86,8 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
       await page.locator('#station-inspection input[name="programm"]').fill('Testkurs');
       await page.locator('#station-inspection input[name="beginn"]').fill('2027-03-15T10:00');
       await page.locator('.pruefung-station .pruefung-aktiv').check();
+      for(const point of await page.locator('.pruefung-station .brilon-pruefpunkt').all())
+        await point.selectOption('ok');
       await page.locator('.pruefung-station .pruefung-zustand').selectOption('mangel');
       assert.equal(await page.locator('.pruefung-station .pruefung-beschreibung').getAttribute('required'),'');
       await page.locator('.pruefung-station .pruefung-beschreibung').fill('Defekter Sicherungskarabiner');
