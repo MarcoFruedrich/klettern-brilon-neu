@@ -422,7 +422,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const reports=await reportResponse.json();
   const report=reports.find(p=>p.id===receipt.id);
   assert.ok(report);
-  assert.equal(report.pruefer,staffData.name);
+  assert.equal(report.pruefer,profileData.name,
+    'Der Bericht bleibt dem aktuell gepflegten Mitarbeiterprofil zugeordnet');
   assert.equal(report.pruefungen[0].zustand,'mangel');
   assert.equal(report.hat_mangel,true);
   assert.equal(report.pruefungen[0].hatFoto,true);
