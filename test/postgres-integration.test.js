@@ -462,7 +462,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await userPost('/api/pruefung/freischalten',{code:newCode})).status,200);
   const greenReport=await userPost('/api/pruefung/berichte',{
     programm:'Nachkontrolle CI',beginn:day1+'T10:00',
-    pruefungen:[{stationId,zustand:'ok',beschreibung:''}]
+    pruefungen:[{stationId,zustand:'ok',beschreibung:'',
+      pruefpunkte:['Wandstruktur','Griffe und Tritte','Sicherungspunkte','Sicherungsmaterial','Fallbereich']
+        .map(name=>({name,zustand:'ok'}))}]
   });
   assert.equal(greenReport.status,201);
   const greenData=await greenReport.json();
