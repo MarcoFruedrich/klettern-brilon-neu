@@ -1436,7 +1436,7 @@ preis=safeText(d.preis,50);
           ORDER BY name,id`);
         return reply(res,200,q.rows);
       }
-      const planung=route.match(/^\\/api\\/admin\\/kalenderzuweisung\\/([0-9a-f-]{36})$/i);
+      const planung=route.match(/^\/api\/admin\/kalenderzuweisung\/([0-9a-f-]{36})$/i);
       if(planung&&req.method==='PATCH')return reply(res,410,{error:'Bitte den neuen Einsatzplanungsbereich verwenden; dort werden Arbeitszeit- und Verdienstgrenzen geprüft.'});
       if(false&&planung&&req.method==='PATCH'){
         const d=await body(req);
