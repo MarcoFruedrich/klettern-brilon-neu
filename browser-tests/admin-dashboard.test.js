@@ -371,6 +371,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(await page.locator('.admin-layout').evaluate(node=>getComputedStyle(node).display),'grid');
     assert.equal(await navigation.evaluate(node=>getComputedStyle(node).flexDirection),'column');
 
+    const startHash=await page.evaluate(()=>location.hash);
     await navigation.locator('a[href="#payment-overview-section"]').click();
     await page.waitForFunction(()=>location.hash==='#payment-overview-section');
     assert.equal(await visibleViews(),1);
@@ -379,7 +380,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(await navigation.locator('[aria-current="page"]').getAttribute('href'),'#payment-overview-section');
 
     await page.goBack();
-    await page.waitForFunction(()=>location.hash==='');
+    await page.waitForFunction(expected=>location.hash===expected,startHash);
     assert.equal(await page.locator('#admin-dashboard').isVisible(),true,
       'Browser-Zurück soll die vorherige Ansicht wiederherstellen');
 
