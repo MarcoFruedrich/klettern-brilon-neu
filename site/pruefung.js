@@ -39,6 +39,16 @@ async function loadOwnReports(){
     target.replaceChildren();status.textContent='Verlauf konnte nicht geladen werden: '+error.message;
   }
 }
+const brilonCheckpoints={
+ 'kletterwand':[['Wandstruktur','Wand auf sichtbare Schäden, Risse und lose Teile prüfen.'],['Griffe und Tritte','Auf lockere, beschädigte oder fehlende Elemente achten.'],['Sicherungspunkte','Vorgesehene Sicherungs- und Umlenkpunkte auf Auffälligkeiten prüfen.'],['Sicherungsmaterial','Seile, Gurte, Karabiner und Sicherungsgeräte nach Vorgaben prüfen.'],['Fallbereich','Fall- und Bewegungsbereich freihalten.']],
+ 'strickleiter':[['Seile und Sprossen','Auf Abrieb, Risse, Schäden und lose Sprossen prüfen.'],['Befestigungen','Aufhängung und Verbindungspunkte auf sichtbare Schäden prüfen.'],['Sicherungssystem','Sicherungsweg und Ausrüstung nach Vorgaben prüfen.'],['Ein- und Ausstieg','Zugangs- und Bodenbereich freihalten.']],
+ 'abseilplattform':[['Plattform und Zugang','Trittflächen, Kanten und Zugänge auf Schäden und Rutschgefahr prüfen.'],['Anschlagpunkte','Vorgesehene Anschlag- und Abseilpunkte kontrollieren.'],['Abseilsystem','Seil, Abseilgerät, Karabiner und Gurt prüfen.'],['Zweitsicherung','Zusätzliche unabhängige Sicherung auf korrekte Einrichtung prüfen.'],['Landezone','Abseilweg und Landeplatz freihalten.']],
+ 'prusikstation':[['Aufhängung','Anschlagpunkte und Befestigungen kontrollieren.'],['Seil und Schlingen','Hauptseil und Prusikschlingen auf Verschleiß prüfen.'],['Knoten und Verbindungen','Knoten und Karabiner auf korrekten Aufbau prüfen.'],['Zusätzliche Sicherung','Vorgesehenes Sicherungssystem prüfen.'],['Bewegungsbereich','Boden- und Bewegungsbereich freihalten.']]
+};
+function brilonPoints(name){
+ const normalized=String(name||'').toLowerCase().replace(/ü/g,'u').replace(/[^a-z]/g,'');
+ return Object.entries(brilonCheckpoints).find(([key])=>normalized.includes(key))?.[1]||null;
+}
 function stationControl(station){
   const fieldset=text('fieldset');
   fieldset.className='booking pruefung-station';fieldset.dataset.id=station.id;
@@ -74,6 +84,18 @@ function stationControl(station){
   foto.type='file';foto.accept='image/*';foto.className='pruefung-foto';
   foto.setAttribute('capture','environment');
   fotoLabel.append(foto);fotoLabel.hidden=true;group.append(fotoLabel);
+  const checkpoints=brilonPoints(station.name);
+  if(checkpoints){
+    const list=text('div','');list.className='brilon-pruefpunkte';
+    list.append(text('h4','Prüfpunkte – Kletterhalle Brilon'));
+    for(const [title,instruction] of checkpoints){
+      const label=text('label','');label.className='check';
+      const box=document.createElement('input');box.type='checkbox';box.className='brilon-pruefpunkt';
+      label.append(box,text('span',title+' – '+instruction));list.append(label);
+    }
+    list.append(text('p','Alle Prüfpunkte bestätigen. Die Einzelhäkchen dienen aktuell der Eingabekontrolle; die revisionssichere Speicherung der Einzelbewertungen wird noch ergänzt.'));
+    group.prepend(list);
+  }
   fieldset.append(group);
   check.addEventListener('change',()=>{group.hidden=!check.checked;});
   state.addEventListener('change',()=>{
@@ -155,6 +177,7 @@ $('station-inspection').addEventListener('submit',async event=>{
   const selected=Array.from(form.querySelectorAll('.pruefung-station')).filter(e=>
     e.querySelector('.pruefung-aktiv').checked);
   if(!selected.length){notice('Bitte mindestens eine verwendete Station auswählen.');return;}
+  for(const station of selected){const points=Array.from(station.querySelectorAll('.brilon-pruefpunkt'));if(points.some(point=>!point.checked)){notice('Bitte alle Prüfpunkte der verwendeten Station '+station.querySelector('legend').textContent+' bestätigen.');return;}}
   const submit=form.querySelector('button[type=submit]');submit.disabled=true;
   try{
     if(selected.filter(e=>e.querySelector('.pruefung-foto').files.length).length>3)
