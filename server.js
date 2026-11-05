@@ -2550,6 +2550,19 @@ async function migrateEinsatzplanung(){
 )`);
       await pool.query(`CREATE INDEX IF NOT EXISTS brilon_einsaetze_mitarbeiter_idx ON brilon_einsaetze(mitarbeiter_id,status)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS brilon_einsaetze_buchung_idx ON brilon_einsaetze(buchung_id)`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigungen (
+  buchung_id UUID PRIMARY KEY REFERENCES brilon_buchungen(id) ON DELETE CASCADE,
+  anlass_mitarbeiter_id UUID REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE SET NULL,
+  faellig_ab TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'geplant'
+    CHECK(status IN ('geplant','versand_laeuft','gesendet','abgebrochen','fehler')),
+  erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  versendet_am TIMESTAMPTZ,
+  fehler TEXT
+)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS brilon_kundenbestaetigungen_faellig_idx
+  ON brilon_kundenbestaetigungen(faellig_ab) WHERE status='geplant'`);
       console.log('Einsatzplanungsschema geprüft');
     }else{
       console.warn('Einsatzplanungsschema zurückgestellt: Grundtabellen noch nicht vorhanden.');
