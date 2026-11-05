@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 315" role="img" aria-labelledby="logo-title">
+<title id="logo-title">Klettern &amp; Abenteuer</title>
+<defs><linearGradient id="forest" x2="0.6" y2="1"><stop stop-color="#76bc08"/><stop offset="1" stop-color="#2c8508"/></linearGradient></defs>
+<path fill="#fffdf4" d="M16 134 98 103 126 118 206 72 252 87 327 34 388 78 446 40 494 61 538 7 586 72 667 62 705 111 786 99 873 140 899 195 858 218 875 246 806 252 756 244 669 268 503 256 377 278 237 261 93 294 42 254 0 222Z"/>
+<path fill="#002d49" d="m80 147 95-72 50 32 110-85 61 65 66-48 59 42 81-76 60 86 54-20 43 40 75-13 65 63-87-29-55-6-35-28-57 12-73-63-61 57-48-26-63 38-68-36-86 67-44-24-83 49Z"/>
+<path fill="#b1d600" d="m110 140 68-50 45 29 113-84 46 49-44-15-35 50-17-29-60 48-45-31-66 45Zm364-48 64-72 55 74-33-19-15-34-30 61Zm136 28 45-35 50 37-32-7-22-17Z"/>
+<g fill="#003451"><path d="m114 129 10-35 10 35-8-7 10 19-22-3 8-14Zm652 18 12-51 12 51-9-11 12 20-28-6 8-13Zm42 1 8-35 9 35-8-8 12 19-27-5Z"/></g>
+<text x="38" y="226" fill="#032a46" font-family="Trebuchet MS,Arial,sans-serif" font-weight="900" font-style="italic" font-size="128" letter-spacing="-8" textLength="408" lengthAdjust="spacingAndGlyphs">Klettern</text>
+<text x="433" y="238" fill="#ff7900" font-family="Trebuchet MS,Arial,sans-serif" font-weight="900" font-style="italic" font-size="164">&amp;</text>
+<text x="543" y="225" fill="url(#forest)" font-family="Trebuchet MS,Arial,sans-serif" font-weight="900" font-style="italic" font-size="110" textLength="337" lengthAdjust="spacingAndGlyphs">Abenteuer</text>
+<path fill="#ffca02" d="M170 266q298 20 576-5-255 39-567 22Z"/></svg>
