@@ -55,6 +55,26 @@
           await load();
         }catch(error){status.textContent='Löschen fehlgeschlagen: '+error.message;remove.disabled=false;}
       });
+      if(a.kategorie==='sicherheit'||a.kategorie==='notfall'){
+        const reports=mk('button','Lesebestätigungen ansehen');reports.type='button';reports.className='btn secondary';
+        reports.addEventListener('click',async()=>{
+          reports.disabled=true;
+          const view=mk('div');view.className='wiki-reading-report';view.textContent='Bestätigungen werden geladen …';
+          card.append(view);
+          try{
+            const data=await api('/api/admin/wissensportal/'+a.id+'/bestaetigungen');
+            const persons=data.personen||[];
+            view.replaceChildren(mk('strong','Lesestatus (aktuelle Version '+a.version+')'));
+            if(!persons.length)view.append(mk('p','Keine zugeordneten aktiven Mitarbeiter vorhanden.'));
+            for(const person of persons){
+              const ok=Number(person.bestaetigte_version)===Number(a.version);
+              view.append(mk('p',(ok?'✓ ':'○ ')+person.name+' – '+(ok?'Aktuelle Version gelesen':'Lesebestätigung offen')));
+            }
+          }catch(error){view.textContent='Lesestatus konnte nicht geladen werden: '+error.message;}
+          finally{reports.disabled=false;}
+        });
+        actions.append(reports);
+      }
       actions.append(edit,publish,remove);card.append(actions);list.append(card);
     }
   }
