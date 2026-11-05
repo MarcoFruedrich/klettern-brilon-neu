@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Mitarbeiterregistrierung | Klettern & Abenteuer</title>
+<link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
+</head>
+<body class="admin-page pruef-page">
+<a class="skip-link" href="#main-content">Zum Inhalt springen</a>
+<header><a class="logo" href="/">🧗 Klettern <span>& Abenteuer</span><small>Mitarbeiterregistrierung</small></a></header>
+<main class="narrow" id="main-content">
+  <h1>Mitarbeiterregistrierung</h1>
+  <p id="registration-intro">Einladung wird geprüft …</p>
+  <form id="registration-form" hidden>
+    <label>Vor- und Nachname
+      <input name="name" maxlength="120" autocomplete="name" required>
+    </label>
+    <label>E-Mail-Adresse
+      <input id="registration-email" type="email" readonly aria-describedby="email-help">
+    </label>
+    <small id="email-help">Diese Adresse wurde von der Verwaltung eingeladen und ist mit dem Zugang verknüpft.</small>
+    <label>Telefonnummer (optional)
+      <input name="telefon" type="tel" maxlength="40" autocomplete="tel">
+    </label>
+    <label>Straße und Hausnummer
+      <input name="strasse" maxlength="160" autocomplete="street-address" required>
+    </label>
+    <div class="two">
+      <label>Postleitzahl<input name="plz" maxlength="12" autocomplete="postal-code" required></label>
+      <label>Wohnort<input name="wohnort" maxlength="100" autocomplete="address-level2" required></label>
+    </div>
+    <label>Qualifikationen und Erfahrung
+      <textarea name="qualifikationen" minlength="2" maxlength="2000" rows="5" required placeholder="Bitte eine Qualifikation oder Erfahrung pro Zeile angeben"></textarea>
+    </label>
+    <p class="hint">Die Verwaltung prüft deine Angaben. Falls ein Nachweis benötigt wird, fordert sie ihn gesondert per E-Mail an. Bitte hier keine Fotos hochladen.</p>
+    <label>Eigenes Passwort (mindestens 6 Zeichen)
+      <input name="passwort" type="password" minlength="6" autocomplete="new-password" required>
+    </label>
+    <label>Passwort wiederholen
+      <input name="passwort_bestaetigung" type="password" minlength="6" autocomplete="new-password" required>
+    </label>
+    <button class="btn" type="submit">Registrierung absenden</button>
+  </form>
+  <p id="registration-status" role="status" aria-live="polite"></p>
+</main>
+<script src="/mitarbeiter-registrierung.js?v=20261105-qualifications-only"></script>
+</body>
+</html>

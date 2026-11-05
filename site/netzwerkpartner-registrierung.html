@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Registrierung für Netzwerkpartner | Klettern & Abenteuer</title>
+<link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
+</head>
+<body class="admin-page pruef-page">
+<a class="skip-link" href="#main-content">Zum Inhalt springen</a>
+<header><a class="logo" href="/">🧗 Klettern <span>& Abenteuer</span><small>Netzwerkpartnerregistrierung</small></a></header>
+<main class="narrow" id="main-content">
+  <h1>Registrierung für Netzwerkpartner</h1>
+  <p id="partner-registration-intro">Einladung wird geprüft …</p>
+  <form id="partner-registration-form" hidden>
+    <label>Organisation / Unternehmen<input name="unternehmen" maxlength="180" required></label>
+    <label>Ansprechperson<input name="ansprechpartner" maxlength="120" autocomplete="name" required></label>
+    <label>E-Mail-Adresse<input id="partner-registration-email" type="email" readonly aria-describedby="partner-email-help"></label>
+    <small id="partner-email-help">Diese Adresse wurde von der Verwaltung eingeladen und gehört zu diesem Partnerzugang.</small>
+    <label>Telefonnummer (optional)<input name="telefon" type="tel" maxlength="40" autocomplete="tel"></label>
+    <label>Straße und Hausnummer (optional)<input name="strasse" maxlength="160" autocomplete="street-address"></label>
+    <div class="two">
+      <label>Postleitzahl<input name="plz" maxlength="12" autocomplete="postal-code"></label>
+      <label>Ort<input name="ort" maxlength="100" autocomplete="address-level2"></label>
+    </div>
+    <label>Weitere Kontakthinweise (optional)<textarea name="weitereAngaben" maxlength="2000" rows="4" placeholder="Zum Beispiel bevorzugte Kontaktzeiten"></textarea></label>
+    <p class="hint">Die Verwaltung prüft deine Angaben und schaltet den Partnerzugang gesondert frei.</p>
+    <label>Eigenes Passwort (mindestens 6 Zeichen)<input name="passwort" type="password" minlength="6" autocomplete="new-password" required></label>
+    <label>Passwort wiederholen<input name="passwort_bestaetigung" type="password" minlength="6" autocomplete="new-password" required></label>
+    <button class="btn" type="submit">Registrierung absenden</button>
+  </form>
+  <p id="partner-registration-status" role="status" aria-live="polite"></p>
+</main>
+<script src="/netzwerkpartner-registrierung.js?v=20261105-1"></script>
+</body>
+</html>

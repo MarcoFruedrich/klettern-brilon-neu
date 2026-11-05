@@ -5,18 +5,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
 </head>
-<body>
-  <header>
+<body class="admin-page">
+  <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
+  <header class="admin-topbar">
     <a class="logo" href="/">
       🧗 Klettern <span>& Abenteuer</span>
       <small>Verwaltung</small>
     </a>
-    <nav><a href="/">Zur Website</a></nav>
+    <a class="admin-back-link" href="/">Zur Website</a>
   </header>
 
-  <main class="narrow">
+  <main class="narrow admin-main" id="main-content" tabindex="-1">
     <h1 style="font-size:42px">Verwaltung</h1>
     <p>Geschützter Bereich für Anfragen und Sonderangebote.</p>
 
@@ -30,15 +31,136 @@
       </label>
       <button class="btn">Anmelden</button>
     </form>
+    <p id="login-status" role="status" aria-live="polite"></p>
 
     <div id="workspace" hidden>
-      <button id="logout" class="btn secondary">Abmelden</button>
+      <div class="admin-layout">
+        <aside class="admin-sidebar" aria-label="Verwaltung">
+          <button id="logout" class="btn secondary">Abmelden</button>
+          <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
+            <a href="#admin-dashboard" data-admin-view-link>Übersicht</a>
+            <a href="#bookings-section" data-admin-view-link>Buchungen</a>
+            <a href="#feedback-admin-section" data-admin-view-link>Feedback</a><a href="#social-media-section" data-admin-view-link>Social Media</a><a href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
+            <a href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
+            <a href="#calendar-view" data-admin-view-link>Kalender</a>
+            <a href="#angebote-verwaltung" data-admin-view-link>Programme</a>
+            <a href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
+            <a href="#anschlussrabatt-section" data-admin-view-link>Anschlussrabatte</a>
+            <a href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
+            <a href="#kundenfeedback-section" data-admin-view-link>Kundenfeedback</a>
+            <a href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
+            <a href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
+            <a href="#standorte-section" data-admin-view-link>Standorte</a>
+            <a class="employee-area-link" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiter</a>
+            <a class="employee-area-link" href="#mitarbeiter-einladen-section" data-admin-view-link>Neue Mitarbeiter</a>
+            <a class="employee-area-link" href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a>
+            <a class="employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
+            <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
+          </nav>
+        </aside>
+        <div class="admin-content"><section id="admin-dashboard" class="admin-view admin-dashboard" data-admin-view aria-labelledby="admin-dashboard-heading"><h2 id="admin-dashboard-heading">Aktuelles auf einen Blick</h2><p>Wähle einen Bereich. Die Übersicht wird nach jeder Anmeldung automatisch geöffnet.</p><nav class="admin-dashboard-grid" aria-label="Direkte Verwaltungsbereiche">
+          <a class="admin-dashboard-link" href="#bookings-section" data-admin-view-link>Buchungen</a>
+          <a class="admin-dashboard-link" href="#mitarbeiter-section" data-admin-view-link>Trainer-Rückmeldungen &amp; Mitarbeiter</a>
+          <a class="admin-dashboard-link" href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
+          <a class="admin-dashboard-link" href="#calendar-view" data-admin-view-link>Kalender</a>
+          <a class="admin-dashboard-link" href="#angebote-verwaltung" data-admin-view-link>Programme</a>
+          <a class="admin-dashboard-link" href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
+          <a class="admin-dashboard-link" href="#anschlussrabatt-section" data-admin-view-link>Anschlussrabatte</a>
+          <a class="admin-dashboard-link" href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
+          <a class="admin-dashboard-link" href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
+          <a class="admin-dashboard-link" href="#feedback-admin-section" data-admin-view-link>Kundenfeedback</a>
+          <a class="admin-dashboard-link" href="#standorte-section" data-admin-view-link>Standorte</a>
+          <a class="admin-dashboard-link" href="#mitarbeiter-einladen-section" data-admin-view-link>Neue Mitarbeiter</a>
+          <a class="admin-dashboard-link employee-area-link" href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a>
+          <a class="admin-dashboard-link employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
+          <a class="admin-dashboard-link employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
+          <a class="admin-dashboard-link" href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
+          <a class="admin-dashboard-link" href="#social-media-section" data-admin-view-link>Social Media</a>
+          <a class="admin-dashboard-link" href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
+        </nav></section>
 
-      <h2>Buchungsanfragen</h2>
+      <section id="payment-overview-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="payment-overview-heading">
+        <h2 id="payment-overview-heading">Zahlungsübersicht</h2>
+        <p>Gesamtsummen über alle Buchungen; gefilterte Einträge werden seitenweise angezeigt. Gutschriften werden getrennt ausgewiesen; Auszahlungen bleiben manuell zu bearbeiten.</p>
+        <div id="payment-overview-summary" class="admin-grid payment-summary-grid" aria-live="polite"></div>
+        <label class="payment-overview-filter">Einträge filtern
+          <select id="payment-overview-filter">
+            <option value="alle">Alle Buchungen</option>
+            <option value="offen">Mit offenem Betrag</option>
+            <option value="teilzahlung">Teilzahlung erfasst</option>
+            <option value="vollstaendig">Vollständig bezahlt</option>
+            <option value="gutschrift">Mit Gutschrift</option>
+          </select>
+        </label>
+        <div id="payment-overview-list" class="admin-grid"></div>
+        <nav id="payment-overview-pagination" class="calendar-navigation" aria-label="Zahlungsseiten" hidden>
+          <button type="button" id="payment-overview-prev" class="btn secondary">← Vorherige</button>
+          <span id="payment-overview-page-info" aria-live="polite"></span>
+          <button type="button" id="payment-overview-next" class="btn secondary">Weitere →</button>
+        </nav>
+      </section>
+
+      <section id="social-media-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="social-media-heading"><h2 id="social-media-heading">Social Media</h2><p>Beiträge für Facebook und Instagram zentral vorbereiten. Eine direkte Veröffentlichung ist erst nach sicherer Verbindung der jeweiligen Konten möglich.</p><div class="admin-grid"><article><h3>Beitrag vorbereiten</h3><p>Entwürfe für Angebote, Sonderaktionen und freie Termine erstellen. Die technische Speicherung von Entwürfen ist noch nicht eingerichtet.</p><label>Beitragstext<textarea id="social-media-draft" rows="6" placeholder="Hier deinen Beitrag vorbereiten …"></textarea></label><button type="button" class="btn secondary" id="social-media-copy">Text kopieren</button><p id="social-media-copy-status" role="status" aria-live="polite"></p></article><article><h3>Kanäle verbinden</h3><p>Facebook und Instagram: Noch nicht verbunden. Automatisches Veröffentlichen, Terminplanung und Statistiken werden erst nach einer autorisierten Anbindung freigeschaltet.</p><p>Bitte keine Passwörter oder Zugangstoken in das Beitragsfeld eingeben.</p></article></div></section><script>document.getElementById('social-media-copy')?.addEventListener('click',async()=>{const field=document.getElementById('social-media-draft');const status=document.getElementById('social-media-copy-status');try{await navigator.clipboard.writeText(field.value);status.textContent='Beitragstext kopiert.'}catch{field.focus();field.select();status.textContent='Text markiert. Bitte manuell kopieren.'}});</script><section id="marketing-campaign-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="marketing-campaign-heading">
+<h2 id="marketing-campaign-heading">Marketing · Kampagnen</h2>
+<p>Gemeinsame Startkampagne für Familien, Schulen, Vereine und Firmen. Entwürfe werden nach Anmeldung zentral in der Datenbank gespeichert, sofern die Marketing-Datenbankmigration aktiviert wurde. Eine Veröffentlichung findet nicht statt.</p>
+<div class="admin-grid"><article>
+<h3>Kampagnen verwalten</h3><label>Kampagne auswählen <select id="campaign-select"><option value="startkampagne">Startkampagne</option></select></label><button class="btn secondary" id="campaign-new" type="button">Neue Kampagne</button> <button class="btn secondary" id="campaign-delete" type="button">Kampagne löschen</button>
+<label>Kampagnenname <input id="campaign-title" value="Gemeinsam Grenzen überwinden, Abenteuer erleben!"></label>
+<label>Zielgruppen <select id="campaign-audience"><option>Alle Zielgruppen</option><option>Familien</option><option>Schulen und Jugendgruppen</option><option>Vereine</option><option>Firmen</option></select></label>
+<label>Beitragstext <textarea id="campaign-body" rows="6">Klettern & Abenteuer Brilon – Gemeinsam Grenzen überwinden, Abenteuer erleben! Ob Kindergeburtstag, Schulausflug, Vereinsaktion oder Teamevent: Entdeckt unsere Angebote und fragt euren Wunschtermin an!</textarea></label>
+<label>Buchungslink <input id="campaign-link" type="url" placeholder="https://…"></label>
+<label>Geplante Veröffentlichung <input id="campaign-date" type="datetime-local"></label><label>Bildlink (HTTPS) <input id="campaign-image" type="url" placeholder="https://…"></label><label>Videolink (HTTPS) <input id="campaign-video" type="url" placeholder="https://…"></label><label>Freigabestatus <select id="campaign-status-select"><option value="entwurf">Entwurf</option><option value="zur-freigabe">Zur Freigabe</option><option value="freigegeben">Freigegeben – nicht veröffentlicht</option></select></label>
+<fieldset><legend>Kanäle für spätere Veröffentlichung</legend><label><input type="checkbox" name="campaign-channel" value="Facebook"> Facebook</label><label><input type="checkbox" name="campaign-channel" value="Instagram"> Instagram</label><label><input type="checkbox" name="campaign-channel" value="WhatsApp Business"> WhatsApp Business</label><label><input type="checkbox" name="campaign-channel" value="X"> X</label><label><input type="checkbox" name="campaign-channel" value="Google"> Google</label></fieldset>
+<button class="btn" id="campaign-save" type="button">Entwurf zentral speichern</button> <button class="btn secondary" id="campaign-copy" type="button">Beitrag kopieren</button> <button class="btn secondary" id="campaign-reset" type="button">Eingaben zurücksetzen</button>
+<p id="campaign-status" role="status" aria-live="polite"></p>
+</article><article><h3>Kampagnenplan</h3><ol><li>Woche 1: Startbeitrag und Kurzvideo</li><li>Woche 2: Kennenlernangebot nach Preisfreigabe</li><li>Woche 3: Regionale Partner aktivieren</li><li>Woche 4: Klicks, Anfragen und Buchungen auswerten</li></ol>
+<h3>Verbindungsstatus</h3><p>Facebook, Instagram, WhatsApp Business, X und Google: keine Veröffentlichung über diese Oberfläche eingerichtet.</p><p>Keine Zugangsdaten hier eingeben. Direkter Datei-Upload, Plattformanbindungen und Statistiken folgen später. Freigabe löst keine Veröffentlichung aus.</p></article></div>
+</section><script src="/marketing-kampagnen.js" defer></script><section id="feedback-admin-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="feedback-admin-heading">
+  <h2 id="feedback-admin-heading">Kundenfeedback</h2>
+  <p>Alle Rückmeldungen sind nur in der Verwaltung sichtbar. Die öffentliche Website zeigt ausschließlich Durchschnittswerte.</p>
+  <p id="feedback-admin-status" role="status" aria-live="polite"></p>
+  <div id="feedback-admin-summary" class="admin-grid"></div>
+  <div id="feedback-admin-list" class="admin-grid"></div>
+</section>
+
+<section id="bookings-section" class="admin-view" data-admin-view aria-labelledby="bookings-heading">
+      <h2 id="bookings-heading" class="admin-anchor">Buchungen &amp; Zahlungen</h2>
+      <div class="admin-booking-filters">
+        <label>Suche nach Name, Nummer, E-Mail oder Angebot
+          <input id="bookings-search" type="search" autocomplete="off">
+        </label>
+        <label>Status
+          <select id="bookings-status-filter">
+            <option value="alle">Alle Status</option>
+            <option value="offen">Offen</option>
+            <option value="bestaetigt">Bestätigt</option>
+            <option value="abgelehnt">Abgelehnt</option>
+            <option value="storniert">Storniert</option>
+          </select>
+        </label>
+      </div>
+      <p id="booking-results-summary" role="status" aria-live="polite"></p>
+      <nav id="bookings-pagination" class="calendar-navigation" aria-label="Buchungsseiten" hidden>
+        <button type="button" id="bookings-prev" class="btn secondary">← Vorherige</button>
+        <span id="bookings-page-info" aria-live="polite"></span>
+        <button type="button" id="bookings-next" class="btn secondary">Weitere →</button>
+      </nav>
       <div id="bookings" class="admin-grid"></div>
+      </section>
 
-      <h2>Buchungskalender</h2>
-      <p>Übersicht der angefragten und bestätigten Klettertermine.</p>
+      <section id="calendar-view" class="admin-view" data-admin-view aria-labelledby="calendar-view-heading">
+      <h2 id="calendar-view-heading">Kalender &amp; Sperrzeiten</h2>
+      <section class="booking" aria-labelledby="einsatzplanung-heading">
+        <h3 id="einsatzplanung-heading">Zentrale Einsatzplanung – Bewerbungen und Zuweisungen</h3>
+        <p>Alle Buchungen dieses Monats mit Bewerbern und eingeteilten Mitarbeitern. Die Einteilung prüft die hinterlegten Verträge und Verdienstgrenzen vor dem Speichern.</p>
+        <div class="einsatz-zuweisung">
+          <label>Monat <input id="einsatzplanung-monat" type="month"></label>
+          <button id="einsatzplanung-refresh" class="btn secondary" type="button">Planung aktualisieren</button>
+        </div>
+        <p id="einsatzplanung-status" role="status" aria-live="polite"></p>
+        <div id="einsatzplanung-termine" class="admin-grid"></div>
+      </section>
+      <p>Übersicht aller angefragten und bestätigten Termine. Kalendertag auswählen, um Buchungen einzusehen und freigegebene Mitarbeiter zuzuweisen. Mehrere Mitarbeiter sind möglich; bestehende Zuweisungen können jederzeit durch die Verwaltung geändert werden.</p>
 
       <section id="calendar-section" class="booking">
         <div class="calendar-navigation">
@@ -121,8 +243,28 @@
 
 <h3>Meine eingetragenen Termine und Sperrzeiten</h3>
 <div id="calendar-entries" class="admin-grid"></div>
+      </section>
 
-      <h2>Sonderangebote verwalten</h2>
+      <section id="anschlussrabatt-section" class="booking admin-view" data-admin-view aria-labelledby="anschlussrabatt-heading">
+        <h2 id="anschlussrabatt-heading">Anschlussrabatt berechnen</h2>
+        <p>Unverbindliche Vorschau: Bei direkt aufeinanderfolgenden Programmen
+          werden beide Programme um 10 % reduziert. Ein Programm erhaelt
+          den Rabatt auch bei zwei Anschluessen nur einmal.</p>
+        <label>Bestehende Buchungen am Datum anzeigen
+          <input id="anschlussrabatt-datum" type="date">
+        </label>
+        <button type="button" id="anschlussrabatt-kandidaten" class="btn secondary">Bestätigte Termine laden</button>
+        <div id="anschlussrabatt-kandidaten-liste" role="status" aria-live="polite"></div>
+        <div id="anschlussrabatt-kandidaten-vorschau" role="status" aria-live="polite"></div>
+        <button type="button" id="anschlussrabatt-anwenden" class="btn" hidden>10-%-Rabatt kontrolliert anwenden</button>
+        <div id="anschlussrabatt-positionen"></div>
+        <button type="button" id="anschlussrabatt-hinzufuegen" class="btn secondary">Weiteres Programm</button>
+        <button type="button" id="anschlussrabatt-berechnen" class="btn">Rabatt berechnen</button>
+        <div id="anschlussrabatt-ergebnis" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="special-offers-view" class="admin-view" data-admin-view aria-labelledby="special-offers-section">
+      <h2 id="special-offers-section" class="admin-anchor">Sonder- und Tagesangebote verwalten</h2>
       <form id="special-form">
         <label>Titel
           <input name="titel" maxlength="120" required>
@@ -137,13 +279,20 @@
   <input name="preis" type="number" min="0" step="0.01"
          placeholder="z. B. 25.00">
 </label>
+        <label>Verknüpftes buchbares Programm (optional)
+          <select name="programm_id" id="special-program-select">
+            <option value="">Unabhängige Sonderaktion – keine automatische Programmauswahl</option>
+          </select>
+          <small>Nur veröffentlichte und buchbare Programme. Der Aktionspreis ist zunächst eine unverbindliche Information; die Buchung wird gesondert geprüft.</small>
+        </label>
         <button class="btn">Angebot veröffentlichen</button>
       </form>
 
       <div id="special-list" class="admin-grid"></div>
+      </section>
 
-<section id="angebote-verwaltung">
-  <h2>Angebote &amp; Preise verwalten</h2>
+<section id="angebote-verwaltung" class="admin-view" data-admin-view aria-labelledby="programs-heading">
+  <h2 id="programs-heading">Angebote &amp; Preise verwalten</h2>
   <p>
     Hier kannst du Kletterangebote, Kindergeburtstage,
     Kistenklettern, Baumklettern und weitere Programme
@@ -169,8 +318,20 @@
   <label>
     Dauer in Minuten
     <input name="dauer" type="number"
-      min="15" placeholder="z. B. 90">
+      min="15" max="1440" step="1" required placeholder="z. B. 90">
   </label>
+  <label>Kategorie<input name="kategorie" maxlength="60" placeholder="Klettern"></label>
+  <label>Zielgruppe<input name="zielgruppe" maxlength="120" placeholder="Familien, Schulklassen"></label>
+  <label>Veranstaltungsort<select name="veranstaltungsort" id="angebot-ort" required></select></label>
+  <label>Kapazität (Teilnehmende)<input name="kapazitaet" type="number" min="1" max="500" value="20" required></label>
+  <label>Buchungsart<select name="buchungsmodus"><option value="gruppe">Gruppenanfrage</option><option value="einzelplatz">Einzelplätze reservieren</option></select></label>
+  <div class="two"><label>Mindestanmeldungen für Durchführung<input name="mindestteilnehmer" type="number" min="5" max="12" value="5"></label>
+  <label>Preis pro Person (€)<input name="preis_pro_person" type="number" min="0.01" step="0.01"></label></div>
+  <p class="hint">Bei Einzelplätzen gilt eine Kapazität von 5 bis 12 Plätzen. Eine Anmeldung reserviert einen Platz; eine Anzahlung wird nicht angefordert.</p>
+  <label>Verfügbare Termine (ein Datum pro Zeile; leer = offen)<textarea name="verfuegbare_termine" rows="3" placeholder="2026-12-01"></textarea></label>
+  <label>Besondere Hinweise<textarea name="hinweise" rows="2" maxlength="1000"></textarea></label>
+  <label class="check"><input name="buchbar" type="checkbox" checked><span>Buchbar</span></label>
+  <label class="check"><input name="veroeffentlicht" type="checkbox"><span>Auf der Website veröffentlichen</span></label>
 
   <button type="submit" class="btn">
     Neues Angebot hinzufügen
@@ -180,11 +341,230 @@
   <div id="angebote-admin-liste"></div>
 </section>
 
+<section id="standorte-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="standorte-heading">
+  <h2 id="standorte-heading">Standorte</h2>
+  <p>Standorte verwalten. Aktive Standorte können neuen Programmen zugeordnet werden. Inaktive Standorte bleiben bei bestehenden Programmen und Buchungen erhalten.</p>
+  <form id="admin-place-form">
+    <label>Neuer Standort
+      <input name="name" maxlength="80" placeholder="z. B. Sundern" required>
+    </label>
+    <button class="btn" type="submit">Standort hinzufügen</button>
+  </form>
+  <p id="admin-place-status" role="status" aria-live="polite"></p>
+  <div id="admin-place-list" class="admin-grid"></div>
+</section>
+
+<section id="mitarbeiter-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="mitarbeiter-heading">
+  <h2 id="mitarbeiter-heading">Mitarbeiter</h2>
+  <section class="booking" aria-labelledby="arbeitsvertraege-heading">
+    <h3 id="arbeitsvertraege-heading">Beschäftigungsart und Arbeitszeitkontrolle</h3>
+    <p>Verträge und Stundensätze nur für die Verwaltung sichtbar. Bereits geleistete und geplante Stunden werden gesondert angezeigt.</p>
+    <div id="arbeitsvertraege-admin" class="admin-grid"></div>
+  </section>
+  <p>Registrierte Mitarbeiter, ausstehende Freigaben, Qualifikationen und aktive Zugänge verwalten.</p>
+  <p id="pruef-personal-status" role="status" aria-live="polite"></p>
+  <div id="pruef-personal-list" class="admin-grid"></div>
+</section>
+
+<section id="mitarbeiter-einladen-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="mitarbeiter-einladen-heading">
+  <h2 id="mitarbeiter-einladen-heading">Neue Mitarbeiter</h2>
+  <p>Der Zugang bleibt gesperrt, bis die Verwaltung Registrierung und Qualifikationen geprüft und freigegeben hat.</p>
+  <form id="pruef-personal-form">
+    <label>Name<input name="name" maxlength="120" required></label>
+    <label>E-Mail<input name="email" type="email" maxlength="180" required></label>
+    <button class="btn" type="submit">Registrierungslink senden</button>
+  </form>
+  <p id="pruef-einladung-status" role="status" aria-live="polite"></p>
+</section>
+
+<section id="netzwerkpartner-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="netzwerkpartner-heading">
+  <h2 id="netzwerkpartner-heading">Netzwerkpartner</h2>
+  <p>Kontaktdaten prüfen und Partnerzugänge einzeln freigeben. Partner erhalten ausschließlich Zugang zu ihrem eigenen Bereich.</p>
+  <p id="netzwerkpartner-status" role="status" aria-live="polite"></p>
+  <div id="netzwerkpartner-list" class="admin-grid"></div>
+</section>
+
+<section id="netzwerkpartner-einladen-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="netzwerkpartner-einladen-heading">
+  <h2 id="netzwerkpartner-einladen-heading">Neue Netzwerkpartner</h2>
+  <p>Der eingeladene Kontakt ergänzt die Daten seiner Organisation. Der Zugang bleibt bis zur Freigabe durch die Verwaltung gesperrt.</p>
+  <form id="netzwerkpartner-invite-form">
+    <label>Ansprechperson<input name="name" maxlength="120" required></label>
+    <label>E-Mail<input name="email" type="email" maxlength="180" required></label>
+    <button class="btn" type="submit">Registrierungslink senden</button>
+  </form>
+  <p id="netzwerkpartner-invite-status" role="status" aria-live="polite"></p>
+</section>
+
+<section id="mitarbeiterbereiche-admin-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="mitarbeiterbereiche-heading">
+  <h2 id="mitarbeiterbereiche-heading">Bereiche im Mitarbeiterportal</h2>
+  <p>Aktivierte Textbereiche erscheinen für alle angemeldeten Mitarbeiter. Vertrauliche Einzelinformationen hier nicht veröffentlichen.</p>
+  <form id="mitarbeiterbereich-form">
+    <label>Bereichstyp<select name="art">
+      <option value="allgemein">Allgemeine Information</option>
+      <option value="standort">Standortinformation</option>
+      <option value="partner">Netzwerk-/Kooperationspartner</option>
+      <option value="programm">Programm</option>
+    </select></label>
+    <label>Bezeichnung des Bereichs<input name="titel" maxlength="100" required placeholder="z. B. Ansprechpartner und Netzwerkpartner"></label>
+    <label>Inhalt<textarea name="inhalt" maxlength="20000" rows="8" required placeholder="Informationen und Kontaktdaten"></textarea></label>
+    <label>Standorte zuordnen (Mehrfachauswahl möglich)
+      <select name="standorte" class="staff-area-locations" multiple size="5" aria-describedby="staff-area-location-help"></select>
+    </label>
+    <small id="staff-area-location-help">Für Standortinformationen und Programme ist mindestens ein aktiver Standort erforderlich. Partner können optional einem oder mehreren Standorten zugeordnet werden.</small>
+    <label class="check"><input name="aktiv" type="checkbox"><span>Im Mitarbeiterbereich anzeigen</span></label>
+    <button type="submit" class="btn">Bereich hinzufügen</button>
+  </form>
+  <p id="mitarbeiterbereich-status" role="status" aria-live="polite"></p>
+  <h3>Vorhandene Bereiche</h3>
+  <div id="mitarbeiterbereiche-list" class="admin-grid"></div>
+</section>
+
+<section id="kundenfeedback-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="kundenfeedback-heading">
+  <h2 id="kundenfeedback-heading">Kundenfeedback</h2>
+  <p>Vertrauliche Rückmeldungen sind nur in dieser Verwaltung sichtbar.</p>
+  <div id="kundenfeedback-summary" class="admin-grid payment-summary-grid" aria-live="polite"></div>
+  <p id="kundenfeedback-status" role="status" aria-live="polite"></p>
+  <div id="kundenfeedback-list" class="admin-grid"></div>
+</section>
+
+<section id="admin-guestbook-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="guestbook-heading">
+  <h2 id="guestbook-heading">Teilnahme-Gästeliste</h2>
+  <p>Angezeigt werden nur abgeschlossene Touren, für die eine ausdrückliche Veröffentlichungseinwilligung vorliegt.</p>
+  <div class="admin-booking-filters">
+    <label>GPS-Tour
+      <select id="admin-guestbook-tour"><option value="">Alle Touren</option></select>
+    </label>
+    <button type="button" id="admin-guestbook-load" class="btn secondary">Einträge laden</button>
+  </div>
+  <p id="admin-guestbook-status" role="status" aria-live="polite"></p>
+  <div id="admin-guestbook-list" class="admin-grid"></div>
+</section>
+
+<section id="gps-verwaltung" class="admin-view" data-admin-view aria-labelledby="gps-heading">
+  <h2 id="gps-heading">GPS-Schatzsuchen</h2>
+  <p>Touren verwalten, Kontrollcodes ändern und Zugänge für bestätigte Buchungen ausstellen.</p>
+  <form id="gps-tour-form">
+    <input name="id" type="hidden">
+    <label>Titel<input name="titel" maxlength="120" required></label>
+    <label>Beschreibung<textarea name="beschreibung" maxlength="2000" rows="3"></textarea></label>
+    <div class="two">
+      <label>Schwierigkeitsgrad<input name="schwierigkeitsgrad" maxlength="30" placeholder="leicht" required></label>
+      <label>Altersgruppe<input name="altersgruppe" maxlength="80" placeholder="3. und 4. Klasse" required></label>
+    </div>
+    <div class="two">
+      <label>Startpunkt<input name="startpunkt" maxlength="160" required></label>
+      <label>Ziel<input name="ziel" maxlength="160" required></label>
+    </div>
+    <div class="two">
+      <label>Dauer (Minuten)<input name="dauer" type="number" min="15" max="1440" required></label>
+      <label>Preis pro Gruppe (€)<input name="preis" type="number" min="0" step="0.01" required></label>
+    </div>
+    <div class="gps-station-heading">
+      <h3>Stationen und Aufgaben</h3>
+      <button class="btn secondary" id="gps-station-add" type="button">Station hinzufügen</button>
+    </div>
+    <div id="gps-stations" class="gps-stations" aria-live="polite"></div>
+    <p class="hint">Kontrollcodes werden als HMAC gespeichert. Koordinaten werden vom Spielbrowser nicht ausgeliefert.</p>
+    <label class="check"><input name="buchbar" type="checkbox"><span>Buchbar</span></label>
+    <label class="check"><input name="aktiv" type="checkbox"><span>Aktivieren</span></label>
+    <button class="btn" type="submit">GPS-Tour anlegen</button>
+  </form>
+  <p id="gps-tour-status" role="status"></p>
+  <div id="gps-tour-list" class="admin-grid"></div>
+  <h3>Spielzugang erstellen</h3>
+  <form id="gps-game-form">
+    <label>Aktive GPS-Tour<select name="tourId" required></select></label>
+    <label>Bestätigte Buchung suchen
+      <input id="gps-booking-search" type="search" maxlength="120" autocomplete="off"
+        placeholder="Name oder Buchungsnummer">
+    </label>
+    <p class="hint">Die Suche berücksichtigt alle bestätigten Buchungen zur ausgewählten GPS-Tour, auch ältere Termine.</p>
+    <label>Bestätigte Buchung<select name="buchungId" required></select></label>
+    <p id="gps-booking-results" role="status" aria-live="polite"></p>
+    <nav id="gps-booking-pagination" class="calendar-navigation" aria-label="GPS-Buchungsseiten" hidden>
+      <button id="gps-booking-prev" type="button" class="btn secondary">← Vorherige</button>
+      <span id="gps-booking-page-info" aria-live="polite"></span>
+      <button id="gps-booking-next" type="button" class="btn secondary">Weitere →</button>
+    </nav>
+    <button class="btn secondary" type="submit">Einmaligen Spielzugang erstellen</button>
+  </form>
+  <p id="gps-game-status" role="status"></p>
+
+  <h3>Ausgestellte Spielzugänge verwalten</h3>
+  <p class="hint">Hier sind ausgestellte Spielzugänge mit Bearbeitungsstand sichtbar. Geheime Zugangscodes und Links können nicht erneut angezeigt werden. Eine Sperrung ist dauerhaft und unterbricht auch gestartete Spiele.</p>
+  <label>GPS-Tour filtern
+    <select id="gps-access-tour"><option value="">Alle GPS-Touren</option></select>
+  </label>
+  <button type="button" id="gps-access-refresh" class="btn secondary">Zugänge aktualisieren</button>
+  <p id="gps-access-status" role="status" aria-live="polite"></p>
+  <div id="gps-access-list" class="admin-grid"></div>
+  <nav id="gps-access-pagination" class="calendar-navigation" aria-label="Seiten der GPS-Zugänge" hidden>
+    <button id="gps-access-prev" class="btn secondary" type="button">← Vorherige</button>
+    <span id="gps-access-page-info"></span>
+    <button id="gps-access-next" class="btn secondary" type="button">Weitere →</button>
+  </nav>
+</section>
+
     
+    <section id="stationspruefung" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="inspection-heading">
+      <h2 id="inspection-heading">Stationsprüfungen – Verwaltung</h2>
+      <p>Für die dokumentierte Kontrolle vor jedem Programm. <a href="/pruefung.html">Prüfformular für Mitarbeitende öffnen</a>.</p>
+      <section id="pruef-uebersicht" aria-label="Sicherheitsübersicht der Kletterstationen">
+        <h3>Aktuelle Sicherheitsübersicht</h3>
+        <p class="hint">Sicherheitsmängel und stillgelegte Stationen haben Vorrang. Kleinere Hinweise werden separat zur Nachprüfung angezeigt. Die Übersicht ersetzt keine vorgeschriebene Kontrolle vor jeder Nutzung.</p>
+        <button id="pruef-uebersicht-refresh" type="button" class="btn secondary">Sicherheitsübersicht aktualisieren</button>
+        <p id="pruef-uebersicht-status" role="status" aria-live="polite">Noch keine Sicherheitsdaten geladen.</p>
+        <div id="pruef-uebersicht-zaehler"></div>
+        <div id="pruef-uebersicht-inhalt"></div>
+      </section>
+      <form id="pruef-station-form">
+        <h3>Station anlegen</h3>
+        <label>Stationsbezeichnung<input name="name" maxlength="100" required placeholder="Kletterwand links"></label>
+        <label>Standort<select id="pruef-station-ort" name="ortId" required></select></label>
+        <label>Erforderliche Qualifikation<input name="qualifikation" maxlength="100" required placeholder="z. B. Kletterprüfung"></label>
+        <button class="btn secondary" type="submit">Station speichern</button>
+      </form>
+      <p id="pruef-station-status" role="status"></p>
+      <div id="pruef-station-list"></div>
+      <h3>Werbetablet am Standort koppeln</h3>
+      <p class="hint">Das Tablet öffnet <a href="/tablet.html">die separate Werbe- und Prüfcode-Anzeige</a>. Es erhält niemals eine Admin-Sitzung. Ein neuer Kopplungscode ist zehn Minuten gültig und nur einmal nutzbar. Das Tablet kann hier gesperrt werden.</p>
+      <button id="tablet-pair-generate" type="button" class="btn secondary">Tablet-Kopplungscode erzeugen</button>
+      <p id="tablet-pair-code" role="status" aria-live="polite"></p>
+      <button id="tablet-admin-refresh" type="button" class="btn secondary">Tablet-Verbindung prüfen</button>
+      <div id="tablet-admin-list"></div>
+      <p id="tablet-admin-status" role="status" aria-live="polite"></p>
+      <h3>Einmaligen Vor-Ort-Code anzeigen (Administrator-Notfalloption)</h3>
+      <p class="hint">Normalerweise fordert die angemeldete Fachkraft den Code über ihr Smartphone an und er erscheint auf dem gekoppelten Tablet. Diese Administrator-Notfalloption zeigt ihn zusätzlich hier an; daher nur in einem geschützten Umfeld verwenden.</p>
+      <button class="btn secondary" id="pruef-code-generate" type="button">Neuen Prüfcode anzeigen</button>
+      <p id="pruef-code-display" role="status" style="font-size:2rem;letter-spacing:.2rem"></p>
+      <h3>Offene Hinweise zur Nachprüfung</h3>
+      <p class="hint">Kleinere Auffälligkeiten ohne unmittelbare Sicherheitsbeeinträchtigung sperren die Station nicht automatisch. Sie bleiben sichtbar, bis eine verantwortliche Person die Prüfung und das Ergebnis dokumentiert.</p>
+      <button class="btn secondary" id="pruef-hinweis-refresh" type="button">Hinweise aktualisieren</button>
+      <p id="pruef-hinweis-status" role="status" aria-live="polite"></p>
+      <div id="pruef-hinweis-list"></div>
+      <h3>Mängelmeldungen – E-Mail-Versand</h3>
+      <p class="hint">Fehlgeschlagene und nicht konfigurierte Benachrichtigungen bleiben nachvollziehbar gespeichert. Eine erneute Sendung ist nur nach manueller Prüfung möglich. „Vom Anbieter angenommen“ bedeutet nicht, dass die E-Mail bereits zugestellt wurde.</p>
+      <button id="pruef-mail-refresh" class="btn secondary" type="button">Versandübersicht aktualisieren</button>
+      <p id="pruef-mail-status" role="status" aria-live="polite"></p>
+      <div id="pruef-mail-list"></div>
+      <h3>Zuletzt gespeicherte Prüfberichte</h3>
+      <button class="btn secondary" id="pruef-report-refresh" type="button">Berichte aktualisieren</button>
+      <p id="pruef-report-status" role="status"></p>
+      <div id="pruef-report-list"></div>
+    </section>
+
     <p id="status" role="status"></p>
+        </div>
+      </div>
       </div>
   </main>
 
-  <script src="/admin.js"></script>
+  <script src="/zahlungsuebersicht.js"></script>
+  <script src="/vendor/qrcode-generator.js"></script>
+  <script src="/qr-etiketten.js"></script>
+  <script src="/admin.js?v=20261105-admin-login-fix"></script>
+  <script src="/pruefung-admin.js?v=20261105-network-feedback"></script>
+  <script src="/feedback-admin.js"></script>
+  <script src="/einsatzplanung-admin.js?v=20261105-planung"></script>
 </body>
 </html>

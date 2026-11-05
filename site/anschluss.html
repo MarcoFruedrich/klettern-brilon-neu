@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Anschlussangebote | Klettern &amp; Abenteuer Brilon</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="container" style="max-width:820px;padding:2rem 1rem">
+    <p class="eyebrow">10 % Anschlussrabatt</p>
+    <h1>Ein Abenteuer passt noch dazu?</h1>
+    <p>Hier siehst du Programme, die direkt vor oder nach deinem bestätigten Termin liegen und für deine Gruppe noch verfügbar sind.</p>
+    <p id="status" role="status" aria-live="polite">Passende Programme werden geprüft …</p>
+    <div id="suggestions" class="cards"></div>
+    <p id="notice" class="hint" hidden>Der Rabatt auf dein bereits bestätigtes Programm wird berücksichtigt, sobald die Zusatzbuchung bestätigt ist.</p>
+    <p><a href="/">Zur Website</a></p>
+  </main>
+<script>
+'use strict';
+const status=document.getElementById('status'),root=document.getElementById('suggestions'),notice=document.getElementById('notice');
+const params=new URLSearchParams(location.hash.slice(1));let token=params.get('zugang');
+try{token=token||sessionStorage.getItem('anschlussZugang');if(params.has('zugang'))sessionStorage.setItem('anschlussZugang',token);}catch{}
+if(location.hash)history.replaceState(null,'',location.pathname+location.search);
+const euro=cent=>(cent/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+function text(tag,value){const node=document.createElement(tag);node.textContent=value;return node;}
+async function laden(){
+  if(!token){status.textContent='Der persönliche Angebotslink fehlt. Bitte öffne den Link aus deiner Bestätigungsmail.';return;}
+  try{
+    const res=await fetch('/api/anschlussangebote/vorschau',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({zugang:token})}),data=await res.json();
+    if(!res.ok)throw new Error(data.error||'Anschlussangebote konnten nicht geladen werden.');
+    if(!data.programme.length){status.textContent='Für deinen Termin sind aktuell keine passenden und verfügbaren Anschlussprogramme vorhanden.';return;}
+    status.textContent='Für '+data.datum+' und '+data.teilnehmer+' Teilnehmende gefunden:';
+    for(const program of data.programme){
+      const card=document.createElement('article'),heading=text('h2',program.name),description=text('p',program.beschreibung||''),duration=text('p','Dauer: '+program.dauer+' Minuten');
+      const price=text('p',euro(program.endpreisCent)+' mit 10 % Rabatt (Ersparnis '+euro(program.rabattCent)+')');
+      const label=text('label','Startzeit auswählen');label.htmlFor='time-'+program.id;
+      const select=document.createElement('select');select.id='time-'+program.id;select.setAttribute('aria-label','Startzeit für '+program.name);
+      for(const time of program.zeiten){const option=document.createElement('option');option.value=time.uhrzeit;option.textContent=time.uhrzeit+' Uhr ('+time.richtung+')';select.append(option);}
+      const button=text('button','Dieses Anschlussprogramm anfragen');button.type='button';button.className='btn';
+      button.addEventListener('click',async()=>{
+        button.disabled=true;status.textContent='Anschlussanfrage wird gesendet …';
+        try{
+          const answer=await fetch('/api/anschlussangebote/buchen',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({zugang:token,programmId:program.id,uhrzeit:select.value})}),result=await answer.json();
+          if(!answer.ok)throw new Error(result.error||'Anfrage fehlgeschlagen.');
+          root.replaceChildren();notice.hidden=false;
+          status.textContent='Anschlussanfrage ist eingegangen. Buchungsnummer: '+result.buchungsnummer+'. Der rabattierte Programmpreis beträgt '+euro(Math.round(result.gesamtpreis*100))+'. Wir melden uns per E-Mail.';
+          try{sessionStorage.removeItem('anschlussZugang');}catch{}
+        }catch(error){status.textContent=error.message;button.disabled=false;}
+      });
+      card.append(heading,description,duration,price,label,select,button);root.append(card);
+    }
+  }catch(error){status.textContent=error.message;}
+}
+laden();
+</script>
+</body>
+</html>
