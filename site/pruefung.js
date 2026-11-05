@@ -38,7 +38,22 @@ async function loadOwnReports(){
           list.append(details);
         }
       }
-      article.append(list);target.append(article);
+      article.append(list);
+      const printButton=text('button','Protokoll drucken / als PDF speichern');
+      printButton.type='button';printButton.className='btn secondary';
+      printButton.addEventListener('click',()=>{
+        const escape=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        const lines=(report.pruefungen||[]).map(item=>{
+          const state=item.zustand==='nicht_genutzt'?'Nicht genutzt – nicht geprüft':item.zustand==='mangel'?'Sicherheitsmangel':item.zustand==='hinweis'?'Hinweis':'In Ordnung';
+          const points=(item.pruefpunkte||[]).map(point=>'<li>'+escape(point.name)+': '+escape(point.zustand==='ok'?'In Ordnung':point.zustand==='hinweis'?'Hinweis':'Sicherheitsmangel')+'</li>').join('');
+          return '<section><h3>'+escape(item.station||'Station')+' – '+escape(state)+'</h3><p>'+escape(item.beschreibung||'')+'</p>'+(points?'<ul>'+points+'</ul>':'')+'</section>';
+        }).join('');
+        const popup=window.open('','_blank','noopener,noreferrer');
+        if(!popup){notice('Bitte Pop-ups für den PDF-Druck erlauben.');return;}
+        popup.document.write('<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Prüfprotokoll '+escape(report.id)+'</title><style>body{font:14px Arial,sans-serif;max-width:800px;margin:30px auto;padding:20px}section{border-top:1px solid #ccc;padding:10px 0}@media print{button{display:none}}</style></head><body><h1>Stationsprüfprotokoll</h1><p>Prüfnummer: '+escape(report.id)+'</p><p>Programm: '+escape(report.programm)+'</p><p>Geplanter Beginn: '+escape(report.beginn)+'</p><p>Erstellt: '+escape(dateText)+'</p>'+lines+'<p>Ausdruck einer elektronischen Aufzeichnung. Kein Nachweis einer fachlichen Freigabe gesperrter Stationen.</p><button onclick="window.print()">Drucken / PDF speichern</button></body></html>');
+        popup.document.close();
+      });
+      article.append(printButton);target.append(article);
     }
     status.textContent='Es werden '+reports.length+' persönliche Prüfprotokolle angezeigt.';
   }catch(error){
