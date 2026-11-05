@@ -2802,6 +2802,15 @@ async function start(){
         erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )`);
+      await pool.query("ALTER TABLE brilon_wissensportal_artikel ADD COLUMN IF NOT EXISTS bild_url TEXT");
+      await pool.query("ALTER TABLE brilon_wissensportal_artikel ADD COLUMN IF NOT EXISTS anhaenge JSONB NOT NULL DEFAULT '[]'::jsonb");
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_wissensportal_versionen (
+        artikel_id UUID NOT NULL REFERENCES brilon_wissensportal_artikel(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL CHECK(version>=1),
+        inhalt JSONB NOT NULL,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY(artikel_id,version)
+      )`);
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_wissensportal_veroeffentlicht_idx ON brilon_wissensportal_artikel(veroeffentlicht,kategorie,titel)');
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_wissensportal_bestaetigungen(
         artikel_id UUID NOT NULL REFERENCES brilon_wissensportal_artikel(id) ON DELETE CASCADE,
