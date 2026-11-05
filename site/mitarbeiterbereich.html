@@ -53,6 +53,15 @@
           </div>
           <button type="button" class="btn secondary" id="wiki-staff-refresh">Aktualisieren</button>
         </div>
+        <nav class="wiki-topic-tabs" id="wiki-topic-tabs" aria-label="Wissenskategorien">
+          <button type="button" data-category="" class="active">Alle Artikel</button>
+          <button type="button" data-category="programm">Programme</button>
+          <button type="button" data-category="standort">Standorte</button>
+          <button type="button" data-category="sicherheit">Sicherheit</button>
+          <button type="button" data-category="notfall">Notfall &amp; Erste Hilfe</button>
+          <button type="button" data-category="ablauf">Arbeitsabläufe</button>
+          <button type="button" data-category="allgemein">Allgemeines</button>
+        </nav>
         <div class="wiki-staff-controls">
           <label>Suche<input id="wiki-staff-search" type="search" autocomplete="off" placeholder="Thema, Programm oder Stichwort suchen"></label>
           <label>Kategorie<select id="wiki-staff-category"><option value="">Alle Kategorien</option><option value="programm">Programme</option>
@@ -67,6 +76,7 @@
           <article id="wiki-staff-content" class="wiki-staff-content">
             <h3>Wissen auf einen Blick</h3><p>Wähle links einen Artikel aus.</p>
           </article>
+          <aside id="wiki-staff-side" class="wiki-staff-side" aria-label="Artikel-Informationen"></aside>
         </div>
       </section>
       <div class="staff-portal-layout">
