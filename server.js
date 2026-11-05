@@ -426,7 +426,7 @@ async function main(req,res){
         :preisFuerTeilnehmer(programm.preise,teilnehmer);
       if(preisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
       gesamtpreis=preisCent/100;
-      const istGast=d.istGast;
+      const istGast=d.istGast===undefined?'nein':d.istGast;
       const gastEinrichtung=safeText(d.gastEinrichtung,120);
       if(!['ja','nein'].includes(istGast)||(istGast==='ja'&&!gastEinrichtung))
         return reply(res,400,{error:'Bitte Gästeangabe und gegebenenfalls die Unterkunft angeben.'});
