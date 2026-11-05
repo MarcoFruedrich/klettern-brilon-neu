@@ -2550,6 +2550,7 @@ async function migrateEinsatzplanung(){
 )`);
       await pool.query(`CREATE INDEX IF NOT EXISTS brilon_einsaetze_mitarbeiter_idx ON brilon_einsaetze(mitarbeiter_id,status)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS brilon_einsaetze_buchung_idx ON brilon_einsaetze(buchung_id)`);
+      await pool.query('ALTER TABLE brilon_beschaeftigung ADD COLUMN IF NOT EXISTS vertrauensperson BOOLEAN NOT NULL DEFAULT false');
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigungen (
   buchung_id UUID PRIMARY KEY REFERENCES brilon_buchungen(id) ON DELETE CASCADE,
   anlass_mitarbeiter_id UUID REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE SET NULL,
