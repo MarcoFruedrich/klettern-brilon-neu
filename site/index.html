@@ -28,7 +28,7 @@
 <small aria-live="polite" id="uhrzeit-hinweis" role="status">Wähle zuerst Veranstaltungsort, Angebot und Wunschtermin. Danach erscheinen die verfügbaren Anfangszeiten.</small>
 </label></div>
 <div aria-label="Kalender zur Auswahl des Wunschtermins" class="buchungskalender" id="buchungskalender"></div>
-<div class="two"><label>Teilnehmende<input id="buchungs-teilnehmer" max="150" min="1" name="teilnehmer" required="" type="number" value="6"/>
+<fieldset id="gaststatus-feld"><legend>Gästeermäßigung</legend><label>Sind Sie Gast einer Unterkunft oder Einrichtung?<select name="istGast" id="ist-gast" required><option value="">Bitte auswählen</option><option value="nein">Nein</option><option value="ja">Ja</option></select></label><label id="gast-einrichtung-feld" hidden>Wo sind Sie Gast?<input name="gastEinrichtung" id="gast-einrichtung" maxlength="120" autocomplete="organization" placeholder="Name der Unterkunft oder Einrichtung"></label><small>Eine mögliche Ermäßigung wird nach Prüfung der Anfrage berücksichtigt. Die Angabe allein bestätigt noch keinen Rabatt.</small></fieldset><div class="two"><label>Teilnehmende<input id="buchungs-teilnehmer" max="150" min="1" name="teilnehmer" required="" type="number" value="6"/>
 <small aria-live="polite" id="buchungs-dauer" role="status"></small>
 <small aria-live="polite" id="buchungs-endzeit" role="status"></small>
 <small aria-live="polite" id="buchungs-modus-hinweis" role="status"></small>
