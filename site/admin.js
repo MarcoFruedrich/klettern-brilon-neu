@@ -1223,6 +1223,10 @@ const kalenderFarben = {
   storniert: '#94a3b8'
 };
 
+let kalenderMitarbeitende = [];
+async function kalenderMitarbeitendeLaden(){
+  kalenderMitarbeitende=await api('/api/admin/kalender-mitarbeitende');
+}
 let eigeneKalenderTermine = [];
 let kalenderLadeSequenz=0;
 function kalenderAnzeigen() {
@@ -1358,6 +1362,45 @@ if (eigeneTermine.length) {
           (statusNamen[b.status] || 'Offen') + ')';
 
         kalenderInfo.append(eintrag);
+        // Die Verwaltung kann mehrere freigegebene Personen einer Buchung zuweisen.
+        const zuweisung=document.createElement('div');
+        zuweisung.className='calendar-staff-assignment';
+        const beschriftung=document.createElement('label');
+        beschriftung.textContent='Mitarbeiter zuweisen (Mehrfachauswahl)';
+        const auswahl=document.createElement('select');
+        auswahl.multiple=true;
+        auswahl.size=Math.max(2,Math.min(6,kalenderMitarbeitende.length));
+        auswahl.setAttribute('aria-label','Mitarbeiter für die Buchung zuweisen');
+        const gewaehlt=new Set(Array.isArray(b.data.mitarbeiterZuweisungen)?b.data.mitarbeiterZuweisungen:[]);
+        for(const person of kalenderMitarbeitende){
+          const option=document.createElement('option');
+          option.value=person.id;
+          option.textContent=person.name+' ('+person.email+')';
+          option.selected=gewaehlt.has(person.id);
+          auswahl.append(option);
+        }
+        beschriftung.append(auswahl);
+        const speichern=document.createElement('button');
+        speichern.type='button';speichern.className='btn secondary';
+        speichern.textContent='Zuweisung speichern';
+        const meldung=document.createElement('span');
+        meldung.setAttribute('role','status');
+        speichern.onclick=async()=>{
+          speichern.disabled=true;
+          meldung.textContent='Zuweisung wird gespeichert …';
+          try{
+            const mitarbeiterIds=Array.from(auswahl.selectedOptions,option=>option.value);
+            const antwort=await api('/api/admin/kalenderzuweisung/'+encodeURIComponent(b.id),{
+              method:'PATCH',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({mitarbeiterIds})
+            });
+            b.data.mitarbeiterZuweisungen=antwort.mitarbeiterIds;
+            meldung.textContent='Zuweisung gespeichert.';
+          }catch(fehler){meldung.textContent='Nicht gespeichert: '+fehler.message;}
+          finally{speichern.disabled=false;}
+        };
+        zuweisung.append(beschriftung,speichern,meldung);
+        kalenderInfo.append(zuweisung);
       }
 
 for (const e of eigeneTermine) {
@@ -1398,7 +1441,10 @@ async function kalenderLaden() {
   const aktuelleSequenz=++kalenderLadeSequenz;
   const monat=`${kalenderDatum.getFullYear()}-${String(kalenderDatum.getMonth()+1).padStart(2,'0')}`;
   try {
-    const buchungen=await api('/api/admin/kalenderbuchungen?monat='+encodeURIComponent(monat));
+    const [buchungen]=await Promise.all([
+      api('/api/admin/kalenderbuchungen?monat='+encodeURIComponent(monat)),
+      kalenderMitarbeitendeLaden()
+    ]);
     if(aktuelleSequenz!==kalenderLadeSequenz)return;
     kalenderBuchungen=buchungen;
     kalenderAnzeigen();
