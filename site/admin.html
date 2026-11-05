@@ -81,17 +81,17 @@
 <h2 id="marketing-campaign-heading">Marketing · Kampagnen</h2>
 <p>Gemeinsame Startkampagne für Familien, Schulen, Vereine und Firmen. Entwürfe werden nach Anmeldung zentral in der Datenbank gespeichert, sofern die Marketing-Datenbankmigration aktiviert wurde. Eine Veröffentlichung findet nicht statt.</p>
 <div class="admin-grid"><article>
-<h3>Kampagne bearbeiten</h3>
+<h3>Kampagnen verwalten</h3><label>Kampagne auswählen <select id="campaign-select"><option value="startkampagne">Startkampagne</option></select></label><button class="btn secondary" id="campaign-new" type="button">Neue Kampagne</button> <button class="btn secondary" id="campaign-delete" type="button">Kampagne löschen</button>
 <label>Kampagnenname <input id="campaign-title" value="Gemeinsam Grenzen überwinden, Abenteuer erleben!"></label>
 <label>Zielgruppen <select id="campaign-audience"><option>Alle Zielgruppen</option><option>Familien</option><option>Schulen und Jugendgruppen</option><option>Vereine</option><option>Firmen</option></select></label>
 <label>Beitragstext <textarea id="campaign-body" rows="6">Klettern & Abenteuer Brilon – Gemeinsam Grenzen überwinden, Abenteuer erleben! Ob Kindergeburtstag, Schulausflug, Vereinsaktion oder Teamevent: Entdeckt unsere Angebote und fragt euren Wunschtermin an!</textarea></label>
 <label>Buchungslink <input id="campaign-link" type="url" placeholder="https://…"></label>
-<label>Geplante Veröffentlichung <input id="campaign-date" type="datetime-local"></label>
+<label>Geplante Veröffentlichung <input id="campaign-date" type="datetime-local"></label><label>Bildlink (HTTPS) <input id="campaign-image" type="url" placeholder="https://…"></label><label>Videolink (HTTPS) <input id="campaign-video" type="url" placeholder="https://…"></label><label>Freigabestatus <select id="campaign-status-select"><option value="entwurf">Entwurf</option><option value="zur-freigabe">Zur Freigabe</option><option value="freigegeben">Freigegeben – nicht veröffentlicht</option></select></label>
 <fieldset><legend>Kanäle für spätere Veröffentlichung</legend><label><input type="checkbox" name="campaign-channel" value="Facebook"> Facebook</label><label><input type="checkbox" name="campaign-channel" value="Instagram"> Instagram</label><label><input type="checkbox" name="campaign-channel" value="WhatsApp Business"> WhatsApp Business</label><label><input type="checkbox" name="campaign-channel" value="X"> X</label><label><input type="checkbox" name="campaign-channel" value="Google"> Google</label></fieldset>
 <button class="btn" id="campaign-save" type="button">Entwurf zentral speichern</button> <button class="btn secondary" id="campaign-copy" type="button">Beitrag kopieren</button> <button class="btn secondary" id="campaign-reset" type="button">Eingaben zurücksetzen</button>
 <p id="campaign-status" role="status" aria-live="polite"></p>
 </article><article><h3>Kampagnenplan</h3><ol><li>Woche 1: Startbeitrag und Kurzvideo</li><li>Woche 2: Kennenlernangebot nach Preisfreigabe</li><li>Woche 3: Regionale Partner aktivieren</li><li>Woche 4: Klicks, Anfragen und Buchungen auswerten</li></ol>
-<h3>Verbindungsstatus</h3><p>Facebook, Instagram, WhatsApp Business, X und Google: keine Veröffentlichung über diese Oberfläche eingerichtet.</p><p>Keine Zugangsdaten hier eingeben. Bilder, Freigabeprozess, gemeinsame Speicherung, API-Anbindung und Statistiken folgen in einem späteren Entwicklungsschritt.</p></article></div>
+<h3>Verbindungsstatus</h3><p>Facebook, Instagram, WhatsApp Business, X und Google: keine Veröffentlichung über diese Oberfläche eingerichtet.</p><p>Keine Zugangsdaten hier eingeben. Direkter Datei-Upload, Plattformanbindungen und Statistiken folgen später. Freigabe löst keine Veröffentlichung aus.</p></article></div>
 </section><script src="/marketing-kampagnen.js" defer></script><section id="feedback-admin-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="feedback-admin-heading">
   <h2 id="feedback-admin-heading">Kundenfeedback</h2>
   <p>Alle Rückmeldungen sind nur in der Verwaltung sichtbar. Die öffentliche Website zeigt ausschließlich Durchschnittswerte.</p>
