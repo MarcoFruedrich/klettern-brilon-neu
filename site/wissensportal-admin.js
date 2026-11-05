@@ -24,13 +24,15 @@
       card.append(mk('h4',a.titel));
       card.append(mk('small',(names[a.kategorie]||a.kategorie)+' · Version '+a.version+
         ' · '+(a.veroeffentlicht?'Veröffentlicht':'Entwurf')+
-        ' · '+(a.standorte.length?a.standorte.map(id=>locations.find(x=>String(x.id)===String(id))?.name||id).join(', '):'Alle Standorte')));
+        ' · '+(a.standorte.length?a.standorte.map(id=>locations.find(x=>String(x.id)===String(id))?.name||id).join(', '):'Alle Standorte')+
+        ' · '+(a.anhaenge?.length||0)+' Anhänge')));
       if(a.kurztext)card.append(mk('p',a.kurztext));
       const actions=mk('div');actions.className='wiki-admin-actions';
       const edit=mk('button','Bearbeiten');edit.type='button';edit.className='btn secondary';
       edit.addEventListener('click',()=>{
         editing=a.id;heading.textContent='Artikel bearbeiten: '+a.titel;
-        for(const key of ['titel','kategorie','kurztext','inhalt','dokumentUrl'])form.elements[key].value=a[key]||'';
+        for(const key of ['titel','kategorie','kurztext','inhalt','dokumentUrl','bildUrl'])form.elements[key].value=a[key]||'';
+        form.elements.anhaengeText.value=(a.anhaenge||[]).map(link=>link.titel+' | '+link.url).join('\n');
         form.elements.veroeffentlicht.checked=a.veroeffentlicht;
         for(const opt of sites.options)opt.selected=a.standorte.some(id=>String(id)===opt.value);
         form.scrollIntoView({behavior:'smooth',block:'start'});
@@ -75,7 +77,21 @@
         });
         actions.append(reports);
       }
-      actions.append(edit,publish,remove);card.append(actions);list.append(card);
+      const history=mk('button','Änderungshistorie');history.type='button';history.className='btn secondary';
+      history.addEventListener('click',async()=>{
+        history.disabled=true;
+        const view=mk('div');view.className='wiki-reading-report';view.textContent='Versionsverlauf wird geladen …';card.append(view);
+        try{
+          const data=await api('/api/admin/wissensportal/'+a.id+'/versionen');
+          view.replaceChildren(mk('strong','Aktuelle Fassung: Version '+data.aktuell.version));
+          for(const version of data.vorherige||[]){
+            const date=new Date(version.erstellt_am).toLocaleString('de-DE');
+            view.append(mk('p','Vorherige Fassung '+version.version+' · gespeichert '+date));
+          }
+        }catch(error){view.textContent='Verlauf konnte nicht geladen werden: '+error.message;}
+        finally{history.disabled=false;}
+      });
+      actions.append(history,edit,publish,remove);card.append(actions);list.append(card);
     }
   }
   search.addEventListener('input',show);
@@ -84,11 +100,20 @@
     event.preventDefault();
     const button=document.getElementById('wiki-save');button.disabled=true;
     status.textContent='Artikel wird gespeichert …';
+    const anhaenge=[];
+    for(const line of form.elements.anhaengeText.value.split('\n').map(v=>v.trim()).filter(Boolean)){
+      const pos=line.indexOf('|');
+      if(pos<1||!/^https:\/\//i.test(line.slice(pos+1).trim())){
+        status.textContent='Anhänge benötigen je Zeile Titel | https://...';
+        button.disabled=false;return;
+      }
+      anhaenge.push({titel:line.slice(0,pos).trim(),url:line.slice(pos+1).trim()});
+    }
     const data={
       titel:form.elements.titel.value,kurztext:form.elements.kurztext.value,
       kategorie:form.elements.kategorie.value,inhalt:form.elements.inhalt.value,
-      dokumentUrl:form.elements.dokumentUrl.value,
-      veroeffentlicht:form.elements.veroeffentlicht.checked,standorte:selected()
+      dokumentUrl:form.elements.dokumentUrl.value,bildUrl:form.elements.bildUrl.value,
+      anhaenge,veroeffentlicht:form.elements.veroeffentlicht.checked,standorte:selected()
     };
     try{
       await api('/api/admin/wissensportal'+(editing?'/'+editing:''),{
