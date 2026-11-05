@@ -3,15 +3,15 @@
 Status: Fachkonzept, noch nicht implementiert oder produktiv aktiviert.
 
 ## Kundenformular
-- Pflichtfrage: „Sind Sie Gast einer Jugendherberge oder einer anderen berechtigten Einrichtung?“ Ja/Nein.
-- Bei Ja: Einrichtung/Standort auswählen; zusätzlich „Andere Einrichtung“ mit Freitext, ohne vorausgesetzte Kenntnis des konkreten Standorts.
+- Pflichtfrage: „Sind Sie Gast einer Unterkunft oder Einrichtung?“ Ja/Nein.
+- Bei Ja: Unterkunft oder Einrichtung frei als Text eingeben; keine Beschränkung auf Jugendherbergen oder eine geschlossene Auswahlliste.
 - Rabatt unverbindlich als voraussichtlichen Preis ausweisen; tatsächliche Berechtigung vor Bestätigung prüfen.
 - Bei Nein keine Rabattdaten erzwingen.
 
 ## Administration
 - Eigener Bereich „Gästeermäßigungen“: Einrichtung/Standort, Anzeigename, Prozentsatz (0–100), aktiv/inaktiv, optional Gültigkeit.
 - Änderungen ohne Programmcode, deaktivierte Standorte bleiben für alte Buchungen nachvollziehbar.
-- Bei „Andere Einrichtung“ keine automatische Gewährung ohne Prüfung.
+- Bei freier Eingabe Rabatt nur nach eindeutiger Zuordnung zu einer aktiven Admin-Regel vorschlagen, sonst manuell prüfen.
 - Rabattprozentsätze und Auswahl zum Anfragezeitpunkt in der Buchung historisieren.
 - Serverseitige Prüfung, kein Vertrauen auf vom Browser gesendete Prozentsätze.
 
