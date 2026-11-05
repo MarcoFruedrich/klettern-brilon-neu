@@ -2524,6 +2524,7 @@ async function start(){
     await pool.query('SELECT 1');
     // Idempotente, eng begrenzte Einsatzplanungs-Migration nach Freigabe.
     // Nur ausführen, wenn die bestehenden Buchungs- und Mitarbeitertabellen vorhanden sind.
+    if(process.env.RUN_SCHEMA_MIGRATIONS==='true'||process.env.RUN_STAFFING_MIGRATION==='true'){
     const einsatzSchema=await pool.query(`SELECT to_regclass('public.brilon_buchungen') AS buchungen,
       to_regclass('public.brilon_pruef_mitarbeitende') AS mitarbeitende`);
     if(einsatzSchema.rows[0]?.buchungen&&einsatzSchema.rows[0]?.mitarbeitende){
@@ -2557,6 +2558,7 @@ async function start(){
       console.log('Einsatzplanungsschema geprüft');
     }else{
       console.warn('Einsatzplanungsschema zurückgestellt: Grundtabellen noch nicht vorhanden.');
+    }
     }
 
     if(process.env.RUN_MARKETING_MIGRATION==='true'){
