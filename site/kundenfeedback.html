@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Dein Feedback | Klettern & Abenteuer Brilon</title>
+<link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
+</head>
+<body class="admin-page pruef-page">
+<a class="skip-link" href="#main-content">Zum Inhalt springen</a>
+<header><a class="logo" href="/">🧗 Klettern <span>& Abenteuer</span><small>Feedback</small></a></header>
+<main class="narrow" id="main-content">
+  <h1>Dein Feedback zum Programm</h1>
+  <p>Mit deiner Kundennummer kannst du uns vertraulich Rückmeldung geben. Nur die Verwaltung kann deine Antworten einsehen.</p>
+  <form id="customer-feedback-form">
+    <label>Kundennummer<input name="buchungsnummer" maxlength="40" autocomplete="off" required></label>
+    <label>Wie hat dir das Programm gefallen?
+      <select name="programmBewertung" required><option value="">Bitte auswählen</option><option value="1">1 – Gar nicht</option><option value="2">2 – Eher nicht</option><option value="3">3 – In Ordnung</option><option value="4">4 – Gut</option><option value="5">5 – Sehr gut</option></select>
+    </label>
+    <label>Wie zufrieden warst du mit dem Mitarbeiter?
+      <select name="mitarbeiterBewertung" required><option value="">Bitte auswählen</option><option value="1">1 – Gar nicht</option><option value="2">2 – Eher nicht</option><option value="3">3 – In Ordnung</option><option value="4">4 – Gut</option><option value="5">5 – Sehr gut</option></select>
+    </label>
+    <label>Wie sicher hast du dich gefühlt?
+      <select name="sicherheitsBewertung" required><option value="">Bitte auswählen</option><option value="1">1 – Gar nicht sicher</option><option value="2">2 – Eher unsicher</option><option value="3">3 – Teils/teils</option><option value="4">4 – Sicher</option><option value="5">5 – Sehr sicher</option></select>
+    </label>
+    <label>Hast du Veränderungsvorschläge? (optional)<textarea name="veraenderungen" maxlength="2000" rows="4"></textarea></label>
+    <label>Was könnten wir zusätzlich anbieten? (optional)<textarea name="ideen" maxlength="2000" rows="4"></textarea></label>
+    <label class="check"><input name="datenschutz" type="checkbox" required><span>Ich bin einverstanden, dass meine Antworten zur internen Auswertung verarbeitet und eine Kopie an die in meiner Buchung hinterlegte E-Mail-Adresse gesendet wird. <a href="/datenschutz.html" target="_blank" rel="noopener">Datenschutzhinweise</a></span></label>
+    <button class="btn" type="submit">Feedback absenden</button>
+  </form>
+  <p id="customer-feedback-status" role="status" aria-live="polite"></p>
+  <p><a href="/">Zurück zur Website</a></p>
+</main>
+<script src="/kundenfeedback.js?v=20261105-1"></script>
+</body>
+</html>

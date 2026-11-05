@@ -1,11 +1,34 @@
 
-document.getElementById('year').textContent=new Date().getFullYear();const date=document.querySelector('input[name=datum]');date.min=new Date().toLocaleDateString('en-CA');
+document.getElementById('year').textContent=new Date().getFullYear();
+const date=document.querySelector('input[name=datum]');
+// Veranstaltungsort Brilon: YYYY-MM-DD unabhängig von Browser-Sprache und Gerätezeitzone.
+function buchungstagInBerlin(zeitpunkt=new Date()){
+  const teile=new Intl.DateTimeFormat('en-GB',{
+    timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(zeitpunkt);
+  const feld=Object.fromEntries(teile.map(teil=>[teil.type,teil.value]));
+  return feld.year+'-'+feld.month+'-'+feld.day;
+}
+if(date)date.min=buchungstagInBerlin();
 
 const verfuegbarkeit = document.getElementById('datum-verfuegbarkeit');
 let sperrzeiten = [];
 let sperrzeitenGeladen = false;
+function datumIstGesperrt(datum){
+  return sperrzeitenGeladen&&window.sperrzeitEnthaelt(datum,sperrzeiten);
+}
 const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
+const angebotAuswahl = document.getElementById('angebot-auswahl');
+const standortAuswahl = document.getElementById('buchungs-standort');
+let angeboteCache=[];
+let verfuegbarkeitsAnfrage=0;
+let sonderaktionsPrefix='';
+function dauerFuer(teilnehmer,angebotName){
+  const programm=angeboteCache.find(a=>a.name===angebotName);
+  return Number(programm?.dauer)||
+    (teilnehmer<=4?90:teilnehmer<=10?150:teilnehmer<=15?180:teilnehmer<=20?210:240);
+}
 
 const buchbareUhrzeiten = [
   '09:00',
@@ -44,18 +67,33 @@ function uhrzeitenAnzeigen() {
 uhrzeitenAnzeigen();
 
 async function belegteUhrzeitenLaden() {
-  if (!uhrzeitAuswahl || !date.value) return;
+  if (!uhrzeitAuswahl) return;
+  const anfrageId=++verfuegbarkeitsAnfrage;
+  if (!date.value) {
+    uhrzeitenAnzeigen();
+    uhrzeitAuswahl.disabled = true;
+    uhrzeitHinweis.textContent = 'Bitte zuerst einen Termin auswählen.';
+    return;
+  }
 
   const datum = date.value;
+  if(datumIstGesperrt(datum)){
+    uhrzeitenAnzeigen();
+    uhrzeitAuswahl.disabled=true;
+    uhrzeitHinweis.textContent='Dieser Tag ist gesperrt. Bitte wähle ein anderes Datum.';
+    return;
+  }
   const teilnehmer = Number(
     document.getElementById('buchungs-teilnehmer')?.value
   );
-
-  const dauer =
-    teilnehmer >= 5 && teilnehmer <= 10 ? 150 :
-    teilnehmer >= 11 && teilnehmer <= 15 ? 180 :
-    teilnehmer >= 16 && teilnehmer <= 20 ? 210 : null;
-
+  const angebot=angebotAuswahl?.value;
+  const teilnehmerWert=document.getElementById('buchungs-teilnehmer')?.value;
+  if(!angebot){
+    uhrzeitenAnzeigen();
+    uhrzeitAuswahl.disabled=true;
+    uhrzeitHinweis.textContent='Bitte zuerst Standort und Angebot auswählen.';
+    return;
+  }
   const vorherigeAuswahl = uhrzeitAuswahl.value;
 
   uhrzeitHinweis.textContent = 'Freie Uhrzeiten werden geprüft …';
@@ -64,23 +102,26 @@ async function belegteUhrzeitenLaden() {
   try {
     const antwort = await fetch(
       '/api/belegte-zeiten?datum=' + encodeURIComponent(datum) +
-      '&teilnehmer=' + encodeURIComponent(teilnehmer)
+      '&teilnehmer=' + encodeURIComponent(teilnehmer) +
+      '&angebot=' + encodeURIComponent(angebot)
     );
 
     if (!antwort.ok) throw new Error('Verfügbarkeit nicht abrufbar');
 
     const daten = await antwort.json();
 
-    if (date.value !== datum) return;
+    if (anfrageId!==verfuegbarkeitsAnfrage || date.value!==datum ||
+        angebotAuswahl?.value!==angebot ||
+        document.getElementById('buchungs-teilnehmer')?.value!==teilnehmerWert ||
+        datumIstGesperrt(datum)) return;
 
-    // Die bisherige Serverabfrage liefert einzelne belegte Startzeiten.
-    // Für eine vollständige Überschneidungsprüfung benötigen wir
-    // zusätzlich die Anfangs- und Endzeiten aller Reservierungen.
-    // Bis dahin zeigen wir nur die direkt gemeldeten Belegungen an.
+    // Der Server prüft jedes auswählbare Startfenster gegen die belegten Zeiträume.
     const belegteZeiten = new Set(
       daten.zeiten.filter(eintrag => eintrag.belegt)
         .map(eintrag => eintrag.uhrzeit)
     );
+    const platzDaten=new Map(daten.zeiten.filter(e=>Number.isInteger(e.freie_plaetze))
+      .map(e=>[e.uhrzeit,e]));
 
     uhrzeitenAnzeigen();
 
@@ -88,6 +129,12 @@ async function belegteUhrzeitenLaden() {
       if (belegteZeiten.has(option.value)) {
         option.disabled = true;
         option.textContent = option.value + ' Uhr – Belegt';
+      }else if(platzDaten.has(option.value)){
+        const platz=platzDaten.get(option.value);
+        const status=platz.angemeldet>=platz.mindestteilnehmer
+          ?`${platz.angemeldet} angemeldet`
+          :`${platz.angemeldet}/${platz.mindestteilnehmer} angemeldet`;
+        option.textContent=`${option.value} Uhr · noch ${platz.freie_plaetze} Plätze · ${status}`;
       }
     }
 
@@ -104,13 +151,17 @@ async function belegteUhrzeitenLaden() {
       buchungsdauerBerechnen();
     }
   } catch (fehler) {
+    if(anfrageId!==verfuegbarkeitsAnfrage)return;
     uhrzeitenAnzeigen();
     uhrzeitHinweis.textContent =
       'Verfügbarkeit derzeit nicht abrufbar. ' +
       'Bitte versuche es später erneut.';
     uhrzeitAuswahl.disabled = true;
   } finally {
-    if (date.value === datum &&
+    if (anfrageId===verfuegbarkeitsAnfrage &&
+        date.value===datum && angebotAuswahl?.value===angebot &&
+        document.getElementById('buchungs-teilnehmer')?.value===teilnehmerWert &&
+        !datumIstGesperrt(datum) &&
         !uhrzeitHinweis.textContent.includes('nicht abrufbar')) {
       uhrzeitAuswahl.disabled = false;
     }
@@ -125,30 +176,14 @@ function buchungsdauerBerechnen() {
   if (!teilnehmerEingabe || !dauerAnzeige) return;
 
   const anzahl = Number(teilnehmerEingabe.value);
-  let dauer = null;
+  const dauer=dauerFuer(anzahl,angebotAuswahl?.value);
 
-  if (anzahl >= 5 && anzahl <= 10) {
-    dauer = 150;
-  } else if (anzahl >= 11 && anzahl <= 15) {
-    dauer = 180;
-  } else if (anzahl >= 16 && anzahl <= 20) {
-    dauer = 210;
-  }
-
-  if (dauer === null) {
-    dauerAnzeige.textContent =
-      'Individuelle Anfrage – Dauer nach Absprache';
-
-    if (endzeitAnzeige) endzeitAnzeige.textContent = '';
-    return;
-  }
-
+  const dauerMinuten = dauer % 60;
   const stunden = Math.floor(dauer / 60);
-  const minuten = dauer % 60;
 
   dauerAnzeige.textContent =
     'Voraussichtliche Dauer: ' +
-    stunden + (minuten ? ',5' : '') + ' Stunden';
+    (stunden ? stunden + ' Std. ' : '') + (dauerMinuten ? dauerMinuten + ' Min.' : '');
 
   if (endzeitAnzeige) {
     const startzeit = uhrzeitAuswahl?.value;
@@ -200,10 +235,7 @@ function datumPruefen() {
     return;
   }
 
-  const gesperrt = sperrzeiten.some(eintrag =>
-    gewaehltesDatum >= eintrag.datum &&
-    gewaehltesDatum <= eintrag.enddatum
-  );
+  const gesperrt=datumIstGesperrt(gewaehltesDatum);
 
   verfuegbarkeit.textContent = gesperrt
     ? '⛔ Dieser Tag ist gesperrt. Bitte wähle ein anderes Datum.'
@@ -291,11 +323,7 @@ function kalenderAnzeigen() {
       String(monat + 1).padStart(2, '0') + '-' +
       String(tag).padStart(2, '0');
 
-    const gesperrt = sperrzeitenGeladen &&
-      sperrzeiten.some(eintrag =>
-        datumWert >= eintrag.datum &&
-        datumWert <= eintrag.enddatum
-      );
+    const gesperrt=datumIstGesperrt(datumWert);
 
     const knopf = document.createElement('button');
     knopf.type = 'button';
@@ -336,6 +364,7 @@ date.addEventListener('change', () => {
 
   datumPruefen();
   kalenderAnzeigen();
+  belegteUhrzeitenLaden();
 });
 
 fetch('/api/sperrzeiten')
@@ -348,6 +377,7 @@ fetch('/api/sperrzeiten')
     sperrzeitenGeladen = true;
     datumPruefen();
     kalenderAnzeigen();
+    belegteUhrzeitenLaden();
   })
   .catch(() => {
     sperrzeitenGeladen = false;
@@ -355,6 +385,12 @@ fetch('/api/sperrzeiten')
   });
 
 const form = document.getElementById('booking');
+const gastStatus=form.querySelector('#ist-gast');
+const gastEinrichtungFeld=form.querySelector('#gast-einrichtung-feld');
+const gastEinrichtung=form.querySelector('#gast-einrichtung');
+function gastEingabeAktualisieren(){const ja=gastStatus.value==='ja';gastEinrichtungFeld.hidden=!ja;gastEinrichtung.required=ja;if(!ja)gastEinrichtung.value='';}
+gastStatus.addEventListener('change',gastEingabeAktualisieren);
+gastEingabeAktualisieren();
 
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -379,8 +415,9 @@ form.addEventListener('submit', async e => {
       throw new Error(json.error || 'Übertragung fehlgeschlagen');
     }
 
-    status.textContent =
-      '✓ BUCHUNGSANFRAGE ERFOLGREICH! Dein gewünschter Termin wurde vorläufig reserviert. Vielen Dank für deine Anfrage bei Klettern & Abenteuer Brilon! Wir melden uns persönlich bei dir.';
+    status.textContent = json.einzelplatz
+      ? `✓ Platz reserviert. Buchungsnummer: ${json.buchungsnummer}. Keine Anzahlung erforderlich. Der Termin findet ab ${json.mindestteilnehmer} Anmeldungen statt.`
+      : '✓ BUCHUNGSANFRAGE ERFOLGREICH! Deine Buchungsnummer: ' + json.buchungsnummer + '. Dein gewünschter Termin wurde vorläufig reserviert. Wir melden uns persönlich bei dir.';
 
     status.style.color = '#167c3a';
     status.style.fontWeight = 'bold';
@@ -396,6 +433,9 @@ form.addEventListener('submit', async e => {
     });
 
     form.reset();
+    sonderaktionsPrefix='';
+    const angebotHinweis=document.getElementById('selected-special');
+    if(angebotHinweis)angebotHinweis.hidden=true;
   } catch (err) {
     status.textContent = '⚠ Buchung nicht möglich: ' + err.message;
     status.style.color = '#a61b1b';
@@ -414,6 +454,54 @@ form.addEventListener('submit', async e => {
     btn.disabled = false;
   }
 });
+
+// Öffentliche Tagesaktion: Nur eine unverbindliche Anfrage vorbereiten.
+// Es gibt keine automatische Rabatt-/Preis-Zusage oder verbindliche Reservierung.
+function sonderaktionAnfragen(aktion){
+  const nachricht=form.querySelector('textarea[name="nachricht"]');
+  const hinweis=document.getElementById('selected-special');
+  if(!nachricht||!hinweis)return;
+  const titel=String(aktion.titel||'').trim().slice(0,120);
+  if(!titel)return;
+  const datumswert=typeof aktion.datum==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(aktion.datum)?
+    aktion.datum:'';
+  const prefix='Anfrage zur Sonderaktion: '+titel+
+    (datumswert?' (Termin: '+datumswert+')':'')+'\n';
+  // Replace only the prefix inserted by us. Preserve personal wishes.
+  let rest=nachricht.value;
+  if(sonderaktionsPrefix&&rest.startsWith(sonderaktionsPrefix))
+    rest=rest.slice(sonderaktionsPrefix.length);
+  nachricht.value=(prefix+rest).slice(0,2000);
+  sonderaktionsPrefix=prefix;
+
+  // Programme are explicitly assigned in administration using their stable ID.
+  // An equal or similar title is never sufficient to associate a booking.
+  const programm=aktion.programm_id==null?null:
+    angeboteCache.find(a=>String(a.id)===String(aktion.programm_id));
+  // A special action can be independent of the programme catalogue. Avoid
+  // silently retaining a programme selected for an earlier special.
+  if(standortAuswahl){
+    standortAuswahl.value=programm?.veranstaltungsort||'';
+    standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  angebotAuswahl.value=programm?.name||'';
+  angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+  const verfuegbar=programm?.verfuegbare_termine;
+  const tagFreigegeben=!Array.isArray(verfuegbar)||!verfuegbar.length||
+    verfuegbar.includes(datumswert);
+  if(datumswert&&datumswert>=buchungstagInBerlin()&&tagFreigegeben){
+    date.value=datumswert;
+    date.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+
+  hinweis.hidden=false;
+  hinweis.textContent='Ausgewählte Sonderaktion: '+titel+
+    (programm?' · verknüpftes Programm: '+programm.name:
+      ' · noch kein buchbares Programm verknüpft. Bitte Programm auswählen oder uns kontaktieren.')+
+    ' Preis und Verfügbarkeit werden erst nach Prüfung der Anfrage bestätigt.';
+  form.scrollIntoView({behavior:'smooth',block:'start'});
+  nachricht.focus({preventScroll:true});
+}
 
 // Tages- und Sonderangebote
 async function specials() {
@@ -464,7 +552,7 @@ if (item.preis !== undefined && item.preis !== null && item.preis !== '') {
   const preis = Number(String(item.preis).replace(',', '.'));
 
   preisAnzeige.textContent = Number.isFinite(preis)
-    ? 'Preis: ' + preis.toLocaleString('de-DE', {
+    ? 'Aktionspreis (vorbehaltlich Bestätigung): ' + preis.toLocaleString('de-DE', {
         style: 'currency',
         currency: 'EUR'
       })
@@ -476,7 +564,8 @@ if (item.preis !== undefined && item.preis !== null && item.preis !== '') {
       const anfrageButton = document.createElement('a');
 anfrageButton.href = '#buchung';
 anfrageButton.className = 'btn';
-anfrageButton.textContent = 'Jetzt anfragen';
+anfrageButton.textContent = 'Diese Aktion anfragen';
+anfrageButton.addEventListener('click',()=>sonderaktionAnfragen(item));
 anfrageButton.style.display = 'inline-block';
 anfrageButton.style.marginTop = '12px';
 
@@ -492,22 +581,56 @@ specials();
 
 async function angeboteLaden() {
   const auswahl = document.getElementById('angebot-auswahl');
-  if (!auswahl) return;
+  if (!auswahl || !standortAuswahl) return;
+
+  function angeboteFuerStandortAnzeigen(){
+    const standort=standortAuswahl.value;
+    const passend=angeboteCache.filter(angebot=>angebot.veranstaltungsort===standort);
+    auswahl.replaceChildren();
+    const platzhalter=document.createElement('option');
+    platzhalter.value='';
+    platzhalter.textContent=!standort?'Bitte zuerst den Veranstaltungsort auswählen':
+      passend.length?'Bitte Angebot auswählen':'Für diesen Ort sind derzeit keine buchbaren Angebote verfügbar';
+    auswahl.append(platzhalter);
+    for(const angebot of passend){
+      const option=document.createElement('option');
+      option.value=angebot.name;
+      option.textContent=angebot.name;
+      auswahl.append(option);
+    }
+    auswahl.value='';
+    auswahl.disabled=!standort||!passend.length;
+    einzelplatzFormAktualisieren();
+    buchungsdauerBerechnen();
+    belegteUhrzeitenLaden();
+  }
+
+  auswahl.addEventListener('change',()=>{
+    einzelplatzFormAktualisieren();
+    buchungsdauerBerechnen();
+    belegteUhrzeitenLaden();
+  });
+  standortAuswahl.addEventListener('change',angeboteFuerStandortAnzeigen);
 
   try {
-    const res = await fetch('/api/angebote');
-    if (!res.ok) throw new Error('Angebote nicht erreichbar');
-
-    const angebote = await res.json();
-
-    for (const angebot of angebote) {
-      const option = document.createElement('option');
-      option.value = angebot.name;
-      option.textContent = angebot.name;
-      auswahl.appendChild(option);
+    const [angeboteAntwort,orteAntwort]=await Promise.all([
+      fetch('/api/angebote'),fetch('/api/orte')
+    ]);
+    if(!angeboteAntwort.ok)throw new Error('Angebote nicht erreichbar');
+    if(!orteAntwort.ok)throw new Error('Veranstaltungsorte nicht erreichbar');
+    angeboteCache=await angeboteAntwort.json();
+    const orte=await orteAntwort.json();
+    for(const ort of orte){
+      const option=document.createElement('option');
+      option.value=ort.name;
+      option.textContent=ort.name;
+      standortAuswahl.append(option);
     }
+    angeboteFuerStandortAnzeigen();
+    einzelplatzFormAktualisieren();
   } catch (fehler) {
-    console.error('Erlebnisangebote konnten nicht geladen werden:', fehler);
+    console.error('Erlebnisangebote oder Veranstaltungsorte konnten nicht geladen werden:', fehler);
+    uhrzeitHinweis.textContent='Standorte und Angebote konnten nicht geladen werden. Bitte lade die Seite erneut.';
   }
 }
 
@@ -529,7 +652,6 @@ async function preisanzeigeStarten() {
 
     function preisAktualisieren() {
       const angebot = angebote.find(a => a.name === auswahl.value);
-      const anzahl = Number(teilnehmer.value);
 
       anzeige.textContent = '';
 
@@ -558,16 +680,36 @@ async function preisanzeigeStarten() {
         bildAnzeige.appendChild(beschreibung);
       }
 
+      const meta=[angebot.kategorie,angebot.zielgruppe,
+        angebot.veranstaltungsort,angebot.dauer ? angebot.dauer+' Minuten' : '']
+        .filter(Boolean).join(' · ');
+      if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
+      if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
+      teilnehmer.max=String(Math.min(150,Number(angebot.kapazitaet)||150));
+      if(Number(teilnehmer.value)>Number(teilnehmer.max)){teilnehmer.value=teilnehmer.max;}
+      const anzahl = Number(teilnehmer.value);
+      const termine=Array.isArray(angebot.verfuegbare_termine)?angebot.verfuegbare_termine:[];
+      date.setCustomValidity(termine.length&&!termine.includes(date.value)
+        ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
+      date.onchange=()=>date.setCustomValidity(termine.length&&!termine.includes(date.value)
+        ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
+
+      if(angebot.buchungsmodus==='einzelplatz'){
+        anzeige.textContent=`${Number(angebot.preis_pro_person).toLocaleString('de-DE',{style:'currency',currency:'EUR'})} pro Person · keine Anzahlung`;
+        return;
+      }
       let gruppe = '';
 
-      if (anzahl >= 5 && anzahl <= 10) gruppe = '5-10';
+      if (anzahl >= 1 && anzahl <= 4) gruppe = '1-4';
+      else if (anzahl >= 5 && anzahl <= 10) gruppe = '5-10';
       else if (anzahl <= 15 && anzahl >= 11) gruppe = '11-15';
       else if (anzahl <= 20 && anzahl >= 16) gruppe = '16-20';
+      else if (anzahl <= 150 && anzahl >= 21) gruppe = '21-150';
 
       const preis = angebot.preise?.[gruppe];
 
       if (preis !== undefined && preis !== null) {
-        anzeige.textContent = 'Gruppenpreis: ' +
+        anzeige.textContent = (termine.length?'Freigegebene Termine: '+termine.map(t=>new Date(t+'T12:00:00').toLocaleDateString('de-DE')).join(', ')+' · ':'')+'Gruppenpreis: ' +
           Number(preis).toLocaleString('de-DE', {
             style: 'currency',
             currency: 'EUR'
@@ -583,6 +725,21 @@ async function preisanzeigeStarten() {
 
   } catch (fehler) {
     console.error('Preisanzeige:', fehler);
+  }
+}
+
+function einzelplatzFormAktualisieren(){
+  const angebot=angeboteCache.find(a=>a.name===angebotAuswahl?.value);
+  const input=document.getElementById('buchungs-teilnehmer');
+  const hinweis=document.getElementById('buchungs-modus-hinweis');
+  if(!input)return;
+  const einzel=angebot?.buchungsmodus==='einzelplatz';
+  input.readOnly=einzel;
+  if(einzel){input.value='1';input.min='1';input.max='1';
+    if(hinweis)hinweis.textContent=`Einzelplatzreservierung. Der Termin findet ab ${Number(angebot.mindestteilnehmer)||5} Anmeldungen statt.`;
+  }else{
+    input.min='1';input.max=String(Math.min(150,Number(angebot?.kapazitaet)||150));
+    if(hinweis)hinweis.textContent='';
   }
 }
 

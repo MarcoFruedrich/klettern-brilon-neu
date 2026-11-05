@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Passwort zurücksetzen | Klettern &amp; Abenteuer</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="admin-page">
+<a class="skip-link" href="#main-content">Zum Inhalt springen</a>
+<header><a class="logo" href="/">🧗 Klettern <span>&amp; Abenteuer</span><small>Passwort zurücksetzen</small></a></header>
+<main class="narrow" id="main-content">
+  <h1>Neues Mitarbeiterpasswort festlegen</h1>
+  <p>Der Link ist einmalig und 30 Minuten gültig. Nach dem Speichern werden alle bestehenden Sitzungen beendet.</p>
+  <form id="password-reset-form">
+    <label>Neues Passwort<input name="passwort" type="password" autocomplete="new-password" minlength="6" maxlength="200" required></label>
+    <label>Passwort wiederholen<input name="wiederholung" type="password" autocomplete="new-password" minlength="6" maxlength="200" required></label>
+    <button class="btn" type="submit">Passwort speichern</button>
+  </form>
+  <p id="password-reset-status" role="status" aria-live="polite"></p>
+  <a id="password-reset-login" href="/mitarbeiterbereich.html" hidden>Zum Mitarbeiterbereich</a>
+</main>
+<script src="/mitarbeiter-passwort-reset.js"></script>
+</body>
+</html>

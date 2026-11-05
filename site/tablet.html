@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#163e35">
+<meta name="robots" content="noindex,nofollow">
+<title>Werbetablet und Prüfcode | Klettern & Abenteuer</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="manifest" href="/tablet-manifest.json">
+</head>
+<body class="tablet-page">
+<main id="tablet-root">
+<section id="tablet-pairing" class="tablet-center">
+<h1>Klettern & Abenteuer</h1>
+<h2>Werbetablet koppeln</h2>
+<p>Diese Anzeige benötigt einen einmaligen Kopplungscode aus der geschützten Verwaltung. Sie benötigt und erhält kein Administratorkonto.</p>
+<form id="tablet-pair-form">
+<label>Tablet-Bezeichnung<input name="name" value="Werbetablet Kletterhalle" minlength="3" maxlength="80" required></label>
+<label>Achtstelliger Kopplungscode<input name="code" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" required></label>
+<button class="btn" type="submit">Tablet koppeln</button>
+</form>
+<p id="tablet-pair-message" role="status"></p>
+</section>
+<section id="tablet-screen" hidden>
+<header class="tablet-top"><strong>Klettern & Abenteuer</strong><span>Jugendherberge Brilon</span></header>
+<section id="tablet-marketing" aria-label="Freizeitangebote">
+<div class="tablet-offer">
+<h1 id="tablet-offer-title">Klettern, Bouldern & Abenteuer</h1>
+<p id="tablet-offer-description">Erlebnisse für Gruppen, Familien und Kindergeburtstage – fragt in der Jugendherberge nach!</p>
+</div>
+<p class="tablet-bottom">Infos an der Rezeption oder online · klettern-abenteuer.de</p>
+</section>
+<section id="tablet-code" role="status" aria-live="assertive" hidden>
+<h2>Stationsprüfung vor Programmbeginn</h2>
+<p>Einmaligen Freischaltcode auf dem Smartphone eingeben:</p>
+<strong id="tablet-digits"></strong>
+<p id="tablet-countdown"></p>
+</section>
+<p class="tablet-connection" id="tablet-connection" aria-live="polite"></p>
+</section>
+</main>
+<script src="/tablet.js"></script>
+</body>
+</html>

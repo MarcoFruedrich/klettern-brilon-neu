@@ -1,0 +1,211 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const {chromium}=require('playwright');
+const net=require('node:net');
+const path=require('node:path');
+const {spawn}=require('node:child_process');
+const sharp=require('sharp');
+
+test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentation',async t=>{
+  const probe=net.createServer();
+  await new Promise((resolve,reject)=>{
+    probe.once('error',reject);probe.listen(0,'127.0.0.1',resolve);
+  });
+  const port=probe.address().port;await new Promise(resolve=>probe.close(resolve));
+  const repo=path.resolve(__dirname,'..');
+  const child=spawn(process.execPath,['server.js'],{cwd:repo,stdio:['ignore','ignore','pipe'],
+    env:{...process.env,PORT:String(port),DATABASE_URL:'',RUN_SCHEMA_MIGRATIONS:'false',
+      NODE_OPTIONS:'',MOCK_PG:'',BREVO_API_KEY:'',SUPABASE_URL:''}});
+  t.after(()=>child.kill());
+  const root='http://127.0.0.1:'+port;
+  let ready=false;
+  for(let attempt=0;attempt<90;attempt++){
+    try{ready=(await fetch(root+'/pruefung.html')).status===200;if(ready)break;}
+    catch{await new Promise(resolve=>setTimeout(resolve,50));}
+  }
+  assert.ok(ready,'Mobile Prüfseite muss vom Testserver ausgeliefert werden');
+  const browser=await chromium.launch({headless:true});
+  t.after(async()=>browser.close());
+
+  for(const width of [360,390,768]){
+    await t.test('Prüfprotokoll '+width+' px und obligatorische Mängelbeschreibung',async()=>{
+      const page=await browser.newPage({viewport:{width,height:844},locale:'de-DE'});
+      const state={loggedIn:false,unlocked:false,saved:null};
+      const station='550e8400-e29b-41d4-a716-446655440001';
+      await page.route('**/api/pruefung/**',async route=>{
+        const req=route.request(),url=new URL(req.url()),endpoint=url.pathname;
+        const respond=(status,data)=>route.fulfill({status,contentType:'application/json',
+          body:JSON.stringify(data)});
+        if(endpoint==='/api/pruefung/login'&&req.method()==='POST'){
+          const d=JSON.parse(req.postData());
+          if(d.email!=='test@example.test'||d.passwort!=='Personal-Geheimnis-2026')
+            return respond(401,{error:'Anmeldedaten ungültig.'});
+          state.loggedIn=true;return respond(200,{name:'Testmitarbeiterin'});
+        }
+        if(!state.loggedIn)return respond(401,{error:'Mitarbeiteranmeldung erforderlich.'});
+        if(endpoint==='/api/pruefung/berichte'&&req.method()==='GET')
+          return respond(200,state.saved?[{id:'pruefung-nur-simuliert',programm:state.saved.programm,
+            beginn:state.saved.beginn,erstellt_am:'2026-11-03T10:00:00.000Z',hat_mangel:true,
+            hat_hinweis:false,pruefungen:state.saved.pruefungen.map(p=>({...p,station:'Kletterwand',foto:undefined}))}]:[]);
+        if(endpoint==='/api/pruefung/stationen'){
+          return respond(200,{mitarbeiter:'Testmitarbeiterin',
+            entsperrtBis:null,stationen:[{id:station,name:'Kletterwand'}]});
+        }
+        if(endpoint==='/api/pruefung/freischalten'&&req.method()==='POST'){
+          if(JSON.parse(req.postData()).code!=='123456')
+            return respond(409,{error:'Code ungültig.'});
+          state.unlocked=true;return respond(200,{success:true,gueltigMinuten:15});
+        }
+        if(endpoint==='/api/pruefung/berichte'&&req.method()==='POST'){
+          if(!state.unlocked)return respond(403,{error:'Vor-Ort-Code fehlt.'});
+          const d=JSON.parse(req.postData());
+          state.saved=d;state.unlocked=false;
+          return respond(201,{id:'pruefung-nur-simuliert',hatMangel:true,
+            status:'mangel_gemeldet',benachrichtigung:'nicht_konfiguriert'});
+        }
+        return respond(404,{error:'Nicht gefunden.'});
+      });
+      await page.goto(root+'/pruefung.html');
+      const dimensions=await page.evaluate(()=>({
+        doc:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth,
+        overflows:Array.from(document.querySelectorAll('body *')).filter(node=>
+          node.getBoundingClientRect().right>innerWidth+2).slice(0,12).map(node=>({
+            tag:node.tagName,id:node.id,className:node.className,
+            right:Math.round(node.getBoundingClientRect().right)
+          }))
+      }));
+      assert.ok(dimensions.doc<=dimensions.viewport+2,JSON.stringify(dimensions));
+      await page.locator('#staff-login input[name="email"]').fill('test@example.test');
+      await page.locator('#staff-login input[name="passwort"]').fill('Personal-Geheimnis-2026');
+      await page.locator('#staff-login button').click();
+      await page.locator('#onsite-unlock input[name="code"]').waitFor({state:'visible'});
+      await page.locator('#onsite-unlock input[name="code"]').fill('123456');
+      await page.locator('#onsite-unlock button[type="submit"], #onsite-unlock button:not([type])').click();
+      await page.locator('#station-inspection input[name="programm"]').waitFor({state:'visible'});
+      await page.locator('#station-inspection input[name="programm"]').fill('Testkurs');
+      await page.locator('#station-inspection input[name="beginn"]').fill('2027-03-15T10:00');
+      await page.locator('.pruefung-station .pruefung-aktiv').check();
+      for(const point of await page.locator('.pruefung-station .brilon-pruefpunkt').all())
+        await point.selectOption('ok');
+      await page.locator('.pruefung-station .pruefung-zustand').selectOption('mangel');
+      assert.equal(await page.locator('.pruefung-station .pruefung-beschreibung').getAttribute('required'),'');
+      await page.locator('.pruefung-station .pruefung-beschreibung').fill('Defekter Sicherungskarabiner');
+      const pngBase64=await page.evaluate(()=>{
+        const canvas=document.createElement('canvas');
+        canvas.width=8;canvas.height=8;
+        canvas.getContext('2d').fillRect(0,0,8,8);
+        return canvas.toDataURL('image/png').split(',')[1];
+      });
+      await page.locator('.pruefung-station .pruefung-foto').setInputFiles({
+        name:'defekt.png',mimeType:'image/png',buffer:Buffer.from(pngBase64,'base64')
+      });
+      await page.locator('#station-inspection button[type="submit"]').click();
+      await page.waitForFunction(()=>document.getElementById('pruefung-status')?.textContent.includes('SICHERHEITSMANGEL ERFASST'));
+      assert.equal(state.saved.pruefungen[0].stationId,station);
+      assert.equal(state.saved.pruefungen[0].zustand,'mangel');
+      assert.match(state.saved.pruefungen[0].beschreibung,/Sicherungskarabiner/);
+      assert.match(state.saved.pruefungen[0].foto,/^data:image\/jpeg;base64,/,
+        'Das Foto muss vor dem Upload lokal in ein kompaktes JPEG umgewandelt werden');
+      assert.equal(await page.locator('#station-inspection').isHidden(),true);
+      assert.equal(await page.locator('#onsite-unlock').isVisible(),true);
+      await page.locator('#staff-reports-list').getByText('Kletterwand: Sicherheitsmangel').waitFor();
+      assert.equal(await page.locator('#staff-reports-list').getByText(/Defekter Sicherungskarabiner/).count(),1);
+      await page.close();
+    });
+  }
+
+  await t.test('Kleinen Hinweis am Smartphone mit Beschreibung und optionalem Bild erfassen',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const station='550e8400-e29b-41d4-a716-446655440001';
+    const state={loggedIn:false,unlocked:false,saved:null};
+    await page.route('**/api/pruefung/**',async route=>{
+      const req=route.request(),url=new URL(req.url()),endpoint=url.pathname;
+      const respond=(status,data)=>route.fulfill({status,contentType:'application/json',
+        body:JSON.stringify(data)});
+      if(endpoint==='/api/pruefung/login'&&req.method()==='POST'){
+        state.loggedIn=true;return respond(200,{name:'Testmitarbeiterin'});
+      }
+      if(!state.loggedIn)return respond(401,{error:'Mitarbeiteranmeldung erforderlich.'});
+      if(endpoint==='/api/pruefung/berichte'&&req.method()==='GET')
+        return respond(200,state.saved?[{id:'test-hinweis',programm:state.saved.programm,
+          beginn:state.saved.beginn,erstellt_am:'2026-11-03T10:00:00.000Z',hat_mangel:false,
+          hat_hinweis:true,pruefungen:state.saved.pruefungen.map(p=>({...p,station:'Boulderbereich'}))}]:[]);
+      if(endpoint==='/api/pruefung/stationen')
+        return respond(200,{mitarbeiter:'Testmitarbeiterin',entsperrtBis:null,
+          stationen:[{id:station,name:'Boulderbereich'}]});
+      if(endpoint==='/api/pruefung/freischalten'){
+        state.unlocked=true;return respond(200,{success:true,gueltigMinuten:15});
+      }
+      if(endpoint==='/api/pruefung/berichte'&&req.method()==='POST'){
+        if(!state.unlocked)return respond(403,{error:'Vor-Ort-Code erforderlich.'});
+        state.saved=JSON.parse(req.postData());state.unlocked=false;
+        return respond(201,{id:'test-hinweis',hatHinweis:true,hatMangel:false,
+          gesperrteStationen:[],status:'hinweis_offen',benachrichtigung:'kein_mangel'});
+      }
+      return respond(404,{error:'Nicht gefunden.'});
+    });
+    await page.goto(root+'/pruefung.html');
+    await page.locator('#staff-login input[name="email"]').fill('test@example.test');
+    await page.locator('#staff-login input[name="passwort"]').fill('Personal-Geheimnis-2026');
+    await page.locator('#staff-login button').click();
+    await page.locator('#onsite-unlock input[name="code"]').waitFor({state:'visible'});
+    await page.locator('#onsite-unlock input[name="code"]').fill('123456');
+    await page.locator('#onsite-unlock button[type="submit"], #onsite-unlock button:not([type])').click();
+    await page.locator('#station-inspection').waitFor({state:'visible'});
+    await page.locator('#station-inspection input[name="programm"]').fill('Kletterkurs');
+    await page.locator('#station-inspection input[name="beginn"]').fill('2027-03-15T10:00');
+    await page.locator('.pruefung-station .pruefung-aktiv').check();
+    await page.locator('.pruefung-station .pruefung-zustand').selectOption('hinweis');
+    assert.equal(await page.locator('.pruefung-station .pruefung-beschreibung').isVisible(),true);
+    assert.equal(await page.locator('.pruefung-station .pruefung-foto').isVisible(),true);
+    await page.locator('.pruefung-station .pruefung-beschreibung')
+      .fill('Beschriftung der Klettergriffe ist teilweise abgeblättert');
+    await page.locator('#station-inspection button[type="submit"]').click();
+    await page.waitForFunction(()=>document.getElementById('pruefung-status')?.textContent.includes('HINWEIS ERFASST'));
+    assert.equal(state.saved.pruefungen[0].zustand,'hinweis');
+    assert.match(state.saved.pruefungen[0].beschreibung,/Beschriftung/);
+    assert.equal(await page.locator('#pruefung-status').textContent().then(t=>t.includes('GESPERRT')),false);
+    await page.close();
+  });
+
+  await t.test('Persönliche Einladung erfasst Mitarbeiterangaben und wartet auf Freigabe',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const token='a'.repeat(64);let saved=null;
+    await page.route('**/api/pruefung/einladung**',route=>route.fulfill({status:200,
+      contentType:'application/json',body:JSON.stringify({name:'Eingeladene Fachkraft',
+        email:'fachkraft@example.test',ablauf:'2026-11-10T12:00:00.000Z'})}));
+    await page.route('**/api/pruefung/registrieren',async route=>{
+      saved=JSON.parse(route.request().postData());
+      return route.fulfill({status:201,contentType:'application/json',
+        body:JSON.stringify({status:'freigabe_ausstehend',email:'fachkraft@example.test'})});
+    });
+    await page.goto(root+'/mitarbeiter-registrierung.html?token='+token);
+    await page.locator('#registration-form').waitFor({state:'visible'});
+    assert.equal(await page.locator('#registration-email').inputValue(),'fachkraft@example.test');
+    assert.equal(await page.locator('#registration-email').isEditable(),false);
+    await page.locator('[name="telefon"]').fill('+49 170 123456');
+    await page.locator('[name="strasse"]').fill('Musterstraße 12');
+    await page.locator('[name="plz"]').fill('59929');
+    await page.locator('[name="wohnort"]').fill('Brilon');
+    await page.locator('[name="qualifikationen"]').fill('Erste Hilfe\nKletterqualifikation');
+    assert.equal(await page.locator('#certificate-files').count(),0,
+      'Nachweise werden nicht bei der Registrierung hochgeladen');
+    await page.locator('[name="passwort"]').fill('Eigenes-Pruefer-Passwort-2026!');
+    await page.locator('[name="passwort_bestaetigung"]').fill('Eigenes-Pruefer-Passwort-2026!');
+    await page.locator('#registration-form button[type="submit"]').click();
+      await page.locator('#registration-status').getByText('bleibt bis zur Freigabe durch die Verwaltung gesperrt').waitFor();
+    assert.equal(saved.token,token);
+    assert.equal(saved.name,'Eingeladene Fachkraft');
+    assert.equal(saved.telefon,'+49 170 123456');
+    assert.equal(saved.strasse,'Musterstraße 12');
+    assert.equal(saved.plz,'59929');
+    assert.equal(saved.wohnort,'Brilon');
+    assert.equal(saved.qualifikationen,'Erste Hilfe\nKletterqualifikation');
+    assert.equal(saved.bescheinigungen,undefined,
+      'Qualifikationsnachweise fordert die Verwaltung bei Bedarf separat per E-Mail an');
+    assert.equal(saved.passwort,'Eigenes-Pruefer-Passwort-2026!');
+    assert.equal(await page.locator('#registration-form').isHidden(),true);
+    await page.close();
+  });
+});
