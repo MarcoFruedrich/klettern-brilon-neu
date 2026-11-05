@@ -27,7 +27,7 @@ test('2026 Minijobgrenze mit individuellem Stundenlohn',()=>{
   assert.equal(moneyLimit({},2026),60300);
   assert.equal(moneyLimit({},2027),null);
   assert.deepEqual(checkLimits({art:'minijob',stundenlohn_cent:1500},
-    {weekMin:0,monthMin:2400,yearMin:2400},30,'2026-11-05'),[]);
+    {weekMin:0,monthMin:2400,yearMin:2400},10,'2026-11-05'),[]);
   assert.match(checkLimits({art:'minijob',stundenlohn_cent:1500},
     {weekMin:0,monthMin:2400,yearMin:2400},60,'2026-11-05').join(' '),/Monat/);
 });
