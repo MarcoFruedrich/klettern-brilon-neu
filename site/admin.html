@@ -438,6 +438,10 @@
       </select></label>
       <label>Kurzbeschreibung<textarea name="kurztext" rows="2" maxlength="500" placeholder="Kurzer Überblick für die Suche"></textarea></label>
       <label>Artikeltext<textarea name="inhalt" rows="12" maxlength="20000" required placeholder="Abläufe, Regeln, Material, Besonderheiten, Sicherheitshinweise ..."></textarea></label>
+      <label>Artikelbild (optional, HTTPS)<input type="url" name="bildUrl" placeholder="https://.../klettern.jpg"></label>
+      <label>Dokumente und PDF-Anhänge (ein Dokument je Zeile: Titel | HTTPS-Link)
+        <textarea name="anhaengeText" rows="4" placeholder="Sicherheitscheck | https://.../checkliste.pdf"></textarea>
+      </label>
       <label>Externer Dokumentenlink (optional, HTTPS)<input type="url" name="dokumentUrl" placeholder="https://..."></label>
       <label>Für diese Standorte freigeben (Mehrfachauswahl)<select name="standorte" id="wiki-standorte" multiple size="5"></select></label>
       <small>Ohne Standortauswahl ist der Artikel für alle angemeldeten Mitarbeiter freigegeben. Mit Standortauswahl nur für Mitarbeiter, die für mindestens einen dieser Standorte freigegeben sind.</small>
