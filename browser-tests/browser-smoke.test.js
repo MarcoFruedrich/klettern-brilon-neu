@@ -120,6 +120,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
           beschreibung:'Unabhängiges Sonderangebot',preis:'50'}
       ])}));
     await page.goto(root+'/');
+    await page.locator('#buchungs-standort').selectOption('Brilon');
     await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor({state:'attached'});
     await page.locator('#booking textarea[name="nachricht"]').fill('Bitte mit Getränkepause planen.');
     await page.locator('#specials article').first().getByText('Diese Aktion anfragen').click();
@@ -168,6 +169,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
         body:JSON.stringify({zeiten:[{uhrzeit:'09:00',belegt:false}]})});
     });
     await page.goto(root+'/');
+    await page.locator('#buchungs-standort').selectOption('Brilon');
     await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor({state:'attached'});
     await page.locator('#angebot-auswahl').selectOption('Klettertest');
     await page.locator('input[name="datum"]').fill('2027-03-15');
@@ -193,6 +195,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     const minimum = await date.getAttribute('min');
     assert.match(minimum || '', /^\d{4}-\d{2}-\d{2}$/,
       'Das native Datumsfeld benötigt ein gültiges ISO-Mindestdatum');
+    await page.locator('#buchungs-standort').selectOption('Brilon');
     await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor({state: 'attached'});
     await page.locator('#angebot-auswahl').selectOption('Klettertest');
     await page.locator('#buchungs-teilnehmer').fill('6');
@@ -231,6 +234,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
         body:JSON.stringify({success:true,buchungsnummer:'EINZELPLATZ-TEST',einzelplatz:true,mindestteilnehmer:5})});
     });
     await page.goto(root+'/#buchung');
+    await page.locator('#buchungs-standort').selectOption('Brilon');
     await page.locator('#angebot-auswahl option[value="Individualklettern"]').waitFor({state:'attached'});
     await page.locator('#angebot-auswahl').selectOption('Individualklettern');
     const participants=page.locator('#buchungs-teilnehmer');

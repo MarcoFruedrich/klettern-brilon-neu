@@ -746,7 +746,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await openAdminView(page,'#mitarbeiter-section');
     const card=page.locator('#pruef-personal-list article').first();
     await card.getByText('Zugang aktiv').waitFor();
-    await card.getByRole('button',{name:'Zugang deaktivieren'}).click();
+    await card.getByRole('button',{name:'Zugang pausieren'}).click();
     await page.locator('#pruef-personal-list').getByText('Zugang deaktiviert').waitFor();
     await page.locator('#pruef-personal-list input[type="password"]').fill('Neues-Protokoll-Passwort-2026!');
     await page.locator('#pruef-personal-list')
@@ -894,7 +894,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.waitForFunction(()=>document.querySelector('#bookings .booking')?.textContent.includes('Bearbeitungsstatus: Bestätigt'),null,{timeout:5000});
     assert.equal(state.bookings[0].bearbeitungsnotiz,'Test: Rückruf erfolgreich');
 
-    await openAdminView(page,'#settings-section');
+    await openAdminView(page,'#standorte-section');
     const placeForm=page.locator('#admin-place-form');
     await placeForm.locator('[name="name"]').fill('Rüthen');
     await placeForm.locator('button[type="submit"]').click();
@@ -915,8 +915,8 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await form.locator('[name="name"]').fill('Neue Fachkraft');
     await form.locator('[name="email"]').fill('fachkraft@example.test');
     await form.locator('button[type="submit"]').click();
-    await page.locator('#pruef-personal-status a.invite-link').waitFor();
-    assert.match(await page.locator('#pruef-personal-status').textContent(),/E-Mail konnte nicht versandt werden/);
+    await page.locator('#pruef-einladung-status a.invite-link').waitFor();
+    assert.match(await page.locator('#pruef-einladung-status').textContent(),/E-Mail konnte nicht versandt werden/);
     await openAdminView(page,'#mitarbeiter-section');
     const card=page.locator('#pruef-personal-list .booking').filter({hasText:'fachkraft@example.test'});
     await card.getByRole('button',{name:'Neue Einladung senden'}).click();

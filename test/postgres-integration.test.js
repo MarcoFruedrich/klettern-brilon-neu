@@ -285,15 +285,11 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await fetch(root+'/api/pruefung/einladung?token='+encodeURIComponent(renewedInviteToken))).status,410,
     'Widerruf macht den Registrierungslink sofort ungültig');
   const staffDataPassword='CI-Fachkraft-Passwort-2026!';
-  const certificateBytes=await sharp({create:{width:900,height:1200,channels:3,background:'#fafafa'}})
-    .jpeg().toBuffer();
-  const certificatePhoto='data:image/jpeg;base64,'+certificateBytes.toString('base64');
   const registration=await fetch(root+'/api/pruefung/registrieren',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({token:invitationToken,name:staffData.name,telefon:'+49 123 456',
       strasse:'Musterstraße 12',plz:'59929',wohnort:'Brilon',
       qualifikationen:'Erste Hilfe\nKletterqualifikation',
-      bescheinigungen:[{bezeichnung:'Kletterqualifikation',dateiname:'Kletterschein.png',daten:certificatePhoto}],
       passwort:staffDataPassword})});
   assert.equal(registration.status,201,'Einladung muss zur Registrierung führen');
   assert.equal((await registration.json()).status,'freigabe_ausstehend');
@@ -313,7 +309,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(pendingStaff.qualifikationen,'Erste Hilfe\nKletterqualifikation');
   assert.equal(pendingStaff.strasse,'Musterstraße 12');
   assert.equal(pendingStaff.plz,'59929');
-  assert.deepEqual(pendingStaff.bescheinigungen.map(x=>x.bezeichnung),['Kletterqualifikation']);
+  assert.deepEqual(pendingStaff.bescheinigungen,[],
+    'Nachweise werden nach der Registrierung von der Verwaltung angefragt und eingesehen');
   const bypassApproval=await fetch(root+'/api/admin/pruefung/mitarbeitende/'+pendingStaff.id+'/reaktivieren',{
     method:'PATCH',headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},
     body:JSON.stringify({passwort:'Umgehung-Unmoeglich-2026!'})});
@@ -333,13 +330,6 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     name:'Kletterwand CI',ortId:approvedPlaceId,qualifikation:'Kletterqualifikation'});
   assert.equal(station.status,201);
   const stationId=(await station.json()).id;
-  const certificateDownload=await fetch(root+'/api/admin/pruefung/mitarbeitende/'+pendingStaff.id+
-    '/bescheinigungen/'+pendingStaff.bescheinigungen[0].id,{headers:{Cookie:cookie}});
-  assert.equal(certificateDownload.status,200,'Bescheinigungsfoto ist nur über die Adminroute abrufbar');
-  assert.match(certificateDownload.headers.get('content-type'),/image\/jpeg/);
-  assert.equal((await fetch(root+'/api/admin/pruefung/mitarbeitende/'+pendingStaff.id+
-    '/bescheinigungen/'+pendingStaff.bescheinigungen[0].id)).status,401,
-    'Bescheinigungsfoto darf ohne Verwaltungssitzung nicht abgerufen werden');
   const unauthorizedCode=await fetch(root+'/api/admin/pruefung/code',{method:'POST'});
   assert.equal(unauthorizedCode.status,401,'Codeanzeige ist nur dem Administrator erlaubt');
   const issued=await adminPost('/api/admin/pruefung/code',{});

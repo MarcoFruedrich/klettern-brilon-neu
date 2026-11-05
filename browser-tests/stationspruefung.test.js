@@ -99,7 +99,7 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
         name:'defekt.png',mimeType:'image/png',buffer:Buffer.from(pngBase64,'base64')
       });
       await page.locator('#station-inspection button[type="submit"]').click();
-      await page.waitForFunction(()=>document.getElementById('pruefung-status')?.textContent.includes('MANGEL ERFASST'));
+      await page.waitForFunction(()=>document.getElementById('pruefung-status')?.textContent.includes('SICHERHEITSMANGEL ERFASST'));
       assert.equal(state.saved.pruefungen[0].stationId,station);
       assert.equal(state.saved.pruefungen[0].zustand,'mangel');
       assert.match(state.saved.pruefungen[0].beschreibung,/Sicherungskarabiner/);
@@ -170,7 +170,6 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
   await t.test('Persönliche Einladung erfasst Mitarbeiterangaben und wartet auf Freigabe',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
     const token='a'.repeat(64);let saved=null;
-    const photo=await sharp({create:{width:800,height:1000,channels:3,background:'#f5f5f5'}}).jpeg().toBuffer();
     await page.route('**/api/pruefung/einladung**',route=>route.fulfill({status:200,
       contentType:'application/json',body:JSON.stringify({name:'Eingeladene Fachkraft',
         email:'fachkraft@example.test',ablauf:'2026-11-10T12:00:00.000Z'})}));
@@ -188,11 +187,8 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
     await page.locator('[name="plz"]').fill('59929');
     await page.locator('[name="wohnort"]').fill('Brilon');
     await page.locator('[name="qualifikationen"]').fill('Erste Hilfe\nKletterqualifikation');
-    await page.locator('#certificate-files').setInputFiles([
-      {name:'Erste-Hilfe.jpg',mimeType:'image/jpeg',buffer:photo},
-      {name:'Kletterqualifikation.jpg',mimeType:'image/jpeg',buffer:photo}
-    ]);
-    await page.locator('#certificate-list .certificate-row').nth(1).waitFor();
+    assert.equal(await page.locator('#certificate-files').count(),0,
+      'Nachweise werden nicht bei der Registrierung hochgeladen');
     await page.locator('[name="passwort"]').fill('Eigenes-Pruefer-Passwort-2026!');
     await page.locator('[name="passwort_bestaetigung"]').fill('Eigenes-Pruefer-Passwort-2026!');
     await page.locator('#registration-form button[type="submit"]').click();
@@ -204,8 +200,8 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
     assert.equal(saved.plz,'59929');
     assert.equal(saved.wohnort,'Brilon');
     assert.equal(saved.qualifikationen,'Erste Hilfe\nKletterqualifikation');
-    assert.equal(saved.bescheinigungen.length,2,'Mehrere Bescheinigungsfotos werden übertragen');
-    assert.ok(saved.bescheinigungen.every(item=>item.daten.startsWith('data:image/jpeg;base64,')));
+    assert.equal(saved.bescheinigungen,undefined,
+      'Qualifikationsnachweise fordert die Verwaltung bei Bedarf separat per E-Mail an');
     assert.equal(saved.passwort,'Eigenes-Pruefer-Passwort-2026!');
     assert.equal(await page.locator('#registration-form').isHidden(),true);
     await page.close();
