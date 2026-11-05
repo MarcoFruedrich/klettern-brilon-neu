@@ -9,7 +9,7 @@
   const categories={allgemein:'Allgemeines',programm:'Programme',standort:'Standorte',
     sicherheit:'Sicherheitseinweisung',notfall:'Notfall & Erste Hilfe',ablauf:'Arbeitsabläufe'};
   const n=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
-  let articles=[],active=null,run=0;
+  let articles=[],sites=[],active=null,run=0;
   const isSafety=e=>e.kategorie==='sicherheit'||e.kategorie==='notfall';
   const confirmed=e=>Number(e.bestaetigte_version)===Number(e.version);
   const readText=(value)=>{
@@ -87,11 +87,11 @@
     }
   }
   function filters(){
-    const values=Array.from(new Set(articles.flatMap(a=>a.standorte))).sort((a,b)=>a-b);
+    const values=sites.filter(place=>articles.some(a=>a.standorte.some(id=>String(id)===String(place.id))));
     const old=site.value;site.replaceChildren();
     const all=n('option','Alle Standorte');all.value='';site.append(all);
-    for(const id of values){
-      const option=n('option','Standort '+id);option.value=String(id);site.append(option);
+    for(const place of values){
+      const option=n('option',place.name);option.value=String(place.id);site.append(option);
     }
     if([...site.options].some(x=>x.value===old))site.value=old;
   }
@@ -103,6 +103,7 @@
       const data=await request('/api/wissensportal');
       if(seq!==run||workspace.hidden)return;
       articles=Array.isArray(data.artikel)?data.artikel:[];
+      sites=Array.isArray(data.standorte)?data.standorte:[];
       const previous=active;active=articles.some(x=>x.id===previous)?previous:null;
       filters();show();
       if(active)select(articles.find(x=>x.id===active));
