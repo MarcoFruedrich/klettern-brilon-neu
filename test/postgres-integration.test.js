@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const net = require('node:net');
 const path = require('node:path');
 const sharp = require('sharp');
-const { fotoBereinigen,passwortHash } = require('../lib/stationspruefung');
+const { fotoBereinigen,passwortHash,passwortPruefen } = require('../lib/stationspruefung');
 const { heuteInBerlin } = require('../lib/kalendertag');
 
 const integrationUrl = process.env.PG_INTEGRATION_URL;
@@ -841,7 +841,11 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await fetch(root+'/api/pruefung/stationen',
     {headers:{Cookie:freshCookie}})).status,401);
   assert.equal((await tryLogin('Aktualisiert-Sicher-2026-!')).status,401);
-  assert.equal((await tryLogin('Reaktiviert-Einmal-2026-!')).status,200);
+  const reactivatedHash=await pool.query(
+    'SELECT passwort_hash FROM brilon_pruef_mitarbeitende WHERE id=$1',[pendingStaff.id]);
+  assert.equal(reactivatedHash.rowCount,1);
+  assert.equal(passwortPruefen('Reaktiviert-Einmal-2026-!',reactivatedHash.rows[0].passwort_hash),true,
+    'Das neue Passwort wird nach der Reaktivierung gesetzt');
 
   // Safety overview aggregates distinct blocked/inactive stations, unresolved
   // minor hints and unconfirmed mail acceptance, without granting permissions.
