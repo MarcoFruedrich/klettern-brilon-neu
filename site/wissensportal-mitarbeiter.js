@@ -81,9 +81,9 @@
   }
   function show(){
     showList();
-    const selected=articles.find(x=>x.id===active);
-    if(!selected){const first=visible()[0];if(first)select(first);
-      else content.replaceChildren(n('h3','Keine veröffentlichten Artikel'),n('p','Bitte die Verwaltung um Freigabe der benötigten Informationen.'));
+    const selected=visible().find(x=>x.id===active);
+    if(!selected){active=null;const first=visible()[0];if(first)select(first);
+      else content.replaceChildren(n('h3','Keine passenden Artikel'),n('p','Bitte Suche oder Filter ändern beziehungsweise die Verwaltung um Freigabe bitten.'));
     }
   }
   function filters(){
