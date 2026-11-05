@@ -37,7 +37,7 @@
       <div class="admin-layout">
         <aside class="admin-sidebar" aria-label="Verwaltung">
           <button id="logout" class="btn secondary">Abmelden</button>
-          <nav class="admin-navigation" aria-label="Verwaltungsbereiche"><a href="#admin-dashboard" data-admin-view-link>Übersicht</a>
+          <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
             <a href="#bookings-section" data-admin-view-link>Buchungen</a>
             <a href="#feedback-admin-section" data-admin-view-link>Feedback</a><a href="#social-media-section" data-admin-view-link>Social Media</a><a href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
             <a href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
@@ -57,7 +57,26 @@
             <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
           </nav>
         </aside>
-        <div class="admin-content"><section id="admin-dashboard" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="admin-dashboard-heading"><h2 id="admin-dashboard-heading">Aktuelles auf einen Blick</h2><p>Deine zentralen Verwaltungsbereiche. Neue Vorgänge und Zähler werden hier ergänzt, sobald die jeweiligen Datenquellen angebunden sind.</p><div class="admin-grid"><article class="booking"><h3>Neue Buchungen</h3><p>Eingegangene Buchungen und Anfragen prüfen.</p><a class="btn secondary" href="#bookings-section" data-admin-view-link>Buchungen öffnen →</a></article><article class="booking"><h3>Trainer-Rückmeldungen</h3><p>Hinweise von Trainern und offene Teilnehmerbestätigungen.</p><a class="btn secondary" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiterbereich öffnen →</a></article><article class="booking"><h3>Stationsprüfungen</h3><p>Prüfberichte und Sicherheitsmeldungen kontrollieren.</p><a class="btn secondary" href="#stationspruefung" data-admin-view-link>Prüfberichte öffnen →</a></article><article class="booking"><h3>Kundenfeedback</h3><p>Neue Rückmeldungen zu Angeboten einsehen.</p><a class="btn secondary" href="#feedback-admin-section" data-admin-view-link>Feedback öffnen →</a></article><article class="booking"><h3>Mitarbeiter</h3><p>Einladungen, Registrierungen und Freigaben bearbeiten.</p><a class="btn secondary" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiter öffnen →</a></article><article class="booking"><h3>Programme & Termine</h3><p>Angebote und kommende Termine verwalten.</p><a class="btn secondary" href="#calendar-view" data-admin-view-link>Kalender öffnen →</a></article></div></section>
+        <div class="admin-content"><section id="admin-dashboard" class="admin-view admin-dashboard" data-admin-view aria-labelledby="admin-dashboard-heading"><h2 id="admin-dashboard-heading">Aktuelles auf einen Blick</h2><p>Wähle einen Bereich. Die Übersicht wird nach jeder Anmeldung automatisch geöffnet.</p><nav class="admin-dashboard-grid" aria-label="Direkte Verwaltungsbereiche">
+          <a class="admin-dashboard-link" href="#bookings-section" data-admin-view-link>Buchungen</a>
+          <a class="admin-dashboard-link" href="#mitarbeiter-section" data-admin-view-link>Trainer-Rückmeldungen &amp; Mitarbeiter</a>
+          <a class="admin-dashboard-link" href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
+          <a class="admin-dashboard-link" href="#calendar-view" data-admin-view-link>Kalender</a>
+          <a class="admin-dashboard-link" href="#angebote-verwaltung" data-admin-view-link>Programme</a>
+          <a class="admin-dashboard-link" href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
+          <a class="admin-dashboard-link" href="#anschlussrabatt-section" data-admin-view-link>Anschlussrabatte</a>
+          <a class="admin-dashboard-link" href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
+          <a class="admin-dashboard-link" href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
+          <a class="admin-dashboard-link" href="#feedback-admin-section" data-admin-view-link>Kundenfeedback</a>
+          <a class="admin-dashboard-link" href="#standorte-section" data-admin-view-link>Standorte</a>
+          <a class="admin-dashboard-link" href="#mitarbeiter-einladen-section" data-admin-view-link>Neue Mitarbeiter</a>
+          <a class="admin-dashboard-link employee-area-link" href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a>
+          <a class="admin-dashboard-link employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
+          <a class="admin-dashboard-link employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
+          <a class="admin-dashboard-link" href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
+          <a class="admin-dashboard-link" href="#social-media-section" data-admin-view-link>Social Media</a>
+          <a class="admin-dashboard-link" href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
+        </nav></section>
 
       <section id="payment-overview-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="payment-overview-heading">
         <h2 id="payment-overview-heading">Zahlungsübersicht</h2>

@@ -980,6 +980,25 @@ body.admin-page { min-height:100vh; padding-top:70px; }
 .admin-page .admin-view p { color:#40594f; }
 .admin-page .admin-view form:not(.payment-entry) { margin:14px 0; }
 .admin-page .admin-view:focus { outline:none; }
+.admin-page .admin-dashboard { background:transparent; border:0; padding:0; }
+.admin-page .admin-dashboard-grid {
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px;
+  margin:18px 0 0; padding:0; background:transparent; border:0; box-shadow:none;
+}
+.admin-page .admin-dashboard-link {
+  display:flex; align-items:center; min-height:62px; padding:13px 17px;
+  border:1px solid #cfdbd1; border-radius:12px; background:#f8faf7;
+  color:#173e35; font-weight:800; line-height:1.35; text-decoration:none;
+  box-shadow:0 3px 10px #173e3508; transition:background-color .15s,border-color .15s,transform .15s;
+}
+.admin-page .admin-dashboard-link:hover,
+.admin-page .admin-dashboard-link:focus-visible {
+  background:#edf4ec; border-color:#86a58f; outline:2px solid #173e35; outline-offset:2px;
+}
+.admin-page .admin-dashboard-link:active { transform:translateY(1px); }
+.admin-page .admin-dashboard-link.employee-area-link { background:#edf6d7; border-color:#bfdc73; }
+.admin-page .admin-dashboard-link.employee-area-link:hover,
+.admin-page .admin-dashboard-link.employee-area-link:focus-visible { background:#e1f0bb; }
 @media(max-width:760px) {
   body.admin-page { padding-top:62px; }
   .admin-page > header.admin-topbar { height:62px; min-height:62px; }
@@ -993,6 +1012,9 @@ body.admin-page { min-height:100vh; padding-top:70px; }
   }
   .admin-page .admin-navigation a { width:auto; min-height:42px; flex:0 0 auto; white-space:nowrap; }
   .admin-page .admin-view { padding:18px 14px; }
+}
+@media(max-width:560px) {
+  .admin-page .admin-dashboard-grid { grid-template-columns:minmax(0,1fr); }
 }
 
 .feedback-form{max-width:760px;margin-top:22px}
