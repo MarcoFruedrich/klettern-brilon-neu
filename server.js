@@ -17,6 +17,7 @@ const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { createEinsatzplanungApi } = require('./lib/einsatzplanung-api');
+const { createKundenbestaetigungService } = require('./lib/kundenbestaetigung-service');
 const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
 const { createKundenfeedbackApi } = require('./lib/kundenfeedback-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
@@ -324,7 +325,8 @@ async function anschlussApi(req,res,url,route,ip){
 }
 
 const pruefungApi=createPruefungApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail,scanForMalware});
-const einsatzplanungApi=createEinsatzplanungApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,brevoMail});
+const kundenService=createKundenbestaetigungService({pool,brevoMail});
+const einsatzplanungApi=createEinsatzplanungApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,brevoMail,kundenService});
 const netzwerkpartnerApi=createNetzwerkpartnerApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 const kundenfeedbackApi=createKundenfeedbackApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 
@@ -3032,6 +3034,16 @@ await pool.query(`
     }
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'||process.env.RUN_STAFFING_MIGRATION==='true')
       await migrateEinsatzplanung();
+    if(process.env.MOCK_PG!=='1'){
+      try{
+        await pool.query('SELECT buchung_id FROM brilon_kundenbestaetigungen LIMIT 0');
+        const confirmationTimer=setInterval(()=>{
+          kundenService.processQueue().catch(error=>console.error('Kundenbestätigungen prüfen:',error.message));
+        },60_000);
+        confirmationTimer.unref();
+        kundenService.processQueue().catch(error=>console.error('Kundenbestätigungen bei Start:',error.message));
+      }catch(error){console.warn('Automatische Kundenbestätigung nicht gestartet: Versandtabelle fehlt.',error.message);}
+    }
     if(process.env.MOCK_PG!=='1'){
       try{
         await pool.query('SELECT bericht_id FROM brilon_pruef_meldungen LIMIT 0');
