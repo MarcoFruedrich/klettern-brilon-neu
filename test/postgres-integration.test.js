@@ -833,7 +833,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     {headers:{Cookie:freshCookie}})).status,401);
   assert.equal((await tryLogin('Aktualisiert-Sicher-2026-!')).status,401);
   assert.equal((await patchAdmin(employeePath+'/deaktivieren',{})).status,409);
-  assert.equal((await patchAdmin(employeePath+'/reaktivieren',{passwort:'zu kurz'})).status,400);
+  assert.equal((await patchAdmin(employeePath+'/reaktivieren',{passwort:'kurz'})).status,400);
   const restarted=await patchAdmin(employeePath+'/reaktivieren',
     {passwort:'Reaktiviert-Einmal-2026-!'});
   assert.equal(restarted.status,200);
