@@ -4,7 +4,7 @@ const node=(tag,value)=>{const element=document.createElement(tag);if(value!==un
 async function request(url,options={}){
   const response=await fetch(url,{credentials:'same-origin',...options});
   const data=await response.json();
-  if(!response.ok)throw Error(data.error||'Anfrage fehlgeschlagen.');
+  if(!response.ok)throw Object.assign(Error(data.error||'Anfrage fehlgeschlagen.'),data);
   return data;
 }
 function showContacts(entry,content){
@@ -67,6 +67,7 @@ function addNavButton(nav,entry,child=false){
 function render(data){
   $('staff-login').hidden=true;$('staff-portal-workspace').hidden=false;
   $('staff-portal-name').textContent=data.mitarbeiter;
+  $('staff-admin-link').hidden=!data.verwaltungszugang;
   const profile=$('staff-profile-form');
   profile.elements.name.value=data.profil?.name||data.mitarbeiter||'';
   profile.elements.email.value=data.profil?.email||'';
@@ -108,11 +109,24 @@ async function load(){
   catch(error){$('staff-login').hidden=false;$('staff-portal-workspace').hidden=true;$('staff-portal-status').textContent=error.message;}
 }
 $('staff-login').addEventListener('submit',async event=>{
-  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button');
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+  $('staff-reset-request').hidden=true;
   button.disabled=true;$('staff-portal-status').textContent='Anmeldung wird geprüft …';
   try{await request('/api/pruefung/login',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(Object.fromEntries(new FormData(form)))});form.reset();await load();}
-  catch(error){$('staff-portal-status').textContent='Anmeldung fehlgeschlagen: '+error.message;}
+  catch(error){$('staff-portal-status').textContent='Anmeldung fehlgeschlagen: '+error.message;
+    if(error.passwortResetMoeglich)$('staff-reset-request').hidden=false;}
+  finally{button.disabled=false;}
+});
+$('staff-reset-request').addEventListener('click',async event=>{
+  const button=event.currentTarget,email=$('staff-login').elements.email.value.trim();
+  if(!email){$('staff-portal-status').textContent='Bitte zuerst die hinterlegte E-Mail-Adresse eintragen.';return;}
+  button.disabled=true;
+  try{
+    const result=await request('/api/pruefung/passwort-reset-anfordern',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    $('staff-portal-status').textContent=result.message;
+  }catch(error){$('staff-portal-status').textContent='Anfrage fehlgeschlagen: '+error.message;}
   finally{button.disabled=false;}
 });
 $('staff-profile-form').addEventListener('submit',async event=>{

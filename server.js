@@ -16,6 +16,8 @@ const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
+const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
+const { createKundenfeedbackApi } = require('./lib/kundenfeedback-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild } = require('./lib/bilddatei');
@@ -128,11 +130,17 @@ async function session(req){
     try{
       if(++persistentSessionChecks%128===0)
         await pool.query('DELETE FROM brilon_admin_sessions WHERE expires_at<=NOW()');
-      const q=await pool.query(
-        'SELECT 1 FROM brilon_admin_sessions WHERE token_hash=$1 AND expires_at>NOW()',[gpsTokenHash(token)]
-      );
-      return {valid:q.rowCount>0};
-    }catch{return {unavailable:true};}
+      const hash=gpsTokenHash(token);
+      const q=await pool.query('SELECT 1 FROM brilon_admin_sessions WHERE token_hash=$1 AND expires_at>NOW()',[hash]);
+      if(q.rowCount)return {valid:true};
+      const delegated=await pool.query(`SELECT 1 FROM brilon_pruef_admin_sessions s
+        JOIN brilon_pruef_mitarbeitende m ON m.id=s.mitarbeiter_id
+        WHERE s.token_hash=$1 AND s.ablauf>NOW() AND m.aktiv=true AND m.verwaltungszugang=true`,[hash]);
+      return {valid:delegated.rowCount>0};
+    }catch(error){
+      if(error?.code==='42P01')return {valid:false};
+      return {unavailable:true};
+    }
   }
   if(++sessionChecks%128===0)abgelaufeneEintraegeEntfernen(sessions,jetzt);
   const exp=sessions.get(token);
@@ -315,6 +323,8 @@ async function anschlussApi(req,res,url,route,ip){
 }
 
 const pruefungApi=createPruefungApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail,scanForMalware});
+const netzwerkpartnerApi=createNetzwerkpartnerApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
+const kundenfeedbackApi=createKundenfeedbackApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 
 const marketingCampaignApi=createMarketingCampaignApi({pool,admin,reply,body});
 async function main(req,res){
@@ -325,6 +335,10 @@ async function main(req,res){
     if(route.startsWith('/api/admin/marketing/kampagnen'))return await marketingCampaignApi(req,res,route);
     if(route.startsWith('/api/pruefung/')||route.startsWith('/api/admin/pruefung/'))
       return await pruefungApi(req,res,u,route,ip);
+    if(route.startsWith('/api/netzwerkpartner/')||route.startsWith('/api/admin/netzwerkpartner/'))
+      return await netzwerkpartnerApi(req,res,u,route,ip);
+    if(route==='/api/kundenfeedback'||route==='/api/admin/kundenfeedback')
+      return await kundenfeedbackApi(req,res,u,route,ip);
     if(route==='/api/anschlussangebote/vorschau'||route==='/api/anschlussangebote/buchen')
       return await anschlussApi(req,res,u,route,ip);
     if(route==='/api/feedback/statistik'&&req.method==='GET'){
@@ -2452,12 +2466,17 @@ if (route === '/api/angebote' && req.method === 'GET') {
   }catch(e){
     console.error('Anfragefehler:',e.message);
     const placesSchemaMissing=route==='/api/admin/orte'&&e.code==='42P01';
+    const partnerFeedbackSchemaMissing=(route.startsWith('/api/netzwerkpartner/')||
+      route.startsWith('/api/admin/netzwerkpartner/')||route==='/api/kundenfeedback'||
+      route==='/api/admin/kundenfeedback')&&e.code==='42P01';
     const statusCode=e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?400:
-      placesSchemaMissing?503:500;
+      placesSchemaMissing||partnerFeedbackSchemaMissing?503:500;
     reply(res,statusCode,{
       error:e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?
         e.message:placesSchemaMissing?
           'Die Veranstaltungsort-Tabelle fehlt. Einmalig RUN_PLACES_MIGRATION=true setzen und den Server neu starten.':
+          partnerFeedbackSchemaMissing?
+            'Dieser Bereich wird gerade eingerichtet. Bitte später erneut versuchen.':
           'Interner Serverfehler.'
     });
   }
@@ -2548,6 +2567,7 @@ async function start(){
     await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS qualifikationen TEXT');
     await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS registriert_am TIMESTAMPTZ');
     await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS freigabe_am TIMESTAMPTZ');
+    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS verwaltungszugang BOOLEAN NOT NULL DEFAULT false');
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_personaldokumente (
       id UUID PRIMARY KEY,
       mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
@@ -2578,6 +2598,16 @@ async function start(){
       token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
       ablauf TIMESTAMPTZ NOT NULL,entsperrt_bis TIMESTAMPTZ)`);
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_sessions_ablauf_idx ON brilon_pruef_sessions(ablauf)');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_admin_sessions (
+      token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+      ablauf TIMESTAMPTZ NOT NULL)`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_admin_sessions_ablauf_idx ON brilon_pruef_admin_sessions(ablauf)');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_login_fehler (
+      email_hash CHAR(64) PRIMARY KEY,versuche INTEGER NOT NULL DEFAULT 0,fenster_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_passwort_resets (
+      token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+      ablauf TIMESTAMPTZ NOT NULL,verwendet_am TIMESTAMPTZ,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_passwort_resets_expiry_idx ON brilon_pruef_passwort_resets(ablauf)');
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_codes (
       id UUID PRIMARY KEY,code_hash CHAR(64) NOT NULL,ablauf TIMESTAMPTZ NOT NULL,
       verbraucht_am TIMESTAMPTZ,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
@@ -2659,6 +2689,39 @@ async function start(){
         PRIMARY KEY(bereich_id,ort_id))`);
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_mitarbeiterbereich_orte_ort_idx ON brilon_mitarbeiterbereich_orte(ort_id,bereich_id)');
       console.log('Mitarbeiterbereiche-Tabelle geprüft (RUN_EMPLOYEE_AREAS_MIGRATION=true)');
+    }
+    // Separate opt-in schema for network partners; never changes employee or admin accounts.
+    if(process.env.RUN_NETWORK_PARTNER_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_netzwerkpartner(
+        id UUID PRIMARY KEY,unternehmen TEXT NOT NULL CHECK(length(unternehmen) BETWEEN 2 AND 180),
+        ansprechpartner TEXT NOT NULL CHECK(length(ansprechpartner) BETWEEN 2 AND 120),
+        email TEXT NOT NULL UNIQUE,telefon TEXT,strasse TEXT,plz TEXT,ort TEXT,weitere_angaben TEXT,
+        passwort_hash TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT false,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),freigabe_am TIMESTAMPTZ)`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_netzwerkpartner_einladungen(
+        id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,token_hash CHAR(64) NOT NULL UNIQUE,
+        ablauf TIMESTAMPTZ NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        verwendet_am TIMESTAMPTZ,widerrufen_am TIMESTAMPTZ)`);
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS brilon_netzwerkpartner_einladungen_offen_email_idx
+        ON brilon_netzwerkpartner_einladungen(email) WHERE verwendet_am IS NULL AND widerrufen_am IS NULL`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_netzwerkpartner_sessions(
+        token_hash CHAR(64) PRIMARY KEY,
+        netzwerkpartner_id UUID NOT NULL REFERENCES brilon_netzwerkpartner(id) ON DELETE CASCADE,
+        ablauf TIMESTAMPTZ NOT NULL)`);
+      await pool.query('CREATE INDEX IF NOT EXISTS brilon_netzwerkpartner_sessions_ablauf_idx ON brilon_netzwerkpartner_sessions(ablauf)');
+      console.log('Getrenntes Netzwerkpartnerschema geprüft (RUN_NETWORK_PARTNER_MIGRATION=true)');
+    }
+    // Customer feedback is private to the admin API and linked to one existing booking.
+    if(process.env.RUN_CUSTOMER_FEEDBACK_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenfeedback(
+        id UUID PRIMARY KEY,buchung_id UUID NOT NULL REFERENCES brilon_buchungen(id) ON DELETE CASCADE,
+        buchungsnummer TEXT NOT NULL,programm_bewertung SMALLINT NOT NULL CHECK(programm_bewertung BETWEEN 1 AND 5),
+        mitarbeiter_bewertung SMALLINT NOT NULL CHECK(mitarbeiter_bewertung BETWEEN 1 AND 5),
+        sicherheits_bewertung SMALLINT NOT NULL CHECK(sicherheits_bewertung BETWEEN 1 AND 5),
+        veraenderungen TEXT,ideen TEXT,einwilligung_am TIMESTAMPTZ NOT NULL,
+        einwilligung_version TEXT NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(buchung_id))`);
+      await pool.query('CREATE INDEX IF NOT EXISTS brilon_kundenfeedback_erstellt_idx ON brilon_kundenfeedback(erstellt_am DESC)');
+      console.log('Kundenfeedbackschema geprüft (RUN_CUSTOMER_FEEDBACK_MIGRATION=true)');
     }
     // Schema changes are opt-in. A normal server start must not alter a live database.
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){

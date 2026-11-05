@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Netzwerkpartnerbereich | Klettern & Abenteuer</title>
+<link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
+</head>
+<body class="admin-page pruef-page">
+<a class="skip-link" href="#main-content">Zum Inhalt springen</a>
+<header class="admin-topbar"><a class="logo" href="/">🧗 Klettern <span>& Abenteuer</span><small>Netzwerkpartnerbereich</small></a></header>
+<main class="narrow" id="main-content">
+  <h1>Dein Netzwerkpartnerbereich</h1>
+  <p>Dieser Zugang ist eigenständig und bietet ausschließlich deinen Netzwerkpartnerbereich.</p>
+  <form id="partner-login-form">
+    <label>E-Mail-Adresse<input name="email" type="email" autocomplete="username" required></label>
+    <label>Passwort<input name="passwort" type="password" autocomplete="current-password" required></label>
+    <button class="btn" type="submit">Anmelden</button>
+  </form>
+  <p id="partner-login-status" role="status" aria-live="polite"></p>
+  <section id="partner-workspace" class="booking" hidden aria-live="polite">
+    <div class="staff-portal-heading"><h2 id="partner-title"></h2><button id="partner-logout" class="btn secondary" type="button">Abmelden</button></div>
+    <p class="staff-access-status is-active">Zugang freigeschaltet</p>
+    <h3>Deine Kontaktdaten</h3>
+    <div id="partner-profile" class="staff-contact-list"></div>
+    <p class="hint">Der Bereich ist getrennt von der Verwaltung und dem Mitarbeiterportal. Weitere gemeinsame Funktionen können hier später ergänzt werden.</p>
+  </section>
+</main>
+<script src="/netzwerkpartnerbereich.js?v=20261105-1"></script>
+</body>
+</html>

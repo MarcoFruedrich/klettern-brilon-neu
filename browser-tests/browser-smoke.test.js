@@ -11,7 +11,9 @@ async function fakePublicApi(page) {
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     let data;
-    if (url.pathname === '/api/angebote') {
+    if (url.pathname === '/api/orte') {
+      data = [{ id: 1, name: 'Brilon' }];
+    } else if (url.pathname === '/api/angebote') {
       data = [{ id: 1, name: 'Klettertest', beschreibung: 'Nur automatisierter Browsertest',
         dauer: 60, preise: {'1-4': 100, '5-10': 150}, kapazitaet: 20, aktiv: true,
         buchbar: true, veroeffentlicht: true, verfuegbare_termine: [],

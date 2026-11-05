@@ -34,6 +34,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     cwd: repo, stdio: ['ignore', 'ignore', 'pipe'], env: {
       ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: integrationUrl,
       DATABASE_SSL_MODE: 'disable', RUN_SCHEMA_MIGRATIONS: 'true',
+      RUN_PLACES_MIGRATION: 'true',
       RUN_EMPLOYEE_AREAS_MIGRATION: 'true',
       PUBLIC_BASE_URL:`http://127.0.0.1:${port}`,
       BREVO_API_KEY: '', BREVO_SENDER_EMAIL: '', BOOKING_NOTIFY_EMAIL: '',

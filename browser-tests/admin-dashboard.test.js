@@ -743,7 +743,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     state.inspectionStaff=[{id,name:'CI Fachkraft',email:'ci@example.test',aktiv:true}];
     page.on('dialog',async d=>d.accept());
     await login(page,root);
-    await openAdminView(page,'#stationspruefung');
+    await openAdminView(page,'#mitarbeiter-section');
     const card=page.locator('#pruef-personal-list article').first();
     await card.getByText('Zugang aktiv').waitFor();
     await card.getByRole('button',{name:'Zugang deaktivieren'}).click();
@@ -883,7 +883,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('1 Buchung(en)'));
     const booking=page.locator('#bookings .booking').first();
     await booking.locator('select:not([name="methode"])').selectOption('bestaetigt');
-    await booking.locator('textarea').fill('Test: Rückruf erfolgreich');
+    await booking.locator('textarea[placeholder="Zum Beispiel: Rückruf vereinbart"]').fill('Test: Rückruf erfolgreich');
     await booking.getByRole('button',{name:'Änderungen speichern'}).click();
     for(let attempt=0;attempt<40 && state.bookings[0].status!=='bestaetigt';attempt++)
       await new Promise(resolve=>setTimeout(resolve,75));
@@ -910,12 +910,14 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const state=fakeAdminApi(page);
     page.on('dialog',dialog=>dialog.accept());
     await login(page,root);
+    await openAdminView(page,'#mitarbeiter-einladen-section');
     const form=page.locator('#pruef-personal-form');
     await form.locator('[name="name"]').fill('Neue Fachkraft');
     await form.locator('[name="email"]').fill('fachkraft@example.test');
     await form.locator('button[type="submit"]').click();
     await page.locator('#pruef-personal-status a.invite-link').waitFor();
     assert.match(await page.locator('#pruef-personal-status').textContent(),/E-Mail konnte nicht versandt werden/);
+    await openAdminView(page,'#mitarbeiter-section');
     const card=page.locator('#pruef-personal-list .booking').filter({hasText:'fachkraft@example.test'});
     await card.getByRole('button',{name:'Neue Einladung senden'}).click();
     await page.waitForFunction(()=>document.querySelectorAll('#pruef-personal-list .booking').length===1);
@@ -937,6 +939,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       strasse:'Musterstraße 4',plz:'59929',wohnort:'Brilon',
       qualifikationen:'Kletterqualifikation\nErste Hilfe',bescheinigungen:[],freigaben:[]});
     await login(page,root);
+    await openAdminView(page,'#mitarbeiter-section');
     const grant=page.locator('#pruef-personal-list .booking').filter({hasText:'geprueft@example.test'});
     await grant.locator('.staff-grant-place').nth(0).check();
     await grant.locator('.staff-grant-place').nth(1).check();

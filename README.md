@@ -13,6 +13,8 @@ Schemaänderungen sind standardmäßig deaktiviert. `RUN_SCHEMA_MIGRATIONS=true`
 
 Die Tabellen für zusätzliche Mitarbeiterportal-Inhalte und deren Standortzuordnungen werden separat und nur mit `RUN_EMPLOYEE_AREAS_MIGRATION=true` angelegt. Dafür muss `brilon_orte` bereits vorhanden sein (zum Beispiel über `RUN_PLACES_MIGRATION=true` oder `RUN_PRUEF_SCHEMA_MIGRATION=true`). Aktivierte Inhalte erscheinen nur nach Mitarbeiteranmeldung. Programme lassen sich mehreren Standorten zuordnen und werden dort als Unterpunkte angezeigt; Standortinfos und zugeordnete Partner erscheinen in der jeweiligen Standortübersicht. Die Erweiterung wurde am 04.11.2026 auf Render bereitgestellt; die einmalige Migration wurde danach bestätigt und der Schalter wieder entfernt.
 
+Die Netzwerkpartnerkonten werden mit `RUN_NETWORK_PARTNER_MIGRATION=true` angelegt. Sie verwenden eine eigene Tabelle, einen eigenen Sitzungscookie und ausschließlich `/netzwerkpartnerbereich.html`; Mitarbeiter- und Adminzugänge werden nicht geteilt. Das vertrauliche Kundenfeedback nutzt separat `RUN_CUSTOMER_FEEDBACK_MIGRATION=true` und verknüpft höchstens eine Rückmeldung mit einer bestätigten, bereits stattgefundenen Buchung. Beide Schalter sind einmalig und getrennt; vor produktiver Ausführung erst in einer isolierten Testdatenbank prüfen und danach wieder entfernen. Das passende additive SQL liegt unter `db/migrations/2026-11-05-network-partner-feedback.sql`.
+
 ## Konfiguration
 
 - Buchungsdatenbank: `DATABASE_URL`
@@ -20,6 +22,7 @@ Die Tabellen für zusätzliche Mitarbeiterportal-Inhalte und deren Standortzuord
 - Mailversand: `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, optional `BOOKING_NOTIFY_EMAIL`
 - Bild-Malware-Prüfung: `CLAMD_HOST`, optional `CLAMD_PORT` (Standard 3310); ohne erreichbaren ClamAV-Dienst werden Bilder nicht gespeichert
 - Personalisierte Anschluss- und Mitarbeiterregistrierungslinks: `PUBLIC_BASE_URL` (HTTPS) und `BOOKING_OFFER_SECRET` (mindestens 32 Zeichen)
+- Netzwerkpartner-Einladungen und Feedbackbestätigungen: `PUBLIC_BASE_URL` (HTTPS), `BREVO_API_KEY` und `BREVO_SENDER_EMAIL`
 - GPS-Kontrollcodes: `GPS_CODE_SECRET` (mindestens 32 Zeichen)
 
 ClamAV muss über ein privates, vertrauenswürdiges Netzwerk erreichbar sein. `clamd`-TCP-Verbindungen verschlüsseln oder authentifizieren den Datenstrom nicht. Der Dienst muss mindestens 5 MB pro `INSTREAM`-Anfrage zulassen und aktuelle Signaturen verwenden. Pro Serverprozess laufen höchstens vier Bildscans gleichzeitig; bei voller Auslastung wird der Upload abgewiesen und kann erneut versucht werden. `MOCK_MALWARE_SCAN=1` ist ausschließlich für automatisierte Tests gedacht.

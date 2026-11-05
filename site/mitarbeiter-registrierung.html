@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>Mitarbeiterregistrierung | Klettern & Abenteuer</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
 </head>
 <body class="admin-page pruef-page">
 <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -32,17 +32,9 @@
       <label>Wohnort<input name="wohnort" maxlength="100" autocomplete="address-level2" required></label>
     </div>
     <label>Qualifikationen und Erfahrung
-      <textarea name="qualifikationen" maxlength="2000" rows="5" placeholder="Bitte eine Qualifikation oder Erfahrung pro Zeile angeben"></textarea>
+      <textarea name="qualifikationen" minlength="2" maxlength="2000" rows="5" required placeholder="Bitte eine Qualifikation oder Erfahrung pro Zeile angeben"></textarea>
     </label>
-    <section class="certificate-upload" aria-labelledby="certificate-heading">
-      <h2 id="certificate-heading">Bescheinigungen als Foto</h2>
-      <p class="hint">Du kannst bis zu fünf Fotos von Bescheinigungen auswählen. Bitte gib für jedes Foto die Bezeichnung an. Erlaubt sind JPG, PNG und WebP.</p>
-      <label>Fotos auswählen
-        <input id="certificate-files" type="file" accept="image/jpeg,image/png,image/webp" multiple>
-      </label>
-      <p id="certificate-status" role="status" aria-live="polite"></p>
-      <div id="certificate-list" class="admin-grid"></div>
-    </section>
+    <p class="hint">Die Verwaltung prüft deine Angaben. Falls ein Nachweis benötigt wird, fordert sie ihn gesondert per E-Mail an. Bitte hier keine Fotos hochladen.</p>
     <label>Eigenes Passwort (mindestens 6 Zeichen)
       <input name="passwort" type="password" minlength="6" autocomplete="new-password" required>
     </label>
@@ -53,6 +45,6 @@
   </form>
   <p id="registration-status" role="status" aria-live="polite"></p>
 </main>
-<script src="/mitarbeiter-registrierung.js"></script>
+<script src="/mitarbeiter-registrierung.js?v=20261105-qualifications-only"></script>
 </body>
 </html>

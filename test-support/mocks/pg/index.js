@@ -28,7 +28,16 @@ class Pool {
     if(process.env.RUN_PROGRAM_FIELDS_MIGRATION==='true'&&
        /^\s*ALTER TABLE brilon_angebote\b/i.test(sql))
       return {rows:[],rowCount:0};
+    if(process.env.RUN_EMPLOYEE_AREAS_MIGRATION==='true'&&
+       /^\s*ALTER TABLE brilon_mitarbeiterbereiche\b/i.test(sql))
+      return {rows:[],rowCount:0};
     if(/^\s*CREATE TABLE IF NOT EXISTS brilon_mitarbeiterbereiche\b/i.test(sql))
+      return {rows:[],rowCount:0};
+    if(/^\s*CREATE TABLE IF NOT EXISTS brilon_mitarbeiterbereich_orte\b/i.test(sql))
+      return {rows:[],rowCount:0};
+    if(/^\s*CREATE INDEX IF NOT EXISTS brilon_mitarbeiterbereich_orte_ort_idx\b/i.test(sql))
+      return {rows:[],rowCount:0};
+    if(/^\s*SELECT 1 FROM brilon_pruef_admin_sessions\b/i.test(sql))
       return {rows:[],rowCount:0};
     if(/^\s*BEGIN\b/i.test(sql))return {rows:[],rowCount:0};
     if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql)){

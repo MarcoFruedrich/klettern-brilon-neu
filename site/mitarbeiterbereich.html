@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Mitarbeiterbereich | Klettern &amp; Abenteuer</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
 </head>
 <body class="admin-page staff-portal-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -20,10 +20,12 @@
       <label>Passwort<input name="passwort" type="password" autocomplete="current-password" required></label>
       <button class="btn" type="submit">Anmelden</button>
     </form>
+    <button id="staff-reset-request" class="btn secondary" type="button" hidden>Passwort per E-Mail zurücksetzen</button>
     <p id="staff-portal-status" role="status" aria-live="polite"></p>
     <section id="staff-portal-workspace" hidden>
       <div class="staff-portal-heading">
         <p>Angemeldet: <strong id="staff-portal-name"></strong></p>
+        <a id="staff-admin-link" class="btn" href="/admin.html" hidden>Zur Verwaltung</a>
         <button id="staff-portal-logout" class="btn secondary" type="button">Abmelden</button>
       </div>
       <details class="staff-profile-panel">

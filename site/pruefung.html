@@ -22,8 +22,9 @@
 <label>Passwort<input name="passwort" type="password" autocomplete="current-password" required></label>
 <button class="btn">Anmelden</button>
 </form>
+<button class="btn secondary" id="staff-reset-request" type="button" hidden>Passwort per E-Mail zurücksetzen</button>
 <section id="pruefung-workspace" hidden>
-<p>Angemeldet: <strong id="pruefung-person"></strong></p>
+<p>Angemeldet: <strong id="pruefung-person"></strong> <a id="pruefung-admin-link" class="btn" href="/admin.html" hidden>Zur Verwaltung</a></p>
 <button class="btn secondary" id="staff-logout" type="button">Abmelden</button>
 <section class="booking" aria-labelledby="staff-reports-heading">
 <h2 id="staff-reports-heading">Meine letzten Prüfprotokolle</h2>

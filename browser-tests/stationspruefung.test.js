@@ -196,7 +196,7 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
     await page.locator('[name="passwort"]').fill('Eigenes-Pruefer-Passwort-2026!');
     await page.locator('[name="passwort_bestaetigung"]').fill('Eigenes-Pruefer-Passwort-2026!');
     await page.locator('#registration-form button[type="submit"]').click();
-    await page.locator('#registration-status').getByText('gesperrt bis zur Freigabe').waitFor();
+      await page.locator('#registration-status').getByText('bleibt bis zur Freigabe durch die Verwaltung gesperrt').waitFor();
     assert.equal(saved.token,token);
     assert.equal(saved.name,'Eingeladene Fachkraft');
     assert.equal(saved.telefon,'+49 170 123456');

@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
-  <link rel="stylesheet" href="/style.css?v=20261105-feedback">
+  <link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -46,11 +46,14 @@
             <a href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
             <a href="#anschlussrabatt-section" data-admin-view-link>Anschlussrabatte</a>
             <a href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
+            <a href="#kundenfeedback-section" data-admin-view-link>Kundenfeedback</a>
             <a href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
             <a href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
             <a href="#standorte-section" data-admin-view-link>Standorte</a>
             <a class="employee-area-link" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiter</a>
             <a class="employee-area-link" href="#mitarbeiter-einladen-section" data-admin-view-link>Neue Mitarbeiter</a>
+            <a class="employee-area-link" href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a>
+            <a class="employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
             <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
           </nav>
         </aside>
@@ -339,6 +342,24 @@
   <p id="pruef-einladung-status" role="status" aria-live="polite"></p>
 </section>
 
+<section id="netzwerkpartner-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="netzwerkpartner-heading">
+  <h2 id="netzwerkpartner-heading">Netzwerkpartner</h2>
+  <p>Kontaktdaten prüfen und Partnerzugänge einzeln freigeben. Partner erhalten ausschließlich Zugang zu ihrem eigenen Bereich.</p>
+  <p id="netzwerkpartner-status" role="status" aria-live="polite"></p>
+  <div id="netzwerkpartner-list" class="admin-grid"></div>
+</section>
+
+<section id="netzwerkpartner-einladen-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="netzwerkpartner-einladen-heading">
+  <h2 id="netzwerkpartner-einladen-heading">Neue Netzwerkpartner</h2>
+  <p>Der eingeladene Kontakt ergänzt die Daten seiner Organisation. Der Zugang bleibt bis zur Freigabe durch die Verwaltung gesperrt.</p>
+  <form id="netzwerkpartner-invite-form">
+    <label>Ansprechperson<input name="name" maxlength="120" required></label>
+    <label>E-Mail<input name="email" type="email" maxlength="180" required></label>
+    <button class="btn" type="submit">Registrierungslink senden</button>
+  </form>
+  <p id="netzwerkpartner-invite-status" role="status" aria-live="polite"></p>
+</section>
+
 <section id="mitarbeiterbereiche-admin-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="mitarbeiterbereiche-heading">
   <h2 id="mitarbeiterbereiche-heading">Bereiche im Mitarbeiterportal</h2>
   <p>Aktivierte Textbereiche erscheinen für alle angemeldeten Mitarbeiter. Vertrauliche Einzelinformationen hier nicht veröffentlichen.</p>
@@ -361,6 +382,14 @@
   <p id="mitarbeiterbereich-status" role="status" aria-live="polite"></p>
   <h3>Vorhandene Bereiche</h3>
   <div id="mitarbeiterbereiche-list" class="admin-grid"></div>
+</section>
+
+<section id="kundenfeedback-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="kundenfeedback-heading">
+  <h2 id="kundenfeedback-heading">Kundenfeedback</h2>
+  <p>Vertrauliche Rückmeldungen sind nur in dieser Verwaltung sichtbar.</p>
+  <div id="kundenfeedback-summary" class="admin-grid payment-summary-grid" aria-live="polite"></div>
+  <p id="kundenfeedback-status" role="status" aria-live="polite"></p>
+  <div id="kundenfeedback-list" class="admin-grid"></div>
 </section>
 
 <section id="admin-guestbook-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="guestbook-heading">
@@ -498,8 +527,8 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261104-employee-portal"></script>
-  <script src="/pruefung-admin.js"></script>
+  <script src="/admin.js?v=20261105-network-feedback"></script>
+  <script src="/pruefung-admin.js?v=20261105-network-feedback"></script>
   <script src="/feedback-admin.js"></script>
 </body>
 </html>

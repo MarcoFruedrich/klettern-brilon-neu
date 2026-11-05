@@ -4,7 +4,7 @@ const text=(tag,content)=>{const node=document.createElement(tag);node.textConte
 async function request(url,options={}){
   const r=await fetch(url,{credentials:'same-origin',...options});
   const data=await r.json();
-  if(!r.ok)throw Error(data.error||'Die Anfrage konnte nicht verarbeitet werden.');
+  if(!r.ok)throw Object.assign(Error(data.error||'Die Anfrage konnte nicht verarbeitet werden.'),data);
   return data;
 }
 function notice(message){$('pruefung-status').textContent=message;}
@@ -172,11 +172,25 @@ async function signedIn(){
 $('staff-login').addEventListener('submit',async event=>{
   event.preventDefault();const form=event.currentTarget;
   const submit=form.querySelector('button');submit.disabled=true;
+  $('staff-reset-request').hidden=true;
   try{
-    await request('/api/pruefung/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    const login=await request('/api/pruefung/login',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(Object.fromEntries(new FormData(form)))});
+    $('pruefung-admin-link').hidden=!login.verwaltungszugang;
     form.reset();await signedIn();notice('Angemeldet. Bitte Vor-Ort-Code vom Tablet eingeben.');
-  }catch(e){notice('Anmeldung fehlgeschlagen: '+e.message);}finally{submit.disabled=false;}
+  }catch(e){notice('Anmeldung fehlgeschlagen: '+e.message);if(e.passwortResetMoeglich)$('staff-reset-request').hidden=false;}
+  finally{submit.disabled=false;}
+});
+$('staff-reset-request')?.addEventListener('click',async event=>{
+  const button=event.currentTarget,email=$('staff-login').elements.email.value.trim();
+  if(!email){notice('Bitte zuerst die hinterlegte E-Mail-Adresse eintragen.');return;}
+  button.disabled=true;
+  try{
+    const result=await request('/api/pruefung/passwort-reset-anfordern',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    notice(result.message);
+  }catch(error){notice('Anfrage fehlgeschlagen: '+error.message);}
+  finally{button.disabled=false;}
 });
 $('request-tablet-code')?.addEventListener('click',async()=>{
   const button=$('request-tablet-code');button.disabled=true;

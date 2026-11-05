@@ -28,6 +28,14 @@
       try{render(find(container),await api(url),activePlaces);}
       catch(err){find(statusId).textContent='Laden fehlgeschlagen: '+err.message;}
     }
+    if(!find('netzwerkpartner-section')?.hidden){
+      try{renderNetworkPartners(await api('/api/admin/netzwerkpartner/liste'));}
+      catch(error){find('netzwerkpartner-status').textContent='Laden fehlgeschlagen: '+error.message;}
+    }
+    if(!find('kundenfeedback-section')?.hidden){
+      try{renderCustomerFeedback(await api('/api/admin/kundenfeedback'));}
+      catch(error){find('kundenfeedback-status').textContent='Laden fehlgeschlagen: '+error.message;}
+    }
   }
   function renderSafetyOverview(target,data){
     target.replaceChildren();
@@ -150,8 +158,11 @@
       const statusText=person.status==='eingeladen'?'Einladung offen – Registrierung noch ausstehend':
         person.status==='geloescht'?'Konto gelöscht – Prüfprotokolle anonymisiert erhalten':
         person.status==='freigabe_ausstehend'?'Registrierung abgeschlossen – Freigabe erforderlich':
-        person.aktiv?'Zugang aktiv':'Zugang deaktiviert';
-      card.append(elt('p',statusText));
+        person.aktiv?'Zugang aktiv':person.freigegeben?'Zugang pausiert':'Zugang deaktiviert';
+      const accessStatus=elt('p',statusText);
+      accessStatus.className='staff-access-status '+(person.aktiv?'is-active':
+        person.status==='freigabe_ausstehend'?'is-pending':'is-inactive');
+      card.append(accessStatus);
       if(person.status==='geloescht'){target.append(card);continue;}
       if(person.ablauf){
         const expiry=new Date(person.ablauf);
@@ -161,6 +172,14 @@
       if(person.strasse||person.plz||person.wohnort)
         card.append(elt('p','Anschrift: '+[person.strasse,[person.plz,person.wohnort].filter(Boolean).join(' ')].filter(Boolean).join(', ')));
       if(person.qualifikationen)card.append(elt('p','Qualifikationen / Erfahrung: '+person.qualifikationen));
+      if(person.status==='freigabe_ausstehend'){
+        const subject='Nachweis zu deinen Qualifikationen';
+        const message='Hallo '+person.name+',\n\nbitte sende uns einen Nachweis zu den angegebenen Qualifikationen, sofern vorhanden.\n\nViele Grüße\nKlettern & Abenteuer Brilon';
+        const requestProof=elt('a','Nachweis per E-Mail anfragen');
+        requestProof.className='btn secondary';
+        requestProof.href='mailto:'+encodeURIComponent(person.email)+'?'+new URLSearchParams({subject,body:message});
+        card.append(requestProof);
+      }
       for(const certificate of person.bescheinigungen||[]){
         const item=elt('div');item.className='certificate-review';
         const image=document.createElement('img');
@@ -235,10 +254,47 @@
         if(!pending)grantPanel.append(elt('p','Änderungen beenden alle laufenden Mitarbeitersitzungen. Inaktive Standorte bleiben sichtbar, gewähren aber keinen Zugriff.'));
         card.append(grantPanel);
       }
+      if(person.art!=='einladung'&&person.freigegeben){
+        const access=elt('p',person.verwaltungszugang?
+          'Verwaltungsbereich: freigegeben. Zugriff umfasst die vollständige Verwaltung.':
+          'Verwaltungsbereich: nicht freigegeben.');
+        access.className='staff-admin-access '+(person.verwaltungszugang?'is-active':'is-inactive');
+        card.append(access);
+        const toggle=elt('button',person.verwaltungszugang?'Verwaltungszugang widerrufen':'Verwaltungszugang freigeben');
+        toggle.type='button';toggle.className='btn '+(person.verwaltungszugang?'secondary':'');
+        toggle.disabled=!person.aktiv&&!person.verwaltungszugang;
+        if(!person.aktiv&&!person.verwaltungszugang)access.append(elt('span',' Freigabe erst nach Reaktivierung möglich.'));
+        toggle.addEventListener('click',async()=>{
+          const grant=!person.verwaltungszugang;
+          const message=grant?'Verwaltungszugang für '+person.name+' freigeben? Damit erhält die Person Zugriff auf die vollständige Verwaltung einschließlich Buchungen und Kundendaten.':
+            'Verwaltungszugang von '+person.name+' widerrufen? Die bestehenden Verwaltungs-Sitzungen werden beendet.';
+          if(!confirm(message))return;
+          toggle.disabled=true;
+          try{
+            await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/verwaltungszugang',{
+              method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({freigegeben:grant})});
+            find('pruef-personal-status').textContent=grant?'Verwaltungszugang freigegeben. Der Mitarbeiter muss sich erneut anmelden.':'Verwaltungszugang widerrufen; Sitzungen wurden beendet.';
+            await refresh();
+          }catch(error){find('pruef-personal-status').textContent='Verwaltungszugang konnte nicht geändert werden: '+error.message;toggle.disabled=false;}
+        });
+        card.append(toggle);
+      }
+      if(person.art!=='einladung'){
+        const remove=elt('button','Mitarbeiterkonto löschen');remove.type='button';remove.className='btn danger';
+        remove.addEventListener('click',async()=>{
+          if(!confirm('Mitarbeiterkonto von '+person.name+' einschließlich Kontaktdaten, Qualifikationen und Zugängen endgültig löschen? Falls Prüfberichte vorliegen, wird das Löschen zum Schutz der Prüfprotokolle blockiert.'))return;
+          remove.disabled=true;
+          try{
+            await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id),{method:'DELETE'});
+            find('pruef-personal-status').textContent='Mitarbeiterkonto gelöscht.';await refresh();
+          }catch(error){find('pruef-personal-status').textContent='Löschen nicht möglich: '+error.message;remove.disabled=false;}
+        });
+        card.append(remove);
+      }
       if(person.aktiv){
         const stop=elt('button','Zugang pausieren');stop.type='button';stop.className='btn secondary';
         stop.addEventListener('click',async()=>{
-          if(!confirm('Zugang pausieren und alle laufenden Mitarbeitersitzungen beenden?'))return;
+          if(!confirm('Mitarbeiterzugang pausieren und alle laufenden Sitzungen beenden?'))return;
           stop.disabled=true;
           try{
             await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/deaktivieren',{method:'PATCH'});
@@ -315,6 +371,77 @@
         }
       });
       card.append(button);target.append(card);
+    }
+  }
+  function renderNetworkPartners(partners){
+    const target=find('netzwerkpartner-list');if(!target)return;
+    target.replaceChildren();
+    for(const partner of partners){
+      const card=elt('article');card.className='booking';
+      const title=partner.unternehmen||partner.ansprechpartner;
+      card.append(elt('strong',title+' · '+partner.email));
+      const status=elt('p',partner.status==='eingeladen'?'Einladung offen – Registrierung ausstehend':
+        partner.aktiv?'Partnerzugang freigeschaltet':'Registrierung abgeschlossen – Freigabe erforderlich');
+      status.className='staff-access-status '+(partner.aktiv?'is-active':
+        partner.status==='freigabe_ausstehend'?'is-pending':'is-inactive');
+      card.append(status);
+      if(partner.unternehmen)card.append(elt('p','Ansprechperson: '+partner.ansprechpartner));
+      if(partner.telefon)card.append(elt('p','Telefon: '+partner.telefon));
+      const address=[partner.strasse,[partner.plz,partner.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+      if(address)card.append(elt('p','Anschrift: '+address));
+      if(partner.weitere_angaben)card.append(elt('p','Weitere Kontakthinweise: '+partner.weitere_angaben));
+      if(partner.art==='einladung'){
+        const revoke=elt('button','Einladung widerrufen');revoke.type='button';revoke.className='btn secondary';
+        revoke.addEventListener('click',async()=>{
+          if(!confirm('Einladung für '+partner.email+' widerrufen?'))return;
+          revoke.disabled=true;
+          try{await api('/api/admin/netzwerkpartner/einladungen/'+encodeURIComponent(partner.id),{method:'DELETE'});
+            find('netzwerkpartner-status').textContent='Einladung widerrufen.';await refresh();}
+          catch(error){find('netzwerkpartner-status').textContent='Widerruf fehlgeschlagen: '+error.message;revoke.disabled=false;}
+        });
+        card.append(revoke);
+      }else if(!partner.aktiv){
+        const approve=elt('button','Netzwerkpartnerzugang freigeben');approve.type='button';approve.className='btn';
+        approve.addEventListener('click',async()=>{
+          if(!confirm('Partnerzugang für '+title+' freigeben und die Freigabe per E-Mail mitteilen?'))return;
+          approve.disabled=true;
+          try{
+            const result=await api('/api/admin/netzwerkpartner/'+encodeURIComponent(partner.id)+'/freigeben',
+              {method:'PATCH'});
+            find('netzwerkpartner-status').textContent=result.emailVersand==='gesendet'?
+              'Zugang freigegeben. Brevo hat die E-Mail angenommen; eine Zustellung ist damit nicht bestätigt.':
+              'Zugang freigegeben, aber die E-Mail konnte nicht als zugestellt bestätigt werden.';
+            await refresh();
+          }catch(error){find('netzwerkpartner-status').textContent='Freigabe fehlgeschlagen: '+error.message;approve.disabled=false;}
+        });
+        card.append(approve);
+      }
+      target.append(card);
+    }
+    if(!partners.length)target.append(elt('p','Noch keine Netzwerkpartner oder Einladungen vorhanden.'));
+  }
+  function renderCustomerFeedback(data){
+    const summary=find('kundenfeedback-summary'),target=find('kundenfeedback-list');
+    if(!summary||!target)return;
+    const stats=data.statistik||{};summary.replaceChildren();target.replaceChildren();
+    for(const [label,value] of [
+      ['Rückmeldungen',Number(stats.anzahl||0)],
+      ['Programm (Ø von 5)',stats.programm??'—'],
+      ['Mitarbeiter (Ø von 5)',stats.mitarbeiter??'—'],
+      ['Sicherheitsgefühl (Ø von 5)',stats.sicherheit??'—']
+    ]){const card=elt('article');card.className='booking payment-summary-card';card.append(elt('strong',String(value)),elt('p',label));summary.append(card);}
+    const entries=Array.isArray(data.eintraege)?data.eintraege:[];
+    if(!entries.length){target.append(elt('p','Noch keine Kundenrückmeldungen vorhanden.'));return;}
+    for(const item of entries){
+      const card=elt('article');card.className='booking';
+      const date=item.erstellt_am?new Date(item.erstellt_am).toLocaleString('de-DE'):'Zeitpunkt unbekannt';
+      card.append(elt('strong',(item.kunde||'Kunde')+' · '+(item.programm||'Programm')),
+        elt('p','Kundennummer: '+item.buchungsnummer+' · Termin: '+(item.datum||'nicht hinterlegt')),
+        elt('p','Programm: '+item.programm_bewertung+'/5 · Mitarbeiter: '+item.mitarbeiter_bewertung+'/5 · Sicherheitsgefühl: '+item.sicherheits_bewertung+'/5'),
+        elt('p','Eingegangen: '+date));
+      if(item.veraenderungen)card.append(elt('p','Veränderungsvorschläge: '+item.veraenderungen));
+      if(item.ideen)card.append(elt('p','Weitere Angebotsideen: '+item.ideen));
+      target.append(card);
     }
   }
   function standortAuswahl(selectedId){
@@ -634,6 +761,21 @@
     try{if(await einladungSenden(values.name,values.email))form.reset();}
     finally{submit.disabled=false;}
   });
+  find('netzwerkpartner-invite-form')?.addEventListener('submit',async event=>{
+    event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+    const status=find('netzwerkpartner-invite-status');button.disabled=true;status.replaceChildren();
+    try{
+      const result=await api('/api/admin/netzwerkpartner/einladungen',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.name.value,email:form.elements.email.value})});
+      status.textContent=result.emailVersand==='gesendet'?
+        'Einladung an '+result.email+' versandt. Der Mailanbieter hat sie angenommen; eine Zustellung ist damit nicht bestätigt.':
+        'Einladung gespeichert, E-Mailversand fehlgeschlagen. Registrierungslink sicher weitergeben:';
+      if(result.registrierungsLink){const link=elt('a',result.registrierungsLink);link.href=result.registrierungsLink;
+        link.className='invite-link';link.style.display='block';link.style.overflowWrap='anywhere';status.append(link);}
+      form.reset();await refresh();
+    }catch(error){status.textContent='Einladung fehlgeschlagen: '+error.message;}
+    finally{button.disabled=false;}
+  });
   find('pruef-station-form')?.addEventListener('submit',async event=>{
     event.preventDefault();const form=event.currentTarget;
     try{
@@ -664,6 +806,9 @@
   find('pruef-hinweis-refresh')?.addEventListener('click',refresh);
   find('pruef-mail-refresh')?.addEventListener('click',refresh);
   find('tablet-admin-refresh')?.addEventListener('click',refresh);
+  document.querySelectorAll('[data-admin-view-link]').forEach(link=>link.addEventListener('click',()=>{
+    if(['#netzwerkpartner-section','#kundenfeedback-section'].includes(link.hash))setTimeout(refresh,0);
+  }));
   // The admin workspace is revealed by the existing login flow.
   const observer=new MutationObserver(()=>{
     if(!find('workspace')?.hidden && !initialized){initialized=true;refresh();}
