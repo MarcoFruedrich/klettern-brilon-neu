@@ -1,0 +1,80 @@
+
+/* Verwaltungskalender V2: Wochen-, Monats- und Agendaansicht.
+   Standortfarbe ist nicht der Buchungsstatus. */
+.admin-page .admin-topbar {background:#103c2c;border-bottom-color:#255741;}
+.admin-page .admin-sidebar {background:linear-gradient(160deg,#114031,#0b2c25);border-color:#1c5947;}
+.admin-page .admin-navigation a {color:#edf7f1;}
+.admin-page .admin-navigation a:hover,.admin-page .admin-navigation a:focus-visible {background:#236c4f;color:white;}
+.admin-page .admin-navigation a[aria-current="page"] {background:#087c51;color:white;}
+.admin-page .admin-sidebar .btn.secondary {background:#285a49;color:white!important;}
+.admin-page .admin-view#calendar-view {background:#f7faf8;}
+.admin-page #calendar-view > h2:first-child {margin-bottom:8px;font-size:clamp(27px,3vw,38px);}
+.admin-page #calendar-view .ck-root {margin:18px 0 30px;font-size:14px;color:#153a30;}
+.ck-root * {box-sizing:border-box;}
+.ck-toolbar {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;}
+.ck-switch {display:flex;gap:5px;}
+.ck-root button {font:inherit;cursor:pointer;}
+.ck-switch button,.ck-nav button,.ck-actions button {min-height:42px;padding:9px 16px;border:1px solid #c9d8d0;border-radius:10px;background:#fff;color:#163e35;font-weight:760;}
+.ck-switch button[aria-pressed="true"] {background:#087847;color:#fff;border-color:#087847;}
+.ck-nav {display:flex;align-items:center;gap:7px;}
+.ck-nav button {padding:8px 12px;}
+.ck-period {display:inline-flex;justify-content:center;align-items:center;min-width:210px;max-width:100%;padding:10px 12px;border:1px solid #d4e0d8;border-radius:10px;background:#fff;font-weight:820;text-align:center;}
+.ck-actions {display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.ck-actions .ck-new {background:#006f43;border-color:#006f43;color:#fff;}
+.ck-actions .ck-new:hover,.ck-switch button[aria-pressed="true"]:hover {background:#015d3b;}
+.ck-filter {display:flex;align-items:center;gap:8px;max-width:260px;color:#234639!important;font-weight:780;}
+.ck-filter select {background:#fff;color:#153a30;border:1px solid #c9d8d0;padding:9px 12px;min-height:42px;width:100%;font:inherit;}
+.ck-state {min-height:20px;margin:8px 0;color:#4f6759;font-size:13px;}
+.ck-body {display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,280px);align-items:start;gap:13px;}
+.ck-panel {background:white;border:1px solid #d7e3dc;border-radius:14px;box-shadow:0 3px 9px #1745310d;overflow:hidden;}
+.ck-board-scroll {width:100%;overflow-x:auto;overscroll-behavior-x:contain;}
+.ck-week-grid {position:relative;min-width:840px;display:grid;grid-template-columns:64px repeat(7,minmax(110px,1fr));grid-template-rows:58px auto auto;border-collapse:collapse;}
+.ck-head-space {background:#f3f8f4;border-bottom:1px solid #dae6de;}
+.ck-dayhead {display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;background:#f6faf7;border-left:1px solid #dce6df;border-bottom:1px solid #dce6df;font-weight:750;color:#224a38;padding:6px;}
+.ck-dayhead.is-today {background:#ddf5e2;}
+.ck-dayhead span {font-size:12px;font-weight:650;color:#4a6559;}
+.ck-allday-label {font-size:11px;font-weight:750;color:#637b6b;padding:9px 5px;border-bottom:1px solid #e2ebe5;}
+.ck-allday {display:flex;flex-direction:column;gap:4px;min-height:30px;padding:4px;border-left:1px solid #e2ebe5;border-bottom:1px solid #e2ebe5;}
+.ck-allday-item {background:#f1f5f2;color:#254d36;border:1px solid #d2e3da;border-radius:5px;padding:4px 5px;font-size:11px;line-height:1.25;text-align:left;}
+.ck-allday-item.is-block {background:#fff0f0;color:#972d39;border-color:#ef9da6;}
+.ck-ticks {position:relative;background:#fafcfb;border-right:1px solid #e0e8e3;}
+.ck-hour {position:absolute;right:9px;transform:translateY(-45%);color:#53675b;font-size:12px;}
+.ck-daylane {position:relative;border-left:1px solid #e0e8e3;background:repeating-linear-gradient(to bottom,#fff 0,#fff 63px,#e9f0eb 64px);min-width:0;}
+.ck-daylane.is-today {background:repeating-linear-gradient(to bottom,#f6fcf7 0,#f6fcf7 63px,#e5f0e7 64px);}
+.ck-event {position:absolute;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;text-align:left;border:1px solid var(--ck-line,#9bcae9);border-radius:7px;padding:5px;background:var(--ck-pale,#eaf4fe);color:#142f31;font-size:11px;line-height:1.22;z-index:1;min-width:0;}
+.ck-event:hover,.ck-event:focus-visible {outline:2px solid #16543a;outline-offset:1px;z-index:3;}
+.ck-event .ck-time {font-weight:840;}
+.ck-event .ck-title {font-weight:760;overflow-wrap:anywhere;}
+.ck-event .ck-site {font-weight:650;color:#374a44;overflow-wrap:anywhere;}
+.ck-event.is-block {--ck-pale:#ffebec;--ck-line:#ed9da3;color:#912736;}
+.ck-event.is-manual {--ck-pale:#e9f4ff;--ck-line:#94bfe4;}
+.ck-event.is-selected {outline:2px solid #087b50;outline-offset:-1px;z-index:2;}
+.ck-detail {padding:14px;min-height:220px;}
+.ck-detail h3 {font-size:18px;margin:0 0 9px!important;}
+.ck-detail-head {border-radius:9px;background:#e6f6e7;padding:9px 11px;font-weight:760;font-size:13px;margin-bottom:12px;}
+.ck-detail-card {display:grid;gap:5px;padding:11px 12px;margin:10px 0;border:1px solid var(--ck-line,#cddbd4);border-left:4px solid var(--ck-strong,#0f7c53);border-radius:9px;background:var(--ck-pale,#fff);color:#1a3b32;}
+.ck-detail-card h4 {margin:0;color:#173d32;font-size:14px;line-height:1.3;}
+.ck-detail-card p {margin:0!important;color:#28473b!important;font-size:12px;}
+.ck-detail-card button {justify-self:start;background:#fff;border:1px solid #bfd3c7;color:#164333;padding:7px 10px;border-radius:7px;font-weight:700;}
+.ck-detail-note {margin:10px 0;padding:10px;border-radius:10px;background:#e7f6eb;color:#145a39;font-weight:650;font-size:12px;}
+.ck-detail-note.is-warning {background:#fff2db;color:#7c4a11;}
+.ck-legend {display:flex;gap:8px 17px;flex-wrap:wrap;margin:14px 0 0;padding:13px;border:1px solid #d6e2db;border-radius:11px;background:#fff;color:#2c493d;font-weight:670;font-size:12px;}
+.ck-legend span {display:inline-flex;gap:6px;align-items:center;}
+.ck-legend i {display:inline-block;width:14px;height:14px;border-radius:4px;}
+.ck-month-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;padding:12px;min-width:660px;}
+.ck-month-label {text-align:center;color:#315b48;font-size:12px;font-weight:800;padding:8px;}
+.ck-month-cell {min-width:0;min-height:103px;border:1px solid #d9e6dc;background:#fff;border-radius:9px;padding:7px 5px;text-align:left;color:#15392c;display:flex;flex-direction:column;gap:5px;}
+.ck-month-cell.is-today {background:#ecfaee;border-color:#87bf9b;}
+.ck-month-cell.is-selected {outline:2px solid #0b794d;}
+.ck-month-day {font-size:13px;font-weight:800;}
+.ck-mini-event {font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--ck-strong,#207a65);background:var(--ck-pale,#eff7f3);padding:2px 3px;border-radius:3px;color:#1a3e2b;}
+.ck-agenda {display:grid;gap:10px;padding:14px;}
+ .ck-agenda-day {border-bottom:1px solid #e1eae3;padding:0 0 8px;}
+.ck-agenda-day h4 {font-size:15px;margin:0 0 6px;}
+.ck-agenda-day button {display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;padding:10px;margin:4px 0;border-radius:8px;border:1px solid var(--ck-line,#d2e5d6);background:var(--ck-pale,#fff);color:#17442c;}
+.ck-agenda-day .ck-empty {color:#7a8980;font-size:12px;margin:2px 0;}
+.ck-actions-bottom {display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.ck-actions-bottom button {min-height:38px;background:#f0f8f3;border:1px solid #bed7c7;color:#19543e;border-radius:8px;padding:7px 10px;font-weight:750;}
+.admin-page.ck-enabled #calendar-section {display:none!important;}
+@media(max-width:1150px){.ck-body{grid-template-columns:minmax(0,1fr)}.ck-detail{min-height:auto}.ck-toolbar{justify-content:flex-start}}
+@media(max-width:700px){.ck-period{min-width:0;font-size:12px;flex:1}.ck-nav{width:100%;justify-content:space-between}.ck-actions{width:100%}.ck-filter{max-width:none;flex:1}.ck-month-grid{min-width:620px}.ck-detail{padding:12px}.ck-toolbar{gap:9px}.ck-legend{font-size:11px}}
