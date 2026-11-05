@@ -295,7 +295,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await registration.json()).status,'freigabe_ausstehend');
   assert.equal((await fetch(root+'/api/pruefung/registrieren',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
-    body:JSON.stringify({token:invitationToken,name:staffData.name,passwort:staffDataPassword})})).status,410,
+    body:JSON.stringify({token:invitationToken,name:staffData.name,telefon:'+49 123 456',
+      strasse:'Musterstraße 12',plz:'59929',wohnort:'Brilon',
+      qualifikationen:'Erste Hilfe\nKletterqualifikation',passwort:staffDataPassword})})).status,410,
   'Einladungslink ist nach der Registrierung verbraucht');
   const pendingLogin=await fetch(root+'/api/pruefung/login',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
