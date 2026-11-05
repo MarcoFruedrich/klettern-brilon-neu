@@ -30,7 +30,13 @@ async function loadOwnReports(){
         const result=item.zustand==='mangel'?'Sicherheitsmangel':
           item.zustand==='hinweis'?'Hinweis – Nachprüfung vorgemerkt':'In Ordnung';
         const detail=item.beschreibung?' – '+item.beschreibung:'';
-        list.append(text('li',(item.station||'Station')+': '+result+detail));
+        const unused=item.zustand==='nicht_genutzt';
+        list.append(text('li',(item.station||'Station')+': '+(unused?'Nicht genutzt / nicht geprüft':result)+detail));
+        if(Array.isArray(item.pruefpunkte)&&item.pruefpunkte.length){
+          const details=text('ul','');
+          for(const point of item.pruefpunkte)details.append(text('li',point.name+': '+(point.zustand==='ok'?'In Ordnung':point.zustand==='hinweis'?'Hinweis':'Sicherheitsmangel')));
+          list.append(details);
+        }
       }
       article.append(list);target.append(article);
     }
@@ -65,6 +71,8 @@ function stationControl(station){
   const label=text('label');label.className='check';
   const check=document.createElement('input');check.type='checkbox';check.className='pruefung-aktiv';
   label.append(check,text('span','Station wird verwendet'));fieldset.append(label);
+  const unused=text('p','Nicht genutzt / nicht Bestandteil des Programms – keine Prüfung erfolgt.');
+  unused.className='hint';fieldset.append(unused);
   const group=text('div');group.hidden=true;
   const resultLabel=text('label','Prüfergebnis');
   const state=document.createElement('select');state.className='pruefung-zustand';
@@ -100,7 +108,7 @@ function stationControl(station){
     group.prepend(list);
   }
   fieldset.append(group);
-  check.addEventListener('change',()=>{group.hidden=!check.checked;});
+  check.addEventListener('change',()=>{group.hidden=!check.checked;unused.hidden=check.checked;});
   state.addEventListener('change',()=>{
     const defect=state.value!=='ok';
     description.hidden=!defect;description.required=defect;
@@ -179,7 +187,7 @@ $('station-inspection').addEventListener('submit',async event=>{
   event.preventDefault();const form=event.currentTarget;
   const selected=Array.from(form.querySelectorAll('.pruefung-station')).filter(e=>
     e.querySelector('.pruefung-aktiv').checked);
-  if(!selected.length){notice('Bitte mindestens eine verwendete Station auswählen.');return;}
+  if(!form.querySelectorAll('.pruefung-station').length){notice('Keine Stationen zur Prüfung verfügbar.');return;}
   for(const station of selected){const points=Array.from(station.querySelectorAll('.brilon-pruefpunkt'));if(points.some(point=>!point.value)){notice('Bitte alle Prüfpunkte der verwendeten Station '+station.querySelector('legend').textContent+' bestätigen.');return;}}
   for(const station of selected){
     const values=Array.from(station.querySelectorAll('.brilon-pruefpunkt')).map(p=>p.value);
@@ -198,6 +206,9 @@ $('station-inspection').addEventListener('submit',async event=>{
       foto:e.querySelector('.pruefung-zustand').value!=='ok'?
         await fotoAlsJPEG(e.querySelector('.pruefung-foto').files[0]):null
     })));
+    for(const e of form.querySelectorAll('.pruefung-station')){
+      if(!e.querySelector('.pruefung-aktiv').checked)pruefungen.push({stationId:e.dataset.id,zustand:'nicht_genutzt',beschreibung:'',pruefpunkte:[],foto:null});
+    }
     const data=await request('/api/pruefung/berichte',{method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({programm:form.elements.programm.value,
