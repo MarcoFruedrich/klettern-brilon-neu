@@ -385,6 +385,12 @@ fetch('/api/sperrzeiten')
   });
 
 const form = document.getElementById('booking');
+const gastStatus=form.querySelector('#ist-gast');
+const gastEinrichtungFeld=form.querySelector('#gast-einrichtung-feld');
+const gastEinrichtung=form.querySelector('#gast-einrichtung');
+function gastEingabeAktualisieren(){const ja=gastStatus.value==='ja';gastEinrichtungFeld.hidden=!ja;gastEinrichtung.required=ja;if(!ja)gastEinrichtung.value='';}
+gastStatus.addEventListener('change',gastEingabeAktualisieren);
+gastEingabeAktualisieren();
 
 form.addEventListener('submit', async e => {
   e.preventDefault();
