@@ -37,7 +37,7 @@
       <div class="admin-layout">
         <aside class="admin-sidebar" aria-label="Verwaltung">
           <button id="logout" class="btn secondary">Abmelden</button>
-          <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
+          <nav class="admin-navigation" aria-label="Verwaltungsbereiche"><a href="#admin-dashboard" data-admin-view-link>Übersicht</a>
             <a href="#bookings-section" data-admin-view-link>Buchungen</a>
             <a href="#feedback-admin-section" data-admin-view-link>Feedback</a>
             <a href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
@@ -54,7 +54,7 @@
             <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
           </nav>
         </aside>
-        <div class="admin-content">
+        <div class="admin-content"><section id="admin-dashboard" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="admin-dashboard-heading"><h2 id="admin-dashboard-heading">Aktuelles auf einen Blick</h2><p>Deine zentralen Verwaltungsbereiche. Neue Vorgänge und Zähler werden hier ergänzt, sobald die jeweiligen Datenquellen angebunden sind.</p><div class="admin-grid"><article class="booking"><h3>Neue Buchungen</h3><p>Eingegangene Buchungen und Anfragen prüfen.</p><a class="btn secondary" href="#bookings-section" data-admin-view-link>Buchungen öffnen →</a></article><article class="booking"><h3>Trainer-Rückmeldungen</h3><p>Hinweise von Trainern und offene Teilnehmerbestätigungen.</p><a class="btn secondary" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiterbereich öffnen →</a></article><article class="booking"><h3>Stationsprüfungen</h3><p>Prüfberichte und Sicherheitsmeldungen kontrollieren.</p><a class="btn secondary" href="#stationspruefung" data-admin-view-link>Prüfberichte öffnen →</a></article><article class="booking"><h3>Kundenfeedback</h3><p>Neue Rückmeldungen zu Angeboten einsehen.</p><a class="btn secondary" href="#feedback-admin-section" data-admin-view-link>Feedback öffnen →</a></article><article class="booking"><h3>Mitarbeiter</h3><p>Einladungen, Registrierungen und Freigaben bearbeiten.</p><a class="btn secondary" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiter öffnen →</a></article><article class="booking"><h3>Programme & Termine</h3><p>Angebote und kommende Termine verwalten.</p><a class="btn secondary" href="#calendar-view" data-admin-view-link>Kalender öffnen →</a></article></div></section>
 
       <section id="payment-overview-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="payment-overview-heading">
         <h2 id="payment-overview-heading">Zahlungsübersicht</h2>
