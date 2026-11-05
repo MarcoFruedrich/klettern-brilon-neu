@@ -74,6 +74,7 @@
   const tabs = {};
   for (const [key,label] of [['week','Woche'],['month','Monat'],['agenda','Agenda']]) {
     tabs[key] = btn(label, '', () => {
+      chosen.cursor = fromIso(chosen.date);
       chosen.mode = key; chosen.entryId = null; load();
     });
     tabs[key].setAttribute('aria-pressed', key === chosen.mode ? 'true' : 'false');
@@ -395,13 +396,21 @@
         sharedStaff.push(person.name);
     }
     sharedStaff=Array.from(new Set(sharedStaff.filter(Boolean)));
-    const pairCount=bookings.reduce((n,a,i)=>n+bookings.slice(i+1).filter(b=>overlap(a,b)).length,0);
+    let pairCount=0,sameSiteCount=0;
+    for(let i=0;i<bookings.length;i++)for(let j=i+1;j<bookings.length;j++){
+      if(!overlap(bookings[i],bookings[j]))continue;
+      pairCount++;
+      if(bookings[i].site&&bookings[i].site===bookings[j].site)sameSiteCount++;
+    }
     const note=mk('div','ck-detail-note');
     if(sharedStaff.length){
       note.classList.add('is-warning');
       note.textContent='⚠ Zeitgleiche Mitarbeitereinsätze prüfen: '+sharedStaff.join(', ');
+    } else if(sameSiteCount){
+      note.classList.add('is-warning');
+      note.textContent='⚠ '+sameSiteCount+' parallele Buchungspaar(e) am selben Standort. Kapazität und Personal prüfen.';
     } else if(pairCount){
-      note.textContent='✓ '+pairCount+' zeitgleiche Buchungspaar(e). Unterschiedliche Standorte sind erlaubt. '+(
+      note.textContent='✓ '+pairCount+' zeitgleiche Buchungspaar(e) an verschiedenen Standorten. '+(
         bookings.some(b=>!b.staff.length)?'Personaleinteilung teilweise noch offen.':'Keine doppelt zugewiesenen Mitarbeiter erkannt.');
     } else {
       note.textContent=bookings.length?'Keine zeitlichen Buchungsüberschneidungen erkannt.':'';
