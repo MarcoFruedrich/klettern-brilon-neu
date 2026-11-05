@@ -372,7 +372,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const bereinigtesFoto=await fotoBereinigen(foto);
   const input={programm:'Klettern Klasse CI',beginn:day1+'T10:00',
     pruefungen:[{stationId,zustand:'mangel',foto,
-      beschreibung:'Karabiner lässt sich nicht ordnungsgemäß schließen'}]};
+      beschreibung:'Karabiner lässt sich nicht ordnungsgemäß schließen',
+      pruefpunkte:['Wandstruktur','Griffe und Tritte','Sicherungspunkte','Sicherungsmaterial','Fallbereich']
+        .map(name=>({name,zustand:'ok'}))}]};
   assert.equal((await userPost('/api/pruefung/berichte',input)).status,403,
     'Ohne Vor-Ort-Code darf kein Prüfprotokoll gespeichert werden');
   assert.equal((await userPost('/api/pruefung/freischalten',{code})).status,200);
