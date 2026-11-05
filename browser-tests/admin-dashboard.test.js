@@ -366,8 +366,8 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const navigation=page.locator('.admin-navigation');
     const visibleViews=()=>page.locator('[data-admin-view]:visible').count();
     assert.equal(await visibleViews(),1,'Nach Anmeldung soll genau ein Bereich sichtbar sein');
-    assert.equal(await page.locator('#bookings-section').isVisible(),true);
-    assert.equal(await navigation.locator('[aria-current="page"]').getAttribute('href'),'#bookings-section');
+    assert.equal(await page.locator('#admin-dashboard').isVisible(),true);
+    assert.equal(await navigation.locator('[aria-current="page"]').getAttribute('href'),'#admin-dashboard');
     assert.equal(await page.locator('.admin-layout').evaluate(node=>getComputedStyle(node).display),'grid');
     assert.equal(await navigation.evaluate(node=>getComputedStyle(node).flexDirection),'column');
 
@@ -380,7 +380,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
 
     await page.goBack();
     await page.waitForFunction(()=>location.hash==='');
-    assert.equal(await page.locator('#bookings-section').isVisible(),true,
+    assert.equal(await page.locator('#admin-dashboard').isVisible(),true,
       'Browser-Zurück soll die vorherige Ansicht wiederherstellen');
 
     await page.setViewportSize({width:390,height:844});
@@ -443,6 +443,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       }
     }));
     await login(page,root);
+    await openAdminView(page,'#bookings-section');
     const info=page.locator('#booking-results-summary');
     await page.waitForFunction(()=>document.getElementById('booking-results-summary')?.textContent.includes('135 Buchung(en) gefunden'));
     assert.equal(await page.locator('#bookings .booking').count(),50);
@@ -874,6 +875,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const page=await browser.newPage({viewport:{width:390,height:844}});
     const state=fakeAdminApi(page);
     await login(page,root);
+    await openAdminView(page,'#bookings-section');
     const search=page.locator('#bookings-search');
     const originalCard=await page.locator('#bookings .booking').first().elementHandle();
     await search.fill('Beispiel');
