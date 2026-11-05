@@ -16,6 +16,7 @@ const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
+const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild } = require('./lib/bilddatei');
 const { createClamScanner } = require('./lib/malware-scanner');
@@ -315,11 +316,13 @@ async function anschlussApi(req,res,url,route,ip){
 
 const pruefungApi=createPruefungApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail,scanForMalware});
 
+const marketingCampaignApi=createMarketingCampaignApi({pool,admin,reply,body});
 async function main(req,res){
   const u=new URL(req.url,'http://localhost'),
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    if(route==='/api/admin/marketing/kampagne')return await marketingCampaignApi(req,res,route);
     if(route.startsWith('/api/pruefung/')||route.startsWith('/api/admin/pruefung/'))
       return await pruefungApi(req,res,u,route,ip);
     if(route==='/api/anschlussangebote/vorschau'||route==='/api/anschlussangebote/buchen')
@@ -2463,6 +2466,14 @@ if (route === '/api/angebote' && req.method === 'GET') {
 async function start(){
   if(pool){
     await pool.query('SELECT 1');
+    if(process.env.RUN_MARKETING_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_marketing_kampagnen (
+        id TEXT PRIMARY KEY,
+        data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      console.log('Marketing-Kampagnentabelle geprüft');
+    }
     // Explicit, narrow opt-in used only to initialize the admin session store.
     if(process.env.RUN_ADMIN_SESSION_MIGRATION==='true'){
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (
