@@ -322,7 +322,7 @@ async function main(req,res){
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
-    if(route==='/api/admin/marketing/kampagne')return await marketingCampaignApi(req,res,route);
+    if(route.startsWith('/api/admin/marketing/kampagnen'))return await marketingCampaignApi(req,res,route);
     if(route.startsWith('/api/pruefung/')||route.startsWith('/api/admin/pruefung/'))
       return await pruefungApi(req,res,u,route,ip);
     if(route==='/api/anschlussangebote/vorschau'||route==='/api/anschlussangebote/buchen')
