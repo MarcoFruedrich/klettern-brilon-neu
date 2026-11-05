@@ -38,6 +38,13 @@
         </form>
         <p id="staff-profile-status" role="status" aria-live="polite"></p>
       </details>
+      <section class="booking" aria-labelledby="staff-planning-heading">
+        <h2 id="staff-planning-heading">Termine und meine Bewerbungen</h2>
+        <p>Du kannst dich auf freie Termine bewerben. Eine Einteilung durch die Verwaltung muss von dir verbindlich bestätigt werden.</p>
+        <button id="staff-planning-refresh" class="btn secondary" type="button">Termine aktualisieren</button>
+        <p id="staff-planning-status" role="status" aria-live="polite"></p>
+        <div id="staff-planning-list" class="admin-grid"></div>
+      </section>
       <div class="staff-portal-layout">
         <nav id="staff-areas-nav" class="staff-areas-nav" aria-label="Mitarbeiterbereiche"></nav>
         <section id="staff-area-content" class="booking staff-area-content" aria-live="polite">
@@ -48,5 +55,6 @@
     </section>
   </main>
   <script src="/mitarbeiterbereich.js"></script>
+  <script src="/einsatzplanung-mitarbeiter.js?v=20261105-planung"></script>
 </body>
 </html>
