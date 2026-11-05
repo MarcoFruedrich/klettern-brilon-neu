@@ -130,7 +130,7 @@
   }
   function visibleEntries(day) {
     return chosen.events.filter(e => e.date <= day && day <= e.last &&
-      (!chosen.site || e.site === chosen.site));
+      (!chosen.site || e.site === chosen.site || e.type !== 'buchung'));
   }
   function bookingStaff(plan) {
     const map=new Map();
@@ -396,19 +396,22 @@
         sharedStaff.push(person.name);
     }
     sharedStaff=Array.from(new Set(sharedStaff.filter(Boolean)));
-    let pairCount=0,sameSiteCount=0;
+    let pairCount=0,sameSiteCount=0,unknownSiteCount=0;
     for(let i=0;i<bookings.length;i++)for(let j=i+1;j<bookings.length;j++){
       if(!overlap(bookings[i],bookings[j]))continue;
       pairCount++;
-      if(bookings[i].site&&bookings[i].site===bookings[j].site)sameSiteCount++;
+      if(!bookings[i].site || !bookings[j].site)unknownSiteCount++;
+      else if(bookings[i].site===bookings[j].site)sameSiteCount++;
     }
     const note=mk('div','ck-detail-note');
     if(sharedStaff.length){
       note.classList.add('is-warning');
       note.textContent='⚠ Zeitgleiche Mitarbeitereinsätze prüfen: '+sharedStaff.join(', ');
-    } else if(sameSiteCount){
+    } else if(sameSiteCount || unknownSiteCount){
       note.classList.add('is-warning');
-      note.textContent='⚠ '+sameSiteCount+' parallele Buchungspaar(e) am selben Standort. Kapazität und Personal prüfen.';
+      note.textContent='⚠ '+pairCount+' parallele Buchungspaar(e). '+
+        (sameSiteCount?'Termine am selben Standort: Kapazität prüfen. ':'')+
+        (unknownSiteCount?'Bei einigen Buchungen fehlt die Standortzuordnung.':'');
     } else if(pairCount){
       note.textContent='✓ '+pairCount+' zeitgleiche Buchungspaar(e) an verschiedenen Standorten. '+(
         bookings.some(b=>!b.staff.length)?'Personaleinteilung teilweise noch offen.':'Keine doppelt zugewiesenen Mitarbeiter erkannt.');
