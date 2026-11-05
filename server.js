@@ -1425,6 +1425,38 @@ preis=safeText(d.preis,50);
         return reply(res,200,q.rows);
       }
 
+      // Dienstplanung: nur die Verwaltung darf Mitarbeiter für Buchungen einteilen.
+      if(route==='/api/admin/kalender-mitarbeitende'&&req.method==='GET'){
+        const q=await pool.query(`SELECT id,name,email FROM brilon_pruef_mitarbeitende
+          WHERE aktiv=true AND registriert_am IS NOT NULL AND freigabe_am IS NOT NULL
+          ORDER BY name,id`);
+        return reply(res,200,q.rows);
+      }
+      const planung=route.match(/^\\/api\\/admin\\/kalenderzuweisung\\/([0-9a-f-]{36})$/i);
+      if(planung&&req.method==='PATCH'){
+        const d=await body(req);
+        if(!d||typeof d!=='object'||Array.isArray(d)||
+            !Array.isArray(d.mitarbeiterIds)||d.mitarbeiterIds.length>30||
+            d.mitarbeiterIds.some(id=>typeof id!=='string'||!/^[0-9a-f-]{36}$/i.test(id)))
+          return reply(res,400,{error:'Ungültige Mitarbeiterzuweisung.'});
+        const ids=[...new Set(d.mitarbeiterIds)];
+        if(ids.length){
+          const staff=await pool.query(`SELECT id FROM brilon_pruef_mitarbeitende
+            WHERE id=ANY($1::uuid[]) AND aktiv=true AND registriert_am IS NOT NULL
+              AND freigabe_am IS NOT NULL`,[ids]);
+          if(staff.rows.length!==ids.length)
+            return reply(res,409,{error:'Mindestens ein Mitarbeiter ist nicht freigegeben oder nicht aktiv.'});
+        }
+        const q=await pool.query(`UPDATE brilon_buchungen SET
+          data=jsonb_set(data,'{mitarbeiterZuweisungen}',$1::jsonb,true),
+          updated_at=NOW()
+          WHERE id=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')
+          RETURNING id,data->'mitarbeiterZuweisungen' AS mitarbeiter_ids`,
+          [JSON.stringify(ids),planung[1]]);
+        if(!q.rowCount)return reply(res,404,{error:'Aktive Buchung nicht gefunden.'});
+        return reply(res,200,{id:q.rows[0].id,mitarbeiterIds:q.rows[0].mitarbeiter_ids});
+      }
+
       if(route==='/api/admin/kalenderbuchungen'&&req.method==='GET'){
         const monat=safeText(u.searchParams.get('monat'),7);
         const match=/^(\d{4})-(0[1-9]|1[0-2])$/.exec(monat);
