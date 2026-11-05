@@ -181,6 +181,12 @@ $('station-inspection').addEventListener('submit',async event=>{
     e.querySelector('.pruefung-aktiv').checked);
   if(!selected.length){notice('Bitte mindestens eine verwendete Station auswählen.');return;}
   for(const station of selected){const points=Array.from(station.querySelectorAll('.brilon-pruefpunkt'));if(points.some(point=>!point.value)){notice('Bitte alle Prüfpunkte der verwendeten Station '+station.querySelector('legend').textContent+' bestätigen.');return;}}
+  for(const station of selected){
+    const values=Array.from(station.querySelectorAll('.brilon-pruefpunkt')).map(p=>p.value);
+    const state=station.querySelector('.pruefung-zustand').value;
+    if(values.includes('mangel')&&state!=='mangel'){notice('Sicherheitsmangel in '+station.querySelector('legend').textContent+': Bitte Stationsbefund auf Sicherheitsmangel setzen.');return;}
+    if(values.includes('hinweis')&&state==='ok'){notice('Hinweis in '+station.querySelector('legend').textContent+': Bitte Stationsbefund entsprechend anpassen.');return;}
+  }
   const submit=form.querySelector('button[type=submit]');submit.disabled=true;
   try{
     if(selected.filter(e=>e.querySelector('.pruefung-foto').files.length).length>3)
