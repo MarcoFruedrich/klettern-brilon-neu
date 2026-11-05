@@ -2519,12 +2519,7 @@ if (route === '/api/angebote' && req.method === 'GET') {
   }
 }
 
-async function start(){
-  if(pool){
-    await pool.query('SELECT 1');
-    // Idempotente, eng begrenzte Einsatzplanungs-Migration nach Freigabe.
-    // Nur ausführen, wenn die bestehenden Buchungs- und Mitarbeitertabellen vorhanden sind.
-    if(process.env.RUN_SCHEMA_MIGRATIONS==='true'||process.env.RUN_STAFFING_MIGRATION==='true'){
+async function migrateEinsatzplanung(){
     const einsatzSchema=await pool.query(`SELECT to_regclass('public.brilon_buchungen') AS buchungen,
       to_regclass('public.brilon_pruef_mitarbeitende') AS mitarbeitende`);
     if(einsatzSchema.rows[0]?.buchungen&&einsatzSchema.rows[0]?.mitarbeitende){
@@ -2559,8 +2554,14 @@ async function start(){
     }else{
       console.warn('Einsatzplanungsschema zurückgestellt: Grundtabellen noch nicht vorhanden.');
     }
-    }
 
+}
+
+async function start(){
+  if(pool){
+    await pool.query('SELECT 1');
+    // Idempotente, eng begrenzte Einsatzplanungs-Migration nach Freigabe.
+    // Nur ausführen, wenn die bestehenden Buchungs- und Mitarbeitertabellen vorhanden sind.
     if(process.env.RUN_MARKETING_MIGRATION==='true'){
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_marketing_kampagnen (
         id TEXT PRIMARY KEY,
@@ -3015,6 +3016,8 @@ await pool.query(`
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }
+    if(process.env.RUN_SCHEMA_MIGRATIONS==='true'||process.env.RUN_STAFFING_MIGRATION==='true')
+      await migrateEinsatzplanung();
     if(process.env.MOCK_PG!=='1'){
       try{
         await pool.query('SELECT bericht_id FROM brilon_pruef_meldungen LIMIT 0');
