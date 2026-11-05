@@ -90,10 +90,13 @@ function stationControl(station){
     list.append(text('h4','Prüfpunkte – Kletterhalle Brilon'));
     for(const [title,instruction] of checkpoints){
       const label=text('label','');label.className='check';
-      const box=document.createElement('input');box.type='checkbox';box.className='brilon-pruefpunkt';
-      label.append(box,text('span',title+' – '+instruction));list.append(label);
+      const select=document.createElement('select');select.className='brilon-pruefpunkt';select.dataset.title=title;select.required=true;
+      for(const [value,caption] of [['','Bitte bewerten'],['ok','In Ordnung'],['hinweis','Hinweis / kleiner Mangel'],['mangel','Sicherheitsmangel']]){
+        const option=text('option',caption);option.value=value;select.append(option);
+      }
+      label.append(text('span',title+' – '+instruction),select);list.append(label);
     }
-    list.append(text('p','Alle Prüfpunkte bestätigen. Die Einzelhäkchen dienen aktuell der Eingabekontrolle; die revisionssichere Speicherung der Einzelbewertungen wird noch ergänzt.'));
+    list.append(text('p','Jeden Prüfpunkt einzeln bewerten. Hinweise und Sicherheitsmängel zusätzlich im Stationsbefund beschreiben.'));
     group.prepend(list);
   }
   fieldset.append(group);
@@ -177,13 +180,14 @@ $('station-inspection').addEventListener('submit',async event=>{
   const selected=Array.from(form.querySelectorAll('.pruefung-station')).filter(e=>
     e.querySelector('.pruefung-aktiv').checked);
   if(!selected.length){notice('Bitte mindestens eine verwendete Station auswählen.');return;}
-  for(const station of selected){const points=Array.from(station.querySelectorAll('.brilon-pruefpunkt'));if(points.some(point=>!point.checked)){notice('Bitte alle Prüfpunkte der verwendeten Station '+station.querySelector('legend').textContent+' bestätigen.');return;}}
+  for(const station of selected){const points=Array.from(station.querySelectorAll('.brilon-pruefpunkt'));if(points.some(point=>!point.value)){notice('Bitte alle Prüfpunkte der verwendeten Station '+station.querySelector('legend').textContent+' bestätigen.');return;}}
   const submit=form.querySelector('button[type=submit]');submit.disabled=true;
   try{
     if(selected.filter(e=>e.querySelector('.pruefung-foto').files.length).length>3)
       throw Error('Maximal drei Fotos pro Prüfprotokoll möglich.');
     const pruefungen=await Promise.all(selected.map(async e=>({
       stationId:e.dataset.id,zustand:e.querySelector('.pruefung-zustand').value,
+      pruefpunkte:Array.from(e.querySelectorAll('.brilon-pruefpunkt')).map(p=>({name:p.dataset.title,zustand:p.value})),
       beschreibung:e.querySelector('.pruefung-beschreibung').value,
       foto:e.querySelector('.pruefung-zustand').value!=='ok'?
         await fotoAlsJPEG(e.querySelector('.pruefung-foto').files[0]):null
