@@ -25,7 +25,7 @@
       card.append(mk('small',(names[a.kategorie]||a.kategorie)+' · Version '+a.version+
         ' · '+(a.veroeffentlicht?'Veröffentlicht':'Entwurf')+
         ' · '+(a.standorte.length?a.standorte.map(id=>locations.find(x=>String(x.id)===String(id))?.name||id).join(', '):'Alle Standorte')+
-        ' · '+(a.anhaenge?.length||0)+' Anhänge')));
+        ' · '+(a.anhaenge?.length||0)+' Anhänge'));
       if(a.kurztext)card.append(mk('p',a.kurztext));
       const actions=mk('div');actions.className='wiki-admin-actions';
       const edit=mk('button','Bearbeiten');edit.type='button';edit.className='btn secondary';
