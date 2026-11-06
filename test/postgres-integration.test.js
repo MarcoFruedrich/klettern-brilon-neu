@@ -73,10 +73,14 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
       datum: date, uhrzeit: time, teilnehmer: 3, angebot: programName, datenschutz: 'on',
       agbBestaetigt: 'on', agbVersion: 1 })
   });
-  const capacity = await Promise.all([book('CIAlpha', day1, '10:00'), book('CIBeta', day1, '11:00')]);
+  let capacity;
+  try { capacity=await Promise.all([book('CIAlpha', day1, '10:00'), book('CIBeta', day1, '11:00')]); }
+  catch(error){throw new Error('Parallele Buchungsanfragen fehlgeschlagen: '+error.message+'; Serverausgabe: '+errors);}
   assert.deepEqual(capacity.map(response => response.status).sort(), [201, 409],
     'Zwei parallele, nicht überlappende Dreiergruppen dürfen die Tageskapazität von fünf nicht überschreiten');
-  const overlap = await Promise.all([book('CIGamma', day2, '10:00'), book('CIDelta', day2, '10:00')]);
+  let overlap;
+  try { overlap=await Promise.all([book('CIGamma', day2, '10:00'), book('CIDelta', day2, '10:00')]); }
+  catch(error){throw new Error('Überlappende Buchungsanfragen fehlgeschlagen: '+error.message+'; Serverausgabe: '+errors);}
   assert.deepEqual(overlap.map(response => response.status).sort(), [201, 409],
     'Parallele Zugriffe dürfen dasselbe Zeitfenster nicht doppelt reservieren');
   const saved = await pool.query(`SELECT id,buchungsnummer FROM brilon_buchungen
