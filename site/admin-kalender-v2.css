@@ -127,3 +127,10 @@
 .ck-agenda-day button {border-left:4px solid var(--ck-site-strong,var(--ck-line,#d2e5d6));}
 
 .ck-site-filter-label {white-space:nowrap;font-size:10px;letter-spacing:-.2px;padding:2px 0;}
+
+.ck-booking-editor{display:grid;gap:10px;margin:14px 0;padding:14px;border:1px solid #bfd4ca;border-radius:12px;background:#f7faf8}
+.ck-booking-edit-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ck-booking-edit-grid label{display:grid;gap:5px;font-weight:700}
+.ck-booking-edit-grid label span{font-size:12px}
+.ck-booking-edit-grid input{min-width:0;width:100%;padding:10px;border:1px solid #bfd4ca;border-radius:8px;background:white;color:#153a30}
+@media(max-width:700px){.ck-booking-edit-grid{grid-template-columns:1fr}}
