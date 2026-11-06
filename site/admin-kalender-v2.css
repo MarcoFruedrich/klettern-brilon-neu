@@ -66,8 +66,15 @@
 .ck-month-cell {min-width:0;min-height:103px;border:1px solid #d9e6dc;background:#fff;border-radius:9px;padding:7px 5px;text-align:left;color:#15392c;display:flex;flex-direction:column;gap:5px;}
 .ck-month-cell.is-today {background:#ecfaee;border-color:#87bf9b;}
 .ck-month-cell.is-selected {outline:2px solid #0b794d;}
-.ck-month-day {font-size:13px;font-weight:800;}
-.ck-mini-event {font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--ck-strong,#207a65);background:var(--ck-pale,#eff7f3);padding:2px 3px;border-radius:3px;color:#1a3e2b;}
+.ck-month-day {align-self:flex-start;border:0;background:transparent;color:#15392c;padding:1px 3px;font-size:13px;font-weight:800;cursor:pointer;}
+.ck-mini-event {display:block;width:100%;font:inherit;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;border-left:3px solid var(--ck-strong,#207a65);background:var(--ck-pale,#eff7f3);padding:3px;border-radius:3px;color:#1a3e2b;text-align:left;cursor:pointer;}
+.ck-mini-event:hover,.ck-mini-event:focus-visible {outline:2px solid #16543a;outline-offset:1px;}
+.ck-booking-actions {display:grid;gap:7px;margin-top:5px;}
+.ck-booking-actions select {width:100%;min-height:38px;padding:7px;border:1px solid #bfd3c7;border-radius:7px;background:#fff;color:#164333;font:inherit;font-size:12px;}
+.ck-detail-card .ck-confirm {background:#087847;color:#fff;border-color:#087847;}
+.ck-detail-card .ck-confirm:hover {background:#05633b;}
+.ck-detail-card button:disabled {opacity:.58;cursor:wait;}
+.ck-action-status {min-height:0;color:#315b48!important;font-weight:700;}
 .ck-agenda {display:grid;gap:10px;padding:14px;}
  .ck-agenda-day {border-bottom:1px solid #e1eae3;padding:0 0 8px;}
 .ck-agenda-day h4 {font-size:15px;margin:0 0 6px;}

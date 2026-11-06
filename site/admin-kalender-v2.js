@@ -154,7 +154,9 @@
       normalized.push({
         id:String(b.id),type:'buchung',date:b.datum,last:b.datum,start,end,reliable,
         title:b.angebot||'Programm',site:b.ort||'',status:b.status||'offen',
-        staff:Array.isArray(b.staff)?b.staff:[],name:b.name||'',duration:reliable?length:null
+        staff:Array.isArray(b.staff)?b.staff:[],name:b.name||'',email:b.email||'',telefon:b.telefon||'',
+        buchungsnummer:b.buchungsnummer||'',teilnehmer:b.teilnehmer||'',nachricht:b.nachricht||'',
+        duration:reliable?length:null
       });
     }
     for (const e of own) {
@@ -180,14 +182,23 @@
     const months = new Set();
     for (let d=from;d<=to;d=addDays(d,1)) months.add(iso(d).slice(0,7));
     try {
-      const plans = await Promise.all(Array.from(months,month =>
-        api('/api/admin/einsatzplanung/kalender?monat='+encodeURIComponent(month))));
-      const own = await api('/api/admin/kalender');
+      const monthList=Array.from(months);
+      const [plans,bookingLists,own] = await Promise.all([
+        Promise.all(monthList.map(month=>api('/api/admin/einsatzplanung/kalender?monat='+encodeURIComponent(month)))),
+        Promise.all(monthList.map(month=>api('/api/admin/kalenderbuchungen?monat='+encodeURIComponent(month)))),
+        api('/api/admin/kalender')
+      ]);
       if (seq!==loadSequence || workspace.hidden) return;
       const bookings = [];
-      for (const plan of plans) {
+      for (let i=0;i<plans.length;i++) {
+        const plan=plans[i];
         const staffing=bookingStaff(plan);
-        for (const b of plan.buchungen || []) bookings.push({...b,staff:staffing.get(b.id)||[]});
+        const details=new Map((bookingLists[i]||[]).map(row=>[String(row.id),row]));
+        for (const b of plan.buchungen || []) {
+          const row=details.get(String(b.id));
+          bookings.push({...b,...(row?.data||{}),id:b.id,status:row?.status||b.status,
+            staff:staffing.get(b.id)||[]});
+        }
       }
       chosen.events=normalize(bookings,Array.isArray(own)?own:[]);
       chosen.staffComplete=true;
@@ -316,11 +327,14 @@
     for(let i=0;i<offset;i++)grid.append(mk('div'));
     for(let d=from;d<=to;d=addDays(d,1)) {
       const key=iso(d),entries=visibleEntries(key);
-      const cell=btn('', 'ck-month-cell'+(key===iso(new Date())?' is-today':'')+(key===chosen.date?' is-selected':''),
-        ()=>{chosen.date=key;chosen.entryId=null;render();});
-      cell.append(mk('span','ck-month-day',String(d.getDate())));
+      const cell=mk('div', 'ck-month-cell'+(key===iso(new Date())?' is-today':'')+(key===chosen.date?' is-selected':''));
+      const dayButton=btn(String(d.getDate()),'ck-month-day',()=>{chosen.date=key;chosen.entryId=null;render();});
+      dayButton.setAttribute('aria-label',dateLabel(d,{day:'numeric',month:'long'}));
+      cell.append(dayButton);
       for(const e of entries.slice(0,3)){
-        const badge=mk('span','ck-mini-event',(e.start==null?'':prettyTime(e.start)+' ')+e.title);
+        const badge=btn((e.start==null?'':prettyTime(e.start)+' ')+e.title,'ck-mini-event',event=>{
+          event.stopPropagation();chosen.date=key;selectEntry(e);
+        });
         paint(badge,e);cell.append(badge);
       }
       if(entries.length>3)cell.append(mk('span','', '+'+(entries.length-3)+' weitere'));
@@ -372,12 +386,47 @@
       card.append(mk('p','',e.start==null?'Ganztägig':prettyTime(e.start)+' – '+prettyTime(e.end)+' Uhr'+(e.reliable?'':' (Dauer ggf. offen)')));
       if(e.type==='buchung') {
         card.append(mk('p','',e.status==='bestaetigt'?'Status: Bestätigt':'Status: Anfrage'));
+        const details=[
+          ['Buchungsnummer',e.buchungsnummer],['Kunde',e.name],['E-Mail',e.email],['Telefon',e.telefon],
+          ['Teilnehmende',e.teilnehmer],['Nachricht',e.nachricht]
+        ];
+        for(const [label,value] of details)if(value!==undefined&&value!==null&&String(value).trim())
+          card.append(mk('p','',label+': '+value));
         const assigned=staffNames(e,['eingeteilt','bestaetigt','abgeschlossen']);
         const applicants=staffNames(e,['beworben']);
         card.append(mk('p','','Eingeteilt: '+(assigned.join(', ')||'noch niemand')));
-        if(applicants.length)card.append(mk('p','','Bewerbungen: '+applicants.join(', ')));
-        card.append(btn('Einsatzplanung öffnen','',()=> {
-          document.getElementById('einsatzplanung-termine')?.scrollIntoView({behavior:'smooth',block:'start'});
+        card.append(mk('p','','Bewerbungen: '+(applicants.join(', ')||'keine')));
+        const applicantsList=(e.staff||[]).filter(s=>s.status==='beworben');
+        if(applicantsList.length){
+          const assignment=mk('div','ck-booking-actions');
+          const select=mk('select');select.setAttribute('aria-label','Beworbenen Mitarbeiter zuweisen');
+          const placeholder=mk('option','','Beworbenen Mitarbeiter auswählen');placeholder.value='';select.append(placeholder);
+          for(const person of applicantsList){
+            const option=mk('option','',person.name+(person.email?' · '+person.email:''));
+            option.value=person.mitarbeiter_id;select.append(option);
+          }
+          const assign=btn('Mitarbeiter zuweisen','',async()=>{
+            if(!select.value)return;
+            assign.disabled=true;feedback.textContent='Prüfe Verfügbarkeit und Arbeitszeit …';
+            try{
+              await api('/api/admin/einsatzplanung/zuweisen/'+encodeURIComponent(e.id)+'/'+encodeURIComponent(select.value),
+                {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+              feedback.textContent='Mitarbeiter wurde zugewiesen.';await load();
+            }catch(error){feedback.textContent='Zuweisung nicht möglich: '+(error.message||'Fehler');assign.disabled=false;}
+          });
+          assignment.append(select,assign);card.append(assignment);
+        }
+        const feedback=mk('p','ck-action-status');feedback.setAttribute('role','status');card.append(feedback);
+        if(e.status!=='bestaetigt')card.append(btn('Buchung bestätigen','ck-confirm',async()=>{
+          if(!window.confirm('Buchung '+(e.buchungsnummer||'')+' für „'+e.title+'“ bestätigen?'))return;
+          const confirmButton=card.querySelector('.ck-confirm');confirmButton.disabled=true;feedback.textContent='Buchung wird bestätigt …';
+          try{
+            await api('/api/admin/buchungen/'+encodeURIComponent(e.id),{
+              method:'PATCH',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({status:'bestaetigt',bearbeitungsnotiz:''})
+            });
+            feedback.textContent='Buchung bestätigt; die bestehende Kundenbenachrichtigung wurde ausgelöst.';await load();
+          }catch(error){feedback.textContent='Buchung konnte nicht bestätigt werden: '+(error.message||'Fehler');confirmButton.disabled=false;}
         }));
       } else {
         card.append(mk('p','',e.type==='sperrzeit'?'Sperrzeit':'Eigener Termin'));
