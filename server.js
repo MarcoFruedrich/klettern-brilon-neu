@@ -8,6 +8,7 @@ const { datenbankKonfiguration } = require('./lib/datenbank-konfiguration');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
 const { zugelasseneAnschlusszeiten, anschlussPreis, erzeugeZugang, pruefeZugang } = require('./lib/anschlussangebote');
 const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, preisBeiAnschlussstorno, zahlungErgaenzen } = require('./lib/buchungslogik');
+const { buchungsdauerBerechnen } = require('./lib/buchungsdauer');
 const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpsspiel');
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 const { sameOriginMutation } = require('./lib/sicherheit');
@@ -298,7 +299,7 @@ function buchungsfenster(data){
   const n=Number(data.teilnehmer),start=minuten(data.uhrzeit);
   const gespeicherteDauer=Number(data.dauer);
   const dauer=Number.isInteger(gespeicherteDauer)&&gespeicherteDauer>0?gespeicherteDauer:
-    n<=4?90:n<=10?150:n<=15?180:n<=20?210:240;
+    buchungsdauerBerechnen(n,150);
   // Alte Buchungen ohne Startzeit oder individuelle Angebote belegen vorsichtshalber den ganzen Tag.
   return start===null||dauer===null?null:[start,start+dauer];
 }
@@ -380,7 +381,7 @@ async function anschlussApi(req,res,url,route,ip){
     for(const p of programs.rows){
       if(p.name===base.angebot)continue;
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
-      const price=preisFuerTeilnehmer(p.preise,participants),duration=Number(p.dauer);
+      const price=preisFuerTeilnehmer(p.preise,participants),duration=buchungsdauerBerechnen(participants,Number(p.dauer));
       if((dates.length&&!dates.includes(base.datum))||participants>Number(p.kapazitaet)||price===null||!Number.isInteger(duration)||duration<1)continue;
       const cap=await pool.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum,p.name]);
       if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))continue;
@@ -573,7 +574,7 @@ async function main(req,res){
       let gesamtpreis = null;
       const preisAbfrage = await pool.query(
         `SELECT preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
-                veranstaltungsort,buchungsmodus,mindestteilnehmer,preis_pro_person
+                veranstaltungsort,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
          LIMIT 1`,[angebot]
@@ -610,7 +611,7 @@ buchungsmodus: einzelplatz?'einzelplatz':'gruppe',
 mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
-       nachricht:safeText(d.nachricht,2000),dauer:programm.dauer,
+       nachricht:safeText(d.nachricht,2000),dauer:buchungsdauerBerechnen(teilnehmer,Number(programm.dauer)),
        datenschutz:'on',datenschutzBestaetigtAm:new Date().toISOString(),
        datenschutzTextVersion:BUCHUNGS_DATENSCHUTZ_VERSION,
        agbBestaetigtAm:new Date().toISOString(),agbTextVersion:Number(agbData.version),agbTextSnapshot:agbData.text
@@ -786,8 +787,8 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       );
       if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
       const einzelplatz=programm.rows[0].buchungsmodus==='einzelplatz';
-      const dauer=Number(programm.rows[0].dauer)||
-        (teilnehmer<=4?90:teilnehmer<=10?150:teilnehmer<=15?180:teilnehmer<=20?210:240);
+      const dauer=buchungsdauerBerechnen(teilnehmer,Number(programm.rows[0].dauer));
+      if(!dauer)return reply(res,409,{error:'Für diese Gruppengröße konnte die Programmdauer nicht berechnet werden.'});
 
       const zeiten=[];
 
