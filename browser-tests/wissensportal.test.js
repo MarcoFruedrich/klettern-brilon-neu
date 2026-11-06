@@ -28,12 +28,13 @@ test('Wissensportal: Anmeldung, Standortfilter, Artikel, Lesebestätigung und re
   for(const width of [390,1280]){
     await t.test('Wissensportal bei '+width+' px',async()=>{
       const page=await browser.newPage({viewport:{width,height:900},locale:'de-DE'});
-      const errors=[],saves=[];
+      const errors=[],saves=[];let signedIn=false;
       page.on('pageerror',e=>errors.push(e.message));
       await page.route('**/api/**',async route=>{
         const req=route.request(),uri=new URL(req.url()),endpoint=uri.pathname;
         const json=(status,data)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
-        if(endpoint==='/api/pruefung/login'&&req.method()==='POST')return json(200,{success:true});
+        if(endpoint==='/api/pruefung/login'&&req.method()==='POST'){signedIn=true;return json(200,{success:true});}
+        if(!signedIn)return json(401,{error:'Mitarbeiteranmeldung erforderlich.'});
         if(endpoint==='/api/pruefung/mitarbeiterbereiche')return json(200,{
           mitarbeiter:'Testmitarbeiter',verwaltungszugang:false,profil:{name:'Testmitarbeiter',email:'test@example.test',telefon:''},
           bereiche:[],kontakte:[],orte:[]});
@@ -65,6 +66,7 @@ test('Wissensportal: Anmeldung, Standortfilter, Artikel, Lesebestätigung und re
       assert.match(await page.locator('#wiki-staff-content').innerText(),/Toprope Programm/);
       await page.locator('#wiki-topic-tabs button[data-category="sicherheit"]').click();
       await page.locator('.wiki-confirm-panel button').click();
+      await page.getByText('Die aktuelle Fassung wurde von dir als gelesen bestätigt.').waitFor({state:'visible'});
       assert.deepEqual(saves,[id1]);
       assert.match(await page.locator('.wiki-confirm-panel').innerText(),/gelesen bestätigt/);
       const widthResult=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth}));
