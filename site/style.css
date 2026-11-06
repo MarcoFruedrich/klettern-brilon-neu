@@ -1032,6 +1032,7 @@ header.site-header{overflow:visible}
 .site-header .navlinks a.nav-widerruf{border:0;border-radius:0;padding:0;text-align:left;text-decoration:none;font-weight:750;background:transparent}
 .site-header .navlinks a.nav-widerruf:hover,.site-header .navlinks a.nav-widerruf:focus-visible{background:transparent;color:#8f1d14!important;text-decoration:underline;outline:0}
 .angebote-filter{max-width:440px;margin:22px 0 26px}
+#angebote{scroll-margin-top:130px}
 .angebote-filter label{display:grid;gap:7px;margin-bottom:7px;color:var(--pine);font-weight:750}
 #angebote-standort-filter{width:100%;padding:12px 14px;border:1px solid #cbd8ce;border-radius:10px;background:#fff;color:var(--pine);font:inherit}
 .angebote-karte-bild{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:15px;margin:0 0 16px}
