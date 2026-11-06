@@ -47,13 +47,13 @@
       form.append(field('Vertragliche Monatsstunden','monatsstunden',p.monatsstunden));
       form.append(field('Individuelle Minijob-Grenze (€; leer = 2026 gesetzlich)','minijobGrenze',
         p.minijob_grenze_cent==null?'':p.minijob_grenze_cent/100));
-remove duplicate trust setting      const save=el('button','Vertragsdaten speichern');save.className='btn secondary';save.type='submit';
+      const save=el('button','Vertragsdaten speichern');save.className='btn secondary';save.type='submit';
       const state=el('p');state.setAttribute('role','status');form.append(save,state);
       form.onsubmit=async event=>{
         event.preventDefault();save.disabled=true;state.textContent='Speichere …';
         try{
           const data=Object.fromEntries(new FormData(form).entries());
-remove trust submit          await api('/api/admin/einsatzplanung/vertrag/'+encodeURIComponent(p.id),{
+          await api('/api/admin/einsatzplanung/vertrag/'+encodeURIComponent(p.id),{
             method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
           state.textContent='Vertragsdaten gespeichert.';await personalAktualisieren();
         }catch(err){state.textContent='Fehler: '+err.message;}finally{save.disabled=false;}
