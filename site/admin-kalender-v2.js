@@ -268,11 +268,18 @@
       for (let i=0;i<plans.length;i++) {
         const plan=plans[i];
         const staffing=bookingStaff(plan);
+        const planBookings=new Map((plan.buchungen||[]).map(b=>[String(b.id),b]));
         const details=new Map((bookingLists[i]||[]).map(row=>[String(row.id),row]));
-        for (const b of plan.buchungen || []) {
-          const row=details.get(String(b.id));
-          bookings.push({...b,...(row?.data||{}),id:b.id,status:row?.status||b.status,
-            staff:staffing.get(b.id)||[]});
+        // Die Buchungsliste ist die maßgebliche Quelle für alle offenen Anfragen.
+        // Die Einsatzplanungs-API kann ältere Einträge mit NULL-Status auslassen.
+        const ids=new Set([...planBookings.keys(),...details.keys()]);
+        for(const id of ids){
+          const b=planBookings.get(id)||{};
+          const row=details.get(id);
+          const source=row?.data||{};
+          bookings.push({...b,...source,id:row?.id||b.id,
+            status:row?.status||b.status||'offen',
+            staff:staffing.get(id)||staffing.get(b.id)||[]});
         }
       }
       knownSites=Array.isArray(places)?places.filter(place=>place.aktiv!==false).map(place=>place.name).filter(Boolean):[];
@@ -534,6 +541,38 @@
           assignment.append(select,assign);card.append(assignment);
         }
         const feedback=mk('p','ck-action-status');feedback.setAttribute('role','status');card.append(feedback);
+        const editor=mk('form','ck-booking-editor');
+        editor.append(mk('strong','','Anfrage bearbeiten'));
+        const editGrid=mk('div','ck-booking-edit-grid');
+        const editField=(labelText,name,type,value)=>{
+          const label=mk('label','','');
+          label.append(mk('span','',labelText));
+          const input=mk('input');input.type=type;input.name=name;input.value=value||'';input.required=true;
+          label.append(input);editGrid.append(label);return input;
+        };
+        const editDate=editField('Termin','datum','date',e.date);
+        const editTime=editField('Uhrzeit','uhrzeit','time',e.start==null?'':prettyTime(e.start));
+        const editDuration=editField('Dauer (Minuten)','dauer','number',e.duration||60);
+        editDuration.min='15';editDuration.max='720';editDuration.step='15';
+        editor.append(editGrid);
+        const editStatus=mk('p','ck-action-status');editStatus.setAttribute('role','status');editor.append(editStatus);
+        const saveEdit=btn('Änderungen speichern','',async()=>{
+          if(!editor.reportValidity())return;
+          saveEdit.disabled=true;editStatus.textContent='Änderungen werden gespeichert …';
+          try{
+            await api('/api/admin/buchungen/'+encodeURIComponent(e.id),{
+              method:'PATCH',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({status:e.status==='bestaetigt'?'bestaetigt':'offen',bearbeitungsnotiz:'',aenderungen:{
+                datum:editDate.value,uhrzeit:editTime.value,dauer:Number(editDuration.value)
+              }})
+            });
+            chosen.date=editDate.value;
+            chosen.cursor=fromIso(editDate.value);
+            if(chosen.mode==='week')chosen.date=iso(startWeek(chosen.cursor));
+            editStatus.textContent='Anfrage aktualisiert.';await load();
+          }catch(error){editStatus.textContent='Änderungen konnten nicht gespeichert werden: '+(error.message||'Fehler');saveEdit.disabled=false;}
+        });
+        saveEdit.type='button';editor.append(saveEdit);card.append(editor);
         if(e.status!=='bestaetigt')card.append(btn('Buchung bestätigen','ck-confirm',async()=>{
           if(!window.confirm('Buchung '+(e.buchungsnummer||'')+' für „'+e.title+'“ bestätigen?'))return;
           const confirmButton=card.querySelector('.ck-confirm');confirmButton.disabled=true;feedback.textContent='Buchung wird bestätigt …';
