@@ -385,6 +385,35 @@ fetch('/api/sperrzeiten')
   });
 
 const form = document.getElementById('booking');
+const agbCheckbox=document.getElementById('booking-agb');
+const agbStatus=document.getElementById('booking-agb-status');
+const agbVersionField=document.createElement('input');
+agbVersionField.type='hidden';agbVersionField.name='agbVersion';form.append(agbVersionField);
+fetch('/api/agb').then(async response=>{
+  const data=await response.json();
+  if(!response.ok||!data.aktiv||!data.text||!data.version)throw new Error(data.error||'Geschäftsbedingungen sind noch nicht veröffentlicht.');
+  agbVersionField.value=String(data.version);
+  document.getElementById('booking-agb-text').textContent=data.text;
+  agbStatus.textContent=`Aktuelle Fassung ${data.version}. Du kannst die Bedingungen vor dem Absenden über den Link öffnen.`;
+}).catch(error=>{
+  agbCheckbox.disabled=true;
+  agbStatus.textContent=error.message||'Geschäftsbedingungen konnten nicht geladen werden.';
+});
+const empfehlungsfeld=document.getElementById('empfehlungsfeld');
+const empfehlungBestaetigt=document.getElementById('empfehlung-bestaetigt');
+const empfehlungsEmailFeld=document.getElementById('empfehlung-email-feld');
+const empfehlungsEmail=document.getElementById('empfehlungsgeber-email');
+empfehlungBestaetigt?.addEventListener('change',()=>{
+  const aktiv=empfehlungBestaetigt.checked;
+  empfehlungsEmailFeld.hidden=!aktiv;empfehlungsEmail.required=aktiv;
+  if(!aktiv)empfehlungsEmail.value='';
+});
+fetch('/api/empfehlungsaktion').then(async response=>{
+  const data=await response.json();
+  if(!response.ok||!data.aktiv)return;
+  document.getElementById('empfehlungstext-kurz').textContent=data.text||'';
+  empfehlungsfeld.hidden=false;
+}).catch(()=>{});
 const gastStatus=form.querySelector('#ist-gast');
 const gastEinrichtungFeld=form.querySelector('#gast-einrichtung-feld');
 const gastEinrichtung=form.querySelector('#gast-einrichtung');

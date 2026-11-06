@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Buchung widerrufen oder stornieren | Klettern &amp; Abenteuer</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="narrow">
+    <a href="/">← Zurück zur Website</a>
+    <h1>Vertrag widerrufen oder Buchung stornieren</h1>
+    <p>Gib deine Buchungsnummer, den bei der Buchung angegebenen Namen und die dazugehörige E-Mail-Adresse ein. Wir senden einen Bestätigungslink an die in der Buchung hinterlegte E-Mail-Adresse. Erst wenn du den Link öffnest und auf „Widerruf bestätigen“ klickst, wird die Buchung storniert.</p>
+    <p class="hint">Der Bestätigungslink ist 24 Stunden gültig. Wenn du diese Anfrage nicht selbst gestellt hast, ignoriere die E-Mail. Bereits geleistete Zahlungen werden nicht automatisch ausgezahlt; die Abrechnung richtet sich nach den für die Buchung bestätigten Bedingungen.</p>
+    <form id="withdrawal-request">
+      <label>Buchungsnummer<input name="buchungsnummer" maxlength="40" autocomplete="off" required></label>
+      <label>Vollständiger Name aus der Buchung<input name="name" maxlength="160" autocomplete="name" required></label>
+      <label>E-Mail-Adresse aus der Buchung<input name="email" type="email" maxlength="180" autocomplete="email" required></label>
+      <button class="btn" type="submit">Bestätigungslink anfordern</button>
+    </form>
+    <p id="request-status" role="status" aria-live="polite"></p>
+
+    <section id="confirm-panel" hidden>
+      <h2>Widerruf / Stornierung bestätigen</h2>
+      <div id="booking-summary"></div>
+      <p>Mit der Bestätigung wird die Buchung auf „storniert“ gesetzt. Eine mögliche Erstattung bereits geleisteter Zahlungen wird gesondert nach den Bedingungen der Buchung bearbeitet.</p>
+      <button id="withdrawal-confirm" class="btn" type="button">Widerruf bestätigen</button>
+      <p id="confirm-status" role="status" aria-live="polite"></p>
+    </section>
+    <p><a href="/agb.html">Allgemeine Geschäftsbedingungen</a> · <a href="/impressum.html">Impressum</a></p>
+  </main>
+  <script>
+  (()=>{
+    const requestForm=document.getElementById('withdrawal-request');
+    const requestStatus=document.getElementById('request-status');
+    const panel=document.getElementById('confirm-panel');
+    const token=new URLSearchParams(location.search).get('token');
+    const confirmButton=document.getElementById('withdrawal-confirm');
+    async function json(url,options){
+      const response=await fetch(url,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json',...(options?.headers||{})}});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Anfrage konnte nicht verarbeitet werden.');return data;
+    }
+    if(token){
+      requestForm.hidden=true;
+      json('/api/buchung-widerruf/'+encodeURIComponent(token)).then(data=>{
+        document.getElementById('booking-summary').textContent=`Buchung ${data.buchungsnummer} · ${data.angebot} · ${data.datum} um ${data.uhrzeit} Uhr`;
+        panel.hidden=false;
+      }).catch(error=>{requestStatus.textContent=error.message;});
+      confirmButton.addEventListener('click',async()=>{
+        confirmButton.disabled=true;document.getElementById('confirm-status').textContent='Wird bestätigt …';
+        try{const data=await json('/api/buchung-widerruf/'+encodeURIComponent(token),{method:'POST',body:JSON.stringify({bestaetigen:true})});
+          document.getElementById('confirm-status').textContent=data.message;confirmButton.hidden=true;
+        }catch(error){document.getElementById('confirm-status').textContent=error.message;confirmButton.disabled=false;}
+      });
+    }
+    requestForm.addEventListener('submit',async event=>{
+      event.preventDefault();const button=requestForm.querySelector('button');button.disabled=true;requestStatus.textContent='Anfrage wird verarbeitet …';
+      try{const body=Object.fromEntries(new FormData(requestForm));const data=await json('/api/buchung-widerruf',{method:'POST',body:JSON.stringify(body)});requestStatus.textContent=data.message;}
+      catch(error){requestStatus.textContent=error.message;}
+      finally{button.disabled=false;}
+    });
+  })();
+  </script>
+</body>
+</html>
