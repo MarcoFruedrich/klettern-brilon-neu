@@ -113,5 +113,4 @@ body.staff-portal-page{background:#f2f6f3!important;color:#173e35;}
   .staff-portal-page .wiki-staff-controls{position:static;}
 }
 
-/* Kleine Displays: Wiki-Inhalte dürfen den Seitenbereich nicht verbreitern. */
-@media(max-width:740px){body.staff-portal-page{overflow-x:clip;}}
+@media(max-width:740px){.staff-portal-page h1{font-size:clamp(28px,8vw,36px);overflow-wrap:anywhere;}}
