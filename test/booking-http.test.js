@@ -15,7 +15,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const repo=path.resolve(__dirname,'..');
   const offers=[
     {id:1,name:'Klettern',preise:{'1-4':100,'5-10':150},kapazitaet:20,aktiv:true,
-      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60,
+      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:100,
       kategorie:'Klettern',zielgruppe:'Alle',veranstaltungsort:'Brilon',hinweise:''},
     {id:2,name:'Bouldern',preise:{'1-4':150,'5-10':200},kapazitaet:20,aktiv:true,
       verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60}
@@ -322,7 +322,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(linkedBookingDelete.status,409,'Anschlussbuchungen dürfen nicht aus dem Rabatt- und Zahlungszusammenhang gelöscht werden');
 
   const addonPayment=await fetch(root+`/api/admin/buchungen/${addonBooking.id}/zahlungen`,{method:'POST',headers:adminHeaders,
-    body:JSON.stringify({betrag:'33.75',methode:'ueberweisung',notiz:'Lokaler Testeingang'})});
+    body:JSON.stringify({betrag:'33.75',methode:'ueberweisung',eingangsdatum:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin'}).format(new Date()),notiz:'Lokaler Testeingang'})});
   assert.equal(addonPayment.status,201);
   const addonPaid=await addonPayment.json();
   assert.equal(addonPaid.buchung.status,'bestaetigt');
