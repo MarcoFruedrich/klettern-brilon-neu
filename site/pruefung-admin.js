@@ -218,8 +218,9 @@
             const result=await api('/api/admin/einsatzplanung/sonderfreigabe/'+encodeURIComponent(person.id),{
               method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({erteilt:granted})
             });
+            person.sonderfreigabe=granted;
             trustStatus.textContent=result.erteilt?'Besondere Freigabe erteilt.':'Besondere Freigabe entzogen.';
-            await refresh();
+            // Lokales Update lässt noch nicht gespeicherte Standort-/Qualifikationshäkchen stehen.
           }catch(error){trustStatus.textContent='Sonderfreigabe konnte nicht gespeichert werden: '+error.message;trustSave.disabled=false;}
         });
         trustPanel.append(trustLabel,trustHelp,trustSave,trustStatus);grantPanel.append(trustPanel);
@@ -312,10 +313,25 @@
           stop.disabled=true;
           try{
             await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/deaktivieren',{method:'PATCH'});
+            find('pruef-personal-status').textContent='Mitarbeiterzugang pausiert; Freigaben bleiben erhalten.';
             await refresh();
           }catch(err){find('pruef-personal-status').textContent='Fehler: '+err.message;stop.disabled=false;}
         });
         card.append(stop);
+      }else if(person.freigegeben){
+        const resume=elt('button','Zugang wieder aktivieren');resume.type='button';resume.className='btn';
+        resume.addEventListener('click',async()=>{
+          if(!confirm('Zugang für '+person.name+' wieder aktivieren?'))return;
+          resume.disabled=true;
+          try{
+            const result=await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+'/reaktivieren',{method:'PATCH'});
+            find('pruef-personal-status').textContent=result.emailVersand==='gesendet'
+              ?'Mitarbeiterzugang reaktiviert; Freigaben bleiben erhalten und eine Information wurde versandt.'
+              :'Mitarbeiterzugang reaktiviert; die Benachrichtigungs-E-Mail konnte nicht bestätigt werden.';
+            await refresh();
+          }catch(error){find('pruef-personal-status').textContent='Zugang konnte nicht reaktiviert werden: '+error.message;resume.disabled=false;}
+        });
+        card.append(resume);
       }
       if(person.art==='konto'){
         const remove=elt('button','Mitarbeiterkonto löschen');remove.type='button';remove.className='btn danger';
