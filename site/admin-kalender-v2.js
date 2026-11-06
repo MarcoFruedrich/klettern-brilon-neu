@@ -167,8 +167,10 @@
       }
       save.disabled=true;cancel.disabled=true;status.textContent='Eintrag wird gespeichert …';
       try{
-        await api('/api/admin/kalender',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-        chosen.newEntrySlot=null;await load();stateText.textContent='Kalendereintrag gespeichert.';
+        const created=await api('/api/admin/kalender',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        showManualEntries([{...data,id:created.id}]);
+        stateText.textContent='Kalendereintrag gespeichert.';
+        await load();stateText.textContent='Kalendereintrag gespeichert.';
       }catch(error){status.textContent='Eintrag konnte nicht gespeichert werden: '+(error.message||'Fehler');save.disabled=false;cancel.disabled=false;}
     });
     detail.append(form);
@@ -237,6 +239,17 @@
     }
     return normalized;
   }
+  function showManualEntries(rawEntries) {
+    const entries=rawEntries.flatMap(entry=>normalize([], [entry]));
+    if(!entries.length)return;
+    const ids=new Set(entries.map(entry=>entry.id));
+    chosen.events=[...chosen.events.filter(entry=>!ids.has(entry.id)),...entries];
+    chosen.date=entries[0].date;
+    chosen.cursor=fromIso(entries[0].date);
+    chosen.entryId=entries[0].id;
+    chosen.newEntrySlot=null;
+    render();
+  }
   async function load() {
     if (workspace.hidden) return;
     const seq=++loadSequence;
@@ -273,7 +286,6 @@
     } catch (e) {
       if (seq!==loadSequence) return;
       stateText.textContent='Kalender konnte nicht geladen werden: '+(e.message||'Unbekannter Fehler');
-      chosen.events=[];
       chosen.staffComplete=false;
       render();
     }
@@ -553,12 +565,13 @@
               beschreibung:e.description||''});
           }
           duplicate.disabled=true;status.textContent=`Erstelle ${copies.length} Kalendereintrag(e) …`;
-          let created=0;
+          let created=0;const savedEntries=[];
           try{
-            for(const copy of copies){await api('/api/admin/kalender',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(copy)});created++;}
+            for(const copy of copies){const saved=await api('/api/admin/kalender',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(copy)});savedEntries.push({...copy,id:saved.id});created++;}
+            showManualEntries(savedEntries);
             status.textContent=created===1?'Kalendereintrag wurde dupliziert.':`${created} wiederkehrende Kalendereinträge wurden erstellt.`;
             await load();
-          }catch(error){status.textContent=`${created} von ${copies.length} Einträgen gespeichert. Weitere Kopien fehlgeschlagen: ${error.message}`;await load();}
+          }catch(error){if(savedEntries.length)showManualEntries(savedEntries);status.textContent=`${created} von ${copies.length} Einträgen gespeichert. Weitere Kopien fehlgeschlagen: ${error.message}`;await load();}
           finally{duplicate.disabled=false;}
         });
         repeatBox.append(dateLabel,ruleLabel,countLabel,duplicate,status);card.append(repeatBox);
