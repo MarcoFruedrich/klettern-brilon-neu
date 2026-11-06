@@ -7,7 +7,15 @@
     site=document.getElementById('wiki-staff-site'),list=document.getElementById('wiki-staff-list'),
     content=document.getElementById('wiki-staff-content'),state=document.getElementById('wiki-staff-status');
   const n=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
-  let articles=[],sites=[],categoryItems=[],categories={},active=null,run=0;
+  const defaultCategories=[
+    {id:'allgemein',titel:'Allgemeines',parentId:null},
+    {id:'programm',titel:'Programminformationen',parentId:null},
+    {id:'standort',titel:'Standortinformationen',parentId:null},
+    {id:'sicherheit',titel:'Sicherheitseinweisungen',parentId:null},
+    {id:'ablauf',titel:'Arbeitsabläufe',parentId:null},
+    {id:'notfall',titel:'Notfall & Erste Hilfe',parentId:null}
+  ];
+  let articles=[],sites=[],categoryItems=defaultCategories,categories={},active=null,run=0;
   function flattened(items=categoryItems,parentId=null,depth=0){
     return items.filter(item=>item.parentId===parentId).flatMap(item=>[{...item,depth},...flattened(items,item.id,depth+1)]);
   }
@@ -204,7 +212,7 @@
       if(seq!==run||workspace.hidden)return;
       articles=Array.isArray(data.artikel)?data.artikel:[];
       sites=Array.isArray(data.standorte)?data.standorte:[];
-      categoryItems=Array.isArray(data.kategorien)?data.kategorien:[];
+      categoryItems=Array.isArray(data.kategorien)&&data.kategorien.length?data.kategorien:defaultCategories;
       renderCategories();
       const previous=active;active=articles.some(x=>x.id===previous)?previous:null;
       filters();show();
