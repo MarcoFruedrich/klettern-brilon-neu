@@ -3,6 +3,8 @@
   const workspace=document.getElementById('staff-portal-workspace');
   const root=document.getElementById('wiki-staff');
   if(!workspace||!root)return;
+  const planning=workspace.querySelector('section[aria-labelledby="staff-planning-heading"]');
+  if(planning)workspace.insertBefore(root,planning);
   const search=document.getElementById('wiki-staff-search'),category=document.getElementById('wiki-staff-category'),
     site=document.getElementById('wiki-staff-site'),list=document.getElementById('wiki-staff-list'),
     content=document.getElementById('wiki-staff-content'),state=document.getElementById('wiki-staff-status');
