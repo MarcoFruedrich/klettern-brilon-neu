@@ -241,7 +241,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const publicGuestbookAfterDelete=await fetch(root+'/api/gps/gaesteliste?tour='+tourId);
   assert.deepEqual(await publicGuestbookAfterDelete.json(),[],'Entfernter Name darf nicht mehr öffentlich erscheinen');
   const payment=await fetch(root+`/api/admin/buchungen/${adjacentData.id}/zahlungen`,{method:'POST',headers:adminHeaders,
-    body:JSON.stringify({betrag:'25.00',methode:'ueberweisung',notiz:'Lokaler Testeingang'})});
+    body:JSON.stringify({betrag:'25.00',methode:'ueberweisung',eingangsdatum:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin'}).format(new Date()),notiz:'Lokaler Testeingang'})});
   assert.equal(payment.status,201);
   const paid=await payment.json();
   assert.equal(paid.buchung.status,'bestaetigt');
