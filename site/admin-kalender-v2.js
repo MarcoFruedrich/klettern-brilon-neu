@@ -71,6 +71,7 @@
   const legend = mk('div', 'ck-legend');
   const chosen = {mode:'week',cursor:midday(new Date()),date:iso(new Date()),entryId:null,site:'',events:[],staffComplete:false,newEntrySlot:null};
   let loadSequence = 0;
+  let knownSites = [];
   const tabs = {};
   for (const [key,label] of [['week','Woche'],['month','Monat'],['agenda','Agenda']]) {
     tabs[key] = btn(label, '', () => {
@@ -245,10 +246,11 @@
     for (let d=from;d<=to;d=addDays(d,1)) months.add(iso(d).slice(0,7));
     try {
       const monthList=Array.from(months);
-      const [plans,bookingLists,own] = await Promise.all([
+      const [plans,bookingLists,own,places] = await Promise.all([
         Promise.all(monthList.map(month=>api('/api/admin/einsatzplanung/kalender?monat='+encodeURIComponent(month)))),
         Promise.all(monthList.map(month=>api('/api/admin/kalenderbuchungen?monat='+encodeURIComponent(month)))),
-        api('/api/admin/kalender')
+        api('/api/admin/kalender'),
+        api('/api/admin/orte').catch(()=>[])
       ]);
       if (seq!==loadSequence || workspace.hidden) return;
       const bookings = [];
@@ -262,6 +264,7 @@
             staff:staffing.get(b.id)||[]});
         }
       }
+      knownSites=Array.isArray(places)?places.filter(place=>place.aktiv!==false).map(place=>place.name).filter(Boolean):[];
       chosen.events=normalize(bookings,Array.isArray(own)?own:[]);
       chosen.staffComplete=true;
       stateText.textContent='';
@@ -276,7 +279,8 @@
     }
   }
   function refreshFilter() {
-    const sites=Array.from(new Set(chosen.events.map(e=>e.site).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'de'));
+    const sites=Array.from(new Set([...knownSites,...chosen.events.map(e=>e.site)].filter(Boolean)))
+      .sort((a,b)=>a.localeCompare(b,'de'));
     if (chosen.site&&!sites.includes(chosen.site)) chosen.site='';
     filter.replaceChildren();
     const all=mk('option','', 'Alle Standorte');all.value='';filter.append(all);
