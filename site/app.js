@@ -26,8 +26,10 @@ let verfuegbarkeitsAnfrage=0;
 let sonderaktionsPrefix='';
 function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
-  return Number(programm?.dauer)||
-    (teilnehmer<=4?90:teilnehmer<=10?150:teilnehmer<=15?180:teilnehmer<=20?210:240);
+  const anzahl=Number(teilnehmer),basis=Number(programm?.dauer);
+  if(!Number.isInteger(anzahl)||anzahl<1||!Number.isFinite(basis)||basis<15)return 150;
+  const faktor=anzahl<=4?0.6:anzahl<=10?1:anzahl<=15?1.2:anzahl<=20?1.4:1.6;
+  return Math.max(15,Math.round((basis*faktor)/5)*5);
 }
 
 const buchbareUhrzeiten = [
@@ -660,8 +662,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       beschreibung.textContent=angebot.beschreibung;
       karte.append(beschreibung);
     }
-    const meta=[angebot.veranstaltungsort,angebot.kategorie,angebot.zielgruppe,
-      angebot.dauer?`${angebot.dauer} Minuten`:null].filter(Boolean).join(' · ');
+    const meta=angebot.veranstaltungsort?`Standort: ${angebot.veranstaltungsort}`:'';
     if(meta){
       const details=document.createElement('p');
       details.className='angebote-karte-meta';
@@ -810,9 +811,7 @@ async function preisanzeigeStarten() {
         bildAnzeige.appendChild(beschreibung);
       }
 
-      const meta=[angebot.kategorie,angebot.zielgruppe,
-        angebot.veranstaltungsort,angebot.dauer ? angebot.dauer+' Minuten' : '']
-        .filter(Boolean).join(' · ');
+      const meta=angebot.veranstaltungsort?'Standort: '+angebot.veranstaltungsort:'';
       if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
       if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
       teilnehmer.max=String(Math.min(150,Number(angebot.kapazitaet)||150));
