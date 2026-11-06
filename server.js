@@ -1664,6 +1664,22 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(!['offen','bestaetigt','abgelehnt','storniert'].includes(status))
         return reply(res,400,{error:'Ungültiger Buchungsstatus.'});
 
+      const aenderungen=d.aenderungen;
+      if(aenderungen!==undefined){
+        if(!aenderungen||typeof aenderungen!=='object'||Array.isArray(aenderungen)||
+           Object.keys(aenderungen).some(key=>!['datum','uhrzeit','dauer'].includes(key)))
+          return reply(res,400,{error:'Ungültige Terminanpassung.'});
+        if(aenderungen.datum!==undefined&&
+           (typeof aenderungen.datum!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(aenderungen.datum)||!gueltigesDatum(aenderungen.datum)))
+          return reply(res,400,{error:'Bitte ein gültiges Veranstaltungsdatum eingeben.'});
+        if(aenderungen.uhrzeit!==undefined&&
+           (typeof aenderungen.uhrzeit!=='string'||(aenderungen.uhrzeit!==''&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(aenderungen.uhrzeit))))
+          return reply(res,400,{error:'Bitte eine gültige Uhrzeit eingeben.'});
+        if(aenderungen.dauer!==undefined&&
+           (!Number.isInteger(Number(aenderungen.dauer))||Number(aenderungen.dauer)<15||Number(aenderungen.dauer)>720))
+          return reply(res,400,{error:'Die Dauer muss zwischen 15 und 720 Minuten liegen.'});
+      }
+
       const ergebnis=await reservierungsTransaktion(async client=>{
         
 const alt=await client.query(
@@ -1675,6 +1691,7 @@ const alt=await client.query(
         
 const alterStatus = alt.rows[0].status;
     const buchungsdaten = alt.rows[0].data;
+        if(aenderungen)Object.assign(buchungsdaten,aenderungen);
 
         if(status==='bestaetigt'&&buchungsdaten.empfehlung&&!buchungsdaten.empfehlung.bestaetigtAm)
           return {empfehlungWartetAufBestaetigung:true};
