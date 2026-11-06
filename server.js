@@ -748,8 +748,13 @@ const buchungsdetails=buchungsDetails({...data,ende:`${ende}${fenster?' Uhr':''}
 
 
 
-const benachrichtigungen = [
-  brevoMail(
+const benachrichtigungen=[];
+const enqueueMail=(...args)=>{
+  const promise=Promise.resolve().then(()=>brevoMail(...args));
+  promise.catch(()=>{});
+  benachrichtigungen.push(promise);
+};
+enqueueMail(
     email,
     'Deine Buchungsanfrage – Klettern & Abenteuer Brilon',
     `Hallo ${name},\n\n` +
@@ -760,12 +765,11 @@ const benachrichtigungen = [
     (einzelplatz?`\n\nKeine Anzahlung ist erforderlich. Der Termin findet ab ${data.mindestteilnehmer} Anmeldungen statt.`:
       `\n\nDeine Anfrage ist eingegangen, aber noch nicht verbindlich bestätigt.\nDu erhältst eine gesonderte Rückmeldung.`) + `\n\n` +
     `Gut Seil!\nKlettern & Abenteuer Brilon`
-  )
-];
+  );
 if(data.empfehlung&&empfehlungsBestaetigungstoken){
   const base=(process.env.PUBLIC_BASE_URL||'https://klettern-brilon-neu.onrender.com').replace(/\/$/,'');
   const link=`${base}/api/empfehlung/bestaetigen?token=${encodeURIComponent(empfehlungsBestaetigungstoken)}`;
-  benachrichtigungen.push(brevoMail(data.empfehlung.email,'Bitte bestätige eine Empfehlung – Klettern & Abenteuer',
+  enqueueMail(data.empfehlung.email,'Bitte bestätige eine Empfehlung – Klettern & Abenteuer',
     `Hallo ${data.empfehlung.name||''},\n\nbei einer neuen Buchungsanfrage wurde deine E-Mail-Adresse als Empfehlungsgeber angegeben. Unser System hat eine frühere, bestätigte und als stattgefunden dokumentierte Buchung mit dieser Adresse gefunden (${data.empfehlung.buchungsnummer||'Buchung'}, ${data.empfehlung.programm||'Programm'} am ${data.empfehlung.veranstaltungsdatum||'—'}).\n\nBitte bestätige über diesen Link, dass du die Empfehlung ausgesprochen hast:\n${link}\n\nDer Link ist 24 Stunden gültig. Die Verwaltung kann die neue Buchung erst bestätigen, wenn du die Empfehlung bestätigt hast. Falls du die Empfehlung nicht ausgesprochen hast, ignoriere diese E-Mail.\n\nViele Grüße\nKlettern & Abenteuer Brilon`));
 }
 try{
@@ -781,7 +785,7 @@ try{
     const adresse=safeText(person.email,180);
     if(!/^\S+@\S+\.\S+$/.test(adresse))continue;
     const anrede=safeText(person.name,120);
-    benachrichtigungen.push(brevoMail(adresse,
+    enqueueMail(adresse,
       'Neue Terminanfrage am Standort '+data.veranstaltungsort+' – Bewerbung möglich',
       `Hallo${anrede?' '+anrede:''},\n\nfür deinen freigegebenen Standort ist eine neue Buchungsanfrage eingegangen.\n\nProgramm: ${data.angebot}\nTermin: ${data.datum} um ${data.uhrzeit||'Uhrzeit offen'} Uhr\nStandort: ${data.veranstaltungsort||'—'}\nTeilnehmer: ${data.teilnehmer}\nBuchungsnummer: ${data.buchungsnummer}\n\nBitte melde dich im Mitarbeiterbereich an und öffne den Termin unter „Termine und meine Bewerbungen“: ${mitarbeiterUrl}\nDort kannst du dich auf die Anfrage bewerben. Die Anfrage ist noch nicht verbindlich bestätigt; die Verwaltung entscheidet über die Einteilung.\n\nViele Grüße\nKlettern & Abenteuer Brilon`
     ));
@@ -790,13 +794,13 @@ try{
   console.error('Mitarbeiter-Benachrichtigung zu Buchungsanfrage fehlgeschlagen:',error.message);
 }
 if (process.env.BOOKING_NOTIFY_EMAIL) {
-  benachrichtigungen.push(brevoMail(
+  enqueueMail(
     process.env.BOOKING_NOTIFY_EMAIL,
     'Neue Buchungsanfrage – Klettern Brilon',
     (einzelplatz?'Neue Einzelplatz-Anmeldung; Platz vorläufig reserviert:\n\n':'Eine neue Buchungsanfrage ist eingegangen:\n\n') +
     buchungsdetails +
     `\n\nKunden-E-Mail: ${email}\nStatus: ${einzelplatz?'Platz reserviert':'Offen'}`
-  ));
+  );
 }
 Promise.allSettled(benachrichtigungen).then(ergebnisse => {
   ergebnisse.forEach((ergebnis, index) => {
