@@ -969,19 +969,18 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(!sameOriginMutation(req))return reply(res,403,{error:'Anfrage abgelehnt.'});
       if(!pool)return reply(res,503,{error:'Stornierungen sind momentan nicht verfügbar.'});
       if(!limit('booking-withdrawal:'+ip,5,3600000))return reply(res,429,{error:'Bitte später erneut versuchen.'});
-      const d=await body(req),number=safeText(d.buchungsnummer,40).toUpperCase(),name=safeText(d.name,160),email=safeText(d.email,180).toLowerCase();
-      if(!/^[A-Z0-9-]{5,40}$/.test(number)||name.length<2||!/^\S+@\S+\.\S+$/.test(email))return reply(res,400,{error:'Bitte Buchungsnummer, vollständigen Namen und E-Mail-Adresse eingeben.'});
+      const d=await body(req),number=safeText(d.buchungsnummer,40).toUpperCase();
+      if(!/^[A-Z0-9-]{5,40}$/.test(number))return reply(res,400,{error:'Bitte eine gültige Buchungsnummer eingeben.'});
       let booking=null;
       try{
         const q=await pool.query(`SELECT id,buchungsnummer,data,status FROM brilon_buchungen
           WHERE UPPER(COALESCE(buchungsnummer,data->>'buchungsnummer',''))=$1
-            AND lower(COALESCE(data->>'name',''))=lower($2)
-            AND lower(COALESCE(data->>'email',''))=lower($3)
-          LIMIT 1`,[number,name,email]);
+          LIMIT 1`,[number]);
         booking=q.rows[0]||null;
       }catch{return reply(res,503,{error:'Widerruf konnte gerade nicht bearbeitet werden.'});}
-      const generic={success:true,message:'Wenn Buchungsnummer und Name zu einer aktiven Buchung passen, erhältst du in Kürze eine E-Mail an die dort hinterlegte Adresse. Die Buchung wird erst nach Bestätigung des Links storniert.'};
+      const generic={success:true,message:'Wenn eine aktive Buchung mit dieser Buchungsnummer vorliegt, senden wir den Bestätigungslink an die bei der Buchung hinterlegte E-Mail-Adresse. Die Buchung wird erst nach Bestätigung des Links storniert.'};
       if(!booking||['storniert','abgelehnt'].includes(booking.status)||!booking.data?.datum||booking.data.datum<heuteInBerlin())return reply(res,200,generic);
+      const email=safeText(booking.data.email,180).toLowerCase(),name=safeText(booking.data.name,160);
       if(!/^\S+@\S+\.\S+$/.test(email))return reply(res,200,generic);
       let base;
       try{base=new URL(process.env.PUBLIC_BASE_URL||'');}catch{return reply(res,200,generic);}
@@ -992,7 +991,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           VALUES($1,$2,$3,$4,$5)`,[requestId,booking.id,gpsTokenHash(token),expires,email]);
         const link=base.toString().replace(/\/$/,'')+`/widerruf.html?token=${token}`;
         await brevoMail(email,'Bitte Widerruf / Stornierung bestätigen – Klettern & Abenteuer',
-          `Guten Tag ${name},\n\nfür die Buchung ${booking.buchungsnummer||number} (${booking.data.angebot||'Programm'}, ${booking.data.datum}) wurde ein Widerruf bzw. eine Stornierung angefordert.\n\nDie Buchung ist noch nicht storniert. Bitte öffne innerhalb von 24 Stunden den folgenden Link und bestätige dort ausdrücklich mit „Widerruf bestätigen“:\n${link}\n\nWenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren. Ohne Linkbestätigung bleibt die Buchung unverändert.\n\nHinweis: Die Behandlung bereits geleisteter Zahlungen richtet sich nach den für die Buchung geltenden Bedingungen und wird nicht automatisch erstattet.\n\nViele Grüße\nKlettern & Abenteuer Brilon`,{idempotencyKey:requestId});
+          `Guten Tag${name?' '+name:''},\n\nfür die Buchung ${booking.buchungsnummer||number} (${booking.data.angebot||'Programm'}, ${booking.data.datum}) wurde ein Widerruf bzw. eine Stornierung angefordert.\n\nDie Buchung ist noch nicht storniert. Bitte öffne innerhalb von 24 Stunden den folgenden Link und bestätige dort ausdrücklich mit „Widerruf bestätigen“:\n${link}\n\nWenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren. Ohne Linkbestätigung bleibt die Buchung unverändert.\n\nHinweis: Die Behandlung bereits geleisteter Zahlungen richtet sich nach den für die Buchung geltenden Bedingungen und wird nicht automatisch erstattet.\n\nViele Grüße\nKlettern & Abenteuer Brilon`,{idempotencyKey:requestId});
       }catch(error){
         await pool.query("UPDATE brilon_buchungswiderrufe SET status='fehlgeschlagen' WHERE id=$1",[requestId]).catch(()=>{});
         console.error('Widerrufslink konnte nicht zugestellt werden:',error.code||'unbekannter Fehler');

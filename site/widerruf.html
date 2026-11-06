@@ -4,18 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Buchung widerrufen oder stornieren | Klettern &amp; Abenteuer</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=20261106-widerruf-eingabe">
 </head>
-<body>
-  <main class="narrow">
+<body class="withdrawal-page">
+  <main class="narrow withdrawal-card">
     <a href="/">← Zurück zur Website</a>
     <h1>Vertrag widerrufen oder Buchung stornieren</h1>
-    <p>Gib deine Buchungsnummer, den bei der Buchung angegebenen Namen und die dazugehörige E-Mail-Adresse ein. Wir senden einen Bestätigungslink an die in der Buchung hinterlegte E-Mail-Adresse. Erst wenn du den Link öffnest und auf „Widerruf bestätigen“ klickst, wird die Buchung storniert.</p>
+    <p>Gib nur deine Buchungsnummer ein. Wenn dazu eine aktive Buchung vorliegt, senden wir den Bestätigungslink an die bei der Buchung hinterlegte E-Mail-Adresse. Erst nach dem Öffnen des Links und deiner ausdrücklichen Bestätigung wird die Buchung storniert.</p>
     <p class="hint">Der Bestätigungslink ist 24 Stunden gültig. Wenn du diese Anfrage nicht selbst gestellt hast, ignoriere die E-Mail. Bereits geleistete Zahlungen werden nicht automatisch ausgezahlt; die Abrechnung richtet sich nach den für die Buchung bestätigten Bedingungen.</p>
     <form id="withdrawal-request">
       <label>Buchungsnummer<input name="buchungsnummer" maxlength="40" autocomplete="off" required></label>
-      <label>Vollständiger Name aus der Buchung<input name="name" maxlength="160" autocomplete="name" required></label>
-      <label>E-Mail-Adresse aus der Buchung<input name="email" type="email" maxlength="180" autocomplete="email" required></label>
       <button class="btn" type="submit">Bestätigungslink anfordern</button>
     </form>
     <p id="request-status" role="status" aria-live="polite"></p>
@@ -61,5 +59,19 @@
     });
   })();
   </script>
+  <style>
+    body.withdrawal-page{min-height:100vh;background:#e8ecea;color:#22352d;padding:28px 16px}
+    .withdrawal-card{max-width:760px;margin:24px auto;padding:clamp(22px,4vw,38px);background:#fff;border:1px solid #d1dbd5;border-radius:18px;box-shadow:0 12px 36px #163e3514}
+    .withdrawal-card h1,.withdrawal-card h2{color:#163e35}
+    .withdrawal-card p{color:#4b6256}
+    .withdrawal-card>a{color:#176044;font-weight:700}
+    .withdrawal-card form{margin-top:22px;background:#f6f8f6;border:1px solid #d9e1dc;border-radius:14px;padding:20px}
+    .withdrawal-card label{color:#263d32}
+    .withdrawal-card input{background:#fff;color:#20352b;border:1px solid #aebfb4}
+    .withdrawal-card input:focus{outline:2px solid #26744d;outline-offset:1px}
+    .withdrawal-card .btn{background:#163e35;color:#fff!important}
+    .withdrawal-card .btn:hover{background:#205b43}
+    @media(max-width:560px){body.withdrawal-page{padding:12px}.withdrawal-card{margin:8px auto;padding:20px 16px}.withdrawal-card form{padding:16px}}
+  </style>
 </body>
 </html>
