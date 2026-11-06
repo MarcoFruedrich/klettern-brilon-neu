@@ -96,7 +96,9 @@ async function rechnungSichernUndVersenden(buchungId){
     if(total<=0||zahlungsstand(total,payments).offenCent>0){await client.query('ROLLBACK');return {status:'nicht_vollstaendig'};}
     if(!rechnungsdatenVollstaendig(config)){await client.query('ROLLBACK');return {status:'rechnungsdaten_unvollstaendig'};}
     const addr=booking.rechnungsadresse||{};
-    if(!addr.strasse||!addr.plz||!addr.ort){await client.query('ROLLBACK');return {status:'rechnungsanschrift_unvollstaendig'};}
+    if(addr.erforderlich===true&&(!addr.strasse||!addr.plz||!addr.ort)){
+      await client.query('ROLLBACK');return {status:'rechnungsanschrift_unvollstaendig'};
+    }
     const prefix=safeText(config.rechnungsPraefix,20)||'KA-';
     const year=heuteInBerlin().slice(0,4),sequence=Number(settings.rows[0].naechste_nummer)||1;
     const number=`${prefix}${year}-${String(sequence).padStart(4,'0')}`;
@@ -120,7 +122,8 @@ async function rechnungSichernUndVersenden(buchungId){
       aussteller:{firma:config.firma,name:config.name,strasse:config.strasse,plz:config.plz,ort:config.ort,
         email:config.email,telefon:config.telefon,steuernummer:config.steuernummer,ustIdNr:config.ustIdNr,
         steuerhinweis:config.steuerhinweis,bankname:config.bankname,iban:config.iban,bic:config.bic,rechnungshinweis:config.rechnungshinweis},
-      kunde:{name:booking.name,firma:addr.firma,strasse:addr.strasse,plz:addr.plz,ort:addr.ort},
+      kunde:{name:booking.name,firma:addr.firma,strasse:addr.strasse,plz:addr.plz,ort:addr.ort,
+        email:booking.email,telefon:booking.telefon},
       buchung:{buchungsnummer:booking.buchungsnummer,angebot:booking.angebot,veranstaltungsort:booking.veranstaltungsort,
         datum:rechnungsDatumFormatieren(booking.datum),uhrzeit:booking.uhrzeit,teilnehmer:booking.teilnehmer}
     };
@@ -548,7 +551,12 @@ async function main(req,res){
             angebot=safeText(d.angebot,120),
             angefragterStandort=safeText(d.veranstaltungsort,80),
             teilnehmer=Number(d.teilnehmer);
-      const rechnungsadresse={firma:safeText(d.rechnungsFirma,160),strasse:safeText(d.rechnungsStrasse,180),
+      const vorhandeneRechnungsadresse=['rechnungsFirma','rechnungsStrasse','rechnungsPlz','rechnungsOrt']
+        .some(key=>Boolean(safeText(d[key],key==='rechnungsStrasse'?180:key==='rechnungsPlz'?12:key==='rechnungsOrt'?120:160)));
+      const rechnungsadresseErforderlich=d.rechnungsadresseErforderlich==='on'||
+        (!Object.prototype.hasOwnProperty.call(d,'rechnungsadresseErforderlich')&&vorhandeneRechnungsadresse);
+      const rechnungsadresse={erforderlich:rechnungsadresseErforderlich,
+        firma:safeText(d.rechnungsFirma,160),strasse:safeText(d.rechnungsStrasse,180),
         plz:safeText(d.rechnungsPlz,12),ort:safeText(d.rechnungsOrt,120)};
       const empfehlungAngefordert=d.empfehlungBestaetigt==='on';
       const empfehlungsgeberEmail=safeText(d.empfehlungsgeberEmail,180).toLowerCase();
@@ -558,7 +566,8 @@ async function main(req,res){
       if(!vorname||!nachname||!/^\S+@\S+\.\S+$/.test(email)||
          (!gueltigesDatum(datum)||datum<heuteInBerlin())||
          !angebot||!Number.isInteger(teilnehmer)||
-         teilnehmer<1||teilnehmer>150||d.datenschutz!=='on'||!rechnungsadresse.strasse||!rechnungsadresse.plz||!rechnungsadresse.ort)
+         teilnehmer<1||teilnehmer>150||d.datenschutz!=='on'||
+         (rechnungsadresseErforderlich&&(!rechnungsadresse.strasse||!rechnungsadresse.plz||!rechnungsadresse.ort)))
         return reply(res,400,{error:'Bitte Pflichtfelder korrekt ausfüllen.'});
 
       let gesamtpreis = null;

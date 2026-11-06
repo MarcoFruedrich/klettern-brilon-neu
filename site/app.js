@@ -420,6 +420,20 @@ const gastEinrichtung=form.querySelector('#gast-einrichtung');
 function gastEingabeAktualisieren(){const ja=gastStatus.value==='ja';gastEinrichtungFeld.hidden=!ja;gastEinrichtung.required=ja;if(!ja)gastEinrichtung.value='';}
 gastStatus.addEventListener('change',gastEingabeAktualisieren);
 gastEingabeAktualisieren();
+const invoiceAddressChoice=form.querySelector('#rechnung-adresse-erforderlich');
+const invoiceAddressFields=form.querySelector('#rechnungsanschrift-feld');
+const invoiceAddressInputs=['rechnungsFirma','rechnungsStrasse','rechnungsPlz','rechnungsOrt']
+  .map(name=>form.elements.namedItem(name));
+function invoiceAddressUpdate(){
+  const required=Boolean(invoiceAddressChoice?.checked);
+  invoiceAddressFields.hidden=!required;
+  for(const input of invoiceAddressInputs){
+    input.required=required&&input.name!=='rechnungsFirma';
+    if(!required)input.value='';
+  }
+}
+invoiceAddressChoice?.addEventListener('change',invoiceAddressUpdate);
+invoiceAddressUpdate();
 
 form.addEventListener('submit', async e => {
   e.preventDefault();
