@@ -26,7 +26,7 @@ test('Terminannahme sendet Kundenbestätigung und Anzahlungsinformationen gemein
     async connect(){
       return {
         async query(sql,params=[]){
-          if(/^\\s*(BEGIN|COMMIT|ROLLBACK)\\b/i.test(sql))return {rows:[],rowCount:0};
+          if(/^\s*(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql))return {rows:[],rowCount:0};
           if(sql.includes('SELECT q.buchung_id,b.data,b.status AS buchungsstatus')){
             if(itemAvailable){itemAvailable=false;return {rows:[booking],rowCount:1};}
             return {rows:[],rowCount:0};

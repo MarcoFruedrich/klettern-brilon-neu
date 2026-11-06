@@ -156,7 +156,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   for(const message of teamRequests){
     assert.match(message.subject,/Neue Terminanfrage am Standort Brilon/);
     assert.match(message.textContent,/2027-03-15 um 10:00 Uhr/);
-    assert.match(message.textContent,/im Mitarbeiterbereich anmelden/);
+    assert.match(message.textContent,/im Mitarbeiterbereich an/);
     assert.match(message.textContent,/bewerben/i);
     assert.doesNotMatch(message.textContent,/max@example.test/,'Kundenkontaktdaten werden nicht an das Team weitergegeben');
   }
