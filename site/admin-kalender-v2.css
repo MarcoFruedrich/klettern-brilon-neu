@@ -125,3 +125,5 @@
 .ck-mini-event {border-left-color:var(--ck-site-strong,var(--ck-strong,#207a65));}
 .ck-detail-card {border-left-color:var(--ck-site-strong,var(--ck-strong,#0f7c53));}
 .ck-agenda-day button {border-left:4px solid var(--ck-site-strong,var(--ck-line,#d2e5d6));}
+
+.ck-site-filter-label {white-space:nowrap;font-size:10px;letter-spacing:-.2px;padding:2px 0;}
