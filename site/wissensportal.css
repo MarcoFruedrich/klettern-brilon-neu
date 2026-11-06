@@ -100,3 +100,14 @@ body.staff-portal-page{background:#f2f6f3!important;color:#173e35;}
   .wiki-article-body{padding:14px;}
   .wiki-article-tabs button{font-size:12px;padding:9px 8px;}
 }
+
+
+/* Mobile: Kategorietasten bleiben klickbar, auch unter der fixierten Kopfzeile. */
+.staff-portal-page .wiki-topic-tabs,
+.staff-portal-page .wiki-topic-tabs button{scroll-margin-top:110px;}
+.staff-portal-page .wiki-staff-section{scroll-margin-top:95px;}
+@media(max-width:740px){
+  .staff-portal-page .wiki-topic-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;gap:7px;}
+  .staff-portal-page .wiki-topic-tabs button{min-width:0;white-space:normal;line-height:1.25;}
+  .staff-portal-page .wiki-staff-controls{position:static;}
+}
