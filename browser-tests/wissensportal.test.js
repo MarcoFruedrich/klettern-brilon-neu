@@ -69,7 +69,7 @@ test('Wissensportal: Anmeldung, Standortfilter, Artikel, Lesebestätigung und re
       await page.getByText('Die aktuelle Fassung wurde von dir als gelesen bestätigt.').waitFor({state:'visible'});
       assert.deepEqual(saves,[id1]);
       assert.match(await page.locator('.wiki-confirm-panel').innerText(),/gelesen bestätigt/);
-      const widthResult=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth}));
+      const widthResult=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth,offenders:[...document.querySelectorAll('body *')].map(el=>({tag:el.tagName,id:el.id,className:String(el.className||'').slice(0,80),left:Math.round(el.getBoundingClientRect().left),right:Math.round(el.getBoundingClientRect().right),width:Math.round(el.getBoundingClientRect().width)})).filter(el=>el.right>innerWidth+2).slice(0,12)}));
       assert.ok(widthResult.scroll<=widthResult.viewport+2,'Horizontaler Überlauf: '+JSON.stringify(widthResult));
       assert.deepEqual(errors,[]);
       await page.close();
