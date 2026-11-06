@@ -2002,8 +2002,10 @@ beschreibung.style.width = '100%';
       const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
       const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
       const veranstaltungsort=feld('Veranstaltungsort',angebot.veranstaltungsort,'veranstaltungsort');
-      const dauer=feld('Dauer (Minuten)',angebot.dauer,'dauer','number');
+      const dauer=feld('Dauer bei 5–10 Personen (Minuten)',angebot.dauer,'dauer','number');
       dauer.min='15';dauer.max='1440';dauer.step='1';
+      const dauerHinweis=el('p','Die angegebene Dauer gilt für 5–10 Personen. Für andere Gruppengrößen wird die voraussichtliche Dauer automatisch angepasst.');
+      dauerHinweis.className='hint';metadaten.append(dauerHinweis);
       const kapazitaet=feld('Kapazität',angebot.kapazitaet,'kapazitaet','number');
       kapazitaet.min='1';kapazitaet.max='500';
       const termine=feld('Verfügbare Termine (ein Datum je Zeile)',(angebot.verfuegbare_termine||[]).join('\n'),'verfuegbare_termine','textarea');
@@ -2025,7 +2027,7 @@ beschreibung.style.width = '100%';
 
       const details = document.createElement('p');
       details.textContent =
-        'Dauer: ' + angebot.dauer + ' Minuten | ' +
+        'Richtdauer für 5–10 Personen: ' + angebot.dauer + ' Minuten | ' +
         (angebot.aktiv ? 'Aktiv' : 'Deaktiviert') + ' · ' +
         (angebot.buchbar ? 'buchbar' : 'nicht buchbar') + ' · ' +
         (angebot.veroeffentlicht ? 'veröffentlicht' : 'nicht veröffentlicht');
