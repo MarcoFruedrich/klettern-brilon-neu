@@ -269,12 +269,29 @@ async function refresh() {
           c.append(el('p', k + ': ' + b.data[k]));
         }
       }
+      if(b.status==='bestaetigt'&&b.data.datum&&b.data.datum<=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Berlin'})){
+        const durchgefuehrt=el('button',b.data.programmStattgefunden?'✓ Programm als stattgefunden dokumentiert':'Programm hat stattgefunden dokumentieren');
+        durchgefuehrt.type='button';durchgefuehrt.className='btn secondary';
+        durchgefuehrt.disabled=Boolean(b.data.programmStattgefunden);
+        const durchfuehrungStatus=el('small',b.data.programmStattgefundenAm?'Dokumentiert am '+new Date(b.data.programmStattgefundenAm).toLocaleString('de-DE'):'');
+        durchgefuehrt.addEventListener('click',async()=>{
+          durchgefuehrt.disabled=true;
+          try{
+            await api('/api/admin/buchungen/'+encodeURIComponent(b.id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:b.status,bearbeitungsnotiz:b.bearbeitungsnotiz||'',programmStattgefunden:true})});
+            await refresh();
+          }catch(error){durchfuehrungStatus.textContent='Konnte nicht gespeichert werden: '+error.message;durchgefuehrt.disabled=false;}
+        });
+        c.append(durchgefuehrt,durchfuehrungStatus);
+      }
       if(b.data.wiederkehrenderKundeHinweis===true){
         const returning=el('p','Wiedererkannt: frühere bestätigte Buchung liegt vor.');
         returning.className='booking-customer-returning';c.append(returning);
       }
       if(b.data.empfehlung){
-        c.append(el('p',`Empfehlungsgeber: ${b.data.empfehlung.email}`));
+        const referral=b.data.empfehlung;
+        c.append(el('p',`Empfehlungsgeber: ${referral.email}`));
+        c.append(el('p',`Nachweis der früheren Buchung: ${referral.buchungsnummer||'Buchung'} · ${referral.programm||'Programm'} am ${referral.veranstaltungsdatum||'Datum unbekannt'} (als stattgefunden dokumentiert am ${referral.stattgefundenAm?new Date(referral.stattgefundenAm).toLocaleDateString('de-DE'):'—'})`));
+        c.append(el('p',referral.bestaetigtAm?'Empfehlung per E-Mail bestätigt am '+new Date(referral.bestaetigtAm).toLocaleString('de-DE'):'Wartet auf die Bestätigung des Empfehlungsgebers per E-Mail.'));
       }
       if(Number(b.data.rabattCent)>0){
         const grund=b.data.rabattArt==='anschlussbuchung'?'Anschlussbuchung':

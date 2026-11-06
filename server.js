@@ -460,6 +460,38 @@ async function main(req,res){
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    if(route==='/api/empfehlung/bestaetigen'&&req.method==='GET'){
+      const token=String(u.searchParams.get('token')||'');
+      if(!/^[a-f0-9]{64}$/.test(token))return reply(res,400,{error:'Der Bestätigungslink ist ungültig.'});
+      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
+      return res.end(`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Empfehlung bestätigen</title><body style="font:16px system-ui,sans-serif;max-width:640px;margin:10vh auto;padding:24px;color:#173f34;background:#f3f5f3"><main style="background:white;padding:32px;border-radius:16px"><h1>Empfehlung bestätigen</h1><p>Bitte bestätige, dass du die Empfehlung für die neue Buchungsanfrage ausgesprochen hast.</p><form method="post" action="/api/empfehlung/bestaetigen?token=${token}"><button style="background:#173f34;color:white;border:0;border-radius:8px;padding:12px 18px;font:inherit;cursor:pointer">Empfehlung jetzt bestätigen</button></form></main></body></html>`);
+    }
+    if(route==='/api/empfehlung/bestaetigen'&&req.method==='POST'){
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      if(!sameOriginMutation(req))return reply(res,403,{error:'Anfrage abgelehnt.'});
+      const token=String(u.searchParams.get('token')||'');
+      if(!/^[a-f0-9]{64}$/.test(token))return reply(res,400,{error:'Der Bestätigungslink ist ungültig.'});
+      const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+      const result=await reservierungsTransaktion(async client=>{
+        const q=await client.query(`SELECT id,data,status,buchungsnummer FROM brilon_buchungen
+          WHERE data->'empfehlung'->>'bestaetigungsTokenHash'=$1 FOR UPDATE`,[tokenHash]);
+        if(!q.rowCount)return {ungueltig:true};
+        const booking=q.rows[0],data=booking.data,ref=data.empfehlung;
+        if(ref.bestaetigtAm)return {bereitsBestaetigt:true};
+        if(!ref.bestaetigungsTokenAblauf||Date.parse(ref.bestaetigungsTokenAblauf)<Date.now())return {abgelaufen:true};
+        ref.bestaetigtAm=new Date().toISOString();
+        delete ref.bestaetigungsTokenHash;delete ref.bestaetigungsTokenAblauf;
+        await client.query('UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW() WHERE id=$2',[JSON.stringify(data),booking.id]);
+        return {bestaetigt:true,buchungsnummer:booking.buchungsnummer||data.buchungsnummer,ref};
+      });
+      if(result.ungueltig||result.abgelaufen)
+        return reply(res,result.abgelaufen?410:404,{error:result.abgelaufen?'Der Bestätigungslink ist abgelaufen.':'Der Bestätigungslink ist ungültig.'});
+      if(result.bestaetigt&&process.env.BOOKING_NOTIFY_EMAIL)
+        brevoMail(process.env.BOOKING_NOTIFY_EMAIL,'Empfehlung bestätigt – Buchung '+(result.buchungsnummer||''),
+          `Die empfehlende Person hat die Empfehlung per E-Mail bestätigt.\n\nNeue Buchung: ${result.buchungsnummer||''}\nEmpfehlungsgeber: ${result.ref.email}\nNachweis: ${result.ref.buchungsnummer||''} · ${result.ref.programm||''} am ${result.ref.veranstaltungsdatum||''}\nBestätigt am: ${new Date(result.ref.bestaetigtAm).toLocaleString('de-DE',{timeZone:'Europe/Berlin'})}`).catch(()=>{});
+      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
+      return res.end(`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Empfehlung bestätigt</title><body style="font:16px system-ui,sans-serif;max-width:640px;margin:10vh auto;padding:24px;color:#173f34;background:#f3f5f3"><main style="background:white;padding:32px;border-radius:16px"><h1>Empfehlung bestätigt</h1><p>${result.bereitsBestaetigt?'Diese Empfehlung wurde bereits bestätigt.':'Danke. Deine Empfehlung wurde bestätigt. Die Verwaltung wurde informiert und kann die Buchungsanfrage jetzt bearbeiten.'}</p><a href="/">Zur Website</a></main></body></html>`);
+    }
     if(route.startsWith('/api/wissensportal')||route.startsWith('/api/admin/wissensportal'))
       return await wissensportalApi(req,res,u,route);
     if(route.startsWith('/api/admin/einsatzplanung')||route.startsWith('/api/pruefung/einsatzplanung'))
@@ -624,6 +656,7 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
 
       const fenster=buchungsfenster(data);
       if(!fenster||fenster[1]>1440)return reply(res,400,{error:'Die Programmdauer passt nicht in den gewählten Veranstaltungstag.'});
+      const empfehlungsBestaetigungstoken=empfehlungAngefordert?crypto.randomBytes(32).toString('hex'):null;
       const ergebnis=await reservierungsTransaktion(async client=>{
         if(empfehlungAngefordert){
           if(empfehlungsgeberEmail===email.toLowerCase())return {empfehlungsgeberSelbst:true};
@@ -632,8 +665,9 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
           const value=Number(String(config.empfehlungRabattWert||'').replace(',','.'));
           if(config.empfehlungAktiv!==true||!Number.isFinite(value)||value<=0||!['prozent','festbetrag'].includes(config.empfehlungRabattArt))
             return {empfehlungsaktionInaktiv:true};
-          const referrer=await client.query(`SELECT id,buchungsnummer FROM brilon_buchungen
+          const referrer=await client.query(`SELECT id,buchungsnummer,data FROM brilon_buchungen
             WHERE lower(COALESCE(data->>'email',''))=lower($1) AND status='bestaetigt'
+              AND data->>'programmStattgefunden'='true'
               AND COALESCE(data->>'datum','')<$2 ORDER BY data->>'datum' DESC LIMIT 1`,
             [empfehlungsgeberEmail,heuteInBerlin()]);
           if(!referrer.rowCount)return {empfehlungNichtVerifiziert:true};
@@ -644,7 +678,14 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
           data.preisVorEmpfehlungsrabattCent=preisCent;
           data.empfehlungRabattCent=rabattCent;
           data.empfehlung={email:empfehlungsgeberEmail,buchungId:referrer.rows[0].id,
-            buchungsnummer:referrer.rows[0].buchungsnummer||null,bestaetigtAm:new Date().toISOString()};
+            buchungsnummer:referrer.rows[0].buchungsnummer||null,
+            name:referrer.rows[0].data?.name||null,
+            programm:referrer.rows[0].data?.angebot||null,
+            veranstaltungsdatum:referrer.rows[0].data?.datum||null,
+            stattgefundenAm:referrer.rows[0].data?.programmStattgefundenAm||null,
+            bestaetigtAm:null,
+            bestaetigungsTokenHash:crypto.createHash('sha256').update(empfehlungsBestaetigungstoken).digest('hex'),
+            bestaetigungsTokenAblauf:new Date(Date.now()+24*60*60*1000).toISOString()};
           data.rabattArt='empfehlung';data.rabattCent=rabattCent;data.rabattBasisCent=preisCent;
           data.gesamtpreis=(preisCent-rabattCent)/100;
           data.anzahlung=einzelplatz?0:Math.round((preisCent-rabattCent)*0.25)/100;
@@ -721,6 +762,12 @@ const benachrichtigungen = [
     `Gut Seil!\nKlettern & Abenteuer Brilon`
   )
 ];
+if(data.empfehlung&&empfehlungsBestaetigungstoken){
+  const base=(process.env.PUBLIC_BASE_URL||'https://klettern-brilon-neu.onrender.com').replace(/\/$/,'');
+  const link=`${base}/api/empfehlung/bestaetigen?token=${encodeURIComponent(empfehlungsBestaetigungstoken)}`;
+  benachrichtigungen.push(brevoMail(data.empfehlung.email,'Bitte bestätige eine Empfehlung – Klettern & Abenteuer',
+    `Hallo ${data.empfehlung.name||''},\n\nbei einer neuen Buchungsanfrage wurde deine E-Mail-Adresse als Empfehlungsgeber angegeben. Unser System hat eine frühere, bestätigte und als stattgefunden dokumentierte Buchung mit dieser Adresse gefunden (${data.empfehlung.buchungsnummer||'Buchung'}, ${data.empfehlung.programm||'Programm'} am ${data.empfehlung.veranstaltungsdatum||'—'}).\n\nBitte bestätige über diesen Link, dass du die Empfehlung ausgesprochen hast:\n${link}\n\nDer Link ist 24 Stunden gültig. Die Verwaltung kann die neue Buchung erst bestätigen, wenn du die Empfehlung bestätigt hast. Falls du die Empfehlung nicht ausgesprochen hast, ignoriere diese E-Mail.\n\nViele Grüße\nKlettern & Abenteuer Brilon`));
+}
 if (process.env.BOOKING_NOTIFY_EMAIL) {
   benachrichtigungen.push(brevoMail(
     process.env.BOOKING_NOTIFY_EMAIL,
@@ -1171,7 +1218,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const fields=['firma','name','strasse','plz','ort','email','telefon','steuernummer','ustIdNr','steuerhinweis',
         'bankname','iban','bic','rechnungshinweis','rechnungsPraefix','empfehlungRabattArt','empfehlungsText'];
       const values={};for(const key of fields)values[key]=safeText(d[key],key==='rechnungshinweis'||key==='steuerhinweis'?1000:200);
-      values.empfehlungsText=safeText(d.empfehlungsText,300)||'Freunde werben Freunde! Empfiehl uns gerne weiter. So können Freunde und Bekannte ebenfalls von deinen positiven Erfahrungen profitieren. Wenn sie bei ihrer Anfrage deine Kontakt-E-Mail-Adresse als Empfehlungsgeber angeben und eine frühere bestätigte Buchung damit nachgewiesen wird, erhalten sie den aktuell in der Verwaltung festgelegten Rabatt.';
+      values.empfehlungsText=safeText(d.empfehlungsText,300)||'Freunde werben Freunde! Empfiehl uns gerne weiter. So können Freunde und Bekannte ebenfalls von deinen positiven Erfahrungen profitieren. Wenn sie bei ihrer Anfrage deine Kontakt-E-Mail-Adresse als Empfehlungsgeber angeben und eine frühere bestätigte Buchung zu dieser E-Mail-Adresse vorliegt, das Programm in der Verwaltung als stattgefunden dokumentiert wurde und der Empfehlungsgeber die Bestätigungs-E-Mail bestätigt, erhalten sie den aktuell in der Verwaltung festgelegten Rabatt.';
       values.empfehlungAktiv=d.empfehlungAktiv===true;
       values.empfehlungRabattArt=['prozent','festbetrag'].includes(d.empfehlungRabattArt)?d.empfehlungRabattArt:'prozent';
       const referralValueText=String(d.empfehlungRabattWert??'').trim().replace(',','.');
@@ -1613,6 +1660,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
       let status = d.status,
       notiz = safeText(d.bearbeitungsnotiz, 2000);
+      const programmStattgefunden=d.programmStattgefunden;
       if(!['offen','bestaetigt','abgelehnt','storniert'].includes(status))
         return reply(res,400,{error:'Ungültiger Buchungsstatus.'});
 
@@ -1627,6 +1675,23 @@ const alt=await client.query(
         
 const alterStatus = alt.rows[0].status;
     const buchungsdaten = alt.rows[0].data;
+
+        if(status==='bestaetigt'&&buchungsdaten.empfehlung&&!buchungsdaten.empfehlung.bestaetigtAm)
+          return {empfehlungWartetAufBestaetigung:true};
+
+        if(programmStattgefunden!==undefined){
+          if(typeof programmStattgefunden!=='boolean')return {ungueltigeDurchfuehrung:true};
+          if(programmStattgefunden&&(alterStatus!=='bestaetigt'||
+             !gueltigesDatum(buchungsdaten.datum)||buchungsdaten.datum>heuteInBerlin()))
+            return {durchfuehrungNichtZulaessig:true};
+          if(programmStattgefunden){
+            buchungsdaten.programmStattgefunden=true;
+            buchungsdaten.programmStattgefundenAm=new Date().toISOString();
+          }else{
+            delete buchungsdaten.programmStattgefunden;
+            delete buchungsdaten.programmStattgefundenAm;
+          }
+        }
 
 
         if(status==='offen'||status==='bestaetigt'){
@@ -1683,6 +1748,12 @@ return {
         return reply(res,409,{error:ergebnis.konflikt});
       if(ergebnis.anschlussElternUngueltig)
         return reply(res,409,{error:'Die Ursprungsbuchung ist nicht mehr bestätigt.'});
+      if(ergebnis.ungueltigeDurchfuehrung)
+        return reply(res,400,{error:'Ungültige Angabe zum Stattfinden des Programms.'});
+      if(ergebnis.durchfuehrungNichtZulaessig)
+        return reply(res,409,{error:'Nur bestätigte Programme mit einem vergangenen Veranstaltungstag können als stattgefunden dokumentiert werden.'});
+      if(ergebnis.empfehlungWartetAufBestaetigung)
+        return reply(res,409,{error:'Die Empfehlung muss zuerst über den Bestätigungslink in der E-Mail bestätigt werden.'});
 
       
 if (

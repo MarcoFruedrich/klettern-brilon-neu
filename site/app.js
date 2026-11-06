@@ -461,8 +461,8 @@ form.addEventListener('submit', async e => {
     }
 
     status.textContent = json.einzelplatz
-      ? `✓ Platz reserviert. Buchungsnummer: ${json.buchungsnummer}. Keine Anzahlung erforderlich. Der Termin findet ab ${json.mindestteilnehmer} Anmeldungen statt.`
-      : '✓ BUCHUNGSANFRAGE ERFOLGREICH! Deine Buchungsnummer: ' + json.buchungsnummer + '. Dein gewünschter Termin wurde vorläufig reserviert. Wir melden uns persönlich bei dir.';
+      ? `✓ Platz reserviert. Buchungsnummer: ${json.buchungsnummer}. Keine Anzahlung erforderlich. Der Termin findet ab ${json.mindestteilnehmer} Anmeldungen statt.` + (data.empfehlungBestaetigt==='on'?' Die Verwaltung kann die Buchung erst bestätigen, nachdem der Empfehlungsgeber den Bestätigungslink per E-Mail angeklickt hat.':'')
+      : '✓ BUCHUNGSANFRAGE ERFOLGREICH! Deine Buchungsnummer: ' + json.buchungsnummer + '. Dein gewünschter Termin wurde vorläufig reserviert. Wir melden uns persönlich bei dir.' + (data.empfehlungBestaetigt==='on'?' Die Verwaltung kann die Buchung erst bestätigen, nachdem der Empfehlungsgeber den Bestätigungslink per E-Mail angeklickt hat.':'');
 
     status.style.color = '#167c3a';
     status.style.fontWeight = 'bold';
