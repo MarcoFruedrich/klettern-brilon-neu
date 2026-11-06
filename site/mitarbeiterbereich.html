@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Mitarbeiterbereich | Klettern &amp; Abenteuer</title>
-  <link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
-  <link rel="stylesheet" href="/wissensportal.css?v=20261106">
+  <link rel="stylesheet" href="/style.css?v=20261106-employee-sidenav">
+  <link rel="stylesheet" href="/wissensportal.css?v=20261106-employee-sidenav-custom-categories">
 </head>
 <body class="admin-page staff-portal-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -39,57 +39,48 @@
         </form>
         <p id="staff-profile-status" role="status" aria-live="polite"></p>
       </details>
-      <section class="booking" aria-labelledby="staff-planning-heading">
-        <h2 id="staff-planning-heading">Termine und meine Bewerbungen</h2>
-        <p>Du kannst dich auf freie Termine bewerben. Eine Einteilung durch die Verwaltung muss von dir verbindlich bestätigt werden.</p>
-        <button id="staff-planning-refresh" class="btn secondary" type="button">Termine aktualisieren</button>
-        <p id="staff-planning-status" role="status" aria-live="polite"></p>
-        <div id="staff-planning-list" class="admin-grid"></div>
-      </section>
-      <section id="wiki-staff" class="wiki-staff-section booking" aria-labelledby="wiki-staff-heading">
-        <div class="wiki-staff-header">
-          <div><h2 id="wiki-staff-heading">Wissensportal – internes Nachschlagewerk</h2>
-            <p>Programminformationen, Standorte, Sicherheitseinweisungen, Notfallabläufe und weitere Hinweise.</p>
-          </div>
-          <button type="button" class="btn secondary" id="wiki-staff-refresh">Aktualisieren</button>
-        </div>
-        <nav class="wiki-topic-tabs" id="wiki-topic-tabs" aria-label="Wissenskategorien">
-          <button type="button" data-category="" class="active">Alle Artikel</button>
-          <button type="button" data-category="programm">Programme</button>
-          <button type="button" data-category="standort">Standorte</button>
-          <button type="button" data-category="sicherheit">Sicherheit</button>
-          <button type="button" data-category="notfall">Notfall &amp; Erste Hilfe</button>
-          <button type="button" data-category="ablauf">Arbeitsabläufe</button>
-          <button type="button" data-category="allgemein">Allgemeines</button>
-        </nav>
-        <div class="wiki-staff-controls">
-          <label>Suche<input id="wiki-staff-search" type="search" autocomplete="off" placeholder="Thema, Programm oder Stichwort suchen"></label>
-          <label>Kategorie<select id="wiki-staff-category"><option value="">Alle Kategorien</option><option value="programm">Programme</option>
-            <option value="standort">Standorte</option><option value="sicherheit">Sicherheitseinweisungen</option>
-            <option value="notfall">Notfall &amp; Erste Hilfe</option><option value="ablauf">Arbeitsabläufe</option>
-            <option value="allgemein">Allgemeines</option></select></label>
-          <label>Standort<select id="wiki-staff-site"><option value="">Alle Standorte</option></select></label>
-        </div>
-        <p id="wiki-staff-status" role="status" aria-live="polite"></p>
-        <div class="wiki-staff-layout">
-          <nav id="wiki-staff-list" aria-label="Wissensartikel" class="wiki-staff-list"></nav>
-          <article id="wiki-staff-content" class="wiki-staff-content">
-            <h3>Wissen auf einen Blick</h3><p>Wähle links einen Artikel aus.</p>
-          </article>
-          <aside id="wiki-staff-side" class="wiki-staff-side" aria-label="Artikel-Informationen"></aside>
-        </div>
-      </section>
       <div class="staff-portal-layout">
         <nav id="staff-areas-nav" class="staff-areas-nav" aria-label="Mitarbeiterbereiche"></nav>
-        <section id="staff-area-content" class="booking staff-area-content" aria-live="polite">
-          <h2>Informationen</h2>
-          <p>Wähle links einen Bereich aus.</p>
-        </section>
+        <div class="staff-portal-pages">
+          <section id="staff-planning-page" class="booking staff-view-panel" aria-labelledby="staff-planning-heading">
+            <h2 id="staff-planning-heading">Termine und meine Buchungen</h2>
+            <p>Du kannst dich auf freie Termine bewerben. Eine Einteilung durch die Verwaltung muss von dir verbindlich bestätigt werden.</p>
+            <button id="staff-planning-refresh" class="btn secondary" type="button">Termine aktualisieren</button>
+            <p id="staff-planning-status" role="status" aria-live="polite"></p>
+            <div id="staff-planning-list" class="admin-grid"></div>
+          </section>
+          <section id="wiki-staff" class="wiki-staff-section booking staff-view-panel" aria-labelledby="wiki-staff-heading" hidden>
+            <div class="wiki-staff-header">
+              <div><h2 id="wiki-staff-heading">Wissenspool – internes Nachschlagewerk</h2>
+                <p>Programminformationen, Standorte, Sicherheitseinweisungen, Notfallabläufe und weitere Hinweise.</p>
+              </div>
+              <button type="button" class="btn secondary" id="wiki-staff-refresh">Aktualisieren</button>
+            </div>
+            <nav class="wiki-topic-tabs" id="wiki-topic-tabs" aria-label="Wissenskategorien"></nav>
+            <div class="wiki-staff-controls">
+              <label>Suche<input id="wiki-staff-search" type="search" autocomplete="off" placeholder="Thema, Programm oder Stichwort suchen"></label>
+              <label>Kategorie<select id="wiki-staff-category"><option value="">Alle Kategorien</option></select></label>
+              <label>Standort<select id="wiki-staff-site"><option value="">Alle Standorte</option></select></label>
+            </div>
+            <p id="wiki-staff-status" role="status" aria-live="polite"></p>
+            <div class="wiki-staff-layout">
+              <nav id="wiki-staff-list" aria-label="Wissensartikel" class="wiki-staff-list"></nav>
+              <article id="wiki-staff-content" class="wiki-staff-content">
+                <h3>Wissen auf einen Blick</h3><p>Wähle links einen Artikel aus.</p>
+              </article>
+              <aside id="wiki-staff-side" class="wiki-staff-side" aria-label="Artikel-Informationen"></aside>
+            </div>
+          </section>
+          <section id="staff-area-content" class="booking staff-area-content staff-view-panel" aria-live="polite" hidden>
+            <h2>Informationen</h2>
+            <p>Wähle links einen Bereich aus.</p>
+          </section>
+        </div>
       </div>
     </section>
   </main>
-  <script src="/mitarbeiterbereich.js"></script>
-  <script src="/einsatzplanung-mitarbeiter.js?v=20261106-bestaetigungszeiten"></script>
-  <script src="/wissensportal-mitarbeiter.js?v=20261106"></script>
+  <script src="/mitarbeiterbereich.js?v=20261106-employee-sidenav"></script>
+  <script src="/einsatzplanung-mitarbeiter.js?v=20261106-customer-confirmation-state"></script>
+  <script src="/wissensportal-mitarbeiter.js?v=20261106-employee-sidenav-custom-categories"></script>
 </body>
 </html>

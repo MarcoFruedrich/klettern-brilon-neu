@@ -13,16 +13,28 @@ function showContacts(entry,content){
     return surname(a.name).localeCompare(surname(b.name),'de',{sensitivity:'base'})||
       String(a.name||'').localeCompare(String(b.name||''),'de',{sensitivity:'base'});
   });
-  const list=node('div');list.className='staff-contact-list';
-  if(!contacts.length)list.append(node('p','Noch keine freigegebenen Mitarbeiterkonten.'));
-  for(const person of contacts){
-    const card=node('article');card.className='booking staff-contact-card';
-    card.append(node('strong',person.name));
-    const email=node('a',person.email);email.href='mailto:'+person.email;card.append(email);
-    if(person.telefon){const phone=node('a',person.telefon);phone.href='tel:'+person.telefon.replace(/[^+\d]/g,'');card.append(phone);}
-    list.append(card);
+  const table=node('div');table.className='staff-contact-table';table.setAttribute('role','table');
+  const header=node('div');header.className='staff-contact-header';header.setAttribute('role','row');
+  for(const label of ['Name','E-Mail','Telefon','Wohnort']){
+    const cell=node('strong',label);cell.setAttribute('role','columnheader');header.append(cell);
   }
-  content.append(list);
+  table.append(header);
+  if(!contacts.length)table.append(node('p','Noch keine freigegebenen Mitarbeiterkonten.'));
+  for(const person of contacts){
+    const row=node('div');row.className='staff-contact-row';row.setAttribute('role','row');
+    const name=node('strong',person.name||'—');name.dataset.label='Name';name.setAttribute('role','cell');row.append(name);
+    const emailCell=node('div');emailCell.dataset.label='E-Mail';emailCell.setAttribute('role','cell');
+    if(person.email){const email=node('a',person.email);email.href='mailto:'+person.email;emailCell.append(email);}
+    else emailCell.append(node('span','—'));
+    row.append(emailCell);
+    const phoneCell=node('div');phoneCell.dataset.label='Telefon';phoneCell.setAttribute('role','cell');
+    if(person.telefon){const phone=node('a',person.telefon);phone.href='tel:'+person.telefon.replace(/[^+\d]/g,'');phoneCell.append(phone);}
+    else phoneCell.append(node('span','—'));
+    row.append(phoneCell);
+    const town=node('span',person.wohnort||'—');town.dataset.label='Wohnort';town.setAttribute('role','cell');row.append(town);
+    table.append(row);
+  }
+  content.append(table);
 }
 function showTextArea(area,content){
   const section=node('section');section.className='staff-location-section';
@@ -33,7 +45,20 @@ function entryForArea(area,subtitle=''){
   return {key:'area:'+area.id+(subtitle?':'+subtitle:''),title:area.titel,area};
 }
 function showEntry(entry){
-  const content=$('staff-area-content');content.replaceChildren();
+  const content=$('staff-area-content'),planning=$('staff-planning-page'),wiki=$('wiki-staff');
+  const primary=entry.kind==='planning'||entry.kind==='wiki';
+  planning.hidden=entry.kind!=='planning';
+  wiki.hidden=entry.kind!=='wiki';
+  content.hidden=primary;
+  if(primary){
+    for(const button of $('staff-areas-nav').querySelectorAll('button[data-entry-key]')){
+      const selected=button.dataset.entryKey===entry.key;
+      button.classList.toggle('active',selected);
+      if(selected)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
+    }
+    return;
+  }
+  content.replaceChildren();
   if(entry.kind==='contacts'){
     content.append(node('h2',entry.title));showContacts(entry,content);
   }else if(entry.kind==='location'){
@@ -73,7 +98,10 @@ function render(data){
   profile.elements.email.value=data.profil?.email||'';
   profile.elements.telefon.value=data.profil?.telefon||'';
   const nav=$('staff-areas-nav');nav.replaceChildren();
-  const areas=data.bereiche||[],entries=[];
+  const areas=data.bereiche||[],entries=[
+    {key:'planning',title:'Termine und meine Buchungen',kind:'planning'},
+    {key:'wiki',title:'Wissenspool',kind:'wiki'}
+  ];
   if(Array.isArray(data.kontakte))entries.push({key:'contacts',title:'Mitarbeiterkontakte',kind:'contacts',kontakte:data.kontakte});
   for(const area of areas.filter(item=>item.art==='allgemein'))entries.push(entryForArea(area));
   const locations=[...(data.orte||[])].sort((a,b)=>a.name.localeCompare(b.name,'de',{sensitivity:'base'}));

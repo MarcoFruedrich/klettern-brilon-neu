@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
   <link rel="stylesheet" href="/style.css?v=20261106-admin-form-align">
-  <link rel="stylesheet" href="/wissensportal.css?v=20261106">
+  <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-site-label-inline">
 </head>
 <body class="admin-page">
@@ -487,15 +487,22 @@
   <h2 id="wissensportal-admin-heading">Wissensportal – interne Wikipedia</h2>
   <p>Hier legst du interne Artikel an, bearbeitest sie und veröffentlichst sie für angemeldete Mitarbeiter. Entwürfe bleiben unsichtbar. Standortzuweisungen können mehrfach erfolgen.</p>
   <p><strong>Wichtig:</strong> Sicherheitseinweisungen und Notfallanweisungen erhalten Versionsnummern. Mitarbeiter können das Lesen der aktuellen Version bestätigen; praktische Sicherheitsunterweisungen bleiben zusätzlich erforderlich.</p>
+  <details id="wiki-categories-panel" class="booking wiki-categories-panel">
+    <summary><strong>Wissenskategorien verwalten</strong></summary>
+    <p>Oberpunkte lassen sich aufklappen. Unterpunkte werden innerhalb des Oberpunkts ergänzt und in der Reihenfolge gespeichert.</p>
+    <div id="wiki-category-tree" class="wiki-category-tree"></div>
+    <div class="wiki-category-new-root">
+      <label>Neue Hauptkategorie<input id="wiki-category-root-title" maxlength="80" placeholder="z. B. Programmsammlung"></label>
+      <button type="button" id="wiki-category-add-root" class="btn secondary">Hauptkategorie hinzufügen</button>
+    </div>
+    <button type="button" id="wiki-category-save" class="btn">Kategorien speichern</button>
+    <p id="wiki-category-status" role="status" aria-live="polite"></p>
+  </details>
   <div class="wiki-admin-layout">
     <form id="wiki-article-form" class="booking">
       <h3 id="wiki-form-heading">Neuer Wissensartikel</h3>
       <label>Titel<input name="titel" maxlength="120" required placeholder="z. B. Kletterwand Brilon – Sicherungsablauf"></label>
-      <label>Kategorie<select name="kategorie" required>
-        <option value="allgemein">Allgemeines</option><option value="programm">Programminformationen</option>
-        <option value="standort">Standortinformationen</option><option value="sicherheit">Sicherheitseinweisungen</option>
-        <option value="ablauf">Arbeitsabläufe</option><option value="notfall">Notfall & Erste Hilfe</option>
-      </select></label>
+      <label>Kategorie<select name="kategorie" required></select></label>
       <label>Kurzbeschreibung<textarea name="kurztext" rows="2" maxlength="500" placeholder="Kurzer Überblick für die Suche"></textarea></label>
       <label>Artikeltext<textarea name="inhalt" rows="12" maxlength="20000" required placeholder="Abläufe, Regeln, Material, Besonderheiten, Sicherheitshinweise ..."></textarea></label>
       <label>Artikelbild (optional, HTTPS)<input type="url" name="bildUrl" placeholder="https://.../klettern.jpg"></label>
@@ -664,8 +671,8 @@
   <script src="/admin.js?v=20261105-admin-login-fix"></script>
   <script src="/pruefung-admin.js?v=20261106-freigabe-pause-fix"></script>
   <script src="/feedback-admin.js"></script>
-  <script src="/einsatzplanung-admin.js?v=20261106-admin-form-align"></script>
-  <script src="/wissensportal-admin.js?v=20261106"></script>
+  <script src="/einsatzplanung-admin.js?v=20261106-settings-persist-check"></script>
+  <script src="/wissensportal-admin.js?v=20261106-hierarchical-categories"></script>
   <script src="/admin-kalender-v2.js?v=20261106-open-bookings-editable"></script>
 </body>
 </html>

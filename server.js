@@ -768,6 +768,27 @@ if(data.empfehlung&&empfehlungsBestaetigungstoken){
   benachrichtigungen.push(brevoMail(data.empfehlung.email,'Bitte bestätige eine Empfehlung – Klettern & Abenteuer',
     `Hallo ${data.empfehlung.name||''},\n\nbei einer neuen Buchungsanfrage wurde deine E-Mail-Adresse als Empfehlungsgeber angegeben. Unser System hat eine frühere, bestätigte und als stattgefunden dokumentierte Buchung mit dieser Adresse gefunden (${data.empfehlung.buchungsnummer||'Buchung'}, ${data.empfehlung.programm||'Programm'} am ${data.empfehlung.veranstaltungsdatum||'—'}).\n\nBitte bestätige über diesen Link, dass du die Empfehlung ausgesprochen hast:\n${link}\n\nDer Link ist 24 Stunden gültig. Die Verwaltung kann die neue Buchung erst bestätigen, wenn du die Empfehlung bestätigt hast. Falls du die Empfehlung nicht ausgesprochen hast, ignoriere diese E-Mail.\n\nViele Grüße\nKlettern & Abenteuer Brilon`));
 }
+try{
+  const standortMitarbeiter=await pool.query(`SELECT DISTINCT m.id,m.name,m.email
+    FROM brilon_pruef_mitarbeitende m
+    JOIN brilon_pruef_freigaben f ON f.mitarbeiter_id=m.id
+    JOIN brilon_orte o ON o.id=f.ort_id
+    WHERE m.aktiv=true AND m.freigabe_am IS NOT NULL AND o.aktiv=true
+      AND lower(btrim(o.name))=lower(btrim($1))
+    ORDER BY m.name,m.id`,[data.veranstaltungsort]);
+  const mitarbeiterUrl=(process.env.PUBLIC_BASE_URL||'https://klettern-brilon-neu.onrender.com').replace(/\/$/,'')+'/mitarbeiterbereich.html';
+  for(const person of standortMitarbeiter.rows){
+    const adresse=safeText(person.email,180);
+    if(!/^\S+@\S+\.\S+$/.test(adresse))continue;
+    const anrede=safeText(person.name,120);
+    benachrichtigungen.push(brevoMail(adresse,
+      'Neue Terminanfrage am Standort '+data.veranstaltungsort+' – Bewerbung möglich',
+      `Hallo${anrede?' '+anrede:''},\n\nfür deinen freigegebenen Standort ist eine neue Buchungsanfrage eingegangen.\n\nProgramm: ${data.angebot}\nTermin: ${data.datum} um ${data.uhrzeit||'Uhrzeit offen'} Uhr\nStandort: ${data.veranstaltungsort||'—'}\nTeilnehmer: ${data.teilnehmer}\nBuchungsnummer: ${data.buchungsnummer}\n\nBitte melde dich im Mitarbeiterbereich an und öffne den Termin unter „Termine und meine Bewerbungen“: ${mitarbeiterUrl}\nDort kannst du dich auf die Anfrage bewerben. Die Anfrage ist noch nicht verbindlich bestätigt; die Verwaltung entscheidet über die Einteilung.\n\nViele Grüße\nKlettern & Abenteuer Brilon`
+    ));
+  }
+}catch(error){
+  console.error('Mitarbeiter-Benachrichtigung zu Buchungsanfrage fehlgeschlagen:',error.message);
+}
 if (process.env.BOOKING_NOTIFY_EMAIL) {
   benachrichtigungen.push(brevoMail(
     process.env.BOOKING_NOTIFY_EMAIL,

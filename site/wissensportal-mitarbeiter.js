@@ -3,15 +3,32 @@
   const workspace=document.getElementById('staff-portal-workspace');
   const root=document.getElementById('wiki-staff');
   if(!workspace||!root)return;
-  const planning=workspace.querySelector('section[aria-labelledby="staff-planning-heading"]');
-  if(planning)workspace.insertBefore(root,planning);
   const search=document.getElementById('wiki-staff-search'),category=document.getElementById('wiki-staff-category'),
     site=document.getElementById('wiki-staff-site'),list=document.getElementById('wiki-staff-list'),
     content=document.getElementById('wiki-staff-content'),state=document.getElementById('wiki-staff-status');
-  const categories={allgemein:'Allgemeines',programm:'Programme',standort:'Standorte',
-    sicherheit:'Sicherheitseinweisung',notfall:'Notfall & Erste Hilfe',ablauf:'Arbeitsabläufe'};
   const n=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
-  let articles=[],sites=[],active=null,run=0;
+  let articles=[],sites=[],categoryItems=[],categories={},active=null,run=0;
+  function flattened(items=categoryItems,parentId=null,depth=0){
+    return items.filter(item=>item.parentId===parentId).flatMap(item=>[{...item,depth},...flattened(items,item.id,depth+1)]);
+  }
+  function renderCategories(){
+    categories=Object.fromEntries(categoryItems.map(item=>[item.id,item.titel]));
+    const old=category.value;
+    category.replaceChildren();
+    const all=n('option','Alle Kategorien');all.value='';category.append(all);
+    for(const item of flattened()){
+      const option=n('option','　'.repeat(item.depth)+item.titel);option.value=item.id;category.append(option);
+    }
+    if([...category.options].some(item=>item.value===old))category.value=old;
+    if(tabs){
+      tabs.replaceChildren();
+      const allTab=n('button','Alle Artikel');allTab.type='button';allTab.dataset.category='';allTab.className='active';tabs.append(allTab);
+      for(const item of categoryItems.filter(item=>!item.parentId)){
+        const button=n('button',item.titel);button.type='button';button.dataset.category=item.id;tabs.append(button);
+      }
+      for(const button of tabs.querySelectorAll('[data-category]'))button.addEventListener('click',()=>{category.value=button.dataset.category;show();});
+    }
+  }
   const isSafety=e=>e.kategorie==='sicherheit'||e.kategorie==='notfall';
   const confirmed=e=>Number(e.bestaetigte_version)===Number(e.version);
   const readText=(value)=>{
@@ -140,9 +157,10 @@
   function showList(){
     list.replaceChildren();
     const title=n('h4','📁 Kategorien');title.className='wiki-nav-title';list.append(title);
-    for(const [key,label] of [['','Alle Artikel'],...Object.entries(categories)]){
+    for(const item of [{id:'',titel:'Alle Artikel',depth:0},...flattened()]){
+      const key=item.id,label=item.titel;
       const count=articles.filter(a=>!key||a.kategorie===key).length;
-      const b=n('button',label+' ('+count+')');
+      const b=n('button','　'.repeat(item.depth)+label+' ('+count+')');
       b.type='button';b.className='wiki-category-entry'+(category.value===key?' active':'');
       b.addEventListener('click',()=>{category.value=key;show();});
       list.append(b);
@@ -186,6 +204,8 @@
       if(seq!==run||workspace.hidden)return;
       articles=Array.isArray(data.artikel)?data.artikel:[];
       sites=Array.isArray(data.standorte)?data.standorte:[];
+      categoryItems=Array.isArray(data.kategorien)?data.kategorien:[];
+      renderCategories();
       const previous=active;active=articles.some(x=>x.id===previous)?previous:null;
       filters();show();
       if(active)select(articles.find(x=>x.id===active));
@@ -196,9 +216,6 @@
     }
   }
   for(const input of [search,category,site])input.addEventListener(input===search?'input':'change',show);
-  if(tabs)for(const b of tabs.querySelectorAll('[data-category]')){
-    b.addEventListener('click',()=>{category.value=b.dataset.category;show();});
-  }
   document.getElementById('wiki-staff-refresh').addEventListener('click',load);
   const observer=new MutationObserver(()=>{
     if(!workspace.hidden)load();

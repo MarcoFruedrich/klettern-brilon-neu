@@ -20,9 +20,9 @@
       personen=liste;personalAnzeigen();termineAnzeigen(plan);
       const settingsForm=document.getElementById('kundenbestaetigung-settings-form');
       if(settingsForm){
-        settingsForm.elements.namedItem('verzoegerungMinuten').value=settings?.verzoegerungMinuten||120;
-        settingsForm.elements.namedItem('ruhebeginn').value=settings?.ruhebeginn||'18:00';
-        settingsForm.elements.namedItem('ruheende').value=settings?.ruheende||'09:00';
+        settingsForm.elements.namedItem('verzoegerungMinuten').value=settings?.verzoegerungMinuten??120;
+        settingsForm.elements.namedItem('ruhebeginn').value=settings?.ruhebeginn??'18:00';
+        settingsForm.elements.namedItem('ruheende').value=settings?.ruheende??'09:00';
       }
       status.textContent='Kalender, Bewerbungen und Mitarbeiterdaten aktualisiert.';
     }catch(err){status.textContent='Einsatzplanung nicht verfügbar: '+err.message;}
@@ -162,14 +162,17 @@
     event.preventDefault();
     const button=settingsForm.querySelector('button[type="submit"]');
     const status=document.getElementById('kundenbestaetigung-settings-status');
-    button.disabled=true;status.textContent='Speichere und aktualisiere geplante Bestätigungen …';
+    button.disabled=true;status.className='';status.textContent='Speichere und aktualisiere geplante Bestätigungen …';
     try{
       const values=Object.fromEntries(new FormData(settingsForm).entries());
       const saved=await api('/api/admin/einsatzplanung/kundenbestaetigung-einstellungen',{
         method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
-      status.textContent=`Einstellungen gespeichert. ${saved.neuGeplant} geplante Kundenbestätigung(en) wurden mit den neuen Zeiten aktualisiert.`;
+      settingsForm.elements.namedItem('verzoegerungMinuten').value=saved.verzoegerungMinuten;
+      settingsForm.elements.namedItem('ruhebeginn').value=saved.ruhebeginn;
+      settingsForm.elements.namedItem('ruheende').value=saved.ruheende;
+      status.className='is-saved';status.textContent=`✓ Einstellungen gespeichert. ${saved.neuGeplant} geplante Kundenbestätigung(en) wurden mit den neuen Zeiten aktualisiert.`;
       await laden();
-    }catch(error){status.textContent='Einstellungen konnten nicht gespeichert werden: '+error.message;}
+    }catch(error){status.className='is-error';status.textContent='Einstellungen konnten nicht gespeichert werden: '+error.message;}
     finally{button.disabled=false;}
   });
   // Die Anmeldung in admin.js aktualisiert die Hauptansicht; laden erst nach Login.

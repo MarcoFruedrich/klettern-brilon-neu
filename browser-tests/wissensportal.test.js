@@ -37,7 +37,7 @@ test('Wissensportal: Anmeldung, Standortfilter, Artikel, Lesebestätigung und re
         if(!signedIn)return json(401,{error:'Mitarbeiteranmeldung erforderlich.'});
         if(endpoint==='/api/pruefung/mitarbeiterbereiche')return json(200,{
           mitarbeiter:'Testmitarbeiter',verwaltungszugang:false,profil:{name:'Testmitarbeiter',email:'test@example.test',telefon:''},
-          bereiche:[],kontakte:[],orte:[]});
+          bereiche:[],kontakte:[{id:'staff-1',name:'Mira Kletter',email:'mira@example.test',telefon:'+49 123 456',wohnort:'Brilon'}],orte:[]});
         if(endpoint==='/api/wissensportal'&&req.method()==='GET')return json(200,{
           standorte:[{id:1,name:'Brilon'},{id:2,name:'Haltern'}],
           artikel:[
@@ -58,6 +58,10 @@ test('Wissensportal: Anmeldung, Standortfilter, Artikel, Lesebestätigung und re
       await page.locator('#staff-login [name="email"]').fill('test@example.test');
       await page.locator('#staff-login [name="passwort"]').fill('Nur-Test-Passwort');
       await page.locator('#staff-login button[type="submit"]').click();
+      await page.locator('#staff-planning-page').waitFor({state:'visible'});
+      assert.equal(await page.locator('#wiki-staff').isVisible(),false,'Wissenspool bleibt geschlossen, bis der Menüpunkt gewählt wird.');
+      await page.locator('#staff-areas-nav button[data-entry-key="wiki"]').click();
+      assert.equal(await page.locator('#staff-planning-page').isVisible(),false);
       await page.locator('#wiki-staff-list button.wiki-entry').first().waitFor({state:'visible'});
       assert.match(await page.locator('#wiki-staff-content').innerText(),/Sicherheitsablauf Brilon/);
       assert.match(await page.locator('#wiki-staff-side').innerText(),/Ablauf PDF/);
@@ -69,6 +73,12 @@ test('Wissensportal: Anmeldung, Standortfilter, Artikel, Lesebestätigung und re
       await page.getByText('Die aktuelle Fassung wurde von dir als gelesen bestätigt.').waitFor({state:'visible'});
       assert.deepEqual(saves,[id1]);
       assert.match(await page.locator('.wiki-confirm-panel').innerText(),/gelesen bestätigt/);
+      await page.locator('#staff-areas-nav button[data-entry-key="contacts"]').click();
+      assert.equal(await page.locator('#staff-area-content').isVisible(),true);
+      assert.equal(await page.locator('#wiki-staff').isVisible(),false);
+      const contactRow=page.locator('.staff-contact-row').first();
+      assert.deepEqual((await contactRow.locator('[role="cell"]').allTextContents()).map(x=>x.trim()),
+        ['Mira Kletter','mira@example.test','+49 123 456','Brilon']);
       const widthResult=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth}));
       assert.ok(widthResult.scroll<=widthResult.viewport+2,'Horizontaler Überlauf: '+JSON.stringify(widthResult));
       assert.deepEqual(errors,[]);
