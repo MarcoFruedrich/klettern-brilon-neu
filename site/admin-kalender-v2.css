@@ -107,3 +107,21 @@
 @media(max-width:900px){.ck-body,.ck-body.ck-has-entry-editor{grid-template-columns:minmax(0,1fr)}.ck-detail{min-height:auto}.ck-toolbar{justify-content:flex-start}}
 @media(max-width:700px){.ck-period{min-width:0;font-size:12px;flex:1}.ck-nav{width:100%;justify-content:space-between}.ck-actions{width:100%}.ck-filter{max-width:none;flex:1}.ck-month-grid{min-width:620px}.ck-detail{padding:12px}.ck-toolbar{gap:9px}.ck-legend{font-size:11px}}
 @media(max-width:620px){.ck-entry-grid{grid-template-columns:minmax(0,1fr)}.ck-entry-field.ck-entry-wide{grid-column:auto}.ck-entry-actions{grid-template-columns:minmax(0,1fr)}}
+
+
+/* Standortfilter: bis zu sieben gleich breite Schaltflächen pro Zeile. */
+.ck-site-filter {padding:10px 12px;border-bottom:1px solid #dce7df;background:#f6faf7;color:#214639;}
+.ck-site-filter-heading {display:block;margin:0 0 7px;font-size:13px;font-weight:800;}
+.ck-site-filter-row {display:grid;gap:5px;margin:0 0 5px;}
+.ck-site-filter-row:last-child {margin-bottom:0;}
+.ck-site-filter-row.is-week {grid-template-columns:64px repeat(7,minmax(110px,1fr));min-width:840px;}
+.ck-site-filter-row.is-seven {grid-template-columns:repeat(7,minmax(0,1fr));min-width:660px;}
+.ck-site-filter-label {display:flex;align-items:center;padding:5px;color:#52675c;font-size:12px;font-weight:800;}
+.ck-site-filter-button {min-width:0;min-height:39px;padding:6px 5px;border:1px solid #cbd8cf;border-radius:8px;background:#e9eeea;color:#53645a;font:inherit;font-size:12px;font-weight:750;line-height:1.2;text-align:center;overflow-wrap:anywhere;cursor:pointer;}
+.ck-site-filter-button[aria-pressed="true"] {border-color:#087847;background:#087847;color:#fff;}
+.ck-site-filter-button[aria-pressed="false"]:hover {background:#dce5df;color:#204634;}
+.ck-site-filter-empty {display:block;padding:7px;color:#66786e;font-size:12px;}
+.ck-event {border-left:4px solid var(--ck-site-strong,var(--ck-line,#9bcae9));}
+.ck-mini-event {border-left-color:var(--ck-site-strong,var(--ck-strong,#207a65));}
+.ck-detail-card {border-left-color:var(--ck-site-strong,var(--ck-strong,#0f7c53));}
+.ck-agenda-day button {border-left:4px solid var(--ck-site-strong,var(--ck-line,#d2e5d6));}

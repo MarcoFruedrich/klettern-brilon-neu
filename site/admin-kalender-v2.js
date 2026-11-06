@@ -50,10 +50,12 @@
   const paint = (node, entry) => {
     const c = entry.type === 'sperrzeit' ? {strong:'#c53e4c',line:'#eea1a9',pale:'#fff0f1'}
       : entry.type === 'termin' ? {strong:'#217fa5',line:'#9dceeb',pale:'#e7f6ff'}
-      : siteColor(entry.site);
+      : entry.status === 'bestaetigt' ? {strong:'#218047',line:'#91cba4',pale:'#e8fadf'}
+      : {strong:'#9b6500',line:'#e6bd68',pale:'#ffe7ad'};
     node.style.setProperty('--ck-strong', c.strong);
     node.style.setProperty('--ck-line', c.line);
     node.style.setProperty('--ck-pale', c.pale);
+    if(entry.type==='buchung')node.style.setProperty('--ck-site-strong',siteColor(entry.site).strong);
   };
   const root = mk('div', 'ck-root');
   root.id = 'calendar-v2';
@@ -69,7 +71,7 @@
   const detail = mk('aside', 'ck-panel ck-detail');
   detail.setAttribute('aria-label', 'Buchungsdetails');
   const legend = mk('div', 'ck-legend');
-  const chosen = {mode:'week',cursor:midday(new Date()),date:iso(new Date()),entryId:null,site:'',events:[],staffComplete:false,newEntrySlot:null};
+  const chosen = {mode:'week',cursor:midday(new Date()),date:iso(new Date()),entryId:null,sites:[],siteOptions:[],siteFilterInitialized:false,events:[],staffComplete:false,newEntrySlot:null};
   let loadSequence = 0;
   let knownSites = [];
   const tabs = {};
@@ -88,14 +90,8 @@
   const today = btn('Heute','', () => {
     chosen.cursor = midday(new Date()); chosen.date = iso(chosen.cursor); chosen.entryId=null; chosen.newEntrySlot=null; load();
   });
-  const filterLabel = mk('label','ck-filter');
-  filterLabel.append(mk('span','Standort'));
-  const filter = mk('select');
-  filter.setAttribute('aria-label','Standort filtern');
-  filter.addEventListener('change', () => {chosen.site=filter.value;chosen.entryId=null;chosen.newEntrySlot=null;render();});
-  filterLabel.append(filter);
   const newEntry = btn('+ Neuer Eintrag','ck-new',() => openNewEntry(chosen.date));
-  actions.append(filterLabel,today,newEntry);
+  actions.append(today,newEntry);
   toolbar.append(switcher,nav,actions);
   body.append(board,detail);
   root.append(toolbar,stateText,body,legend);
@@ -194,8 +190,10 @@
     return [first,addDays(first,6)];
   }
   function visibleEntries(day) {
+    const allSitesVisible=!chosen.siteOptions.length ||
+      (chosen.sites.length===chosen.siteOptions.length&&chosen.siteOptions.every(site=>chosen.sites.includes(site)));
     return chosen.events.filter(e => e.date <= day && day <= e.last &&
-      (!chosen.site || e.site === chosen.site || e.type !== 'buchung'));
+      (e.type !== 'buchung' || chosen.sites.includes(e.site) || (allSitesVisible&&!e.site)));
   }
   function bookingStaff(plan) {
     const map=new Map();
@@ -293,13 +291,40 @@
   function refreshFilter() {
     const sites=Array.from(new Set([...knownSites,...chosen.events.map(e=>e.site)].filter(Boolean)))
       .sort((a,b)=>a.localeCompare(b,'de'));
-    if (chosen.site&&!sites.includes(chosen.site)) chosen.site='';
-    filter.replaceChildren();
-    const all=mk('option','', 'Alle Standorte');all.value='';filter.append(all);
-    for (const site of sites) {
-      const opt=mk('option','',site);opt.value=site;filter.append(opt);
+    const previous=chosen.siteOptions;
+    const allWereSelected=!previous.length ||
+      (chosen.sites.length===previous.length&&previous.every(site=>chosen.sites.includes(site)));
+    chosen.sites=!chosen.siteFilterInitialized||allWereSelected?[...sites]:chosen.sites.filter(site=>sites.includes(site));
+    chosen.siteOptions=sites;
+    chosen.siteFilterInitialized=true;
+  }
+  function toggleSite(site) {
+    const selected=new Set(chosen.sites);
+    if(selected.has(site))selected.delete(site);else selected.add(site);
+    chosen.sites=[...selected];
+    chosen.entryId=null;chosen.newEntrySlot=null;
+    render();
+  }
+  function renderSiteFilters() {
+    const selector=mk('div','ck-site-filter');
+    selector.setAttribute('role','group');
+    selector.setAttribute('aria-label','Standorte filtern, Mehrfachauswahl möglich');
+    const week=chosen.mode==='week';
+    if(!week)selector.append(mk('strong','ck-site-filter-heading','Standorte · Mehrfachauswahl'));
+    if(!chosen.siteOptions.length)selector.append(mk('span','ck-site-filter-empty','Keine Standorte eingetragen.'));
+    for(let start=0;start<chosen.siteOptions.length;start+=7){
+      const row=mk('div','ck-site-filter-row '+(week?'is-week':'is-seven'));
+      if(week)row.append(mk('span','ck-site-filter-label',start===0?'Standorte':''));
+      for(const site of chosen.siteOptions.slice(start,start+7)){
+        const selected=chosen.sites.includes(site);
+        const choice=btn(site,'ck-site-filter-button',()=>toggleSite(site));
+        choice.setAttribute('aria-pressed',String(selected));
+        choice.title='Standort '+site+(selected?' abwählen':' auswählen');
+        row.append(choice);
+      }
+      selector.append(row);
     }
-    filter.value=chosen.site;
+    board.append(selector);
   }
   function render() {
     for (const [key,tab] of Object.entries(tabs)) tab.setAttribute('aria-pressed',String(chosen.mode===key));
@@ -308,15 +333,15 @@
       dateLabel(from,{month:'long',year:'numeric'}):
       dateLabel(from,{day:'2-digit',month:'short'})+' – '+dateLabel(to,{day:'2-digit',month:'short',year:'numeric'});
     board.replaceChildren();
+    renderSiteFilters();
     if (chosen.mode==='week') renderWeek(from);
     if (chosen.mode==='month') renderMonth(from,to);
     if (chosen.mode==='agenda') renderAgenda(from);
     renderDetail();
     legend.replaceChildren();
     const items=[
-      ['#b9e1ff','Buchung (Standortfarbe)'],['#e8fadf','Bestätigt (Status im Detail)'],
-      ['#ffe0a6','Anfrage (Status im Detail)'],['#ffb9c0','Sperrzeit'],
-      ['#e8f5ff','Eigener Termin']
+      ['#e8fadf','Buchung bestätigt · Rand zeigt Standort'],['#ffe7ad','Buchungsanfrage · Rand zeigt Standort'],
+      ['#ffb9c0','Sperrzeit'],['#e8f5ff','Eigener Termin']
     ];
     for (const [color,label] of items) {
       const entry=mk('span');const swatch=mk('i');swatch.style.background=color;
