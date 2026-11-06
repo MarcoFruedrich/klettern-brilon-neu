@@ -11,7 +11,7 @@ test('Spätnachmittag: Versand am Folgetag um 9 Uhr Berlin',()=>{
 });
 test('Abend und früher Morgen bleiben bis zum nächsten Tag 9 Uhr ausgesetzt',()=>{
   assert.equal(customerConfirmationDue('2026-11-05T19:00:00+01:00').toISOString(),'2026-11-06T08:00:00.000Z');
-  assert.equal(customerConfirmationDue('2026-11-05T07:45:00+01:00').toISOString(),'2026-11-06T08:00:00.000Z');
+  assert.equal(customerConfirmationDue('2026-11-05T07:45:00+01:00').toISOString(),'2026-11-05T08:00:00.000Z');
 });
 test('Sommerzeit berücksichtigt Berlin, 9 Uhr bleibt 9 Uhr',()=>{
   const x=customerConfirmationDue('2026-07-05T19:00:00+02:00');

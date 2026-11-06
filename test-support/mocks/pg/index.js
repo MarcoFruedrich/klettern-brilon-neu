@@ -14,6 +14,8 @@ class Pool {
     this.adminSessions = new Map();
     this.adminTotpSteps = new Map();
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
+    this.rechnungsdaten = {agbText:'Test-AGB', agbAktiv:true, agbVersion:1,
+      empfehlungAktiv:false, empfehlungRabattArt:'prozent', empfehlungRabattWert:''};
     this.advisoryLockOwner = null;
     this.advisoryLockWaiters = [];
   }
@@ -53,6 +55,12 @@ class Pool {
       }
       return {rows:[],rowCount:0};
     }
+    if (sql.includes('FROM brilon_rechnungsdaten')) {
+      if (sql.includes("data->>'agbText'")) return {rows:[{text:this.rechnungsdaten.agbText,
+        aktiv:String(this.rechnungsdaten.agbAktiv),version:String(this.rechnungsdaten.agbVersion)}],rowCount:1};
+      return {rows:[{data:this.rechnungsdaten}],rowCount:1};
+    }
+    if (sql.includes('UPDATE brilon_rechnungsdaten')) return {rows:[],rowCount:1};
     if (process.env.MOCK_ADMIN_SESSION_FAIL==='1'&&sql.includes('brilon_admin_sessions'))
       throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
     if (process.env.MOCK_ADMIN_TOTP_FAIL==='1'&&sql.includes('brilon_admin_totp_steps'))

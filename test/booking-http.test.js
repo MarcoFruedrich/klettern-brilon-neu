@@ -118,7 +118,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     'Buchbare Veranstaltungsorte werden für die Anfrage öffentlich bereitgestellt');
   const anfrage=(uhrzeit,datum='2027-03-15',veranstaltungsort='Brilon')=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     vorname:'Max',nachname:'Mueller',email:'max@example.test',datum,uhrzeit,
-    teilnehmer:4,angebot:'Klettern',veranstaltungsort,datenschutz:'on'
+    teilnehmer:4,angebot:'Klettern',veranstaltungsort,datenschutz:'on',agbBestaetigt:'on',agbVersion:1
   })});
   const blockedDates=await fetch(root+'/api/sperrzeiten');
   assert.equal(blockedDates.status,200);

@@ -49,7 +49,7 @@ body.staff-portal-page{background:#f2f6f3!important;color:#173e35;}
 .staff-portal-page .wiki-staff-section{max-width:none;margin:20px 0!important;padding:20px!important;background:#f7f9f7!important;}
 .staff-portal-page .wiki-staff-header{align-items:center;}
 .staff-portal-page .wiki-staff-header h2{color:#103c2d;}
-.staff-portal-page .wiki-topic-tabs{display:flex;gap:7px;overflow-x:auto;margin:16px 0;padding-bottom:5px;scrollbar-width:thin;}
+.staff-portal-page .wiki-topic-tabs{position:relative;z-index:3;display:flex;gap:7px;overflow-x:auto;margin:16px 0;padding-bottom:5px;scrollbar-width:thin;}
 .staff-portal-page .wiki-topic-tabs button{flex:0 0 auto;min-height:41px;background:#fff;color:#204336;border:1px solid #c9dacf;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:750;cursor:pointer;}
 .staff-portal-page .wiki-topic-tabs button.active{background:#087d4b;border-color:#087d4b;color:#fff;}
 .staff-portal-page .wiki-topic-tabs button:hover,.staff-portal-page .wiki-topic-tabs button:focus-visible{outline:2px solid #197d52;outline-offset:1px;}

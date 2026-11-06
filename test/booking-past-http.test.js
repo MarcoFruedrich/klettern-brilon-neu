@@ -55,7 +55,7 @@ test('HTTP: vergangene Buchungstage sind auch über alte Anschlusslinks nicht bu
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ vorname: 'Test', nachname: 'Person', email: 'test@example.test',
       datum: '2026-01-01', uhrzeit: '10:00', teilnehmer: 2,
-      angebot: 'Klettern', datenschutz: 'on' })
+      angebot: 'Klettern', datenschutz: 'on', agbBestaetigt: 'on', agbVersion: 1 })
   });
   assert.equal(historicalBooking.status, 400, 'Vergangene Daten dürfen nicht neu gebucht werden');
 

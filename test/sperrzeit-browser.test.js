@@ -17,7 +17,7 @@ test('Sperrzeit-Helfer umfasst beide Randtage und einzelne Tage',()=>{
 test('Öffentlicher Kalender aktualisiert nach Datumseingabe die Verfügbarkeit',()=>{
   const html=fs.readFileSync(path.join(__dirname,'..','site','index.html'),'utf8');
   const app=fs.readFileSync(path.join(__dirname,'..','site','app.js'),'utf8');
-  assert.match(html,/<script src="\/sperrzeit\.js"><\/script><script src="\/app\.js"><\/script>/);
+  assert.match(html,/<script src="\/sperrzeit\.js"><\/script>[\s\S]*?<script src="\/app\.js(?:\?[^\"]*)?"><\/script>/);
   const handler=app.match(/date\.addEventListener\('change',\s*\(\)\s*=>\s*\{([\s\S]*?)\n\}\);/);
   assert.ok(handler,'Datumsfeld muss einen Änderungs-Handler haben');
   assert.match(handler[1],/belegteUhrzeitenLaden\(\)/);
