@@ -21,6 +21,7 @@ const { createKundenbestaetigungService } = require('./lib/kundenbestaetigung-se
 const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
 const { createKundenfeedbackApi } = require('./lib/kundenfeedback-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
+const { createWissensportalApi } = require('./lib/wissensportal-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild } = require('./lib/bilddatei');
 const { createClamScanner } = require('./lib/malware-scanner');
@@ -331,11 +332,14 @@ const netzwerkpartnerApi=createNetzwerkpartnerApi({pool,admin,reply,body,sameOri
 const kundenfeedbackApi=createKundenfeedbackApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 
 const marketingCampaignApi=createMarketingCampaignApi({pool,admin,reply,body});
+const wissensportalApi=createWissensportalApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation});
 async function main(req,res){
   const u=new URL(req.url,'http://localhost'),
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    if(route.startsWith('/api/wissensportal')||route.startsWith('/api/admin/wissensportal'))
+      return await wissensportalApi(req,res,u,route);
     if(route.startsWith('/api/admin/einsatzplanung')||route.startsWith('/api/pruefung/einsatzplanung'))
       return await einsatzplanungApi(req,res,u,route);
     if(route.startsWith('/api/admin/marketing/kampagnen'))return await marketingCampaignApi(req,res,route);
@@ -2782,6 +2786,40 @@ async function start(){
         PRIMARY KEY(bereich_id,ort_id))`);
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_mitarbeiterbereich_orte_ort_idx ON brilon_mitarbeiterbereich_orte(ort_id,bereich_id)');
       console.log('Mitarbeiterbereiche-Tabelle geprüft (RUN_EMPLOYEE_AREAS_MIGRATION=true)');
+    }
+    // Eigenständiges internes Wissensportal – erst nach ausdrücklicher Freigabe opt-in migrieren.
+    if(process.env.RUN_WISSENSPORTAL_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_wissensportal_artikel(
+        id UUID PRIMARY KEY,
+        titel TEXT NOT NULL CHECK(length(titel) BETWEEN 1 AND 120),
+        kurztext TEXT NOT NULL DEFAULT '' CHECK(length(kurztext)<=500),
+        inhalt TEXT NOT NULL CHECK(length(inhalt) BETWEEN 1 AND 20000),
+        kategorie TEXT NOT NULL CHECK(kategorie IN ('allgemein','programm','standort','sicherheit','ablauf','notfall')),
+        standorte BIGINT[] NOT NULL DEFAULT '{}',
+        dokument_url TEXT CHECK(dokument_url IS NULL OR length(dokument_url)<=1000),
+        veroeffentlicht BOOLEAN NOT NULL DEFAULT false,
+        version INTEGER NOT NULL DEFAULT 1 CHECK(version>=1),
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await pool.query("ALTER TABLE brilon_wissensportal_artikel ADD COLUMN IF NOT EXISTS bild_url TEXT");
+      await pool.query("ALTER TABLE brilon_wissensportal_artikel ADD COLUMN IF NOT EXISTS anhaenge JSONB NOT NULL DEFAULT '[]'::jsonb");
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_wissensportal_versionen (
+        artikel_id UUID NOT NULL REFERENCES brilon_wissensportal_artikel(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL CHECK(version>=1),
+        inhalt JSONB NOT NULL,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY(artikel_id,version)
+      )`);
+      await pool.query('CREATE INDEX IF NOT EXISTS brilon_wissensportal_veroeffentlicht_idx ON brilon_wissensportal_artikel(veroeffentlicht,kategorie,titel)');
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_wissensportal_bestaetigungen(
+        artikel_id UUID NOT NULL REFERENCES brilon_wissensportal_artikel(id) ON DELETE CASCADE,
+        mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL CHECK(version>=1),
+        bestaetigt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY(artikel_id,mitarbeiter_id)
+      )`);
+      console.log('Wissensportal-Schema geprüft (RUN_WISSENSPORTAL_MIGRATION=true)');
     }
     // Separate opt-in schema for network partners; never changes employee or admin accounts.
     if(process.env.RUN_NETWORK_PARTNER_MIGRATION==='true'){

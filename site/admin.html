@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
   <link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
+  <link rel="stylesheet" href="/wissensportal.css?v=20261106">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106">
 </head>
 <body class="admin-page">
@@ -57,6 +58,7 @@
             <a class="employee-area-link" href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a>
             <a class="employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
             <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
+            <a class="employee-area-link" href="#wissensportal-admin-section" data-admin-view-link>Wissensportal</a>
           </nav>
         </aside>
         <div class="admin-content"><section id="admin-dashboard" class="admin-view admin-dashboard" data-admin-view aria-labelledby="admin-dashboard-heading"><h2 id="admin-dashboard-heading">Aktuelles auf einen Blick</h2><p>Wähle einen Bereich. Die Übersicht wird nach jeder Anmeldung automatisch geöffnet.</p><nav class="admin-dashboard-grid" aria-label="Direkte Verwaltungsbereiche">
@@ -75,6 +77,7 @@
           <a class="admin-dashboard-link employee-area-link" href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a>
           <a class="admin-dashboard-link employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
           <a class="admin-dashboard-link employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
+          <a class="admin-dashboard-link employee-area-link" href="#wissensportal-admin-section" data-admin-view-link>Wissensportal pflegen</a>
           <a class="admin-dashboard-link" href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
           <a class="admin-dashboard-link" href="#social-media-section" data-admin-view-link>Social Media</a>
           <a class="admin-dashboard-link" href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
@@ -420,6 +423,41 @@
   <div id="mitarbeiterbereiche-list" class="admin-grid"></div>
 </section>
 
+<section id="wissensportal-admin-section" class="admin-view" data-admin-view aria-labelledby="wissensportal-admin-heading">
+  <h2 id="wissensportal-admin-heading">Wissensportal – interne Wikipedia</h2>
+  <p>Hier legst du interne Artikel an, bearbeitest sie und veröffentlichst sie für angemeldete Mitarbeiter. Entwürfe bleiben unsichtbar. Standortzuweisungen können mehrfach erfolgen.</p>
+  <p><strong>Wichtig:</strong> Sicherheitseinweisungen und Notfallanweisungen erhalten Versionsnummern. Mitarbeiter können das Lesen der aktuellen Version bestätigen; praktische Sicherheitsunterweisungen bleiben zusätzlich erforderlich.</p>
+  <div class="wiki-admin-layout">
+    <form id="wiki-article-form" class="booking">
+      <h3 id="wiki-form-heading">Neuer Wissensartikel</h3>
+      <label>Titel<input name="titel" maxlength="120" required placeholder="z. B. Kletterwand Brilon – Sicherungsablauf"></label>
+      <label>Kategorie<select name="kategorie" required>
+        <option value="allgemein">Allgemeines</option><option value="programm">Programminformationen</option>
+        <option value="standort">Standortinformationen</option><option value="sicherheit">Sicherheitseinweisungen</option>
+        <option value="ablauf">Arbeitsabläufe</option><option value="notfall">Notfall & Erste Hilfe</option>
+      </select></label>
+      <label>Kurzbeschreibung<textarea name="kurztext" rows="2" maxlength="500" placeholder="Kurzer Überblick für die Suche"></textarea></label>
+      <label>Artikeltext<textarea name="inhalt" rows="12" maxlength="20000" required placeholder="Abläufe, Regeln, Material, Besonderheiten, Sicherheitshinweise ..."></textarea></label>
+      <label>Artikelbild (optional, HTTPS)<input type="url" name="bildUrl" placeholder="https://.../klettern.jpg"></label>
+      <label>Dokumente und PDF-Anhänge (ein Dokument je Zeile: Titel | HTTPS-Link)
+        <textarea name="anhaengeText" rows="4" placeholder="Sicherheitscheck | https://.../checkliste.pdf"></textarea>
+      </label>
+      <label>Externer Dokumentenlink (optional, HTTPS)<input type="url" name="dokumentUrl" placeholder="https://..."></label>
+      <label>Für diese Standorte freigeben (Mehrfachauswahl)<select name="standorte" id="wiki-standorte" multiple size="5"></select></label>
+      <small>Ohne Standortauswahl ist der Artikel für alle angemeldeten Mitarbeiter freigegeben. Mit Standortauswahl nur für Mitarbeiter, die für mindestens einen dieser Standorte freigegeben sind.</small>
+      <label class="check"><input type="checkbox" name="veroeffentlicht"><span>Jetzt im Mitarbeiter-Wissensportal veröffentlichen</span></label>
+      <div class="wiki-admin-actions"><button class="btn" id="wiki-save" type="submit">Artikel speichern</button><button class="btn secondary" id="wiki-new" type="button">Neuen Artikel beginnen</button></div>
+      <p id="wiki-admin-status" role="status" aria-live="polite"></p>
+    </form>
+    <div class="booking">
+      <h3>Vorhandene Wissensartikel</h3>
+      <label>Artikel suchen<input id="wiki-admin-search" type="search" placeholder="Titel, Stichwort oder Inhalt"></label>
+      <button type="button" id="wiki-admin-refresh" class="btn secondary">Aktualisieren</button>
+      <div id="wiki-admin-list" class="wiki-admin-list"></div>
+    </div>
+  </div>
+</section>
+
 <section id="kundenfeedback-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="kundenfeedback-heading">
   <h2 id="kundenfeedback-heading">Kundenfeedback</h2>
   <p>Vertrauliche Rückmeldungen sind nur in dieser Verwaltung sichtbar.</p>
@@ -567,6 +605,7 @@
   <script src="/pruefung-admin.js?v=20261105-network-feedback"></script>
   <script src="/feedback-admin.js"></script>
   <script src="/einsatzplanung-admin.js?v=20261105-planung"></script>
+  <script src="/wissensportal-admin.js?v=20261106"></script>
   <script src="/admin-kalender-v2.js?v=20261106"></script>
 </body>
 </html>
