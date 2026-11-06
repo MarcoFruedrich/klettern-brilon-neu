@@ -47,21 +47,12 @@
       form.append(field('Vertragliche Monatsstunden','monatsstunden',p.monatsstunden));
       form.append(field('Individuelle Minijob-Grenze (€; leer = 2026 gesetzlich)','minijobGrenze',
         p.minijob_grenze_cent==null?'':p.minijob_grenze_cent/100));
-      const trustLabel=el('label','Besondere Freigabe erteilt');
-      const trust=document.createElement('select');trust.name='vertrauensperson';
-      for(const [value,label] of [['nein','Nein'],['ja','Ja']]){
-        const option=document.createElement('option');option.value=value;option.textContent=label;
-        option.selected=(Boolean(p.vertrauensperson)?'ja':'nein')===value;trust.append(option);
-      }
-      trustLabel.append(trust,el('small','Bei „Ja“ darf die Zusage dieses Mitarbeiters nach Ablauf der zentral eingestellten Verzögerung automatisch an den Kunden weitergegeben werden.'));
-      form.append(trustLabel);
       const save=el('button','Vertragsdaten speichern');save.className='btn secondary';save.type='submit';
       const state=el('p');state.setAttribute('role','status');form.append(save,state);
       form.onsubmit=async event=>{
         event.preventDefault();save.disabled=true;state.textContent='Speichere …';
         try{
           const data=Object.fromEntries(new FormData(form).entries());
-          data.vertrauensperson=trust.value==='ja';
           await api('/api/admin/einsatzplanung/vertrag/'+encodeURIComponent(p.id),{
             method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
           state.textContent='Vertragsdaten gespeichert.';await personalAktualisieren();

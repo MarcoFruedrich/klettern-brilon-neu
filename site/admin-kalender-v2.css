@@ -26,6 +26,21 @@
 .ck-filter select {background:#fff;color:#153a30;border:1px solid #c9d8d0;padding:9px 12px;min-height:42px;width:100%;font:inherit;}
 .ck-state {min-height:20px;margin:8px 0;color:#4f6759;font-size:13px;}
 .ck-body {display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,280px);align-items:start;gap:13px;}
+.ck-body.ck-has-entry-editor {grid-template-columns:minmax(0,1fr) minmax(320px,360px);}
+.ck-daylane {cursor:crosshair;}
+.ck-event {cursor:pointer;}
+.ck-inline-entry {display:grid!important;gap:10px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;}
+.ck-entry-intro {font-size:12px;line-height:1.45;margin:0 0 10px!important;}
+.ck-entry-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.ck-entry-field {display:grid;align-content:start;gap:4px;min-width:0;font-size:12px;line-height:1.3;}
+.ck-entry-field>span {min-height:30px;display:flex;align-items:flex-end;}
+.ck-entry-field input,.ck-entry-field select,.ck-entry-field textarea {width:100%;min-width:0;min-height:38px;padding:7px 9px;border:1px solid #bfd3c7;border-radius:7px;background:#fff;color:#164333;font:inherit;font-size:13px;}
+.ck-entry-field textarea {min-height:80px;resize:vertical;}
+.ck-entry-field.ck-entry-wide {grid-column:1/-1;}
+.ck-entry-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.ck-entry-actions button {min-height:42px;padding:8px 10px;border:1px solid #bfd3c7;border-radius:8px;background:#fff;color:#164333;font-weight:750;}
+.ck-entry-actions .ck-entry-save {background:#087847;border-color:#087847;color:#fff;}
+.ck-entry-status {min-height:18px;margin:0!important;font-size:12px;line-height:1.4;color:#315b48!important;}
 .ck-panel {background:white;border:1px solid #d7e3dc;border-radius:14px;box-shadow:0 3px 9px #1745310d;overflow:hidden;}
 .ck-board-scroll {width:100%;overflow-x:auto;overscroll-behavior-x:contain;}
 .ck-week-grid {position:relative;min-width:840px;display:grid;grid-template-columns:64px repeat(7,minmax(110px,1fr));grid-template-rows:58px auto auto;border-collapse:collapse;}
@@ -89,5 +104,6 @@
 .ck-actions-bottom {display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
 .ck-actions-bottom button {min-height:38px;background:#f0f8f3;border:1px solid #bed7c7;color:#19543e;border-radius:8px;padding:7px 10px;font-weight:750;}
 .admin-page.ck-enabled #calendar-section {display:none!important;}
-@media(max-width:1150px){.ck-body{grid-template-columns:minmax(0,1fr)}.ck-detail{min-height:auto}.ck-toolbar{justify-content:flex-start}}
+@media(max-width:900px){.ck-body,.ck-body.ck-has-entry-editor{grid-template-columns:minmax(0,1fr)}.ck-detail{min-height:auto}.ck-toolbar{justify-content:flex-start}}
 @media(max-width:700px){.ck-period{min-width:0;font-size:12px;flex:1}.ck-nav{width:100%;justify-content:space-between}.ck-actions{width:100%}.ck-filter{max-width:none;flex:1}.ck-month-grid{min-width:620px}.ck-detail{padding:12px}.ck-toolbar{gap:9px}.ck-legend{font-size:11px}}
+@media(max-width:620px){.ck-entry-grid{grid-template-columns:minmax(0,1fr)}.ck-entry-field.ck-entry-wide{grid-column:auto}.ck-entry-actions{grid-template-columns:minmax(0,1fr)}}

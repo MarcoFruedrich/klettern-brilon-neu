@@ -197,6 +197,32 @@
         const pending=person.status==='freigabe_ausstehend';
         const grantPanel=elt('div');grantPanel.className='staff-grants';
         grantPanel.append(elt('h4',pending?'Standorte und geprüfte Qualifikationen freigeben':'Standort- und Qualifikationsfreigaben verwalten'));
+        const trustPanel=elt('div');trustPanel.className='staff-special-approval';
+        const trustLabel=elt('label','Besondere Freigabe erteilt');
+        const trustSelect=document.createElement('select');
+        trustSelect.setAttribute('aria-label','Besondere Freigabe erteilt');
+        for(const [value,label] of [['nein','Nein'],['ja','Ja']]){
+          const option=document.createElement('option');option.value=value;option.textContent=label;
+          trustSelect.append(option);
+        }
+        trustSelect.value=person.sonderfreigabe?'ja':'nein';
+        trustLabel.append(trustSelect);
+        const trustHelp=elt('p','Bei „Ja“ kann der Mitarbeiter nach aktiver Standortfreigabe passende Buchungen verbindlich übernehmen. Die Kundenbestätigung wird nach den eingestellten Zeiten ausgelöst.');
+        const trustStatus=elt('p');trustStatus.className='staff-special-approval-status';trustStatus.setAttribute('role','status');
+        const trustSave=elt('button','Sonderfreigabe speichern');trustSave.type='button';trustSave.className='btn secondary';
+        trustSave.addEventListener('click',async()=>{
+          const granted=trustSelect.value==='ja';
+          if(granted&&!person.sonderfreigabe&&!confirm('Besondere Freigabe für '+person.name+' erteilen? Der Mitarbeiter kann nach aktiver Standortfreigabe Buchungen verbindlich übernehmen.'))return;
+          trustSave.disabled=true;trustStatus.textContent='Sonderfreigabe wird gespeichert …';
+          try{
+            const result=await api('/api/admin/einsatzplanung/sonderfreigabe/'+encodeURIComponent(person.id),{
+              method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({erteilt:granted})
+            });
+            trustStatus.textContent=result.erteilt?'Besondere Freigabe erteilt.':'Besondere Freigabe entzogen.';
+            await refresh();
+          }catch(error){trustStatus.textContent='Sonderfreigabe konnte nicht gespeichert werden: '+error.message;trustSave.disabled=false;}
+        });
+        trustPanel.append(trustLabel,trustHelp,trustSave,trustStatus);grantPanel.append(trustPanel);
         const placeField=elt('fieldset');placeField.append(elt('legend','Standorte (mehrere auswählbar)'));
         const assignedPlaces=(person.freigaben||[]).filter(grant=>!places.some(place=>Number(place.id)===Number(grant.ortId)))
           .map(grant=>({id:grant.ortId,name:grant.ort,aktiv:grant.ortAktiv}));
@@ -278,18 +304,6 @@
           }catch(error){find('pruef-personal-status').textContent='Verwaltungszugang konnte nicht geändert werden: '+error.message;toggle.disabled=false;}
         });
         card.append(toggle);
-      }
-      if(person.art!=='einladung'){
-        const remove=elt('button','Mitarbeiterkonto löschen');remove.type='button';remove.className='btn danger';
-        remove.addEventListener('click',async()=>{
-          if(!confirm('Mitarbeiterkonto von '+person.name+' einschließlich Kontaktdaten, Qualifikationen und Zugängen endgültig löschen? Falls Prüfberichte vorliegen, wird das Löschen zum Schutz der Prüfprotokolle blockiert.'))return;
-          remove.disabled=true;
-          try{
-            await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id),{method:'DELETE'});
-            find('pruef-personal-status').textContent='Mitarbeiterkonto gelöscht.';await refresh();
-          }catch(error){find('pruef-personal-status').textContent='Löschen nicht möglich: '+error.message;remove.disabled=false;}
-        });
-        card.append(remove);
       }
       if(person.aktiv){
         const stop=elt('button','Zugang pausieren');stop.type='button';stop.className='btn secondary';

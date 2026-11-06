@@ -5,9 +5,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
-  <link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
+  <link rel="stylesheet" href="/style.css?v=20261106-admin-form-align">
   <link rel="stylesheet" href="/wissensportal.css?v=20261106">
-  <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106">
+  <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-inline-entry">
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -417,9 +417,9 @@
     <h3 id="kundenbestaetigung-settings-heading">Sonderfreigabe und automatische Kundenbestätigung</h3>
     <p>Nur Mitarbeiter mit „Besondere Freigabe erteilt: Ja“ können nach ihrer Zusage die zeitversetzte Kundenbestätigung auslösen. Die Standortfreigabe bleibt zusätzlich erforderlich. Änderungen an den Zeiten werden auch auf bereits geplante, noch nicht versandte Bestätigungen angewendet.</p>
     <form id="kundenbestaetigung-settings-form" class="einsatz-vertragsformular">
-      <label>Verzögerung nach Mitarbeiterzusage (Minuten)<input name="verzoegerungMinuten" type="number" min="1" max="1440" step="1" value="120" required></label>
-      <label>Ruhezeit beginnt <input name="ruhebeginn" type="time" value="18:00" required></label>
-      <label>Ruhezeit endet <input name="ruheende" type="time" value="09:00" required></label>
+      <label><span>Verzögerung nach Mitarbeiterzusage</span><span class="kundenbestaetigung-unit"><input name="verzoegerungMinuten" type="number" min="1" max="1440" step="1" value="120" required><span>Minuten</span></span></label>
+      <label><span>Ruhezeit beginnt</span><input name="ruhebeginn" type="time" value="18:00" required></label>
+      <label><span>Ruhezeit endet</span><input name="ruheende" type="time" value="09:00" required></label>
       <small>Bestätigungen werden in diesem Zeitfenster nicht versandt und am Ende der Ruhezeit freigegeben. Gleiche Start- und Endzeit schaltet die Ruhezeit aus. Standardeinstellung: 120 Minuten Verzögerung und Ruhezeit von 18:00 bis 09:00 Uhr.</small>
       <button class="btn secondary" type="submit">Bestätigungszeiten speichern</button>
       <p id="kundenbestaetigung-settings-status" role="status" aria-live="polite"></p>
@@ -662,10 +662,10 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261105-admin-login-fix"></script>
-  <script src="/pruefung-admin.js?v=20261105-network-feedback"></script>
+  <script src="/pruefung-admin.js?v=20261106-sonderfreigabe"></script>
   <script src="/feedback-admin.js"></script>
-  <script src="/einsatzplanung-admin.js?v=20261106-bestaetigungszeiten"></script>
+  <script src="/einsatzplanung-admin.js?v=20261106-admin-form-align"></script>
   <script src="/wissensportal-admin.js?v=20261106"></script>
-  <script src="/admin-kalender-v2.js?v=20261106"></script>
+  <script src="/admin-kalender-v2.js?v=20261106-inline-entry"></script>
 </body>
 </html>

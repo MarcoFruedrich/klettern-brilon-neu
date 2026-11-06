@@ -69,13 +69,13 @@
   const detail = mk('aside', 'ck-panel ck-detail');
   detail.setAttribute('aria-label', 'Buchungsdetails');
   const legend = mk('div', 'ck-legend');
-  const chosen = {mode:'week',cursor:midday(new Date()),date:iso(new Date()),entryId:null,site:'',events:[],staffComplete:false};
+  const chosen = {mode:'week',cursor:midday(new Date()),date:iso(new Date()),entryId:null,site:'',events:[],staffComplete:false,newEntrySlot:null};
   let loadSequence = 0;
   const tabs = {};
   for (const [key,label] of [['week','Woche'],['month','Monat'],['agenda','Agenda']]) {
     tabs[key] = btn(label, '', () => {
       chosen.cursor = fromIso(chosen.date);
-      chosen.mode = key; chosen.entryId = null; load();
+      chosen.mode = key; chosen.entryId = null; chosen.newEntrySlot=null; load();
     });
     tabs[key].setAttribute('aria-pressed', key === chosen.mode ? 'true' : 'false');
     switcher.append(tabs[key]);
@@ -85,15 +85,15 @@
   const next = btn('›', '', () => move(1)); next.setAttribute('aria-label','Nächster Zeitraum');
   nav.append(prev,period,next);
   const today = btn('Heute','', () => {
-    chosen.cursor = midday(new Date()); chosen.date = iso(chosen.cursor); chosen.entryId=null; load();
+    chosen.cursor = midday(new Date()); chosen.date = iso(chosen.cursor); chosen.entryId=null; chosen.newEntrySlot=null; load();
   });
   const filterLabel = mk('label','ck-filter');
   filterLabel.append(mk('span','Standort'));
   const filter = mk('select');
   filter.setAttribute('aria-label','Standort filtern');
-  filter.addEventListener('change', () => {chosen.site=filter.value;chosen.entryId=null;render();});
+  filter.addEventListener('change', () => {chosen.site=filter.value;chosen.entryId=null;chosen.newEntrySlot=null;render();});
   filterLabel.append(filter);
-  const newEntry = btn('+ Neuer Eintrag','ck-new',() => jumpToForm());
+  const newEntry = btn('+ Neuer Eintrag','ck-new',() => openNewEntry(chosen.date));
   actions.append(filterLabel,today,newEntry);
   toolbar.append(switcher,nav,actions);
   body.append(board,detail);
@@ -101,14 +101,76 @@
   section.insertBefore(root, section.querySelector('.booking'));
   document.body.classList.add('ck-enabled');
 
-  function jumpToForm(type) {
-    if (typeof window.adminNavigateToElement === 'function') window.adminNavigateToElement('calendar-form');
-    const form = document.getElementById('calendar-form');
-    if (!form) return;
-    if (type) form.elements.typ.value = type;
-    form.scrollIntoView({block:'center',behavior:'smooth'});
-    const title = form.elements.titel;
-    if (title) title.focus({preventScroll:true});
+  function clock(value) {
+    return value==null||value<0||value>=1440?'':String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0');
+  }
+  function openNewEntry(date=chosen.date,startMinute=null,type='termin') {
+    const selectedDate=/^\d{4}-\d{2}-\d{2}$/.test(date||'')?date:iso(new Date());
+    const start=startMinute==null?'':clock(Math.max(0,Math.min(1439,Math.round(startMinute/15)*15)));
+    const numericStart=minutes(start);
+    const end=numericStart==null?'':clock(numericStart+60);
+    chosen.date=selectedDate;chosen.entryId=null;
+    chosen.newEntrySlot={date:selectedDate,start,end,type};
+    renderDetail();
+    detail.querySelector('[name="titel"]')?.focus();
+  }
+  function renderNewEntryForm() {
+    const slot=chosen.newEntrySlot;
+    detail.append(mk('h3','','Neuen Kalendereintrag anlegen'));
+    detail.append(mk('p','ck-entry-intro','Datum und Uhrzeit sind vorausgefüllt. Du kannst Termin, Sperrzeit, Zeitraum und interne Hinweise ergänzen.'));
+    const form=mk('form','ck-inline-entry');
+    const fields=mk('div','ck-entry-grid');
+    const status=mk('p','ck-entry-status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+    const addField=(labelText,name,type,value='',options={})=>{
+      const label=mk('label','ck-entry-field');
+      label.append(mk('span','',labelText));
+      let control;
+      if(type==='select'){
+        control=mk('select');
+        for(const [optionValue,optionText] of [['termin','Eigener Klettertermin'],['sperrzeit','Sperrzeit / Nicht verfügbar']]){
+          const option=mk('option','',optionText);option.value=optionValue;control.append(option);
+        }
+      }else if(type==='textarea')control=mk('textarea');
+      else {control=mk('input');control.type=type;}
+      control.name=name;
+      if(value)control.value=value;
+      if(options.required)control.required=true;
+      if(options.maxlength)control.maxLength=options.maxlength;
+      if(options.rows)control.rows=options.rows;
+      label.append(control);fields.append(label);
+      return control;
+    };
+    const kind=addField('Art des Eintrags','typ','select',slot.type);kind.value=slot.type;
+    const title=addField('Titel','titel','text','',{required:true,maxlength:120});
+    title.placeholder='z. B. Schulklasse, Geburtstag oder Urlaub';
+    const date=addField('Beginn (Datum)','datum','date',slot.date,{required:true});
+    const endDate=addField('Ende (Datum, optional)','enddatum','date');
+    endDate.min=slot.date;
+    date.addEventListener('change',()=>{endDate.min=date.value;if(endDate.value&&endDate.value<date.value)endDate.value='';});
+    addField('Beginn (Uhrzeit, optional)','uhrzeit','time',slot.start);
+    addField('Ende (Uhrzeit, optional)','endzeit','time',slot.end);
+    const description=addField('Beschreibung / Interne Hinweise','beschreibung','textarea','',{maxlength:1000,rows:3});
+    description.placeholder='Weitere Informationen zum Termin';
+    description.closest('label').classList.add('ck-entry-wide');
+    const actions=mk('div','ck-entry-actions');
+    const cancel=btn('Abbrechen','ck-entry-cancel',()=>{chosen.newEntrySlot=null;renderDetail();});
+    const save=btn('Eintrag speichern','ck-entry-save');save.type='submit';
+    actions.append(cancel,save);
+    form.append(fields,actions,status);
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      const data=Object.fromEntries(new FormData(form).entries());
+      if(data.enddatum&&data.enddatum<data.datum){status.textContent='Das Enddatum darf nicht vor dem Beginn liegen.';endDate.focus();return;}
+      if((!data.enddatum||data.enddatum===data.datum)&&data.uhrzeit&&data.endzeit&&data.endzeit<=data.uhrzeit){
+        status.textContent='Die Endzeit muss nach der Beginnzeit liegen.';form.elements.endzeit.focus();return;
+      }
+      save.disabled=true;cancel.disabled=true;status.textContent='Eintrag wird gespeichert …';
+      try{
+        await api('/api/admin/kalender',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        chosen.newEntrySlot=null;await load();stateText.textContent='Kalendereintrag gespeichert.';
+      }catch(error){status.textContent='Eintrag konnte nicht gespeichert werden: '+(error.message||'Fehler');save.disabled=false;cancel.disabled=false;}
+    });
+    detail.append(form);
   }
   function move(dir) {
     const d = chosen.cursor;
@@ -116,7 +178,7 @@
       ? new Date(d.getFullYear(),d.getMonth()+dir,1,12)
       : addDays(d,dir*7);
     chosen.date = iso(chosen.mode === 'month' ? chosen.cursor : startWeek(chosen.cursor));
-    chosen.entryId=null;
+    chosen.entryId=null;chosen.newEntrySlot=null;
     load();
   }
   function range() {
@@ -259,7 +321,7 @@
     for (const date of days) {
       const key=iso(date);
       const h=btn(dateLabel(date,{weekday:'short'})+' '+date.getDate()+'.', 'ck-dayhead'+(key===iso(new Date())?' is-today':''),()=>{
-        chosen.date=key;chosen.entryId=null;renderDetail();
+        chosen.date=key;chosen.entryId=null;chosen.newEntrySlot=null;renderDetail();
       });
       h.append(mk('span','',dateLabel(date,{month:'short'})));
       grid.append(h);
@@ -284,6 +346,14 @@
       const key=iso(day);
       const lane=mk('div','ck-daylane'+(key===iso(new Date())?' is-today':''));
       lane.style.height=laneHeight+'px';
+      lane.title='In einen freien Zeitabschnitt klicken, um hier einen Eintrag anzulegen';
+      lane.addEventListener('click',event=>{
+        if(event.target.closest('button'))return;
+        const rect=lane.getBoundingClientRect();
+        const offset=Math.max(0,Math.min(laneHeight-1,event.clientY-rect.top));
+        const minute=Math.max(0,Math.min(23*60,Math.round((hourStart*60+offset/hourHeight*60)/15)*15));
+        openNewEntry(key,minute);
+      });
       const entries=visibleEntries(key).filter(e=>e.start!=null&&e.end!=null).sort((a,b)=>a.start-b.start||b.end-a.end);
       // Intervalle in zusammenhängenden Überschneidungsgruppen verteilen.
       let groups=[],current=[],finish=-1;
@@ -328,7 +398,9 @@
     for(let d=from;d<=to;d=addDays(d,1)) {
       const key=iso(d),entries=visibleEntries(key);
       const cell=mk('div', 'ck-month-cell'+(key===iso(new Date())?' is-today':'')+(key===chosen.date?' is-selected':''));
-      const dayButton=btn(String(d.getDate()),'ck-month-day',()=>{chosen.date=key;chosen.entryId=null;render();});
+      cell.title='Freie Fläche anklicken, um an diesem Tag einen Eintrag anzulegen';
+      cell.addEventListener('click',event=>{if(event.target.closest('button'))return;openNewEntry(key);});
+      const dayButton=btn(String(d.getDate()),'ck-month-day',()=>{chosen.date=key;chosen.entryId=null;chosen.newEntrySlot=null;render();});
       dayButton.setAttribute('aria-label',dateLabel(d,{day:'numeric',month:'long'}));
       cell.append(dayButton);
       for(const e of entries.slice(0,3)){
@@ -363,7 +435,7 @@
   }
   function selectEntry(entry) {
     chosen.date=chosen.date>=entry.date&&chosen.date<=entry.last?chosen.date:entry.date;
-    chosen.entryId=entry.id;
+    chosen.entryId=entry.id;chosen.newEntrySlot=null;
     render();
   }
   function staffNames(e,statusList) {
@@ -373,6 +445,10 @@
     detail.replaceChildren();
     const picked=/^\d{4}-\d{2}-\d{2}$/.test(chosen.date)?chosen.date:iso(chosen.cursor);
     const date=fromIso(picked);
+    const editing=Boolean(chosen.newEntrySlot);
+    body.classList.toggle('ck-has-entry-editor',editing);
+    detail.classList.toggle('ck-entry-open',editing);
+    if(editing){renderNewEntryForm();return;}
     detail.append(mk('h3','',dateLabel(date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})));
     const all=visibleEntries(picked).sort((a,b)=>(a.start??-1)-(b.start??-1));
     const selected=chosen.entryId?all.filter(e=>e.id===chosen.entryId):all;
@@ -521,7 +597,7 @@
     if(note.textContent)detail.append(note);
     const controls=mk('div','ck-actions-bottom');
     controls.append(btn('Mitarbeiter einteilen','',()=>document.getElementById('einsatzplanung-termine')?.scrollIntoView({behavior:'smooth',block:'start'})),
-      btn('Sperrzeit eintragen','',()=>jumpToForm('sperrzeit')));
+      btn('Sperrzeit eintragen','',()=>openNewEntry(chosen.date,null,'sperrzeit')));
     detail.append(controls);
   }
   // Neu gespeicherte Sperrzeiten zeitnah aktualisieren.
