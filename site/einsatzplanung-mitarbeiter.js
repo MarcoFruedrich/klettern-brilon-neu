@@ -15,14 +15,21 @@
         card.append(el('h3',t.datum+' · '+(t.uhrzeit||'Uhrzeit offen')+' Uhr'));
         card.append(el('p',(t.angebot||'Programm')+' · '+(t.ort||'Standort offen')+
           ' · '+(t.dauer||'Dauer nicht angegeben')+' Minuten'));
-        card.append(el('p','Dein Status: '+(t.mein_status||'noch nicht beworben')));
+        card.append(el('p','Dein Status: '+(t.mein_status==='bestaetigt'?'verbindlich zugesagt':t.mein_status||'noch nicht beworben')));
+        if(t.mein_status==='bestaetigt'&&t.kundenbestaetigung_faellig_ab)
+          card.append(el('p','Die Kundenbestätigung ist für '+new Date(t.kundenbestaetigung_faellig_ab).toLocaleString('de-DE')+' geplant.'));
         const action=async(url,data={})=>{
           try{
             await request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
             await loadPlanning();
           }catch(error){status.textContent='Aktion nicht möglich: '+error.message;}
         };
-        if(!t.mein_status||['beworben','abgelehnt'].includes(t.mein_status)){
+        if(t.sonderfreigabe&&(!t.mein_status||['beworben','abgelehnt'].includes(t.mein_status))){
+          const direct=el('button','Programm verbindlich übernehmen');
+          direct.type='button';direct.className='btn';
+          direct.onclick=()=>action('/api/pruefung/einsatzplanung/direkt-annehmen/'+encodeURIComponent(t.id));
+          card.append(direct,el('small','Deine Zusage ist verbindlich. Die Kundenbestätigung wird gemäß Verwaltungseinstellung zeitversetzt versandt.'));
+        }else if(!t.sonderfreigabe&&(!t.mein_status||['beworben','abgelehnt'].includes(t.mein_status))){
           const button=el('button',t.mein_status==='beworben'?'Bewerbung aktualisieren':'Für Termin bewerben');
           button.type='button';button.className='btn secondary';
           button.onclick=()=>action('/api/pruefung/einsatzplanung/bewerben/'+encodeURIComponent(t.id));
