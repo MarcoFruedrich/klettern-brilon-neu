@@ -622,6 +622,69 @@ a.append(anfrageButton);
 
 specials();
 
+function angeboteUebersichtAnzeigen(standortFilter=''){
+  const ausgabe=document.getElementById('angebote-uebersicht');
+  if(!ausgabe)return;
+  const passend=angeboteCache.filter(angebot=>!standortFilter||angebot.veranstaltungsort===standortFilter);
+  ausgabe.replaceChildren();
+  if(!passend.length){
+    const hinweis=document.createElement('p');
+    hinweis.className='hint';
+    hinweis.textContent=standortFilter
+      ?'Für diesen Standort sind derzeit keine veröffentlichten Angebote verfügbar.'
+      :'Derzeit sind keine veröffentlichten Angebote verfügbar.';
+    ausgabe.append(hinweis);
+    return;
+  }
+  for(const angebot of passend){
+    const karte=document.createElement('article');
+    if(angebot.bild_url){
+      const bild=document.createElement('img');
+      bild.src=angebot.bild_url;
+      bild.alt=angebot.name;
+      bild.loading='lazy';
+      bild.className='angebote-karte-bild';
+      karte.append(bild);
+    }else{
+      const symbol=document.createElement('div');
+      symbol.className='symbol';
+      symbol.setAttribute('aria-hidden','true');
+      symbol.textContent='🧗';
+      karte.append(symbol);
+    }
+    const titel=document.createElement('h3');
+    titel.textContent=angebot.name;
+    karte.append(titel);
+    if(angebot.beschreibung){
+      const beschreibung=document.createElement('p');
+      beschreibung.textContent=angebot.beschreibung;
+      karte.append(beschreibung);
+    }
+    const meta=[angebot.veranstaltungsort,angebot.kategorie,angebot.zielgruppe,
+      angebot.dauer?`${angebot.dauer} Minuten`:null].filter(Boolean).join(' · ');
+    if(meta){
+      const details=document.createElement('p');
+      details.className='angebote-karte-meta';
+      details.textContent=meta;
+      karte.append(details);
+    }
+    if(angebot.hinweise){
+      const hinweis=document.createElement('p');
+      hinweis.className='angebote-karte-meta';
+      hinweis.textContent=angebot.hinweise;
+      karte.append(hinweis);
+    }
+    const anfrage=document.createElement('a');
+    anfrage.className='angebote-anfragen-link';
+    anfrage.href='#buchung';
+    anfrage.dataset.location=angebot.veranstaltungsort||'';
+    anfrage.dataset.program=angebot.name;
+    anfrage.textContent='Dieses Angebot anfragen →';
+    karte.append(anfrage);
+    ausgabe.append(karte);
+  }
+}
+
 async function angeboteLaden() {
   const auswahl = document.getElementById('angebot-auswahl');
   if (!auswahl || !standortAuswahl) return;
@@ -663,6 +726,30 @@ async function angeboteLaden() {
     if(!orteAntwort.ok)throw new Error('Veranstaltungsorte nicht erreichbar');
     angeboteCache=await angeboteAntwort.json();
     const orte=await orteAntwort.json();
+    const standortFilter=document.getElementById('angebote-standort-filter');
+    if(standortFilter){
+      standortFilter.replaceChildren();
+      const alle=document.createElement('option');
+      alle.value='';
+      alle.textContent='Alle Standorte – alle Angebote';
+      standortFilter.append(alle);
+      for(const ort of orte){
+        const option=document.createElement('option');
+        option.value=ort.name;
+        option.textContent=ort.name;
+        standortFilter.append(option);
+      }
+      standortFilter.addEventListener('change',()=>angeboteUebersichtAnzeigen(standortFilter.value));
+      document.getElementById('angebote-uebersicht')?.addEventListener('click',ereignis=>{
+        const link=ereignis.target.closest('.angebote-anfragen-link');
+        if(!link)return;
+        standortAuswahl.value=link.dataset.location;
+        standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+        auswahl.value=link.dataset.program;
+        auswahl.dispatchEvent(new Event('change',{bubbles:true}));
+      });
+    }
+    angeboteUebersichtAnzeigen(standortFilter?.value||'');
     for(const ort of orte){
       const option=document.createElement('option');
       option.value=ort.name;
