@@ -75,6 +75,12 @@
 .ck-detail-card .ck-confirm:hover {background:#05633b;}
 .ck-detail-card button:disabled {opacity:.58;cursor:wait;}
 .ck-action-status {min-height:0;color:#315b48!important;font-weight:700;}
+.ck-repeat-box {display:grid;gap:8px;margin-top:8px;padding:10px;border:1px solid #d7e3dc;border-radius:9px;background:#f7faf8;color:#1a3b32;font-size:12px;}
+.ck-repeat-box [hidden] {display:none!important;}
+.ck-repeat-box label {display:grid;gap:4px;font-weight:700;color:#28473b;}
+.ck-repeat-box input,.ck-repeat-box select {width:100%;min-height:36px;padding:6px 8px;border:1px solid #bfd3c7;border-radius:7px;background:#fff;color:#164333;font:inherit;}
+.ck-repeat-box button {justify-self:start;background:#087847;color:#fff;border:1px solid #087847;padding:8px 11px;border-radius:7px;font-weight:750;}
+.ck-repeat-box button:disabled {opacity:.58;cursor:wait;}
 .ck-agenda {display:grid;gap:10px;padding:14px;}
  .ck-agenda-day {border-bottom:1px solid #e1eae3;padding:0 0 8px;}
 .ck-agenda-day h4 {font-size:15px;margin:0 0 6px;}

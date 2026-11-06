@@ -166,6 +166,47 @@ async function zahlungsuebersichtLaden(){
   }
 }
 
+async function umbuchungsanfragenLaden(){
+  const list=document.getElementById('reschedule-requests-list');
+  const status=document.getElementById('reschedule-requests-status');
+  if(!list)return;
+  try{
+    const result=await api('/api/admin/umbuchungsanfragen');
+    list.replaceChildren();
+    const requests=result.anfragen||[];
+    status.textContent=requests.length?`${requests.length} bestätigte Umbuchungsanfrage(n) warten auf Entscheidung.`:'Keine Umbuchungsanfragen zur Freigabe.';
+    for(const request of requests){
+      const card=el('article');card.className='booking';
+      const data=request.data||{};
+      card.append(el('h4',`${request.buchungsnummer||data.buchungsnummer||'Buchung'} · ${data.name||'Kunde'}`));
+      card.append(el('p',`${data.angebot||'Programm'} · bisher: ${data.datum||'—'} um ${data.uhrzeit||'—'} Uhr`));
+      card.append(el('p',`gewünscht: ${request.wunschdatum||'—'} um ${(request.wunschzeit||'').slice(0,5)||'—'} Uhr`));
+      card.append(el('p',`Kontakt: ${data.email||'keine E-Mail hinterlegt'} · Anfrage bestätigt: ${request.bestaetigt_am?new Date(request.bestaetigt_am).toLocaleString('de-DE'):'—'}`));
+      const feedback=el('p');feedback.setAttribute('role','status');
+      const actions=el('div');actions.className='booking-actions';
+      for(const [decision,label] of [['freigegeben','Umbuchung freigeben'],['abgelehnt','Umbuchung ablehnen']]){
+        const button=el('button',label);button.type='button';button.className=decision==='freigegeben'?'btn':'btn secondary';
+        button.addEventListener('click',async()=>{
+          if(!confirm(decision==='freigegeben'
+            ?`Umbuchung auf ${request.wunschdatum} um ${(request.wunschzeit||'').slice(0,5)} Uhr freigeben?`
+            :'Umbuchungsanfrage ablehnen? Die bisherige Buchung bleibt bestehen.'))return;
+          button.disabled=true;feedback.textContent='Entscheidung wird gespeichert …';
+          try{
+            await api('/api/admin/umbuchungsanfragen/'+encodeURIComponent(request.anfrage_id),{
+              method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:decision})
+            });
+            feedback.textContent=decision==='freigegeben'?'Umbuchung freigegeben.':'Umbuchungsanfrage abgelehnt.';
+            await refresh();
+          }catch(error){feedback.textContent='Entscheidung nicht gespeichert: '+error.message;button.disabled=false;}
+        });
+        actions.append(button);
+      }
+      card.append(actions,feedback);list.append(card);
+    }
+  }catch(error){status.textContent='Umbuchungsanfragen konnten nicht geladen werden: '+error.message;}
+}
+document.getElementById('reschedule-requests-refresh')?.addEventListener('click',umbuchungsanfragenLaden);
+
 async function refresh() {
   const aktuelleSequenz=++refreshSequenz;
   try {
@@ -626,6 +667,7 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
     c.append(bookingActions,meldung);
       box.append(c);
     }
+    await umbuchungsanfragenLaden();
 
     const offers = await api('/api/admin/aktionen');
     const list = document.getElementById('special-list');

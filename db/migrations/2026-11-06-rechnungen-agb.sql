@@ -47,5 +47,16 @@ CREATE TABLE IF NOT EXISTS brilon_buchungswiderrufe (
 );
 CREATE INDEX IF NOT EXISTS brilon_buchungswiderrufe_buchung_idx ON brilon_buchungswiderrufe(buchung_id,erstellt_am DESC);
 CREATE INDEX IF NOT EXISTS brilon_buchungswiderrufe_ablauf_idx ON brilon_buchungswiderrufe(ablauf) WHERE status='bestaetigung_ausstehend';
+ALTER TABLE brilon_buchungswiderrufe ADD COLUMN IF NOT EXISTS anliegen TEXT NOT NULL DEFAULT 'widerruf';
+ALTER TABLE brilon_buchungswiderrufe ADD COLUMN IF NOT EXISTS wunschdatum DATE;
+ALTER TABLE brilon_buchungswiderrufe ADD COLUMN IF NOT EXISTS wunschzeit TIME;
+ALTER TABLE brilon_buchungswiderrufe DROP CONSTRAINT IF EXISTS brilon_buchungswiderrufe_status_check;
+ALTER TABLE brilon_buchungswiderrufe ADD CONSTRAINT brilon_buchungswiderrufe_status_check
+  CHECK (status IN ('bestaetigung_ausstehend','bestaetigt','wartet_verwaltung','freigegeben','abgelehnt','abgelaufen','fehlgeschlagen'));
+ALTER TABLE brilon_buchungswiderrufe DROP CONSTRAINT IF EXISTS brilon_buchungswiderrufe_anliegen_check;
+ALTER TABLE brilon_buchungswiderrufe ADD CONSTRAINT brilon_buchungswiderrufe_anliegen_check
+  CHECK (anliegen IN ('widerruf','umbuchung'));
+CREATE INDEX IF NOT EXISTS brilon_umbuchungsanfragen_status_idx
+  ON brilon_buchungswiderrufe(status,angefragt_am DESC) WHERE anliegen='umbuchung';
 
 ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;

@@ -10,18 +10,25 @@
   <main class="narrow withdrawal-card">
     <a href="/">← Zurück zur Website</a>
     <h1>Vertrag widerrufen oder Buchung stornieren</h1>
-    <p>Gib nur deine Buchungsnummer ein. Wenn dazu eine aktive Buchung vorliegt, senden wir den Bestätigungslink an die bei der Buchung hinterlegte E-Mail-Adresse. Erst nach dem Öffnen des Links und deiner ausdrücklichen Bestätigung wird die Buchung storniert.</p>
-    <p class="hint">Der Bestätigungslink ist 24 Stunden gültig. Wenn du diese Anfrage nicht selbst gestellt hast, ignoriere die E-Mail. Bereits geleistete Zahlungen werden nicht automatisch ausgezahlt; die Abrechnung richtet sich nach den für die Buchung bestätigten Bedingungen.</p>
+    <p>Gib deine Buchungsnummer ein und wähle, ob du die Buchung widerrufen oder einen anderen Termin anfragen möchtest. Der Bestätigungslink wird an die bei der Buchung hinterlegte E-Mail-Adresse gesendet.</p>
+    <p class="hint">Eine Umbuchung wird nicht automatisch vorgenommen. Sie muss von der Verwaltung geprüft und ausdrücklich freigegeben werden. Der Bestätigungslink ist 24 Stunden gültig.</p>
     <form id="withdrawal-request">
       <label>Buchungsnummer<input name="buchungsnummer" maxlength="40" autocomplete="off" required></label>
+      <label>Dein Anliegen<select id="withdrawal-type" name="anliegen" required><option value="widerruf">Buchung widerrufen</option><option value="umbuchung">Umbuchung anfragen</option></select></label>
+      <fieldset id="reschedule-fields" hidden>
+        <legend>Gewünschter neuer Termin</legend>
+        <label>Wunschtermin<input id="reschedule-date" name="wunschdatum" type="date"></label>
+        <label>Wunschzeit<input id="reschedule-time" name="wunschzeit" type="time"></label>
+        <p class="hint">Deine Buchung bleibt zunächst beim bisherigen Termin. Die Verwaltung meldet sich nach der Prüfung deines Wunschtermins.</p>
+      </fieldset>
       <button class="btn" type="submit">Bestätigungslink anfordern</button>
     </form>
     <p id="request-status" role="status" aria-live="polite"></p>
 
     <section id="confirm-panel" hidden>
-      <h2>Widerruf / Stornierung bestätigen</h2>
+      <h2 id="confirm-heading">Anfrage bestätigen</h2>
       <div id="booking-summary"></div>
-      <p>Mit der Bestätigung wird die Buchung auf „storniert“ gesetzt. Eine mögliche Erstattung bereits geleisteter Zahlungen wird gesondert nach den Bedingungen der Buchung bearbeitet.</p>
+      <p id="confirm-description">Bitte bestätige deine Anfrage.</p>
       <button id="withdrawal-confirm" class="btn" type="button">Widerruf bestätigen</button>
       <p id="confirm-status" role="status" aria-live="polite"></p>
     </section>
@@ -32,8 +39,18 @@
     const requestForm=document.getElementById('withdrawal-request');
     const requestStatus=document.getElementById('request-status');
     const panel=document.getElementById('confirm-panel');
+    const typeSelect=document.getElementById('withdrawal-type');
+    const rescheduleFields=document.getElementById('reschedule-fields');
+    const rescheduleDate=document.getElementById('reschedule-date');
+    const rescheduleTime=document.getElementById('reschedule-time');
     const token=new URLSearchParams(location.search).get('token');
     const confirmButton=document.getElementById('withdrawal-confirm');
+    function requestTypeUpdate(){
+      const reschedule=typeSelect.value==='umbuchung';
+      rescheduleFields.hidden=!reschedule;rescheduleDate.required=reschedule;rescheduleTime.required=reschedule;
+      if(!reschedule){rescheduleDate.value='';rescheduleTime.value='';}
+    }
+    typeSelect.addEventListener('change',requestTypeUpdate);requestTypeUpdate();
     async function json(url,options){
       const response=await fetch(url,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json',...(options?.headers||{})}});
       const data=await response.json();if(!response.ok)throw new Error(data.error||'Anfrage konnte nicht verarbeitet werden.');return data;
@@ -41,7 +58,15 @@
     if(token){
       requestForm.hidden=true;
       json('/api/buchung-widerruf/'+encodeURIComponent(token)).then(data=>{
-        document.getElementById('booking-summary').textContent=`Buchung ${data.buchungsnummer} · ${data.angebot} · ${data.datum} um ${data.uhrzeit} Uhr`;
+        const reschedule=data.anliegen==='umbuchung';
+        document.getElementById('confirm-heading').textContent=reschedule?'Umbuchungsanfrage bestätigen':'Widerruf / Stornierung bestätigen';
+        document.getElementById('confirm-description').textContent=reschedule
+          ?'Mit deiner Bestätigung wird die Anfrage an die Verwaltung geleitet. Die Umbuchung erfolgt erst nach ausdrücklicher Freigabe; bis dahin bleibt der bisherige Termin bestehen.'
+          :'Mit deiner Bestätigung wird die Buchung auf „storniert“ gesetzt. Eine mögliche Erstattung bereits geleisteter Zahlungen wird gesondert nach den Bedingungen der Buchung bearbeitet.';
+        confirmButton.textContent=reschedule?'Umbuchungsanfrage bestätigen':'Widerruf bestätigen';
+        document.getElementById('booking-summary').textContent=reschedule
+          ?`Buchung ${data.buchungsnummer} · ${data.angebot} · bisher ${data.datum} um ${data.uhrzeit} Uhr · gewünscht ${data.wunschdatum} um ${data.wunschzeit} Uhr`
+          :`Buchung ${data.buchungsnummer} · ${data.angebot} · ${data.datum} um ${data.uhrzeit} Uhr`;
         panel.hidden=false;
       }).catch(error=>{requestStatus.textContent=error.message;});
       confirmButton.addEventListener('click',async()=>{

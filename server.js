@@ -979,7 +979,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(!pool)return reply(res,503,{error:'Stornierungen sind momentan nicht verfügbar.'});
       if(!limit('booking-withdrawal:'+ip,5,3600000))return reply(res,429,{error:'Bitte später erneut versuchen.'});
       const d=await body(req),number=safeText(d.buchungsnummer,40).toUpperCase();
+      const anliegen=d.anliegen==='umbuchung'?'umbuchung':'widerruf';
+      const wunschdatum=safeText(d.wunschdatum,10),wunschzeit=safeText(d.wunschzeit,5);
       if(!/^[A-Z0-9-]{5,40}$/.test(number))return reply(res,400,{error:'Bitte eine gültige Buchungsnummer eingeben.'});
+      if(anliegen==='umbuchung'){
+        const gueltigesDatum=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(new Date(v+'T12:00:00Z').getTime())&&new Date(v+'T12:00:00Z').toISOString().slice(0,10)===v;
+        if(!gueltigesDatum(wunschdatum)||wunschdatum<heuteInBerlin()||!/^([01]\d|2[0-3]):[0-5]\d$/.test(wunschzeit))
+          return reply(res,400,{error:'Bitte einen gültigen zukünftigen Wunschtermin mit Uhrzeit angeben.'});
+      }
       let booking=null;
       try{
         const q=await pool.query(`SELECT id,buchungsnummer,data,status FROM brilon_buchungen
@@ -987,7 +994,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           LIMIT 1`,[number]);
         booking=q.rows[0]||null;
       }catch{return reply(res,503,{error:'Widerruf konnte gerade nicht bearbeitet werden.'});}
-      const generic={success:true,message:'Wenn eine aktive Buchung mit dieser Buchungsnummer vorliegt, senden wir den Bestätigungslink an die bei der Buchung hinterlegte E-Mail-Adresse. Die Buchung wird erst nach Bestätigung des Links storniert.'};
+      const generic={success:true,message:'Wenn eine aktive Buchung mit dieser Buchungsnummer vorliegt, senden wir einen Bestätigungslink an die bei der Buchung hinterlegte E-Mail-Adresse. Erst nach Bestätigung wird der ausgewählte Widerruf oder die Umbuchungsanfrage weiterbearbeitet.'};
       if(!booking||['storniert','abgelehnt'].includes(booking.status)||!booking.data?.datum||booking.data.datum<heuteInBerlin())return reply(res,200,generic);
       const email=safeText(booking.data.email,180).toLowerCase(),name=safeText(booking.data.name,160);
       if(!/^\S+@\S+\.\S+$/.test(email))return reply(res,200,generic);
@@ -996,11 +1003,13 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(base.protocol!=='https:'||base.username||base.password)return reply(res,200,generic);
       const token=crypto.randomBytes(32).toString('hex'),requestId=crypto.randomUUID(),expires=new Date(Date.now()+24*60*60*1000);
       try{
-        await pool.query(`INSERT INTO brilon_buchungswiderrufe(id,buchung_id,token_hash,ablauf,anfrage_email)
-          VALUES($1,$2,$3,$4,$5)`,[requestId,booking.id,gpsTokenHash(token),expires,email]);
+        await pool.query(`INSERT INTO brilon_buchungswiderrufe(id,buchung_id,token_hash,ablauf,anfrage_email,anliegen,wunschdatum,wunschzeit)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,[requestId,booking.id,gpsTokenHash(token),expires,email,anliegen,
+            anliegen==='umbuchung'?wunschdatum:null,anliegen==='umbuchung'?wunschzeit:null]);
         const link=base.toString().replace(/\/$/,'')+`/widerruf.html?token=${token}`;
-        await brevoMail(email,'Bitte Widerruf / Stornierung bestätigen – Klettern & Abenteuer',
-          `Guten Tag${name?' '+name:''},\n\nfür die Buchung ${booking.buchungsnummer||number} (${booking.data.angebot||'Programm'}, ${booking.data.datum}) wurde ein Widerruf bzw. eine Stornierung angefordert.\n\nDie Buchung ist noch nicht storniert. Bitte öffne innerhalb von 24 Stunden den folgenden Link und bestätige dort ausdrücklich mit „Widerruf bestätigen“:\n${link}\n\nWenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren. Ohne Linkbestätigung bleibt die Buchung unverändert.\n\nHinweis: Die Behandlung bereits geleisteter Zahlungen richtet sich nach den für die Buchung geltenden Bedingungen und wird nicht automatisch erstattet.\n\nViele Grüße\nKlettern & Abenteuer Brilon`,{idempotencyKey:requestId});
+        const umbuchung=anliegen==='umbuchung';
+        await brevoMail(email,umbuchung?'Bitte Umbuchungsanfrage bestätigen – Klettern & Abenteuer':'Bitte Widerruf / Stornierung bestätigen – Klettern & Abenteuer',
+          `Guten Tag${name?' '+name:''},\n\nfür die Buchung ${booking.buchungsnummer||number} (${booking.data.angebot||'Programm'}, ${booking.data.datum} um ${booking.data.uhrzeit||'—'} Uhr) wurde ${umbuchung?`eine Umbuchung auf den Wunschtermin ${wunschdatum} um ${wunschzeit} Uhr angefragt`:'ein Widerruf bzw. eine Stornierung angefordert'}.\n\n${umbuchung?'Die Buchung bleibt unverändert. Die Verwaltung prüft deine Anfrage und muss einer Umbuchung ausdrücklich zustimmen.':'Die Buchung ist noch nicht storniert.'} Bitte öffne innerhalb von 24 Stunden den folgenden Link und bestätige deine Anfrage:\n${link}\n\nWenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren. Ohne Linkbestätigung wird sie nicht weiterbearbeitet.\n\nViele Grüße\nKlettern & Abenteuer Brilon`,{idempotencyKey:requestId});
       }catch(error){
         await pool.query("UPDATE brilon_buchungswiderrufe SET status='fehlgeschlagen' WHERE id=$1",[requestId]).catch(()=>{});
         console.error('Widerrufslink konnte nicht zugestellt werden:',error.code||'unbekannter Fehler');
@@ -1012,12 +1021,15 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     if(customerWithdrawal&&req.method==='GET'){
       if(!pool)return reply(res,503,{error:'Widerruf ist momentan nicht verfügbar.'});
       try{
-        const q=await pool.query(`SELECT r.status,r.ablauf,r.angefragt_am,b.buchungsnummer,b.data,b.status AS buchungsstatus
+        const q=await pool.query(`SELECT r.status,r.ablauf,r.angefragt_am,r.anliegen,r.wunschdatum::text,r.wunschzeit::text,
+            b.buchungsnummer,b.data,b.status AS buchungsstatus
           FROM brilon_buchungswiderrufe r JOIN brilon_buchungen b ON b.id=r.buchung_id
           WHERE r.token_hash=$1`,[gpsTokenHash(customerWithdrawal[1])]);
         if(!q.rowCount)return reply(res,404,{error:'Dieser Bestätigungslink ist ungültig oder wurde bereits verwendet.'});
         const row=q.rows[0];if(row.status!=='bestaetigung_ausstehend'||new Date(row.ablauf)<=new Date())return reply(res,410,{error:'Dieser Bestätigungslink ist abgelaufen oder wurde bereits verwendet.'});
-        return reply(res,200,{buchungsnummer:row.buchungsnummer||row.data.buchungsnummer,angebot:row.data.angebot,datum:row.data.datum,uhrzeit:row.data.uhrzeit,angefragtAm:row.angefragt_am});
+        return reply(res,200,{anliegen:row.anliegen,buchungsnummer:row.buchungsnummer||row.data.buchungsnummer,
+          angebot:row.data.angebot,datum:row.data.datum,uhrzeit:row.data.uhrzeit,
+          wunschdatum:row.wunschdatum,wunschzeit:row.wunschzeit,angefragtAm:row.angefragt_am});
       }catch{return reply(res,503,{error:'Bestätigungslink konnte nicht geprüft werden.'});}
     }
     if(customerWithdrawal&&req.method==='POST'){
@@ -1025,6 +1037,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(!pool)return reply(res,503,{error:'Widerruf ist momentan nicht verfügbar.'});
       const result=await reservierungsTransaktion(async client=>{
         const q=await client.query(`SELECT r.id AS request_id,r.buchung_id,r.status AS request_status,r.ablauf,r.angefragt_am,
+          r.anliegen,r.wunschdatum::text,r.wunschzeit::text,
           b.buchungsnummer,b.data,b.status AS booking_status
           FROM brilon_buchungswiderrufe r JOIN brilon_buchungen b ON b.id=r.buchung_id
           WHERE r.token_hash=$1 FOR UPDATE OF r,b`,[gpsTokenHash(customerWithdrawal[1])]);
@@ -1032,6 +1045,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         const row=q.rows[0];if(row.request_status!=='bestaetigung_ausstehend'||new Date(row.ablauf)<=new Date()||['storniert','abgelehnt'].includes(row.booking_status))return {abgelaufen:true};
         if(row.data.datum<heuteInBerlin())return {terminVorbei:true};
         const data=row.data;
+        if(row.anliegen==='umbuchung'){
+          data.umbuchung={status:'wartet_verwaltung',angefragtAm:row.angefragt_am,
+            bestaetigtAm:new Date().toISOString(),wunschtermin:row.wunschdatum,wunschzeit:row.wunschzeit};
+          const updated=await client.query(`UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW()
+            WHERE id=$2 RETURNING id,buchungsnummer,data,status`,[JSON.stringify(data),row.buchung_id]);
+          await client.query("UPDATE brilon_buchungswiderrufe SET status='wartet_verwaltung',bestaetigt_am=NOW() WHERE id=$1",[row.request_id]);
+          return {umbuchung:true,buchung:updated.rows[0],requestId:row.request_id,wunschdatum:row.wunschdatum,wunschzeit:row.wunschzeit};
+        }
         data.stornierung={status:'bestaetigt',art:'KundenwiderrufOderStornierung',angefragtAm:row.angefragt_am,
           bestaetigtAm:new Date().toISOString(),bedingungenVersion:data.agbTextVersion||null};
         const rabatt=await anschlussRabattElternZuruecknehmen(client,data,row.buchung_id);
@@ -1044,6 +1065,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(result.abgelaufen)return reply(res,410,{error:'Dieser Bestätigungslink ist abgelaufen oder die Buchung ist bereits beendet.'});
       if(result.terminVorbei)return reply(res,409,{error:'Der Veranstaltungstermin liegt bereits zurück. Bitte kontaktiere uns direkt.'});
       const data=result.buchung.data,bookingNumber=result.buchung.buchungsnummer||data.buchungsnummer||'';
+      if(result.umbuchung){
+        const text=`Guten Tag ${data.name||''},\n\nwir haben deine bestätigte Anfrage erhalten, die Buchung ${bookingNumber} auf den ${result.wunschdatum} um ${result.wunschzeit} Uhr umzubuchen. Die bestehende Buchung bleibt bis zur ausdrücklichen Freigabe durch die Verwaltung unverändert. Wir melden uns nach der Prüfung.\n\nViele Grüße\nKlettern & Abenteuer Brilon`;
+        const customerEmail=safeText(data.email,180).toLowerCase();
+        if(/^\S+@\S+\.\S+$/.test(customerEmail))brevoMail(customerEmail,'Umbuchungsanfrage eingegangen – Klettern & Abenteuer',text,{idempotencyKey:result.requestId}).catch(error=>console.error('Umbuchungs-Eingangsbestätigung fehlgeschlagen:',error.code||'unbekannter Fehler'));
+        if(process.env.BOOKING_NOTIFY_EMAIL)brevoMail(process.env.BOOKING_NOTIFY_EMAIL,'Umbuchungsanfrage zur Freigabe',
+          `Eine Umbuchungsanfrage wurde vom Kunden bestätigt und wartet auf die Freigabe durch die Verwaltung.\n\nBuchung: ${bookingNumber}\nKunde: ${data.name||''} · ${customerEmail}\nBisheriger Termin: ${data.datum||''} um ${data.uhrzeit||'—'} Uhr\nWunschtermin: ${result.wunschdatum} um ${result.wunschzeit} Uhr\nAngebot: ${data.angebot||''}\nBuchungs-ID: ${result.buchung.id}`).catch(error=>console.error('Verwaltungsbenachrichtigung zur Umbuchungsanfrage fehlgeschlagen:',error.code||'unbekannter Fehler'));
+        return reply(res,200,{success:true,buchungsnummer:bookingNumber,message:'Deine Umbuchungsanfrage wurde bestätigt und an die Verwaltung weitergeleitet. Die bestehende Buchung bleibt unverändert, bis die Verwaltung die Umbuchung freigibt.'});
+      }
       const cancellationText=`Die Buchung ${bookingNumber} wurde nach Bestätigung des Widerrufs / der Stornierung am ${new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'})} auf storniert gesetzt.\n\nProgramm: ${data.angebot||''}\nTermin: ${data.datum||''} um ${data.uhrzeit||''} Uhr\n\nBereits geleistete Zahlungen werden nicht automatisch ausgezahlt. Die Abrechnung erfolgt nach den bei der Buchung bestätigten Geschäftsbedingungen. Bei einer Stornierung innerhalb des kostenfreien Zeitraums wird eine etwaige Erstattung separat bearbeitet.\n\nViele Grüße\nKlettern & Abenteuer Brilon`;
       const customerEmail=safeText(data.email,180).toLowerCase();
       if(/^\S+@\S+\.\S+$/.test(customerEmail))brevoMail(customerEmail,'Widerruf / Stornierung bestätigt – Klettern & Abenteuer',
@@ -1051,6 +1080,78 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(process.env.BOOKING_NOTIFY_EMAIL)brevoMail(process.env.BOOKING_NOTIFY_EMAIL,'Kundenwiderruf / Stornierung bestätigt',
         `${cancellationText}\n\nKunde: ${data.name||''} · ${customerEmail}\nBuchungs-ID: ${result.buchung.id}`).catch(error=>console.error('Verwaltungsbenachrichtigung zum Widerruf fehlgeschlagen:',error.code||'unbekannter Fehler'));
       return reply(res,200,{success:true,buchungsnummer:bookingNumber,message:'Der Widerruf / die Stornierung wurde bestätigt. Eine Bestätigungs-E-Mail wurde veranlasst.'});
+    }
+
+    if(route==='/api/admin/umbuchungsanfragen'&&req.method==='GET'){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      const q=await pool.query(`SELECT r.id AS anfrage_id,r.angefragt_am,r.bestaetigt_am,
+          r.wunschdatum::text AS wunschdatum,r.wunschzeit::text AS wunschzeit,
+          b.id AS buchung_id,b.buchungsnummer,b.status AS buchungsstatus,b.data
+        FROM brilon_buchungswiderrufe r JOIN brilon_buchungen b ON b.id=r.buchung_id
+        WHERE r.anliegen='umbuchung' AND r.status='wartet_verwaltung'
+        ORDER BY r.angefragt_am ASC LIMIT 200`);
+      return reply(res,200,{anfragen:q.rows});
+    }
+    const rescheduleDecision=route.match(/^\/api\/admin\/umbuchungsanfragen\/([0-9a-f-]{36})$/i);
+    if(rescheduleDecision&&req.method==='PATCH'){
+      if(!await admin(req,res))return;
+      if(!sameOriginMutation(req))return reply(res,403,{error:'Anfrage abgelehnt.'});
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      const d=await body(req);
+      if(!['freigegeben','abgelehnt'].includes(d?.status))return reply(res,400,{error:'Bitte freigeben oder ablehnen.'});
+      const result=await reservierungsTransaktion(async client=>{
+        const q=await client.query(`SELECT r.id AS anfrage_id,r.buchung_id,r.status AS anfrage_status,
+            r.anliegen,r.wunschdatum::text,r.wunschzeit::text,b.status AS buchungsstatus,b.data,b.buchungsnummer
+          FROM brilon_buchungswiderrufe r JOIN brilon_buchungen b ON b.id=r.buchung_id
+          WHERE r.id=$1 FOR UPDATE OF r,b`,[rescheduleDecision[1]]);
+        if(!q.rowCount)return {fehlt:true};
+        const row=q.rows[0];
+        if(row.anliegen!=='umbuchung'||row.anfrage_status!=='wartet_verwaltung')return {erledigt:true};
+        if(['storniert','abgelehnt'].includes(row.buchungsstatus))return {buchungBeendet:true};
+        const data=row.data||{},altDatum=data.datum,altUhrzeit=data.uhrzeit||'';
+        if(d.status==='freigegeben'){
+          if(row.wunschdatum<heuteInBerlin())return {wunschAbgelaufen:true};
+          const shifted={...data,datum:row.wunschdatum,uhrzeit:row.wunschzeit};
+          const conflict=await pruefeBuchungskonflikt(client,shifted.datum,buchungsfenster(shifted),row.buchung_id,
+            shifted.buchungsmodus==='einzelplatz'?{angebot:shifted.angebot,uhrzeit:shifted.uhrzeit}:null);
+          if(conflict)return {konflikt:conflict};
+          if(shifted.buchungsmodus==='einzelplatz'){
+            const programm=await client.query('SELECT kapazitaet FROM brilon_angebote WHERE name=$1 LIMIT 1',[shifted.angebot]);
+            if(!programm.rowCount)return {konflikt:'Die Kapazität dieses Einzelplatzangebots kann nicht geprüft werden.'};
+            const belegung=await client.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS gebucht
+              FROM brilon_buchungen WHERE id<>$1 AND data->>'datum'=$2 AND data->>'angebot'=$3 AND data->>'uhrzeit'=$4
+                AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[row.buchung_id,shifted.datum,shifted.angebot,shifted.uhrzeit]);
+            if(Number(belegung.rows[0].gebucht)+Number(shifted.teilnehmer||1)>Number(programm.rows[0].kapazitaet))
+              return {konflikt:'Die Kapazität für diesen Einzelplatztermin ist ausgeschöpft.'};
+          }
+          shifted.umbuchung={status:'freigegeben',altDatum,altUhrzeit,wunschtermin:row.wunschdatum,
+            wunschzeit:row.wunschzeit,freigegebenAm:new Date().toISOString()};
+          await client.query('UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW() WHERE id=$2',[JSON.stringify(shifted),row.buchung_id]);
+        }else{
+          data.umbuchung={status:'abgelehnt',altDatum,altUhrzeit,wunschtermin:row.wunschdatum,
+            wunschzeit:row.wunschzeit,abgelehntAm:new Date().toISOString()};
+          await client.query('UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW() WHERE id=$2',[JSON.stringify(data),row.buchung_id]);
+        }
+        await client.query('UPDATE brilon_buchungswiderrufe SET status=$1,abgeschlossen_am=NOW() WHERE id=$2',
+          [d.status,row.anfrage_id]);
+        return {status:d.status,buchungsnummer:row.buchungsnummer||data.buchungsnummer,data:d.status==='freigegeben'?{...data,datum:row.wunschdatum,uhrzeit:row.wunschzeit}:data};
+      });
+      if(result.fehlt)return reply(res,404,{error:'Umbuchungsanfrage nicht gefunden.'});
+      if(result.erledigt)return reply(res,409,{error:'Diese Umbuchungsanfrage wurde bereits bearbeitet.'});
+      if(result.buchungBeendet)return reply(res,409,{error:'Die Buchung wurde inzwischen beendet.'});
+      if(result.wunschAbgelaufen)return reply(res,409,{error:'Der gewünschte Termin liegt inzwischen in der Vergangenheit.'});
+      if(result.konflikt)return reply(res,409,{error:result.konflikt});
+      const data=result.data||{},email=safeText(data.email,180).toLowerCase();
+      if(/^\S+@\S+\.\S+$/.test(email)){
+        const approved=result.status==='freigegeben';
+        const text=approved
+          ?`Guten Tag ${data.name||''},\n\ndeine Umbuchungsanfrage für die Buchung ${result.buchungsnummer||''} wurde freigegeben. Der Termin ist jetzt auf ${data.datum} um ${data.uhrzeit||'—'} Uhr geändert.\n\nViele Grüße\nKlettern & Abenteuer Brilon`
+          :`Guten Tag ${data.name||''},\n\nleider können wir deine Umbuchungsanfrage für die Buchung ${result.buchungsnummer||''} auf ${data.umbuchung?.wunschtermin||''} um ${data.umbuchung?.wunschzeit||'—'} Uhr nicht freigeben. Deine ursprüngliche Buchung bleibt bestehen: ${data.datum} um ${data.uhrzeit||'—'} Uhr.\n\nViele Grüße\nKlettern & Abenteuer Brilon`;
+        brevoMail(email,approved?'Umbuchung freigegeben – Klettern & Abenteuer':'Umbuchungsanfrage – Entscheidung der Verwaltung',text)
+          .catch(error=>console.error('Entscheidungs-E-Mail zur Umbuchung fehlgeschlagen:',error.code||'unbekannter Fehler'));
+      }
+      return reply(res,200,{success:true,status:result.status});
     }
 
     if(route==='/api/admin/rechnungsdaten'&&req.method==='GET'){

@@ -170,6 +170,13 @@
 
 <section id="bookings-section" class="admin-view" data-admin-view aria-labelledby="bookings-heading">
       <h2 id="bookings-heading" class="admin-anchor">Buchungen &amp; Zahlungen</h2>
+      <section class="booking" aria-labelledby="reschedule-requests-heading">
+        <h3 id="reschedule-requests-heading">Umbuchungsanfragen – Freigabe erforderlich</h3>
+        <p>Bestätigte Kundenanfragen bleiben bis zu deiner Entscheidung unverändert. Erst „Freigeben“ ändert den Buchungstermin.</p>
+        <button id="reschedule-requests-refresh" class="btn secondary" type="button">Anfragen aktualisieren</button>
+        <p id="reschedule-requests-status" role="status" aria-live="polite"></p>
+        <div id="reschedule-requests-list" class="admin-grid"></div>
+      </section>
       <div class="admin-booking-filters">
         <label>Suche nach Name, Nummer, E-Mail oder Angebot
           <input id="bookings-search" type="search" autocomplete="off">

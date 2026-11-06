@@ -431,6 +431,57 @@
       } else {
         card.append(mk('p','',e.type==='sperrzeit'?'Sperrzeit':'Eigener Termin'));
         if(e.description)card.append(mk('p','',e.description));
+        const repeatBox=mk('div','ck-repeat-box');
+        repeatBox.append(mk('strong','',e.type==='sperrzeit'?'Sperrzeit kopieren / wiederholen':'Termin kopieren / wiederholen'));
+        const dateLabel=mk('label','','Erster Kopietermin');
+        const targetDate=mk('input');targetDate.type='date';targetDate.min=iso(new Date());
+        targetDate.value=iso(addDays(fromIso(e.date),1));targetDate.required=true;dateLabel.append(targetDate);
+        const ruleLabel=mk('label','','Wiederholung');
+        const rule=mk('select');rule.setAttribute('aria-label','Wiederholungsintervall');
+        for(const [value,label] of [['einmalig','Einmalig duplizieren'],['woechentlich','Wöchentlich'],['14tage','Alle 14 Tage'],['3wochen','Alle 3 Wochen'],['monatlich','Monatlich'],['2monate','Alle 2 Monate']]){
+          const option=mk('option','',label);option.value=value;rule.append(option);
+        }
+        const countLabel=mk('label','','Anzahl der Kopien');
+        const count=mk('input');count.type='number';count.min='2';count.max='52';count.step='1';count.value='4';countLabel.append(count);
+        const updateRepeat=()=>{countLabel.hidden=rule.value==='einmalig';count.required=rule.value!=='einmalig';};
+        rule.addEventListener('change',updateRepeat);updateRepeat();
+        const status=mk('p','ck-action-status');status.setAttribute('role','status');
+        const duplicate=btn('Kopie(n) erstellen','',async()=>{
+          const total=rule.value==='einmalig'?1:Number(count.value);
+          if(!targetDate.value||!/^\d{4}-\d{2}-\d{2}$/.test(targetDate.value)||
+             (rule.value!=='einmalig'&&(!Number.isInteger(total)||total<2||total>52))){
+            status.textContent='Bitte ein gültiges Startdatum und eine Anzahl zwischen 2 und 52 eingeben.';return;
+          }
+          const daysBetween=Math.max(0,Math.round((fromIso(e.last)-fromIso(e.date))/86400000));
+          const copies=[];let cursor=fromIso(targetDate.value);
+          for(let i=0;i<total;i++){
+            if(i>0){
+              if(rule.value==='woechentlich')cursor=addDays(cursor,7);
+              else if(rule.value==='14tage')cursor=addDays(cursor,14);
+              else if(rule.value==='3wochen')cursor=addDays(cursor,21);
+              else if(rule.value==='monatlich'||rule.value==='2monate'){
+                const addMonths=rule.value==='monatlich'?1:2;
+                const monthFirst=new Date(cursor.getFullYear(),cursor.getMonth()+addMonths,1,12);
+                const lastDay=new Date(monthFirst.getFullYear(),monthFirst.getMonth()+1,0,12).getDate();
+                cursor=new Date(monthFirst.getFullYear(),monthFirst.getMonth(),Math.min(cursor.getDate(),lastDay),12);
+              }
+            }
+            const start=iso(cursor);
+            copies.push({typ:e.type==='sperrzeit'?'sperrzeit':'termin',titel:e.title,datum:start,
+              enddatum:daysBetween?iso(addDays(cursor,daysBetween)):'',
+              uhrzeit:e.start==null?'':prettyTime(e.start),endzeit:e.end==null?'':prettyTime(e.end),
+              beschreibung:e.description||''});
+          }
+          duplicate.disabled=true;status.textContent=`Erstelle ${copies.length} Kalendereintrag(e) …`;
+          let created=0;
+          try{
+            for(const copy of copies){await api('/api/admin/kalender',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(copy)});created++;}
+            status.textContent=created===1?'Kalendereintrag wurde dupliziert.':`${created} wiederkehrende Kalendereinträge wurden erstellt.`;
+            await load();
+          }catch(error){status.textContent=`${created} von ${copies.length} Einträgen gespeichert. Weitere Kopien fehlgeschlagen: ${error.message}`;await load();}
+          finally{duplicate.disabled=false;}
+        });
+        repeatBox.append(dateLabel,ruleLabel,countLabel,duplicate,status);card.append(repeatBox);
       }
       detail.append(card);
     }
