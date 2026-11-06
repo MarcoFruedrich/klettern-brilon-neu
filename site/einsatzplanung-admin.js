@@ -12,11 +12,18 @@
     const status=document.getElementById('einsatzplanung-status');
     status.textContent='Einsatzplanung wird geladen …';
     try{
-      const [liste,plan]=await Promise.all([
+      const [liste,plan,settings]=await Promise.all([
         api('/api/admin/einsatzplanung/personen'),
-        api('/api/admin/einsatzplanung/kalender?monat='+encodeURIComponent(monat))
+        api('/api/admin/einsatzplanung/kalender?monat='+encodeURIComponent(monat)),
+        api('/api/admin/einsatzplanung/kundenbestaetigung-einstellungen')
       ]);
       personen=liste;personalAnzeigen();termineAnzeigen(plan);
+      const settingsForm=document.getElementById('kundenbestaetigung-settings-form');
+      if(settingsForm){
+        settingsForm.elements.namedItem('verzoegerungMinuten').value=settings?.verzoegerungMinuten??120;
+        settingsForm.elements.namedItem('ruhebeginn').value=settings?.ruhebeginn??'18:00';
+        settingsForm.elements.namedItem('ruheende').value=settings?.ruheende??'09:00';
+      }
       status.textContent='Kalender, Bewerbungen und Mitarbeiterdaten aktualisiert.';
     }catch(err){status.textContent='Einsatzplanung nicht verfügbar: '+err.message;}
   }
@@ -40,19 +47,12 @@
       form.append(field('Vertragliche Monatsstunden','monatsstunden',p.monatsstunden));
       form.append(field('Individuelle Minijob-Grenze (€; leer = 2026 gesetzlich)','minijobGrenze',
         p.minijob_grenze_cent==null?'':p.minijob_grenze_cent/100));
-      const trustLabel=el('label');
-      trustLabel.className='check';
-      const trust=document.createElement('input');trust.type='checkbox';trust.name='vertrauensperson';
-      trust.checked=Boolean(p.vertrauensperson);
-      trustLabel.append(trust,el('span','Besonders vertrauenswürdig: Kundenbestätigung nach Mitarbeiterfreigabe zeitversetzt zulassen'));
-      form.append(trustLabel);
       const save=el('button','Vertragsdaten speichern');save.className='btn secondary';save.type='submit';
       const state=el('p');state.setAttribute('role','status');form.append(save,state);
       form.onsubmit=async event=>{
         event.preventDefault();save.disabled=true;state.textContent='Speichere …';
         try{
           const data=Object.fromEntries(new FormData(form).entries());
-          data.vertrauensperson=trust.checked;
           await api('/api/admin/einsatzplanung/vertrag/'+encodeURIComponent(p.id),{
             method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
           state.textContent='Vertragsdaten gespeichert.';await personalAktualisieren();
@@ -157,6 +157,24 @@
   const filter=document.getElementById('einsatzplanung-monat');
   filter.value=monat;filter.onchange=()=>{if(/^\d{4}-\d\d$/.test(filter.value)){monat=filter.value;laden();}};
   document.getElementById('einsatzplanung-refresh').onclick=laden;
+  const settingsForm=document.getElementById('kundenbestaetigung-settings-form');
+  settingsForm?.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const button=settingsForm.querySelector('button[type="submit"]');
+    const status=document.getElementById('kundenbestaetigung-settings-status');
+    button.disabled=true;status.className='';status.textContent='Speichere und aktualisiere geplante Bestätigungen …';
+    try{
+      const values=Object.fromEntries(new FormData(settingsForm).entries());
+      const saved=await api('/api/admin/einsatzplanung/kundenbestaetigung-einstellungen',{
+        method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
+      settingsForm.elements.namedItem('verzoegerungMinuten').value=saved.verzoegerungMinuten;
+      settingsForm.elements.namedItem('ruhebeginn').value=saved.ruhebeginn;
+      settingsForm.elements.namedItem('ruheende').value=saved.ruheende;
+      status.className='is-saved';status.textContent=`✓ Einstellungen gespeichert. ${saved.neuGeplant} geplante Kundenbestätigung(en) wurden mit den neuen Zeiten aktualisiert.`;
+      await laden();
+    }catch(error){status.className='is-error';status.textContent='Einstellungen konnten nicht gespeichert werden: '+error.message;}
+    finally{button.disabled=false;}
+  });
   // Die Anmeldung in admin.js aktualisiert die Hauptansicht; laden erst nach Login.
   const observer=new MutationObserver(()=>{
     if(!document.getElementById('workspace').hidden){observer.disconnect();laden();}

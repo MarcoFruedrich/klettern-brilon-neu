@@ -19,6 +19,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     throw new Error('Integrationstests dürfen nur die lokale Datenbank brilon_test mit Benutzer brilon_ci verwenden.');
   const { Pool } = require('pg');
   const pool = new Pool({ connectionString: integrationUrl, ssl: false });
+  await pool.query(`CREATE TABLE IF NOT EXISTS brilon_buchungen (
+    id UUID PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
   t.after(async () => {
     await pool.end();
   });
@@ -33,7 +35,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const child = spawn(process.execPath, ['server.js'], {
     cwd: repo, stdio: ['ignore', 'ignore', 'pipe'], env: {
       ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: integrationUrl,
-      DATABASE_SSL_MODE: 'disable', RUN_SCHEMA_MIGRATIONS: 'true',
+      DATABASE_SSL_MODE: 'disable', RUN_SCHEMA_MIGRATIONS: 'true', RUN_INVOICE_MIGRATION: 'true',
       RUN_PRUEF_SCHEMA_MIGRATION: 'true',
       RUN_PLACES_MIGRATION: 'true',
       RUN_EMPLOYEE_AREAS_MIGRATION: 'true',
@@ -57,6 +59,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   }
   assert.ok(ready, `PostgreSQL-Testserver konnte nicht starten: ${errors}`);
 
+  await pool.query(`UPDATE brilon_rechnungsdaten SET data=data||'{"agbAktiv":true}'::jsonb WHERE id=1`);
   const programName = 'CI-Postgres-Klettern-' + crypto.randomUUID();
   await pool.query(`INSERT INTO brilon_angebote
     (name,beschreibung,dauer,preise,aktiv,kapazitaet,buchbar,veroeffentlicht)
@@ -67,12 +70,17 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const book = (name, date, time) => fetch(root + '/api/buchungen', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ vorname: name, nachname: 'Postgres', email: `${name}@example.test`,
-      datum: date, uhrzeit: time, teilnehmer: 3, angebot: programName, datenschutz: 'on' })
+      datum: date, uhrzeit: time, teilnehmer: 3, angebot: programName, datenschutz: 'on',
+      agbBestaetigt: 'on', agbVersion: 1 })
   });
-  const capacity = await Promise.all([book('CIAlpha', day1, '10:00'), book('CIBeta', day1, '11:00')]);
+  let capacity;
+  try { capacity=await Promise.all([book('CIAlpha', day1, '10:00'), book('CIBeta', day1, '11:00')]); }
+  catch(error){throw new Error('Parallele Buchungsanfragen fehlgeschlagen: '+error.message+'; Serverausgabe: '+errors);}
   assert.deepEqual(capacity.map(response => response.status).sort(), [201, 409],
     'Zwei parallele, nicht überlappende Dreiergruppen dürfen die Tageskapazität von fünf nicht überschreiten');
-  const overlap = await Promise.all([book('CIGamma', day2, '10:00'), book('CIDelta', day2, '10:00')]);
+  let overlap;
+  try { overlap=await Promise.all([book('CIGamma', day2, '10:00'), book('CIDelta', day2, '10:00')]); }
+  catch(error){throw new Error('Überlappende Buchungsanfragen fehlgeschlagen: '+error.message+'; Serverausgabe: '+errors);}
   assert.deepEqual(overlap.map(response => response.status).sort(), [201, 409],
     'Parallele Zugriffe dürfen dasselbe Zeitfenster nicht doppelt reservieren');
   const saved = await pool.query(`SELECT id,buchungsnummer FROM brilon_buchungen
@@ -95,7 +103,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const individualBook=index=>fetch(root+'/api/buchungen',{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify({vorname:'CIIndividual'+index,
       nachname:'Postgres',email:`individual${index}@example.test`,datum:day1,uhrzeit:'14:00',
-      teilnehmer:1,angebot:individualName,datenschutz:'on'})});
+      teilnehmer:1,angebot:individualName,datenschutz:'on',agbBestaetigt:'on',agbVersion:1})});
   const individualResults=await Promise.all(Array.from({length:2},(_,i)=>individualBook(i+1)));
   assert.ok(individualResults.every(response=>response.status===201),
     'Gleichzeitige Einzelanmeldungen dürfen denselben Termin teilen und je einen Platz reservieren');

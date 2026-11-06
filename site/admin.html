@@ -5,9 +5,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
-  <link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
-  <link rel="stylesheet" href="/wissensportal.css?v=20261106">
-  <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106">
+  <link rel="stylesheet" href="/style.css?v=20261106-admin-form-align">
+  <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
+  <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-site-label-inline">
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -44,6 +44,7 @@
             <a href="#bookings-section" data-admin-view-link>Buchungen</a>
             <a href="#feedback-admin-section" data-admin-view-link>Feedback</a><a href="#social-media-section" data-admin-view-link>Social Media</a><a href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
             <a href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
+            <a href="#rechnungen-agb-section" data-admin-view-link>Rechnungen &amp; AGB</a>
             <a href="#calendar-view" data-admin-view-link>Kalender</a>
             <a href="#angebote-verwaltung" data-admin-view-link>Programme</a>
             <a href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
@@ -65,6 +66,7 @@
           <a class="admin-dashboard-link" href="#bookings-section" data-admin-view-link>Buchungen</a>
           <a class="admin-dashboard-link" href="#mitarbeiter-section" data-admin-view-link>Trainer-Rückmeldungen &amp; Mitarbeiter</a>
           <a class="admin-dashboard-link" href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
+          <a class="admin-dashboard-link" href="#rechnungen-agb-section" data-admin-view-link>Rechnungen &amp; AGB</a>
           <a class="admin-dashboard-link" href="#calendar-view" data-admin-view-link>Kalender</a>
           <a class="admin-dashboard-link" href="#angebote-verwaltung" data-admin-view-link>Programme</a>
           <a class="admin-dashboard-link" href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
@@ -82,6 +84,45 @@
           <a class="admin-dashboard-link" href="#social-media-section" data-admin-view-link>Social Media</a>
           <a class="admin-dashboard-link" href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
         </nav></section>
+
+      <section id="rechnungen-agb-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="rechnungen-agb-heading">
+        <h2 id="rechnungen-agb-heading">Rechnungen &amp; Geschäftsbedingungen</h2>
+        <p>Hinterlege hier die Rechnungsstellerdaten und die aktuelle AGB-Fassung. Vollständig bezahlte Buchungen erhalten automatisch eine PDF-Rechnung per E-Mail. Der Zahlungseingang verwendet das beim Zahlungseintrag erfasste Datum.</p>
+        <form id="invoice-settings-form" class="admin-grid">
+          <article><h3>Rechnungssteller</h3>
+            <label>Firmen-/Betriebsname<input name="firma" maxlength="200" required></label>
+            <label>Name des Rechnungsstellers<input name="name" maxlength="200" required></label>
+            <label>Straße und Hausnummer<input name="strasse" maxlength="200" required></label>
+            <div class="two"><label>PLZ<input name="plz" maxlength="20" required></label><label>Ort<input name="ort" maxlength="200" required></label></div>
+            <label>E-Mail<input name="email" type="email" maxlength="200" required></label>
+            <label>Telefon<input name="telefon" maxlength="60" required></label>
+            <label>Steuernummer<input name="steuernummer" maxlength="100"></label>
+            <label>Umsatzsteuer-ID (falls vorhanden)<input name="ustIdNr" maxlength="100"></label>
+            <label>Steuerangabe auf der Rechnung<textarea name="steuerhinweis" rows="3" maxlength="1000" placeholder="Steuerliche Behandlung und erforderliche Umsatzsteuerangaben"></textarea></label>
+            <label>Bankname<input name="bankname" maxlength="200"></label>
+            <label>IBAN<input name="iban" maxlength="50"></label>
+            <label>BIC<input name="bic" maxlength="20"></label>
+            <label>Rechnungshinweis (optional)<textarea name="rechnungshinweis" rows="3" maxlength="1000"></textarea></label>
+            <label>Rechnungsnummern-Präfix<input name="rechnungsPraefix" maxlength="20" placeholder="KA-"></label>
+            <fieldset><legend>Freunde werben Freunde</legend>
+              <label class="check"><input name="empfehlungAktiv" type="checkbox"><span>Empfehlungsrabatt bei Buchungsanfragen aktivieren</span></label>
+              <label>Rabattart<select name="empfehlungRabattArt"><option value="prozent">Prozent vom Programmpreis</option><option value="festbetrag">Fester Eurobetrag</option></select></label>
+              <label>Rabattwert<input name="empfehlungRabattWert" type="number" min="0.01" step="0.01" placeholder="z. B. 10 für 10 % oder 5 für 5 €"></label>
+              <label>Werbetext auf der Rechnung<textarea name="empfehlungsText" rows="5" maxlength="300"></textarea></label>
+              <p class="hint">Der Empfehlende muss die bei seiner früheren Buchung verwendete E-Mail-Adresse eintragen. Diese muss zu einer bestätigten Buchung gehören, deren Programm in der Verwaltung als tatsächlich stattgefunden dokumentiert wurde. Der Empfehlende erhält zusätzlich eine Bestätigungs-E-Mail; die neue Buchung kann erst danach bestätigt werden.</p>
+            </fieldset>
+          </article>
+          <article><h3>Geschäftsbedingungen</h3>
+            <p class="hint">Der Musterdatensatz enthält die 25-%-Anzahlung und den kostenfreien Rücktritt bis zehn Kalendertage vor dem Termin. Eine pauschale Einbehaltung des vollen Preises bei Nichterscheinen ist nicht voreingestellt.</p>
+            <label>AGB-Text<textarea name="agbText" rows="20" maxlength="12000" required></textarea></label>
+            <label class="check"><input name="agbAktiv" type="checkbox"><span>Diese Fassung auf der Website anzeigen und bei Buchungsanfragen zur Bestätigung verlangen.</span></label>
+            <p id="invoice-settings-version" class="hint"></p>
+            <button type="submit" class="btn">Rechnungsdaten und AGB speichern</button>
+            <p id="invoice-settings-status" role="status" aria-live="polite"></p>
+          </article>
+        </form>
+        <article><h3>Ausgestellte Rechnungen</h3><button id="invoice-backfill" type="button" class="btn secondary">Rechnungen für vollständig bezahlte Buchungen nachziehen</button> <button id="invoice-list-refresh" type="button" class="btn secondary">Rechnungen aktualisieren</button><p id="invoice-list-status" role="status" aria-live="polite"></p><div id="invoice-list" class="admin-grid"></div></article>
+      </section>
 
       <section id="payment-overview-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="payment-overview-heading">
         <h2 id="payment-overview-heading">Zahlungsübersicht</h2>
@@ -129,6 +170,13 @@
 
 <section id="bookings-section" class="admin-view" data-admin-view aria-labelledby="bookings-heading">
       <h2 id="bookings-heading" class="admin-anchor">Buchungen &amp; Zahlungen</h2>
+      <section class="booking" aria-labelledby="reschedule-requests-heading">
+        <h3 id="reschedule-requests-heading">Umbuchungsanfragen – Freigabe erforderlich</h3>
+        <p>Bestätigte Kundenanfragen bleiben bis zu deiner Entscheidung unverändert. Erst „Freigeben“ ändert den Buchungstermin.</p>
+        <button id="reschedule-requests-refresh" class="btn secondary" type="button">Anfragen aktualisieren</button>
+        <p id="reschedule-requests-status" role="status" aria-live="polite"></p>
+        <div id="reschedule-requests-list" class="admin-grid"></div>
+      </section>
       <div class="admin-booking-filters">
         <label>Suche nach Name, Nummer, E-Mail oder Angebot
           <input id="bookings-search" type="search" autocomplete="off">
@@ -365,6 +413,18 @@
     <p>Verträge und Stundensätze nur für die Verwaltung sichtbar. Bereits geleistete und geplante Stunden werden gesondert angezeigt.</p>
     <div id="arbeitsvertraege-admin" class="admin-grid"></div>
   </section>
+  <section class="booking" aria-labelledby="kundenbestaetigung-settings-heading">
+    <h3 id="kundenbestaetigung-settings-heading">Sonderfreigabe und automatische Kundenbestätigung</h3>
+    <p>Nur Mitarbeiter mit „Besondere Freigabe erteilt: Ja“ können nach ihrer Zusage die zeitversetzte Kundenbestätigung auslösen. Die Standortfreigabe bleibt zusätzlich erforderlich. Änderungen an den Zeiten werden auch auf bereits geplante, noch nicht versandte Bestätigungen angewendet.</p>
+    <form id="kundenbestaetigung-settings-form" class="einsatz-vertragsformular">
+      <label><span>Verzögerung nach Mitarbeiterzusage</span><span class="kundenbestaetigung-unit"><input name="verzoegerungMinuten" type="number" min="1" max="1440" step="1" value="120" required><span>Minuten</span></span></label>
+      <label><span>Ruhezeit beginnt</span><input name="ruhebeginn" type="time" value="18:00" required></label>
+      <label><span>Ruhezeit endet</span><input name="ruheende" type="time" value="09:00" required></label>
+      <small>Bestätigungen werden in diesem Zeitfenster nicht versandt und am Ende der Ruhezeit freigegeben. Gleiche Start- und Endzeit schaltet die Ruhezeit aus. Standardeinstellung: 120 Minuten Verzögerung und Ruhezeit von 18:00 bis 09:00 Uhr.</small>
+      <button class="btn secondary" type="submit">Bestätigungszeiten speichern</button>
+      <p id="kundenbestaetigung-settings-status" role="status" aria-live="polite"></p>
+    </form>
+  </section>
   <p>Registrierte Mitarbeiter, ausstehende Freigaben, Qualifikationen und aktive Zugänge verwalten.</p>
   <p id="pruef-personal-status" role="status" aria-live="polite"></p>
   <div id="pruef-personal-list" class="admin-grid"></div>
@@ -427,15 +487,22 @@
   <h2 id="wissensportal-admin-heading">Wissensportal – interne Wikipedia</h2>
   <p>Hier legst du interne Artikel an, bearbeitest sie und veröffentlichst sie für angemeldete Mitarbeiter. Entwürfe bleiben unsichtbar. Standortzuweisungen können mehrfach erfolgen.</p>
   <p><strong>Wichtig:</strong> Sicherheitseinweisungen und Notfallanweisungen erhalten Versionsnummern. Mitarbeiter können das Lesen der aktuellen Version bestätigen; praktische Sicherheitsunterweisungen bleiben zusätzlich erforderlich.</p>
+  <details id="wiki-categories-panel" class="booking wiki-categories-panel">
+    <summary><strong>Wissenskategorien verwalten</strong></summary>
+    <p>Oberpunkte lassen sich aufklappen. Unterpunkte werden innerhalb des Oberpunkts ergänzt und in der Reihenfolge gespeichert.</p>
+    <div id="wiki-category-tree" class="wiki-category-tree"></div>
+    <div class="wiki-category-new-root">
+      <label>Neue Hauptkategorie<input id="wiki-category-root-title" maxlength="80" placeholder="z. B. Programmsammlung"></label>
+      <button type="button" id="wiki-category-add-root" class="btn secondary">Hauptkategorie hinzufügen</button>
+    </div>
+    <button type="button" id="wiki-category-save" class="btn">Kategorien speichern</button>
+    <p id="wiki-category-status" role="status" aria-live="polite"></p>
+  </details>
   <div class="wiki-admin-layout">
     <form id="wiki-article-form" class="booking">
       <h3 id="wiki-form-heading">Neuer Wissensartikel</h3>
       <label>Titel<input name="titel" maxlength="120" required placeholder="z. B. Kletterwand Brilon – Sicherungsablauf"></label>
-      <label>Kategorie<select name="kategorie" required>
-        <option value="allgemein">Allgemeines</option><option value="programm">Programminformationen</option>
-        <option value="standort">Standortinformationen</option><option value="sicherheit">Sicherheitseinweisungen</option>
-        <option value="ablauf">Arbeitsabläufe</option><option value="notfall">Notfall & Erste Hilfe</option>
-      </select></label>
+      <label>Kategorie<select name="kategorie" required></select></label>
       <label>Kurzbeschreibung<textarea name="kurztext" rows="2" maxlength="500" placeholder="Kurzer Überblick für die Suche"></textarea></label>
       <label>Artikeltext<textarea name="inhalt" rows="12" maxlength="20000" required placeholder="Abläufe, Regeln, Material, Besonderheiten, Sicherheitshinweise ..."></textarea></label>
       <label>Artikelbild (optional, HTTPS)<input type="url" name="bildUrl" placeholder="https://.../klettern.jpg"></label>
@@ -495,7 +562,7 @@
       <label>Ziel<input name="ziel" maxlength="160" required></label>
     </div>
     <div class="two">
-      <label>Dauer (Minuten)<input name="dauer" type="number" min="15" max="1440" required></label>
+      <label>Dauer bei 5–10 Personen (Minuten)<input name="dauer" type="number" min="15" max="1440" required></label>
       <label>Preis pro Gruppe (€)<input name="preis" type="number" min="0" step="0.01" required></label>
     </div>
     <div class="gps-station-heading">
@@ -602,10 +669,10 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261105-admin-login-fix"></script>
-  <script src="/pruefung-admin.js?v=20261105-network-feedback"></script>
+  <script src="/pruefung-admin.js?v=20261106-freigabe-pause-fix"></script>
   <script src="/feedback-admin.js"></script>
-  <script src="/einsatzplanung-admin.js?v=20261105-planung"></script>
-  <script src="/wissensportal-admin.js?v=20261106"></script>
-  <script src="/admin-kalender-v2.js?v=20261106"></script>
+  <script src="/einsatzplanung-admin.js?v=20261106-settings-persist-check"></script>
+  <script src="/wissensportal-admin.js?v=20261106-hierarchical-categories"></script>
+  <script src="/admin-kalender-v2.js?v=20261106-open-bookings-editable"></script>
 </body>
 </html>

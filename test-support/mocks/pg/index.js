@@ -14,6 +14,8 @@ class Pool {
     this.adminSessions = new Map();
     this.adminTotpSteps = new Map();
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
+    this.rechnungsdaten = {agbText:'Test-AGB', agbAktiv:true, agbVersion:1,
+      empfehlungAktiv:false, empfehlungRabattArt:'prozent', empfehlungRabattWert:''};
     this.advisoryLockOwner = null;
     this.advisoryLockWaiters = [];
   }
@@ -52,6 +54,17 @@ class Pool {
           await new Promise(resolve=>{client.advisoryLockFortsetzen=resolve;});
       }
       return {rows:[],rowCount:0};
+    }
+    if (sql.includes('FROM brilon_rechnungsdaten')) {
+      if (sql.includes("data->>'agbText'")) return {rows:[{text:this.rechnungsdaten.agbText,
+        aktiv:String(this.rechnungsdaten.agbAktiv),version:String(this.rechnungsdaten.agbVersion)}],rowCount:1};
+      return {rows:[{data:this.rechnungsdaten}],rowCount:1};
+    }
+    if(sql.includes('UPDATE brilon_kundenbestaetigungen SET faellig_ab=$1'))return {rows:[],rowCount:0};
+    if (sql.includes('UPDATE brilon_rechnungsdaten')) {
+      const patch=typeof params[0]==='string'?JSON.parse(params[0]):(params[0]||{});
+      this.rechnungsdaten={...this.rechnungsdaten,...patch};
+      return {rows:[],rowCount:1};
     }
     if (process.env.MOCK_ADMIN_SESSION_FAIL==='1'&&sql.includes('brilon_admin_sessions'))
       throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
@@ -178,6 +191,13 @@ class Pool {
       const offer=this.offers.find(item=>String(item.id)===String(params[1]));
       if(!offer)return {rows:[],rowCount:0};
       offer.archiviert=params[0];return {rows:[{id:offer.id,archiviert:offer.archiviert}],rowCount:1};
+    }
+    if(sql.includes('FROM brilon_pruef_mitarbeitende m')&&sql.includes('JOIN brilon_pruef_freigaben f')&&sql.includes('JOIN brilon_orte o')){
+      const site=String(params[0]||'').trim().toLocaleLowerCase('de-DE');
+      const staff=JSON.parse(process.env.MOCK_BOOKING_STAFF||'[]').filter(person=>person.aktiv===true&&
+        Boolean(person.freigabe_am)&&person.ortAktiv===true&&String(person.ort||'').trim().toLocaleLowerCase('de-DE')===site)
+        .sort((a,b)=>String(a.name).localeCompare(String(b.name),'de'));
+      return {rows:staff.map(({id,name,email})=>({id,name,email})),rowCount:staff.length};
     }
     if (sql.includes('FROM brilon_orte')) {
       const rows=this.places.filter(item=>item.aktiv===true).sort((a,b)=>a.name.localeCompare(b.name,'de'));

@@ -1027,6 +1027,15 @@ header.site-header{overflow:visible}
 .site-header .brand-logo{position:relative;z-index:2;display:block;flex:0 1 440px;max-width:min(44vw,440px);margin-bottom:-30px;align-self:flex-end}
 .site-header .brand-logo img{display:block;width:100%;height:auto;object-fit:contain}
 .site-header .navlinks{position:relative;z-index:3}
+.site-header .navlinks a.nav-widerruf{color:#b42318!important;border:1px solid #b42318;border-radius:10px;padding:9px 12px;text-align:center;text-decoration:none;font-weight:850}
+.site-header .navlinks a.nav-widerruf:hover,.site-header .navlinks a.nav-widerruf:focus-visible{background:#fff0ee;color:#8f1d14!important;outline:2px solid #b42318;outline-offset:2px}
+.angebote-filter{max-width:440px;margin:22px 0 26px}
+#angebote{scroll-margin-top:130px}
+.angebote-filter label{display:grid;gap:7px;margin-bottom:7px;color:var(--pine);font-weight:750}
+#angebote-standort-filter{width:100%;padding:12px 14px;border:1px solid #cbd8ce;border-radius:10px;background:#fff;color:var(--pine);font:inherit}
+.angebote-karte-bild{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:15px;margin:0 0 16px}
+.angebote-karte-meta{font-size:14px}
+.angebote-anfragen-link{display:inline-block;margin-top:12px;color:var(--pine);font-weight:750;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:900px){.site-header .brand-logo{max-width:39vw;margin-bottom:-14px}}
 @media(max-width:750px){.site-header .header-inner{min-height:75px}.site-header .brand-logo{flex:0 1 260px;max-width:min(67vw,260px);margin-bottom:-17px}.site-header .menu-toggle{position:relative;z-index:4}}
 
@@ -1043,3 +1052,91 @@ header.site-header{overflow:visible}
 #staff-planning-list{display:grid;gap:12px;margin-top:16px;}
 #staff-planning-list .booking>button{margin-right:10px;margin-bottom:8px;}
 @media(max-width:620px){.einsatz-zuweisung{flex-direction:column;align-items:stretch}.einsatz-zuweisung>*{width:100%;}}
+
+/* Einheitliche Eingabemaske für zeitversetzte Kundenbestätigungen. */
+#kundenbestaetigung-settings-form {
+  grid-template-columns:minmax(190px,1.1fr) repeat(2,minmax(145px,.9fr)) minmax(190px,1.25fr) minmax(165px,.95fr);
+  align-items:stretch;
+}
+#kundenbestaetigung-settings-form>label {
+  min-width:0;
+  display:grid;
+  grid-template-rows:minmax(44px,auto) 52px;
+  align-content:start;
+  gap:8px;
+  line-height:1.35;
+}
+#kundenbestaetigung-settings-form>label>span:first-child {
+  display:flex;
+  align-items:flex-end;
+  min-height:44px;
+}
+#kundenbestaetigung-settings-form input {
+  width:100%;min-width:0;height:52px;min-height:52px;padding:0 13px;
+  border:1px solid #bfd0c5;border-radius:10px;background:#fff;color:#173e35;
+  font-size:15px;font-variant-numeric:tabular-nums;
+}
+#kundenbestaetigung-settings-form .kundenbestaetigung-unit {position:relative;display:block;}
+#kundenbestaetigung-settings-form .kundenbestaetigung-unit input {padding-right:76px;}
+#kundenbestaetigung-settings-form .kundenbestaetigung-unit>span {
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  color:#506358;font-size:13px;font-weight:650;pointer-events:none;
+}
+#kundenbestaetigung-settings-form>small {align-self:center;font-size:12px;line-height:1.45;}
+#kundenbestaetigung-settings-form>button {
+  width:100%;min-height:52px;height:52px;align-self:end;display:flex;align-items:center;justify-content:center;
+  padding:0 14px;text-align:center;line-height:1.25;
+}
+#kundenbestaetigung-settings-form>#kundenbestaetigung-settings-status {grid-column:1/-1;min-height:1.4em;margin:0;}
+.staff-special-approval {
+  display:grid;grid-template-columns:minmax(190px,1fr) minmax(220px,1.5fr) auto;
+  align-items:center;gap:12px;margin:4px 0 14px;padding:14px;
+  border:1px solid #d3dfd7;border-radius:10px;background:#f8faf7;
+}
+.staff-special-approval label {display:grid;gap:6px;margin:0;color:#173e35;font-weight:750;}
+.staff-special-approval select {width:100%;height:46px;min-height:46px;padding:8px 10px;border:1px solid #bfd0c5;border-radius:8px;background:#fff;color:#173e35;font:inherit;}
+.staff-special-approval p {margin:0;color:#40594f;font-size:13px;line-height:1.4;}
+.staff-special-approval button {min-height:46px;padding:8px 14px;white-space:nowrap;}
+.staff-special-approval .staff-special-approval-status {grid-column:1/-1;min-height:1.35em;}
+@media(max-width:1100px){
+  #kundenbestaetigung-settings-form {grid-template-columns:repeat(3,minmax(0,1fr));}
+  #kundenbestaetigung-settings-form>small {grid-column:1/3;align-self:start;}
+  #kundenbestaetigung-settings-form>button {grid-column:3;}
+}
+@media(max-width:700px){
+  #kundenbestaetigung-settings-form {grid-template-columns:repeat(2,minmax(0,1fr));}
+  #kundenbestaetigung-settings-form>small {grid-column:1/-1;}
+  #kundenbestaetigung-settings-form>button {grid-column:1/-1;}
+  .staff-special-approval {grid-template-columns:minmax(0,1fr);}
+  .staff-special-approval .staff-special-approval-status {grid-column:auto;}
+}
+/* Equal-size, centered menu items on the public website. */
+.site-header .navlinks {
+  display:grid;flex:1 1 auto;grid-template-columns:repeat(5,minmax(0,1fr));
+  align-items:stretch;gap:10px;min-width:0;
+}
+.site-header .navlinks>a {
+  display:flex;min-width:0;min-height:62px;align-items:center;justify-content:center;
+  padding:8px 9px;border:1px solid #d5ded6;border-radius:10px;color:var(--pine);
+  font-size:13px;font-weight:750;line-height:1.25;text-align:center;text-decoration:none;overflow-wrap:anywhere;
+}
+.site-header .navlinks>a:hover,.site-header .navlinks>a:focus-visible {
+  background:#eff5ee;outline:2px solid #6b9981;outline-offset:1px;
+}
+.site-header .navlinks>a.nav-widerruf {color:#b42318!important;border:1px solid #b42318;font-weight:850;background:transparent;}
+.site-header .navlinks>a.nav-widerruf:hover,.site-header .navlinks>a.nav-widerruf:focus-visible {
+  color:#8f1d14!important;background:#fff0ee;
+}
+@media(max-width:900px){
+  .site-header .navlinks {gap:7px;}
+  .site-header .navlinks>a {min-height:58px;padding:7px 6px;font-size:12px;}
+}
+@media(max-width:750px){
+  .site-header .navlinks {
+    display:none;position:absolute;top:75px;left:0;right:0;z-index:5;
+    grid-template-columns:minmax(0,1fr);flex-direction:column;align-items:stretch;gap:10px;
+    padding:18px 23px 25px;background:#fcfdf8;
+  }
+  .site-header .navlinks.open {display:grid;}
+  .site-header .navlinks>a {width:100%;min-height:50px;font-size:15px;}
+}

@@ -15,7 +15,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const repo=path.resolve(__dirname,'..');
   const offers=[
     {id:1,name:'Klettern',preise:{'1-4':100,'5-10':150},kapazitaet:20,aktiv:true,
-      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60,
+      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:100,
       kategorie:'Klettern',zielgruppe:'Alle',veranstaltungsort:'Brilon',hinweise:''},
     {id:2,name:'Bouldern',preise:{'1-4':150,'5-10':200},kapazitaet:20,aktiv:true,
       verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60}
@@ -56,6 +56,12 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
         gast_name:null,gast_einwilligung:false,einwilligung_am:null,einwilligung_version:null}
     ]),
     MOCK_PLACES:JSON.stringify([{id:1,name:'Brilon',aktiv:true}]),
+    MOCK_BOOKING_STAFF:JSON.stringify([
+      {id:'staff-brilon-1',name:'Trainer Brilon 1',email:'trainer1@team.example.test',aktiv:true,freigabe_am:'2026-11-01',ort:'Brilon',ortAktiv:true},
+      {id:'staff-brilon-2',name:'Trainer Brilon 2',email:'trainer2@team.example.test',aktiv:true,freigabe_am:'2026-11-01',ort:'Brilon',ortAktiv:true},
+      {id:'staff-olpe',name:'Trainer Olpe',email:'olpe@team.example.test',aktiv:true,freigabe_am:'2026-11-01',ort:'Olpe',ortAktiv:true},
+      {id:'staff-paused',name:'Pausierter Trainer',email:'pausiert@team.example.test',aktiv:false,freigabe_am:'2026-11-01',ort:'Brilon',ortAktiv:true}
+    ]),
     MOCK_GUESTBOOK:JSON.stringify([
       {id:guestId,name:null,datum:'2027-03-15',dauer_sekunden:912,tour:'Brilon-Rätseltour',tour_id:tourId,
         token_hash:guestTokenHash,abgeschlossen:true,einwilligung:false,einwilligung_am:null},
@@ -118,7 +124,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     'Buchbare Veranstaltungsorte werden für die Anfrage öffentlich bereitgestellt');
   const anfrage=(uhrzeit,datum='2027-03-15',veranstaltungsort='Brilon')=>fetch(root+'/api/buchungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     vorname:'Max',nachname:'Mueller',email:'max@example.test',datum,uhrzeit,
-    teilnehmer:4,angebot:'Klettern',veranstaltungsort,datenschutz:'on'
+    teilnehmer:4,angebot:'Klettern',veranstaltungsort,datenschutz:'on',agbBestaetigt:'on',agbVersion:1
   })});
   const blockedDates=await fetch(root+'/api/sperrzeiten');
   assert.equal(blockedDates.status,200);
@@ -144,7 +150,17 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
     'Ein identisches Startfenster wird als belegt markiert');
   assert.equal(availableTimes.find(item=>item.uhrzeit==='11:00').belegt,false,
     'Ein direkt an das gebuchte Fenster anschließender Termin bleibt verfügbar');
-  await waitForEmails(2);
+  await waitForEmails(4);
+  const teamRequests=mailMessages.filter(message=>message.to?.[0]?.email?.endsWith('@team.example.test'));
+  assert.equal(teamRequests.length,2,'Nur aktive Mitarbeiter mit Standortfreigabe Brilon erhalten eine neue Terminanfrage');
+  for(const message of teamRequests){
+    assert.match(message.subject,/Neue Terminanfrage am Standort Brilon/);
+    assert.match(message.textContent,/2027-03-15 um 10:00 Uhr/);
+    assert.match(message.textContent,/im Mitarbeiterbereich an/);
+    assert.match(message.textContent,/bewerben/i);
+    assert.doesNotMatch(message.textContent,/max@example.test/,'Kundenkontaktdaten werden nicht an das Team weitergegeben');
+  }
+
   const customerRequest=mailMessages.find(message=>message.to?.[0]?.email==='max@example.test');
   const operatorRequest=mailMessages.find(message=>message.to?.[0]?.email==='operator@example.test');
   assert.ok(customerRequest,'Kundenpostfach muss eine Buchungseingangsbestätigung erhalten');
@@ -188,6 +204,16 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const invalidPaymentPage=await fetch(root+'/api/admin/zahlungsuebersicht?seite=0',{headers:{Cookie:cookie}});
   assert.equal(invalidPaymentPage.status,400);
   const adminHeaders={Cookie:cookie,Origin:root,'X-CSRF-Token':loginData.csrfToken,'Content-Type':'application/json'};
+  const confirmationSettings=await fetch(root+'/api/admin/einsatzplanung/kundenbestaetigung-einstellungen',{headers:{Cookie:cookie}});
+  assert.equal(confirmationSettings.status,200);
+  assert.deepEqual(await confirmationSettings.json(),{verzoegerungMinuten:120,ruhebeginn:'18:00',ruheende:'09:00'});
+  const saveConfirmationSettings=await fetch(root+'/api/admin/einsatzplanung/kundenbestaetigung-einstellungen',{method:'PUT',headers:adminHeaders,
+    body:JSON.stringify({verzoegerungMinuten:'45',ruhebeginn:'22:15',ruheende:'07:30'})});
+  assert.equal(saveConfirmationSettings.status,200);
+  assert.equal((await saveConfirmationSettings.json()).neuGeplant,0);
+  const persistedConfirmationSettings=await fetch(root+'/api/admin/einsatzplanung/kundenbestaetigung-einstellungen',{headers:{Cookie:cookie}});
+  assert.deepEqual(await persistedConfirmationSettings.json(),{verzoegerungMinuten:45,ruhebeginn:'22:15',ruheende:'07:30'});
+
   const invalidProgramDuration=await fetch(root+'/api/admin/angebote/1',{method:'PATCH',headers:adminHeaders,
     body:JSON.stringify({preise:{'1-4':100},dauer:1441})});
   assert.equal(invalidProgramDuration.status,400,'Programmdauer darf beim Bearbeiten nicht über 24 Stunden liegen');
@@ -241,7 +267,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   const publicGuestbookAfterDelete=await fetch(root+'/api/gps/gaesteliste?tour='+tourId);
   assert.deepEqual(await publicGuestbookAfterDelete.json(),[],'Entfernter Name darf nicht mehr öffentlich erscheinen');
   const payment=await fetch(root+`/api/admin/buchungen/${adjacentData.id}/zahlungen`,{method:'POST',headers:adminHeaders,
-    body:JSON.stringify({betrag:'25.00',methode:'ueberweisung',notiz:'Lokaler Testeingang'})});
+    body:JSON.stringify({betrag:'25.00',methode:'ueberweisung',eingangsdatum:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin'}).format(new Date()),notiz:'Lokaler Testeingang'})});
   assert.equal(payment.status,201);
   const paid=await payment.json();
   assert.equal(paid.buchung.status,'bestaetigt');
@@ -322,7 +348,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
   assert.equal(linkedBookingDelete.status,409,'Anschlussbuchungen dürfen nicht aus dem Rabatt- und Zahlungszusammenhang gelöscht werden');
 
   const addonPayment=await fetch(root+`/api/admin/buchungen/${addonBooking.id}/zahlungen`,{method:'POST',headers:adminHeaders,
-    body:JSON.stringify({betrag:'33.75',methode:'ueberweisung',notiz:'Lokaler Testeingang'})});
+    body:JSON.stringify({betrag:'33.75',methode:'ueberweisung',eingangsdatum:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin'}).format(new Date()),notiz:'Lokaler Testeingang'})});
   assert.equal(addonPayment.status,201);
   const addonPaid=await addonPayment.json();
   assert.equal(addonPaid.buchung.status,'bestaetigt');

@@ -166,6 +166,47 @@ async function zahlungsuebersichtLaden(){
   }
 }
 
+async function umbuchungsanfragenLaden(){
+  const list=document.getElementById('reschedule-requests-list');
+  const status=document.getElementById('reschedule-requests-status');
+  if(!list)return;
+  try{
+    const result=await api('/api/admin/umbuchungsanfragen');
+    list.replaceChildren();
+    const requests=result.anfragen||[];
+    status.textContent=requests.length?`${requests.length} bestätigte Umbuchungsanfrage(n) warten auf Entscheidung.`:'Keine Umbuchungsanfragen zur Freigabe.';
+    for(const request of requests){
+      const card=el('article');card.className='booking';
+      const data=request.data||{};
+      card.append(el('h4',`${request.buchungsnummer||data.buchungsnummer||'Buchung'} · ${data.name||'Kunde'}`));
+      card.append(el('p',`${data.angebot||'Programm'} · bisher: ${data.datum||'—'} um ${data.uhrzeit||'—'} Uhr`));
+      card.append(el('p',`gewünscht: ${request.wunschdatum||'—'} um ${(request.wunschzeit||'').slice(0,5)||'—'} Uhr`));
+      card.append(el('p',`Kontakt: ${data.email||'keine E-Mail hinterlegt'} · Anfrage bestätigt: ${request.bestaetigt_am?new Date(request.bestaetigt_am).toLocaleString('de-DE'):'—'}`));
+      const feedback=el('p');feedback.setAttribute('role','status');
+      const actions=el('div');actions.className='booking-actions';
+      for(const [decision,label] of [['freigegeben','Umbuchung freigeben'],['abgelehnt','Umbuchung ablehnen']]){
+        const button=el('button',label);button.type='button';button.className=decision==='freigegeben'?'btn':'btn secondary';
+        button.addEventListener('click',async()=>{
+          if(!confirm(decision==='freigegeben'
+            ?`Umbuchung auf ${request.wunschdatum} um ${(request.wunschzeit||'').slice(0,5)} Uhr freigeben?`
+            :'Umbuchungsanfrage ablehnen? Die bisherige Buchung bleibt bestehen.'))return;
+          button.disabled=true;feedback.textContent='Entscheidung wird gespeichert …';
+          try{
+            await api('/api/admin/umbuchungsanfragen/'+encodeURIComponent(request.anfrage_id),{
+              method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:decision})
+            });
+            feedback.textContent=decision==='freigegeben'?'Umbuchung freigegeben.':'Umbuchungsanfrage abgelehnt.';
+            await refresh();
+          }catch(error){feedback.textContent='Entscheidung nicht gespeichert: '+error.message;button.disabled=false;}
+        });
+        actions.append(button);
+      }
+      card.append(actions,feedback);list.append(card);
+    }
+  }catch(error){status.textContent='Umbuchungsanfragen konnten nicht geladen werden: '+error.message;}
+}
+document.getElementById('reschedule-requests-refresh')?.addEventListener('click',umbuchungsanfragenLaden);
+
 async function refresh() {
   const aktuelleSequenz=++refreshSequenz;
   try {
@@ -180,6 +221,9 @@ async function refresh() {
     login.hidden = true;
     workspace.hidden = false;
     adminAnsichtAusHash();
+
+    await rechnungsdatenLaden();
+    await rechnungenLaden();
 
     await erlebnisangeboteLaden();
     await orteLaden();
@@ -224,6 +268,35 @@ async function refresh() {
         if (b.data[k]) {
           c.append(el('p', k + ': ' + b.data[k]));
         }
+      }
+      if(b.status==='bestaetigt'&&b.data.datum&&b.data.datum<=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Berlin'})){
+        const durchgefuehrt=el('button',b.data.programmStattgefunden?'✓ Programm als stattgefunden dokumentiert':'Programm hat stattgefunden dokumentieren');
+        durchgefuehrt.type='button';durchgefuehrt.className='btn secondary';
+        durchgefuehrt.disabled=Boolean(b.data.programmStattgefunden);
+        const durchfuehrungStatus=el('small',b.data.programmStattgefundenAm?'Dokumentiert am '+new Date(b.data.programmStattgefundenAm).toLocaleString('de-DE'):'');
+        durchgefuehrt.addEventListener('click',async()=>{
+          durchgefuehrt.disabled=true;
+          try{
+            await api('/api/admin/buchungen/'+encodeURIComponent(b.id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:b.status,bearbeitungsnotiz:b.bearbeitungsnotiz||'',programmStattgefunden:true})});
+            await refresh();
+          }catch(error){durchfuehrungStatus.textContent='Konnte nicht gespeichert werden: '+error.message;durchgefuehrt.disabled=false;}
+        });
+        c.append(durchgefuehrt,durchfuehrungStatus);
+      }
+      if(b.data.wiederkehrenderKundeHinweis===true){
+        const returning=el('p','Wiedererkannt: frühere bestätigte Buchung liegt vor.');
+        returning.className='booking-customer-returning';c.append(returning);
+      }
+      if(b.data.empfehlung){
+        const referral=b.data.empfehlung;
+        c.append(el('p',`Empfehlungsgeber: ${referral.email}`));
+        c.append(el('p',`Nachweis der früheren Buchung: ${referral.buchungsnummer||'Buchung'} · ${referral.programm||'Programm'} am ${referral.veranstaltungsdatum||'Datum unbekannt'} (als stattgefunden dokumentiert am ${referral.stattgefundenAm?new Date(referral.stattgefundenAm).toLocaleDateString('de-DE'):'—'})`));
+        c.append(el('p',referral.bestaetigtAm?'Empfehlung per E-Mail bestätigt am '+new Date(referral.bestaetigtAm).toLocaleString('de-DE'):'Wartet auf die Bestätigung des Empfehlungsgebers per E-Mail.'));
+      }
+      if(Number(b.data.rabattCent)>0){
+        const grund=b.data.rabattArt==='anschlussbuchung'?'Anschlussbuchung':
+          b.data.rabattArt==='empfehlung'?'Freunde werben Freunde':'Rabatt';
+        c.append(el('p',`Angewandter Rabatt (${grund}): ${euroCent(Number(b.data.rabattCent)||0)}`));
       }
 
       c.append(
@@ -289,8 +362,10 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
 
   const zahlungsformular = document.createElement('form');
   zahlungsformular.className = 'payment-entry';
+  const lokalesHeute=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   zahlungsformular.innerHTML = '<label>Eingegangener Betrag (€)<input name="betrag" type="number" min="0.01" max="' +
     (restbetragCent / 100).toFixed(2) + '" step="0.01" required></label>' +
+    '<label>Buchungsdatum / Zahlungseingang<input name="eingangsdatum" type="date" value="'+lokalesHeute+'" required></label>' +
     '<label>Zahlungsart<select name="methode"><option value="ueberweisung">Überweisung</option>' +
     '<option value="bar">Bar</option><option value="karte">Karte</option><option value="sonstiges">Sonstiges</option></select></label>' +
     '<label>Interne Notiz (optional)<input name="notiz" maxlength="300"></label>' +
@@ -314,13 +389,20 @@ if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
 
   for (const z of zahlungen) {
     const cent = Number(z.betragCent || 0);
-    const zahlungsZeile=el('p',new Date(z.erhaltenAm).toLocaleString('de-DE') +
+    const eingangsDatum=z.eingangsdatum?new Date(z.eingangsdatum+'T12:00:00').toLocaleDateString('de-DE'):'Datum nicht hinterlegt';
+    const zahlungsZeile=el('p',eingangsDatum+' · erfasst '+new Date(z.erhaltenAm).toLocaleString('de-DE') +
       ' · ' + euro(cent) + ' · ' + z.methode + (z.notiz ? ' · ' + z.notiz : ''));
     zahlungsZeile.className='payment-entry-row';
     zahlungsInfo.append(zahlungsZeile);
   }
 
   c.append(zahlungsInfo, zahlungsformular);
+  if(b.data.rechnung?.id){
+    const invoice=el('div');invoice.className='invoice-status';
+    invoice.append(el('p',`Rechnung ${b.data.rechnung.nummer||''}: ${b.data.rechnung.status||'erstellt'}`));
+    const download=el('a','PDF herunterladen');download.href='/api/admin/rechnungen/'+encodeURIComponent(b.data.rechnung.id)+'.pdf';invoice.append(download);
+    c.append(invoice);
+  }
 
   const kundenkontaktForm=document.createElement('form');
   kundenkontaktForm.className='payment-entry customer-contact';
@@ -602,6 +684,7 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
     c.append(bookingActions,meldung);
       box.append(c);
     }
+    await umbuchungsanfragenLaden();
 
     const offers = await api('/api/admin/aktionen');
     const list = document.getElementById('special-list');
@@ -1936,8 +2019,10 @@ beschreibung.style.width = '100%';
       const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
       const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
       const veranstaltungsort=feld('Veranstaltungsort',angebot.veranstaltungsort,'veranstaltungsort');
-      const dauer=feld('Dauer (Minuten)',angebot.dauer,'dauer','number');
+      const dauer=feld('Dauer bei 5–10 Personen (Minuten)',angebot.dauer,'dauer','number');
       dauer.min='15';dauer.max='1440';dauer.step='1';
+      const dauerHinweis=el('p','Die angegebene Dauer gilt für 5–10 Personen. Für andere Gruppengrößen wird die voraussichtliche Dauer automatisch angepasst.');
+      dauerHinweis.className='hint';metadaten.append(dauerHinweis);
       const kapazitaet=feld('Kapazität',angebot.kapazitaet,'kapazitaet','number');
       kapazitaet.min='1';kapazitaet.max='500';
       const termine=feld('Verfügbare Termine (ein Datum je Zeile)',(angebot.verfuegbare_termine||[]).join('\n'),'verfuegbare_termine','textarea');
@@ -1959,7 +2044,7 @@ beschreibung.style.width = '100%';
 
       const details = document.createElement('p');
       details.textContent =
-        'Dauer: ' + angebot.dauer + ' Minuten | ' +
+        'Richtdauer für 5–10 Personen: ' + angebot.dauer + ' Minuten | ' +
         (angebot.aktiv ? 'Aktiv' : 'Deaktiviert') + ' · ' +
         (angebot.buchbar ? 'buchbar' : 'nicht buchbar') + ' · ' +
         (angebot.veroeffentlicht ? 'veröffentlicht' : 'nicht veröffentlicht');
@@ -2430,3 +2515,63 @@ function anschlussrabattStarten() {
   programmHinzufuegen();
 }
 anschlussrabattStarten();
+
+async function rechnungsdatenLaden(){
+  const form=document.getElementById('invoice-settings-form');if(!form)return;
+  const status=document.getElementById('invoice-settings-status');
+  try{
+    const data=await api('/api/admin/rechnungsdaten');
+    for(const [key,value] of Object.entries(data)){
+      const field=form.elements.namedItem(key);if(!field)continue;
+      if(field.type==='checkbox')field.checked=value===true;else if(key!=='naechsteNummer')field.value=value??'';
+    }
+    document.getElementById('invoice-settings-version').textContent=`AGB-Fassung ${data.agbVersion||1} · nächste Rechnungsnummer ${data.rechnungsPraefix||'KA-'}${new Date().getFullYear()}-${String(data.naechsteNummer||1).padStart(4,'0')}`;
+    if(status)status.textContent='Rechnungsdaten und Geschäftsbedingungen geladen.';
+  }catch(error){if(status)status.textContent='Einstellungen konnten nicht geladen werden: '+error.message;}
+}
+
+document.getElementById('invoice-settings-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,status=document.getElementById('invoice-settings-status');
+  const button=form.querySelector('button[type="submit"]');button.disabled=true;status.textContent='Wird gespeichert …';
+  try{
+    const values=Object.fromEntries(new FormData(form));
+    values.agbAktiv=form.elements.agbAktiv.checked;
+    values.empfehlungAktiv=form.elements.empfehlungAktiv.checked;
+    const result=await api('/api/admin/rechnungsdaten',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
+    status.textContent=`Gespeichert. AGB-Fassung ${result.data.agbVersion} ${result.data.agbAktiv?'ist veröffentlicht.':'ist nicht veröffentlicht.'}`;
+    await rechnungsdatenLaden();
+  }catch(error){status.textContent='Speichern fehlgeschlagen: '+error.message;}
+  finally{button.disabled=false;}
+});
+
+async function rechnungenLaden(){
+  const list=document.getElementById('invoice-list'),status=document.getElementById('invoice-list-status');if(!list)return;
+  status.textContent='Rechnungen werden geladen …';list.replaceChildren();
+  try{
+    const result=await api('/api/admin/rechnungen');
+    if(!result.rechnungen.length){status.textContent='Noch keine Rechnungen erstellt.';return;}
+    status.textContent=`${result.rechnungen.length} Rechnung(en), höchstens 100 angezeigt.`;
+    for(const row of result.rechnungen){
+      const card=el('article');card.className='booking invoice-record';
+      const data=row.data||{};
+      card.append(el('strong',`${row.rechnungsnummer} · ${row.kunde||'Kunde'}`));
+      card.append(el('p',`${data.buchung?.angebot||'Programm'} · ${data.buchung?.datum||'Termin offen'} · ${data.betragCent?euroCent(data.betragCent):''}`));
+      card.append(el('p',`E-Mail-Status: ${row.email_status}${row.email_fehler?' · '+row.email_fehler:''}`));
+      const link=el('a','PDF herunterladen');link.href='/api/admin/rechnungen/'+encodeURIComponent(row.id)+'.pdf';card.append(link);
+      if(row.email_status!=='angenommen'){
+        const resend=el('button','E-Mail erneut senden');resend.type='button';resend.className='btn secondary';
+        resend.addEventListener('click',async()=>{resend.disabled=true;try{await api('/api/admin/rechnungen/'+encodeURIComponent(row.id)+'/versenden',{method:'POST'});await rechnungenLaden();}catch(error){status.textContent='Versand konnte nicht bestätigt werden: '+error.message;resend.disabled=false;}});
+        card.append(resend);
+      }
+      list.append(card);
+    }
+  }catch(error){status.textContent='Rechnungsübersicht nicht verfügbar: '+error.message;}
+}
+document.getElementById('invoice-list-refresh')?.addEventListener('click',rechnungenLaden);
+document.getElementById('invoice-backfill')?.addEventListener('click',async event=>{
+  const button=event.currentTarget,status=document.getElementById('invoice-list-status');button.disabled=true;
+  status.textContent='Vollständig bezahlte Buchungen werden geprüft …';
+  try{const result=await api('/api/admin/rechnungen/ausstehend',{method:'POST'});status.textContent=`Nachverarbeitung abgeschlossen: ${result.verarbeitet} Rechnung(en) bearbeitet.`;await rechnungenLaden();}
+  catch(error){status.textContent='Nachverarbeitung fehlgeschlagen: '+error.message;}
+  finally{button.disabled=false;}
+});

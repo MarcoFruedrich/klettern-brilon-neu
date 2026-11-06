@@ -26,8 +26,10 @@ let verfuegbarkeitsAnfrage=0;
 let sonderaktionsPrefix='';
 function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
-  return Number(programm?.dauer)||
-    (teilnehmer<=4?90:teilnehmer<=10?150:teilnehmer<=15?180:teilnehmer<=20?210:240);
+  const anzahl=Number(teilnehmer),basis=Number(programm?.dauer);
+  if(!Number.isInteger(anzahl)||anzahl<1||!Number.isFinite(basis)||basis<15)return 150;
+  const faktor=anzahl<=4?0.6:anzahl<=10?1:anzahl<=15?1.2:anzahl<=20?1.4:1.6;
+  return Math.max(15,Math.round((basis*faktor)/5)*5);
 }
 
 const buchbareUhrzeiten = [
@@ -385,12 +387,55 @@ fetch('/api/sperrzeiten')
   });
 
 const form = document.getElementById('booking');
+const agbCheckbox=document.getElementById('booking-agb');
+const agbStatus=document.getElementById('booking-agb-status');
+const agbVersionField=document.createElement('input');
+agbVersionField.type='hidden';agbVersionField.name='agbVersion';form.append(agbVersionField);
+fetch('/api/agb').then(async response=>{
+  const data=await response.json();
+  if(!response.ok||!data.aktiv||!data.text||!data.version)throw new Error(data.error||'Geschäftsbedingungen sind noch nicht veröffentlicht.');
+  agbVersionField.value=String(data.version);
+  document.getElementById('booking-agb-text').textContent=data.text;
+  agbStatus.textContent=`Aktuelle Fassung ${data.version}. Du kannst die Bedingungen vor dem Absenden über den Link öffnen.`;
+}).catch(error=>{
+  agbCheckbox.disabled=true;
+  agbStatus.textContent=error.message||'Geschäftsbedingungen konnten nicht geladen werden.';
+});
+const empfehlungsfeld=document.getElementById('empfehlungsfeld');
+const empfehlungBestaetigt=document.getElementById('empfehlung-bestaetigt');
+const empfehlungsEmailFeld=document.getElementById('empfehlung-email-feld');
+const empfehlungsEmail=document.getElementById('empfehlungsgeber-email');
+empfehlungBestaetigt?.addEventListener('change',()=>{
+  const aktiv=empfehlungBestaetigt.checked;
+  empfehlungsEmailFeld.hidden=!aktiv;empfehlungsEmail.required=aktiv;
+  if(!aktiv)empfehlungsEmail.value='';
+});
+fetch('/api/empfehlungsaktion').then(async response=>{
+  const data=await response.json();
+  if(!response.ok||!data.aktiv)return;
+  document.getElementById('empfehlungstext-kurz').textContent=data.text||'';
+  empfehlungsfeld.hidden=false;
+}).catch(()=>{});
 const gastStatus=form.querySelector('#ist-gast');
 const gastEinrichtungFeld=form.querySelector('#gast-einrichtung-feld');
 const gastEinrichtung=form.querySelector('#gast-einrichtung');
 function gastEingabeAktualisieren(){const ja=gastStatus.value==='ja';gastEinrichtungFeld.hidden=!ja;gastEinrichtung.required=ja;if(!ja)gastEinrichtung.value='';}
 gastStatus.addEventListener('change',gastEingabeAktualisieren);
 gastEingabeAktualisieren();
+const invoiceAddressChoice=form.querySelector('#rechnung-adresse-erforderlich');
+const invoiceAddressFields=form.querySelector('#rechnungsanschrift-feld');
+const invoiceAddressInputs=['rechnungsFirma','rechnungsStrasse','rechnungsPlz','rechnungsOrt']
+  .map(name=>form.elements.namedItem(name));
+function invoiceAddressUpdate(){
+  const required=Boolean(invoiceAddressChoice?.checked);
+  invoiceAddressFields.hidden=!required;
+  for(const input of invoiceAddressInputs){
+    input.required=required&&input.name!=='rechnungsFirma';
+    if(!required)input.value='';
+  }
+}
+invoiceAddressChoice?.addEventListener('change',invoiceAddressUpdate);
+invoiceAddressUpdate();
 
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -416,8 +461,8 @@ form.addEventListener('submit', async e => {
     }
 
     status.textContent = json.einzelplatz
-      ? `✓ Platz reserviert. Buchungsnummer: ${json.buchungsnummer}. Keine Anzahlung erforderlich. Der Termin findet ab ${json.mindestteilnehmer} Anmeldungen statt.`
-      : '✓ BUCHUNGSANFRAGE ERFOLGREICH! Deine Buchungsnummer: ' + json.buchungsnummer + '. Dein gewünschter Termin wurde vorläufig reserviert. Wir melden uns persönlich bei dir.';
+      ? `✓ Platz reserviert. Buchungsnummer: ${json.buchungsnummer}. Keine Anzahlung erforderlich. Der Termin findet ab ${json.mindestteilnehmer} Anmeldungen statt.` + (data.empfehlungBestaetigt==='on'?' Die Verwaltung kann die Buchung erst bestätigen, nachdem der Empfehlungsgeber den Bestätigungslink per E-Mail angeklickt hat.':'')
+      : '✓ BUCHUNGSANFRAGE ERFOLGREICH! Deine Buchungsnummer: ' + json.buchungsnummer + '. Dein gewünschter Termin wurde vorläufig reserviert. Wir melden uns persönlich bei dir.' + (data.empfehlungBestaetigt==='on'?' Die Verwaltung kann die Buchung erst bestätigen, nachdem der Empfehlungsgeber den Bestätigungslink per E-Mail angeklickt hat.':'');
 
     status.style.color = '#167c3a';
     status.style.fontWeight = 'bold';
@@ -579,6 +624,68 @@ a.append(anfrageButton);
 
 specials();
 
+function angeboteUebersichtAnzeigen(standortFilter=''){
+  const ausgabe=document.getElementById('angebote-uebersicht');
+  if(!ausgabe)return;
+  const passend=angeboteCache.filter(angebot=>!standortFilter||angebot.veranstaltungsort===standortFilter);
+  ausgabe.replaceChildren();
+  if(!passend.length){
+    const hinweis=document.createElement('p');
+    hinweis.className='hint';
+    hinweis.textContent=standortFilter
+      ?'Für diesen Standort sind derzeit keine veröffentlichten Angebote verfügbar.'
+      :'Derzeit sind keine veröffentlichten Angebote verfügbar.';
+    ausgabe.append(hinweis);
+    return;
+  }
+  for(const angebot of passend){
+    const karte=document.createElement('article');
+    if(angebot.bild_url){
+      const bild=document.createElement('img');
+      bild.src=angebot.bild_url;
+      bild.alt=angebot.name;
+      bild.loading='lazy';
+      bild.className='angebote-karte-bild';
+      karte.append(bild);
+    }else{
+      const symbol=document.createElement('div');
+      symbol.className='symbol';
+      symbol.setAttribute('aria-hidden','true');
+      symbol.textContent='🧗';
+      karte.append(symbol);
+    }
+    const titel=document.createElement('h3');
+    titel.textContent=angebot.name;
+    karte.append(titel);
+    if(angebot.beschreibung){
+      const beschreibung=document.createElement('p');
+      beschreibung.textContent=angebot.beschreibung;
+      karte.append(beschreibung);
+    }
+    const meta=angebot.veranstaltungsort?`Standort: ${angebot.veranstaltungsort}`:'';
+    if(meta){
+      const details=document.createElement('p');
+      details.className='angebote-karte-meta';
+      details.textContent=meta;
+      karte.append(details);
+    }
+    if(angebot.hinweise){
+      const hinweis=document.createElement('p');
+      hinweis.className='angebote-karte-meta';
+      hinweis.textContent=angebot.hinweise;
+      karte.append(hinweis);
+    }
+    const anfrage=document.createElement('a');
+    anfrage.className='angebote-anfragen-link';
+    anfrage.href='#buchung';
+    anfrage.dataset.location=angebot.veranstaltungsort||'';
+    anfrage.dataset.program=angebot.name;
+    anfrage.textContent='Dieses Angebot anfragen →';
+    karte.append(anfrage);
+    ausgabe.append(karte);
+  }
+}
+
 async function angeboteLaden() {
   const auswahl = document.getElementById('angebot-auswahl');
   if (!auswahl || !standortAuswahl) return;
@@ -620,6 +727,30 @@ async function angeboteLaden() {
     if(!orteAntwort.ok)throw new Error('Veranstaltungsorte nicht erreichbar');
     angeboteCache=await angeboteAntwort.json();
     const orte=await orteAntwort.json();
+    const standortFilter=document.getElementById('angebote-standort-filter');
+    if(standortFilter){
+      standortFilter.replaceChildren();
+      const alle=document.createElement('option');
+      alle.value='';
+      alle.textContent='Alle Standorte – alle Angebote';
+      standortFilter.append(alle);
+      for(const ort of orte){
+        const option=document.createElement('option');
+        option.value=ort.name;
+        option.textContent=ort.name;
+        standortFilter.append(option);
+      }
+      standortFilter.addEventListener('change',()=>angeboteUebersichtAnzeigen(standortFilter.value));
+      document.getElementById('angebote-uebersicht')?.addEventListener('click',ereignis=>{
+        const link=ereignis.target.closest('.angebote-anfragen-link');
+        if(!link)return;
+        standortAuswahl.value=link.dataset.location;
+        standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+        auswahl.value=link.dataset.program;
+        auswahl.dispatchEvent(new Event('change',{bubbles:true}));
+      });
+    }
+    angeboteUebersichtAnzeigen(standortFilter?.value||'');
     for(const ort of orte){
       const option=document.createElement('option');
       option.value=ort.name;
@@ -680,9 +811,7 @@ async function preisanzeigeStarten() {
         bildAnzeige.appendChild(beschreibung);
       }
 
-      const meta=[angebot.kategorie,angebot.zielgruppe,
-        angebot.veranstaltungsort,angebot.dauer ? angebot.dauer+' Minuten' : '']
-        .filter(Boolean).join(' · ');
+      const meta=angebot.veranstaltungsort?'Standort: '+angebot.veranstaltungsort:'';
       if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
       if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
       teilnehmer.max=String(Math.min(150,Number(angebot.kapazitaet)||150));

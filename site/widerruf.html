@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Buchung widerrufen oder stornieren | Klettern &amp; Abenteuer</title>
+  <link rel="stylesheet" href="/style.css?v=20261106-widerruf-dreizeilig">
+</head>
+<body class="withdrawal-page">
+  <main class="narrow withdrawal-card">
+    <a href="/">← Zurück zur Website</a>
+    <h1 class="withdrawal-heading"><span>Vertrag widerrufen</span><span class="withdrawal-or">oder</span><span>Umbuchungsanfrage</span></h1>
+    <p>Gib deine Buchungsnummer ein und wähle, ob du die Buchung widerrufen oder einen anderen Termin anfragen möchtest. Der Bestätigungslink wird an die bei der Buchung hinterlegte E-Mail-Adresse gesendet.</p>
+    <p class="hint">Eine Umbuchung wird nicht automatisch vorgenommen. Sie muss von der Verwaltung geprüft und ausdrücklich freigegeben werden. Der Bestätigungslink ist 24 Stunden gültig.</p>
+    <form id="withdrawal-request">
+      <label>Buchungsnummer<input name="buchungsnummer" maxlength="40" autocomplete="off" required></label>
+      <label>Dein Anliegen<select id="withdrawal-type" name="anliegen" required><option value="widerruf">Buchung widerrufen</option><option value="umbuchung">Umbuchung anfragen</option></select></label>
+      <fieldset id="reschedule-fields" hidden>
+        <legend>Gewünschter neuer Termin</legend>
+        <label>Wunschtermin<input id="reschedule-date" name="wunschdatum" type="date"></label>
+        <label>Wunschzeit<input id="reschedule-time" name="wunschzeit" type="time"></label>
+        <p class="hint">Deine Buchung bleibt zunächst beim bisherigen Termin. Die Verwaltung meldet sich nach der Prüfung deines Wunschtermins.</p>
+      </fieldset>
+      <button class="btn" type="submit">Bestätigungslink anfordern</button>
+    </form>
+    <p id="request-status" role="status" aria-live="polite"></p>
+
+    <section id="confirm-panel" hidden>
+      <h2 id="confirm-heading">Anfrage bestätigen</h2>
+      <div id="booking-summary"></div>
+      <p id="confirm-description">Bitte bestätige deine Anfrage.</p>
+      <button id="withdrawal-confirm" class="btn" type="button">Widerruf bestätigen</button>
+      <p id="confirm-status" role="status" aria-live="polite"></p>
+    </section>
+    <p><a href="/agb.html">Allgemeine Geschäftsbedingungen</a> · <a href="/impressum.html">Impressum</a></p>
+  </main>
+  <script>
+  (()=>{
+    const requestForm=document.getElementById('withdrawal-request');
+    const requestStatus=document.getElementById('request-status');
+    const panel=document.getElementById('confirm-panel');
+    const typeSelect=document.getElementById('withdrawal-type');
+    const rescheduleFields=document.getElementById('reschedule-fields');
+    const rescheduleDate=document.getElementById('reschedule-date');
+    const rescheduleTime=document.getElementById('reschedule-time');
+    const token=new URLSearchParams(location.search).get('token');
+    const confirmButton=document.getElementById('withdrawal-confirm');
+    function requestTypeUpdate(){
+      const reschedule=typeSelect.value==='umbuchung';
+      rescheduleFields.hidden=!reschedule;rescheduleDate.required=reschedule;rescheduleTime.required=reschedule;
+      if(!reschedule){rescheduleDate.value='';rescheduleTime.value='';}
+    }
+    typeSelect.addEventListener('change',requestTypeUpdate);requestTypeUpdate();
+    async function json(url,options){
+      const response=await fetch(url,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json',...(options?.headers||{})}});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||'Anfrage konnte nicht verarbeitet werden.');return data;
+    }
+    if(token){
+      requestForm.hidden=true;
+      json('/api/buchung-widerruf/'+encodeURIComponent(token)).then(data=>{
+        const reschedule=data.anliegen==='umbuchung';
+        document.getElementById('confirm-heading').textContent=reschedule?'Umbuchungsanfrage bestätigen':'Widerruf / Stornierung bestätigen';
+        document.getElementById('confirm-description').textContent=reschedule
+          ?'Mit deiner Bestätigung wird die Anfrage an die Verwaltung geleitet. Die Umbuchung erfolgt erst nach ausdrücklicher Freigabe; bis dahin bleibt der bisherige Termin bestehen.'
+          :'Mit deiner Bestätigung wird die Buchung auf „storniert“ gesetzt. Eine mögliche Erstattung bereits geleisteter Zahlungen wird gesondert nach den Bedingungen der Buchung bearbeitet.';
+        confirmButton.textContent=reschedule?'Umbuchungsanfrage bestätigen':'Widerruf bestätigen';
+        document.getElementById('booking-summary').textContent=reschedule
+          ?`Buchung ${data.buchungsnummer} · ${data.angebot} · bisher ${data.datum} um ${data.uhrzeit} Uhr · gewünscht ${data.wunschdatum} um ${data.wunschzeit} Uhr`
+          :`Buchung ${data.buchungsnummer} · ${data.angebot} · ${data.datum} um ${data.uhrzeit} Uhr`;
+        panel.hidden=false;
+      }).catch(error=>{requestStatus.textContent=error.message;});
+      confirmButton.addEventListener('click',async()=>{
+        confirmButton.disabled=true;document.getElementById('confirm-status').textContent='Wird bestätigt …';
+        try{const data=await json('/api/buchung-widerruf/'+encodeURIComponent(token),{method:'POST',body:JSON.stringify({bestaetigen:true})});
+          document.getElementById('confirm-status').textContent=data.message;confirmButton.hidden=true;
+        }catch(error){document.getElementById('confirm-status').textContent=error.message;confirmButton.disabled=false;}
+      });
+    }
+    requestForm.addEventListener('submit',async event=>{
+      event.preventDefault();const button=requestForm.querySelector('button');button.disabled=true;requestStatus.textContent='Anfrage wird verarbeitet …';
+      try{const body=Object.fromEntries(new FormData(requestForm));const data=await json('/api/buchung-widerruf',{method:'POST',body:JSON.stringify(body)});requestStatus.textContent=data.message;}
+      catch(error){requestStatus.textContent=error.message;}
+      finally{button.disabled=false;}
+    });
+  })();
+  </script>
+  <style>
+    body.withdrawal-page{min-height:100vh;background:#e8ecea;color:#22352d;padding:28px 16px}
+    .withdrawal-card{max-width:760px;margin:24px auto;padding:clamp(22px,4vw,38px);background:#fff;border:1px solid #d1dbd5;border-radius:18px;box-shadow:0 12px 36px #163e3514}
+    .withdrawal-card h1,.withdrawal-card h2{color:#163e35}
+    .withdrawal-card .withdrawal-heading{display:grid;justify-items:center;gap:2px;text-align:center;font-size:clamp(30px,5vw,48px);line-height:1.08;letter-spacing:-.035em;margin:28px 0 22px;overflow-wrap:anywhere}
+    .withdrawal-card .withdrawal-or{font-size:.48em;line-height:1.3;font-weight:650;letter-spacing:0}
+    .withdrawal-card h1{font-size:clamp(1.65rem,4.2vw,2.7rem);line-height:1.14;text-align:center;max-width:100%;margin:22px auto 20px;overflow-wrap:anywhere}
+    .withdrawal-card p{color:#4b6256}
+    .withdrawal-card>a{color:#176044;font-weight:700}
+    .withdrawal-card form{margin-top:22px;background:#f6f8f6;border:1px solid #d9e1dc;border-radius:14px;padding:20px}
+    .withdrawal-card label{color:#263d32}
+    .withdrawal-card input{background:#fff;color:#20352b;border:1px solid #aebfb4}
+    .withdrawal-card input:focus{outline:2px solid #26744d;outline-offset:1px}
+    .withdrawal-card .btn{background:#163e35;color:#fff!important}
+    .withdrawal-card .btn:hover{background:#205b43}
+    @media(max-width:560px){body.withdrawal-page{padding:12px}.withdrawal-card{margin:8px auto;padding:20px 16px}.withdrawal-card form{padding:16px}}
+  </style>
+</body>
+</html>

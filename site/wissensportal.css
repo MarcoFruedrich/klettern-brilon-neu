@@ -45,15 +45,16 @@
 
 /* Freigegebene Darstellungsvariante: dreispaltiges internes Wiki */
 body.staff-portal-page{background:#f2f6f3!important;color:#173e35;}
-.staff-portal-page main.narrow{max-width:none!important;width:100%;padding:26px clamp(14px,2.4vw,40px) 50px;}
+.staff-portal-page main.narrow{box-sizing:border-box;min-width:0;max-width:none!important;width:100%;padding:26px clamp(14px,2.4vw,40px) 50px;}
 .staff-portal-page .wiki-staff-section{max-width:none;margin:20px 0!important;padding:20px!important;background:#f7f9f7!important;}
 .staff-portal-page .wiki-staff-header{align-items:center;}
 .staff-portal-page .wiki-staff-header h2{color:#103c2d;}
-.staff-portal-page .wiki-topic-tabs{display:flex;gap:7px;overflow-x:auto;margin:16px 0;padding-bottom:5px;scrollbar-width:thin;}
+.staff-portal-page .wiki-topic-tabs{position:relative;z-index:3;display:flex;gap:7px;overflow-x:auto;margin:16px 0;padding-bottom:5px;scrollbar-width:thin;}
 .staff-portal-page .wiki-topic-tabs button{flex:0 0 auto;min-height:41px;background:#fff;color:#204336;border:1px solid #c9dacf;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:750;cursor:pointer;}
 .staff-portal-page .wiki-topic-tabs button.active{background:#087d4b;border-color:#087d4b;color:#fff;}
 .staff-portal-page .wiki-topic-tabs button:hover,.staff-portal-page .wiki-topic-tabs button:focus-visible{outline:2px solid #197d52;outline-offset:1px;}
 .staff-portal-page .wiki-staff-layout{grid-template-columns:minmax(180px,230px) minmax(300px,1fr) minmax(195px,275px);gap:16px;align-items:start;}
+.staff-portal-page .wiki-staff-layout,.staff-portal-page .wiki-staff-layout>*{min-width:0;max-width:100%;box-sizing:border-box;}
 .staff-portal-page .wiki-staff-list{align-content:start;gap:5px;max-height:800px;padding:11px;background:#f4f8f5;}
 .staff-portal-page .wiki-nav-title{font-size:15px;padding:8px 10px;margin:0;color:#194633;}
 .staff-portal-page .wiki-category-entry{display:block;width:100%;min-height:36px;padding:8px 11px;text-align:left;border-radius:8px;background:transparent;border:0;color:#254a36;font:inherit;font-size:13px;font-weight:700;cursor:pointer;}
@@ -111,3 +112,43 @@ body.staff-portal-page{background:#f2f6f3!important;color:#173e35;}
   .staff-portal-page .wiki-topic-tabs button{min-width:0;white-space:normal;line-height:1.25;}
   .staff-portal-page .wiki-staff-controls{position:static;}
 }
+
+@media(max-width:740px){.staff-portal-page h1{font-size:clamp(28px,8vw,36px);overflow-wrap:anywhere;}}
+
+
+/* Mitarbeiterbereich: einzelne Seiten in einer Seitenleiste statt untereinander */
+.staff-portal-pages{min-width:0;}
+.staff-portal-pages>.staff-view-panel{min-width:0;margin:0!important;}
+.staff-areas-nav{max-height:calc(100vh - 110px);overflow-y:auto;overscroll-behavior:contain;}
+.staff-areas-nav .employee-area-link.active{background:#17483b!important;border-color:#17483b!important;color:#fff!important;}
+.staff-contact-table{display:grid;gap:0;margin-top:14px;overflow:hidden;border:1px solid #d5dfd8;border-radius:12px;background:#fff;}
+.staff-contact-header,.staff-contact-row{display:grid;grid-template-columns:minmax(130px,1.1fr) minmax(190px,1.7fr) minmax(130px,1fr) minmax(130px,1fr);gap:12px;align-items:center;padding:12px 14px;}
+.staff-contact-header{background:#e9f1eb;color:#173e35;}
+.staff-contact-row{border-top:1px solid #e0e8e2;color:#254c3a;}
+.staff-contact-row>*{min-width:0;overflow-wrap:anywhere;}
+.staff-contact-row a{color:#075c42;font-weight:650;}
+.staff-assignment-status{margin:12px 0!important;padding:10px 12px;border:1px solid #ccd7cf;border-radius:9px;background:#f1f3f1;color:#33483b;font-weight:800;}
+.staff-assignment-status.is-confirmed{background:#123f32;color:#fff;border-color:#123f32;}
+.staff-assignment-status.is-assigned{background:#fff3d6;color:#614314;border-color:#e9cd86;}
+.staff-assignment-status.is-applied{background:#e8eef8;color:#29476a;border-color:#c8d7ea;}
+.staff-customer-mail-status{margin:7px 0!important;padding:8px 10px;border-radius:8px;background:#edf4ef;color:#254c3a;font-size:14px;}
+@media(max-width:700px){
+  .staff-areas-nav{max-height:none;grid-template-columns:repeat(2,minmax(0,1fr));}
+  .staff-contact-header{display:none;}
+  .staff-contact-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;}
+  .staff-contact-row>*::before{content:attr(data-label);display:block;margin-bottom:2px;color:#64776a;font-size:11px;font-weight:750;}
+}
+.admin-page #kundenbestaetigung-settings-status.is-saved{color:#14532d;font-weight:800;}
+.admin-page #kundenbestaetigung-settings-status.is-error{color:#9b1c1c;font-weight:750;}
+
+.wiki-categories-panel{margin:1rem 0;padding:1rem}
+.wiki-categories-panel>summary{cursor:pointer;font-size:1.1rem}
+.wiki-category-tree{display:grid;gap:.55rem;margin:1rem 0}
+.wiki-category-node{border:1px solid #cbd9d3;border-radius:.6rem;padding:.65rem;background:#f8faf8}
+.wiki-category-node>summary{font-weight:700;cursor:pointer}
+.wiki-category-node label{display:block;margin:.5rem 0}
+.wiki-category-node input{width:100%;max-width:34rem}
+.wiki-category-node .wiki-category-node{margin:.6rem 0 .6rem 1rem}
+.wiki-category-add-child,.wiki-category-new-root{display:flex;align-items:end;gap:.6rem;flex-wrap:wrap;margin:.65rem 0}
+.wiki-category-add-child input,.wiki-category-new-root input{min-width:14rem}
+.wiki-category-panel .success,#wiki-category-status.success{color:#126343;font-weight:700}
