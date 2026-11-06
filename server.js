@@ -1241,7 +1241,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           if(!current.rowCount){await client.query('ROLLBACK');return reply(res,503,{error:'Rechnungs- und AGB-Schema ist noch nicht eingerichtet.'});}
           const old=current.rows[0].data||{};
           values.agbVersion=(Number(old.agbVersion)||0)+(old.agbText===text?0:1);
-          await client.query('UPDATE brilon_rechnungsdaten SET data=$1::jsonb,aktualisiert_am=NOW() WHERE id=1',[JSON.stringify(values)]);
+          await client.query("UPDATE brilon_rechnungsdaten SET data=COALESCE(data,'{}'::jsonb)||$1::jsonb,aktualisiert_am=NOW() WHERE id=1",[JSON.stringify(values)]);
           row=values;await client.query('COMMIT');
         }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
         return reply(res,200,{success:true,data:row});

@@ -413,6 +413,18 @@
     <p>Verträge und Stundensätze nur für die Verwaltung sichtbar. Bereits geleistete und geplante Stunden werden gesondert angezeigt.</p>
     <div id="arbeitsvertraege-admin" class="admin-grid"></div>
   </section>
+  <section class="booking" aria-labelledby="kundenbestaetigung-settings-heading">
+    <h3 id="kundenbestaetigung-settings-heading">Sonderfreigabe und automatische Kundenbestätigung</h3>
+    <p>Nur Mitarbeiter mit „Besondere Freigabe erteilt: Ja“ können nach ihrer Zusage die zeitversetzte Kundenbestätigung auslösen. Die Standortfreigabe bleibt zusätzlich erforderlich. Änderungen an den Zeiten werden auch auf bereits geplante, noch nicht versandte Bestätigungen angewendet.</p>
+    <form id="kundenbestaetigung-settings-form" class="einsatz-vertragsformular">
+      <label>Verzögerung nach Mitarbeiterzusage (Minuten)<input name="verzoegerungMinuten" type="number" min="1" max="1440" step="1" value="120" required></label>
+      <label>Ruhezeit beginnt <input name="ruhebeginn" type="time" value="18:00" required></label>
+      <label>Ruhezeit endet <input name="ruheende" type="time" value="09:00" required></label>
+      <small>Bestätigungen werden in diesem Zeitfenster nicht versandt und am Ende der Ruhezeit freigegeben. Gleiche Start- und Endzeit schaltet die Ruhezeit aus. Standardeinstellung: 120 Minuten Verzögerung und Ruhezeit von 18:00 bis 09:00 Uhr.</small>
+      <button class="btn secondary" type="submit">Bestätigungszeiten speichern</button>
+      <p id="kundenbestaetigung-settings-status" role="status" aria-live="polite"></p>
+    </form>
+  </section>
   <p>Registrierte Mitarbeiter, ausstehende Freigaben, Qualifikationen und aktive Zugänge verwalten.</p>
   <p id="pruef-personal-status" role="status" aria-live="polite"></p>
   <div id="pruef-personal-list" class="admin-grid"></div>
@@ -652,7 +664,7 @@
   <script src="/admin.js?v=20261105-admin-login-fix"></script>
   <script src="/pruefung-admin.js?v=20261105-network-feedback"></script>
   <script src="/feedback-admin.js"></script>
-  <script src="/einsatzplanung-admin.js?v=20261105-planung"></script>
+  <script src="/einsatzplanung-admin.js?v=20261106-bestaetigungszeiten"></script>
   <script src="/wissensportal-admin.js?v=20261106"></script>
   <script src="/admin-kalender-v2.js?v=20261106"></script>
 </body>
