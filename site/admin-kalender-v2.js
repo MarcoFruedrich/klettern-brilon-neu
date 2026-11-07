@@ -531,16 +531,20 @@
         card.append(mk('p','','Eingeteilt: '+(assigned.join(', ')||'noch niemand')));
         card.append(mk('p','','Bewerbungen: '+(applicants.join(', ')||'keine')));
         const connectionLabels={davor:'Termin davor',danach:'Termin danach',beides:'Termin davor und danach'};
-        const connectionStaff=(e.staff||[]).filter(person=>connectionLabels[person.anschluss_option]);
+        const connectionStaff=(e.staff||[]).filter(person=>person.status==='bestaetigt'&&connectionLabels[person.anschluss_option]);
         if(connectionStaff.length){
-          const info=mk('p','ck-followup-availability','Zusatztermine für Sonder- oder Tagesangebote möglich: '+
+          const info=mk('p','ck-followup-availability','Mitarbeiterbereitschaft für Zusatzangebote: '+
             connectionStaff.map(person=>person.name+' ('+connectionLabels[person.anschluss_option]+')').join(', '));
           card.append(info);
-          card.append(btn('Sonder-/Tagesangebot vorbereiten','ck-plan-followup',()=>{
-            window.dispatchEvent(new CustomEvent('klettern:sonderangebot-vorbereiten',{detail:{
-              date:e.date,title:e.title,site:e.site,time:e.start==null?'':prettyTime(e.start),
-              staff:connectionStaff.map(person=>person.name+' ('+connectionLabels[person.anschluss_option]+')')
-            }}));
+          card.append(btn('Zusatzangebote automatisch vorschlagen','ck-plan-followup',async event=>{
+            const button=event.currentTarget;button.disabled=true;stateText.textContent='Zeitfenster werden berechnet und der Verwaltung vorgelegt …';
+            try{
+              const result=await api('/api/admin/aktionen/vorschlaege',{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({buchung_id:e.id})});
+              stateText.textContent=result.nachricht||'Automatische Vorschläge wurden der Verwaltung vorgelegt.';
+              window.dispatchEvent(new CustomEvent('klettern:sonderangebote-aktualisieren'));
+              window.adminNavigateToElement?.('special-offers-section');
+            }catch(error){stateText.textContent=error.message||'Zusatzangebote konnten nicht vorgeschlagen werden.';button.disabled=false;}
           }));
         }
         const applicantsList=(e.staff||[]).filter(s=>s.status==='beworben');

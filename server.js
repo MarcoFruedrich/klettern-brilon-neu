@@ -62,6 +62,22 @@ function malwareScanReply(res,error){
 async function body(req,maxBytes=16000){const chunks=[];let total=0;for await(const chunk of req){total+=chunk.length;if(total>maxBytes)throw Error('Anfrage zu groß');chunks.push(chunk)}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){return rateLimiter.erlauben(key,max,window)}
 function safeText(v,n=200){return typeof v==='string'?v.trim().slice(0,n):''}
+function tagesangebotPasstZurQuellbuchung(action,source){
+  if(!action?.quelle_buchung_id)return true;
+  if(!source||!['offen','bestaetigt'].includes(source.status))return false;
+  const data=source.data||{},duration=Number(data.dauer),participants=Number(data.teilnehmer);
+  if(data.datum!==action.datum||data.angebot!==action.quellprogramm||
+     safeText(data.veranstaltungsort,80)!==safeText(action.veranstaltungsort,80)||
+     participants!==Number(action.teilnehmer)||duration!==Number(action.dauer)||
+     !/^\d{2}:\d{2}$/.test(String(data.uhrzeit||'')))return false;
+  const mainStart=Number(data.uhrzeit.slice(0,2))*60+Number(data.uhrzeit.slice(3,5));
+  const mainEnd=mainStart+duration;
+  const offerStart=action.vorschlagsrichtung==='davor'?mainStart-duration:mainEnd;
+  const offerEnd=action.vorschlagsrichtung==='davor'?mainStart:mainEnd+duration;
+  const fmt=value=>String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0');
+  return ['davor','danach'].includes(action.vorschlagsrichtung)&&
+    action.uhrzeit===fmt(offerStart)&&action.endzeit===fmt(offerEnd);
+}
 function programmStufenPruefen(input){
   if(!Array.isArray(input)||input.length>100)return {ok:false,fehler:'Bitte gültige Teilnehmerstufen angeben.'};
   if(input.some(item=>item?.preis===null||item?.preis===undefined||item?.preis===''))
@@ -618,9 +634,9 @@ async function main(req,res){
          (rechnungsadresseErforderlich&&(!rechnungsadresse.strasse||!rechnungsadresse.plz||!rechnungsadresse.ort)))
         return reply(res,400,{error:'Bitte Pflichtfelder korrekt ausfüllen.'});
 
-      let gesamtpreis = null;
+      let gesamtpreis = null,sonderaktionData=null;
       const preisAbfrage = await pool.query(
-        `SELECT preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
+        `SELECT id,preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
                 veranstaltungsort,veranstaltungsorte,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer,dauer_modus,gruppenstufen
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
@@ -633,6 +649,22 @@ async function main(req,res){
       const bookingSite=angefragterStandort||offerSites[0];
       if(!offerSites.includes(bookingSite))
         return reply(res,409,{error:'Das ausgewählte Angebot gehört nicht zum gewählten Veranstaltungsort.'});
+      const sonderaktionId=safeText(d.sonderaktion_id,36);
+      if(sonderaktionId){
+        const action=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[sonderaktionId]);
+        sonderaktionData=action.rows[0]?.data||null;
+        if(sonderaktionData?.quelle_buchung_id){
+          const source=await pool.query('SELECT data,status FROM brilon_buchungen WHERE id=$1',[sonderaktionData.quelle_buchung_id]);
+          if(!tagesangebotPasstZurQuellbuchung(sonderaktionData,source.rows[0]))
+            return reply(res,409,{error:'Das Tagesangebot ist nicht mehr aktuell, weil sich die zugehörige Buchung geändert hat oder storniert wurde.'});
+        }
+        if(!sonderaktionData||sonderaktionData.status!=='freigegeben'||sonderaktionData.datum!==datum||
+           sonderaktionData.uhrzeit!==safeText(d.uhrzeit,5)||safeText(sonderaktionData.veranstaltungsort,80)!==bookingSite||
+           String(sonderaktionData.programm_id)!==String(preisAbfrage.rows[0].id)||
+           (Number.isInteger(Number(sonderaktionData.teilnehmer))&&Number(sonderaktionData.teilnehmer)!==teilnehmer)||
+           (Number.isInteger(Number(sonderaktionData.dauer))&&Number(sonderaktionData.dauer)!==buchungsdauerFuerProgramm(teilnehmer,programm)))
+          return reply(res,409,{error:'Das ausgewählte Tagesangebot ist für diesen Termin nicht mehr freigegeben.'});
+      }
       const einzelplatz=programm.buchungsmodus==='einzelplatz';
       if(einzelplatz&&teilnehmer!==1)return reply(res,400,{error:'Für dieses Angebot kannst du nur einen Einzelplatz pro Anmeldung reservieren.'});
       const verfuegbareTermine=Array.isArray(programm.verfuegbare_termine)?programm.verfuegbare_termine:[];
@@ -641,10 +673,14 @@ async function main(req,res){
       if(teilnehmer>Number(programm.kapazitaet))return reply(res,409,{error:'Die Gruppengröße überschreitet die maximale Kapazität.'});
       const einzelpreisCent=Number.isFinite(Number(programm.preis_pro_person))
         ?Math.round(Number(programm.preis_pro_person)*100):null;
-      const preisCent=einzelplatz
+      const gruppenPreisCent=einzelplatz
         ?(einzelpreisCent>0?einzelpreisCent:null)
         :preisFuerTeilnehmer(programm.preise,teilnehmer,programm.gruppenstufen);
-      if(preisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
+      if(gruppenPreisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
+      const sonderaktionsPreis=sonderaktionData?Number(String(sonderaktionData.preis??'').replace(',','.')):null;
+      if(sonderaktionData&&(!Number.isFinite(sonderaktionsPreis)||sonderaktionsPreis<0))
+        return reply(res,409,{error:'Für dieses Tagesangebot ist noch kein gültiger Aktionspreis hinterlegt.'});
+      const preisCent=sonderaktionData?Math.round(sonderaktionsPreis*100):gruppenPreisCent;
       gesamtpreis=preisCent/100;
       const istGast=d.istGast===undefined?'nein':d.istGast;
       const gastEinrichtung=safeText(d.gastEinrichtung,120);
@@ -662,14 +698,18 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
        nachricht:safeText(d.nachricht,2000),dauer:buchungsdauerFuerProgramm(teilnehmer,programm),
+       ...(sonderaktionData?{sonderaktionId,sonderaktionTitel:safeText(sonderaktionData.titel,120),
+         sonderaktionsPreisCent:preisCent,sonderaktionsBasisPreisCent:gruppenPreisCent,
+         sonderaktionsBereitschaft:sonderaktionData.vorschlagsmitarbeiter||[],
+         sonderaktionsRichtung:sonderaktionData.vorschlagsrichtung}:{}),
        datenschutz:'on',datenschutzBestaetigtAm:new Date().toISOString(),
        datenschutzTextVersion:BUCHUNGS_DATENSCHUTZ_VERSION,
        agbBestaetigtAm:new Date().toISOString(),agbTextVersion:Number(agbData.version),agbTextSnapshot:agbData.text
       };
 
-      if(!/^(09|1[0-9]):00$/.test(data.uhrzeit))
+      if(!/^(?:09:(?:00|15|30|45)|1[0-8]:(?:00|15|30|45)|19:00)$/.test(data.uhrzeit))
         return reply(res,400,{
-          error:'Bitte eine gültige Anfangszeit zwischen 09:00 und 19:00 Uhr auswählen.'
+          error:'Bitte eine gültige Anfangszeit zwischen 09:00 und 19:00 Uhr in 15-Minuten-Schritten auswählen.'
         });
 
       const fenster=buchungsfenster(data);
@@ -877,7 +917,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
       const angebot=safeText(u.searchParams.get('angebot'),120);
       const programm=await pool.query(
-        `SELECT dauer,dauer_modus,gruppenstufen,preise,buchungsmodus,mindestteilnehmer,kapazitaet FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
+        `SELECT id,dauer,dauer_modus,gruppenstufen,preise,buchungsmodus,mindestteilnehmer,kapazitaet FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
       );
       if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
       const einzelplatz=programm.rows[0].buchungsmodus==='einzelplatz';
@@ -887,11 +927,31 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const dauer=buchungsdauerFuerProgramm(teilnehmer,programm.rows[0]);
       if(!dauer)return reply(res,409,{error:'Für diese Gruppengröße konnte die Programmdauer nicht berechnet werden.'});
 
+      const specialId=safeText(u.searchParams.get('sonderaktion_id'),36);
+      let requestedTimes=null;
+      if(specialId){
+        const action=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[specialId]);
+        const special=action.rows[0]?.data||{};
+        if(special.quelle_buchung_id){
+          const source=await pool.query('SELECT data,status FROM brilon_buchungen WHERE id=$1',[special.quelle_buchung_id]);
+          if(!tagesangebotPasstZurQuellbuchung(special,source.rows[0]))
+            return reply(res,409,{error:'Dieses Tagesangebot ist nicht mehr aktuell, weil sich die zugehörige Buchung geändert hat oder storniert wurde.'});
+        }
+        const standort=safeText(u.searchParams.get('standort'),80);
+        if(!action.rowCount||special.status!=='freigegeben'||special.datum!==datum||
+           String(special.programm_id)!==String(programm.rows[0].id)||safeText(special.quellprogramm,120)!==angebot||
+           (standort&&safeText(special.veranstaltungsort,80)!==standort)||
+           (Number.isInteger(Number(special.teilnehmer))&&Number(special.teilnehmer)!==teilnehmer)||
+           (Number.isInteger(Number(special.dauer))&&Number(special.dauer)!==dauer))
+          return reply(res,409,{error:'Dieses Tagesangebot ist nicht mehr für diese Auswahl freigegeben.'});
+        requestedTimes=[safeText(special.uhrzeit,5)];
+      }
       const zeiten=[];
+      const timeSlots=requestedTimes||Array.from({length:11},(_,hour)=>String(hour+9).padStart(2,'0')+':00');
 
-      for(let stunde=9;stunde<=19;stunde++){
-        const uhrzeit=String(stunde).padStart(2,'0')+':00';
-        const start=stunde*60;
+      for(const uhrzeit of timeSlots){
+        if(!/^(?:09:(?:00|15|30|45)|1[0-8]:(?:00|15|30|45)|19:00)$/.test(uhrzeit))continue;
+        const start=Number(uhrzeit.slice(0,2))*60+Number(uhrzeit.slice(3,5));
 
         const neuesFenster=
           dauer===null ? null : [start,start+dauer];
@@ -932,8 +992,11 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     if(route==='/api/aktionen'&&req.method==='GET'){
       if(!pool)return reply(res,200,[]);
       const q=await pool.query(
-        `SELECT a.id,a.data->>'titel' AS titel,a.data->>'datum' AS datum,
+        `SELECT a.id,a.data AS aktionsdaten,a.data->>'titel' AS titel,a.data->>'datum' AS datum,
           a.data->>'beschreibung' AS beschreibung,a.data->>'preis' AS preis,
+          a.data->>'uhrzeit' AS uhrzeit,a.data->>'endzeit' AS endzeit,
+          a.data->>'veranstaltungsort' AS veranstaltungsort,
+          a.data->>'teilnehmer' AS teilnehmer,a.id::text AS sonderaktion_id,
           a.data->>'bild_url' AS bild_url,
           p.id AS programm_id,p.name AS programm_name
          FROM brilon_aktionen a
@@ -942,9 +1005,17 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
            AND (a.data->>'datum' IS NULL OR a.data->>'datum'=''
              OR jsonb_array_length(COALESCE(p.verfuegbare_termine,'[]'::jsonb))=0
              OR p.verfuegbare_termine ? (a.data->>'datum'))
+         WHERE COALESCE(a.data->>'status','freigegeben')='freigegeben'
+           AND (a.data->>'uhrzeit' IS NULL OR p.id IS NOT NULL)
          ORDER BY a.data->>'datum' ASC NULLS LAST,a.id DESC LIMIT 100`
       );
-      return reply(res,200,q.rows);
+      const current=await Promise.all(q.rows.map(async row=>{
+        const action=row.aktionsdaten||{};
+        if(!action.quelle_buchung_id)return row;
+        const source=await pool.query('SELECT data,status FROM brilon_buchungen WHERE id=$1',[action.quelle_buchung_id]);
+        return tagesangebotPasstZurQuellbuchung(action,source.rows[0])?row:null;
+      }));
+      return reply(res,200,current.filter(Boolean).map(({aktionsdaten,...row})=>row));
     }
 
     if(route==='/api/gps/start'&&req.method==='POST'){
@@ -2491,9 +2562,85 @@ preis=safeText(d.preis,50);
         const q=await pool.query(
           `SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,
             data->>'beschreibung' AS beschreibung,data->>'preis' AS preis,
-            data->>'bild_url' AS bild_url,data->>'programm_id' AS programm_id
+            data->>'bild_url' AS bild_url,data->>'programm_id' AS programm_id,
+            COALESCE(data->>'status','freigegeben') AS status,
+            data->>'uhrzeit' AS uhrzeit,data->>'endzeit' AS endzeit,
+            data->>'veranstaltungsort' AS veranstaltungsort,
+            data->>'vorschlagsrichtung' AS vorschlagsrichtung,
+            data->'vorschlagsmitarbeiter' AS vorschlagsmitarbeiter,
+            data->>'quellprogramm' AS quellprogramm
            FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100`);
         return reply(res,200,q.rows);
+      }
+
+      if(route==='/api/admin/aktionen/vorschlaege'&&req.method==='POST'){
+        const d=await body(req),bookingId=safeText(d.buchung_id,36);
+        if(!/^[0-9a-f-]{36}$/i.test(bookingId))return reply(res,400,{error:'Buchungsbezug fehlt.'});
+        const client=await pool.connect();
+        try{
+          await client.query('BEGIN');
+          const bookingQuery=await client.query('SELECT id,data,status FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[bookingId]);
+          if(!bookingQuery.rowCount){await client.query('ROLLBACK');return reply(res,404,{error:'Buchung nicht gefunden.'});}
+          const booking=bookingQuery.rows[0],data=booking.data||{};
+          const date=data.datum,time=String(data.uhrzeit||''),duration=Number(data.dauer),participants=Number(data.teilnehmer);
+          if(!['offen','bestaetigt'].includes(booking.status)||!/^\d{4}-\d\d-\d\d$/.test(date||'')||
+             !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)||!Number.isInteger(duration)||duration<15||duration>1440||
+             !Number.isInteger(participants)||participants<1||participants>1000){
+            await client.query('ROLLBACK');return reply(res,409,{error:'Die Buchung hat keine gültige Zeit oder Programmdauer für einen automatischen Vorschlag.'});
+          }
+          const programQuery=await client.query(`SELECT id,name,veranstaltungsort,veranstaltungsorte,preise,gruppenstufen,kapazitaet
+            FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[safeText(data.angebot,120)]);
+          if(!programQuery.rowCount){await client.query('ROLLBACK');return reply(res,409,{error:'Das gebuchte Programm ist nicht mehr buchbar; ein Angebot kann nicht automatisch zugeordnet werden.'});}
+          const program=programQuery.rows[0],sites=Array.isArray(program.veranstaltungsorte)&&program.veranstaltungsorte.length
+            ?program.veranstaltungsorte:[program.veranstaltungsort];
+          const site=safeText(data.veranstaltungsort||program.veranstaltungsort,80);
+          if(!sites.includes(site)){await client.query('ROLLBACK');return reply(res,409,{error:'Der Buchungsstandort ist für das Programm nicht mehr freigegeben.'});}
+          const staffQuery=await client.query(`SELECT e.mitarbeiter_id,e.anschluss_option,m.name
+            FROM brilon_einsaetze e JOIN brilon_pruef_mitarbeitende m ON m.id=e.mitarbeiter_id
+            WHERE e.buchung_id=$1 AND e.status='bestaetigt'
+              AND e.anschluss_option IN ('davor','danach','beides')
+              AND m.aktiv=true AND m.freigabe_am IS NOT NULL
+            ORDER BY m.name,e.mitarbeiter_id`,[bookingId]);
+          if(!staffQuery.rowCount){await client.query('ROLLBACK');return reply(res,409,{error:'Für diese Buchung liegt noch keine bestätigte Mitarbeiterbereitschaft für davor oder danach vor.'});}
+          const startOfMain=Number(time.slice(0,2))*60+Number(time.slice(3,5)),endOfMain=startOfMain+duration;
+          const timeText=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+          const candidates=[];
+          for(const direction of ['davor','danach']){
+            const eligible=staffQuery.rows.filter(person=>person.anschluss_option===direction||person.anschluss_option==='beides');
+            if(!eligible.length)continue;
+            const start=direction==='davor'?startOfMain-duration:endOfMain;
+            const end=direction==='davor'?startOfMain:endOfMain+duration;
+            // Tagesangebote bleiben in den regulären Buchungszeiten. Bei „davor“ endet der Zusatztermin
+            // exakt mit dem Haupttermin; „danach“ beginnt exakt an dessen Ende.
+            if(start<9*60||start>19*60||end>24*60||start%15!==0||end%15!==0)continue;
+            candidates.push({direction,start,end,staff:eligible.map(person=>({id:person.mitarbeiter_id,name:person.name}))});
+          }
+          if(!candidates.length){
+            await client.query('ROLLBACK');return reply(res,409,{error:'Die Bereitschaft ist gespeichert, aber die direkt angrenzenden Zeitfenster liegen außerhalb der Buchungszeiten oder lassen sich nicht exakt in 15-Minuten-Schritten anbieten.'});
+          }
+          let defaultPrice=null;
+          try{const cents=preisFuerTeilnehmer(program.preise,participants,program.gruppenstufen);if(cents!==null)defaultPrice=(cents/100).toFixed(2);}
+          catch{}
+          const created=[];
+          for(const candidate of candidates){
+            const start=timeText(candidate.start),end=timeText(candidate.end);
+            const prior=await client.query(`SELECT id FROM brilon_aktionen WHERE data->>'quelle_buchung_id'=$1
+              AND data->>'vorschlagsrichtung'=$2 AND data->>'datum'=$3 AND data->>'uhrzeit'=$4 LIMIT 1`,
+              [bookingId,candidate.direction,date,start]);
+            if(prior.rowCount){created.push(prior.rows[0].id);continue;}
+            const actionId=crypto.randomUUID();
+            const directionLabel=candidate.direction==='davor'?'davor':'danach';
+            const action={status:'vorschlag',titel:`Tagesangebot ${candidate.direction==='davor'?'vor':'nach'} ${data.angebot}`,
+              datum:date,uhrzeit:start,endzeit:end,veranstaltungsort:site,preis:defaultPrice||'',programm_id:String(program.id),
+              beschreibung:`Automatisch vorgeschlagenes Zusatzprogramm direkt ${directionLabel} der Buchung ${safeText(data.buchungsnummer,80)||bookingId}.`,
+              vorschlagsrichtung:candidate.direction,quelle_buchung_id:bookingId,quellprogramm:safeText(data.angebot,120),
+              vorschlagsmitarbeiter:candidate.staff,teilnehmer:participants,dauer:duration};
+            await client.query('INSERT INTO brilon_aktionen(id,data) VALUES($1,$2::jsonb)',[actionId,JSON.stringify(action)]);
+            created.push(actionId);
+          }
+          await client.query('COMMIT');
+          return reply(res,201,{success:true,ids:created,anzahl:created.length,nachricht:`${created.length} automatisch berechnete Zusatzangebot(e) liegen der Verwaltung zur Prüfung vor.`});
+        }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
       }
 
       if(route==='/api/admin/aktionen'&&req.method==='POST'){
@@ -2519,9 +2666,39 @@ preis=safeText(d.preis,50);
         const q=await pool.query(
           'INSERT INTO brilon_aktionen(id,data) VALUES ($1,$2) RETURNING id',
           [crypto.randomUUID(),JSON.stringify({titel,datum,beschreibung,preis,
+            status:'freigegeben',
             ...(programmId?{programm_id:programmId}:{})})]
         );
         return reply(res,201,{id:q.rows[0].id});
+      }
+
+      const publishProposal=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/freigeben$/);
+      if(publishProposal&&req.method==='POST'){
+        const d=await body(req),title=safeText(d.titel,120),description=safeText(d.beschreibung,1000),price=Number(String(d.preis??'').replace(',','.')),
+          programId=String(d.programm_id||'').trim();
+        if(!title||!Number.isFinite(price)||price<0||!/^\d{1,16}$/.test(programId))
+          return reply(res,400,{error:'Bitte Titel, gültigen Preis und ein buchbares Programm ergänzen.'});
+        const current=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[publishProposal[1]]);
+        if(!current.rowCount)return reply(res,404,{error:'Vorschlag nicht gefunden.'});
+        const action=current.rows[0].data||{};
+        if(action.status!=='vorschlag')return reply(res,409,{error:'Dieser Eintrag ist kein offener Verwaltungsvorschlag.'});
+        const selected=await pool.query(`SELECT id,name,dauer,dauer_modus,gruppenstufen,veranstaltungsort,veranstaltungsorte,verfuegbare_termine
+          FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
+        if(!selected.rowCount)return reply(res,400,{error:'Das verknüpfte Programm ist nicht veröffentlicht und buchbar.'});
+        const program=selected.rows[0],sites=Array.isArray(program.veranstaltungsorte)&&program.veranstaltungsorte.length
+          ?program.veranstaltungsorte:[program.veranstaltungsort];
+        if(!sites.includes(action.veranstaltungsort)||program.name!==action.quellprogramm)
+          return reply(res,400,{error:'Das Programm muss zum vorgeschlagenen Standort und zur gebuchten Programmart passen.'});
+        if(buchungsdauerFuerProgramm(Number(action.teilnehmer),program)!==Number(action.dauer))
+          return reply(res,409,{error:'Die Programmdauer hat sich seit dem Vorschlag geändert. Bitte den Kalender aktualisieren und einen neuen Zeitvorschlag berechnen lassen.'});
+        const source=await pool.query('SELECT data,status FROM brilon_buchungen WHERE id=$1',[action.quelle_buchung_id]);
+        if(!source.rowCount||!tagesangebotPasstZurQuellbuchung(action,source.rows[0]))
+          return reply(res,409,{error:'Die zugehörige Buchung wurde inzwischen geändert oder storniert. Der Vorschlag kann nicht mehr freigegeben werden.'});
+        if(Array.isArray(program.verfuegbare_termine)&&program.verfuegbare_termine.length&&!program.verfuegbare_termine.includes(action.datum))
+          return reply(res,400,{error:'Das Programm ist für den vorgeschlagenen Tag nicht freigegeben.'});
+        const q=await pool.query(`UPDATE brilon_aktionen SET data=$2::jsonb WHERE id=$1
+          RETURNING id,data->>'status' AS status`,[publishProposal[1],JSON.stringify({...action,titel:title,beschreibung,preis:price.toFixed(2),programm_id:programId,status:'freigegeben',freigegebenAm:new Date().toISOString()})]);
+        return reply(res,200,{success:true,...q.rows[0]});
       }
 
       const specialProgramme=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/programm$/);

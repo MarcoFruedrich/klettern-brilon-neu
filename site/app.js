@@ -24,6 +24,7 @@ const standortAuswahl = document.getElementById('buchungs-standort');
 let angeboteCache=[];
 let verfuegbarkeitsAnfrage=0;
 let sonderaktionsPrefix='';
+let ausgewaehlteSonderaktion=null;
 function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
   const anzahl=Number(teilnehmer),basis=Number(programm?.dauer);
@@ -61,10 +62,13 @@ function uhrzeitenAnzeigen() {
   platzhalter.textContent = 'Bitte Anfangszeit auswählen';
   uhrzeitAuswahl.append(platzhalter);
 
-  buchbareUhrzeiten.forEach(uhrzeit => {
+  const zeiten=[...buchbareUhrzeiten];
+  if(ausgewaehlteSonderaktion?.datum===date?.value&&/^\d{2}:\d{2}$/.test(ausgewaehlteSonderaktion.uhrzeit||''))
+    zeiten.push(ausgewaehlteSonderaktion.uhrzeit);
+  [...new Set(zeiten)].sort().forEach(uhrzeit => {
     const option = document.createElement('option');
     option.value = uhrzeit;
-    option.textContent = uhrzeit + ' Uhr';
+    option.textContent = uhrzeit + ' Uhr'+(ausgewaehlteSonderaktion?.uhrzeit===uhrzeit?' · festes Tagesangebot':'');
     uhrzeitAuswahl.append(option);
   });
 
@@ -110,7 +114,9 @@ async function belegteUhrzeitenLaden() {
     const antwort = await fetch(
       '/api/belegte-zeiten?datum=' + encodeURIComponent(datum) +
       '&teilnehmer=' + encodeURIComponent(teilnehmer) +
-      '&angebot=' + encodeURIComponent(angebot)
+      '&angebot=' + encodeURIComponent(angebot) +
+      '&standort=' + encodeURIComponent(standortAuswahl?.value||'')+
+      (ausgewaehlteSonderaktion?.sonderaktion_id?'&sonderaktion_id='+encodeURIComponent(ausgewaehlteSonderaktion.sonderaktion_id):'')
     );
 
     if (!antwort.ok) throw new Error('Verfügbarkeit nicht abrufbar');
@@ -487,6 +493,9 @@ form.addEventListener('submit', async e => {
     sonderaktionsPrefix='';
     const angebotHinweis=document.getElementById('selected-special');
     if(angebotHinweis)angebotHinweis.hidden=true;
+    ausgewaehlteSonderaktion=null;
+    const specialId=form.querySelector('input[name="sonderaktion_id"]');if(specialId)specialId.value='';
+    const participants=document.getElementById('buchungs-teilnehmer');if(participants)participants.readOnly=false;
   } catch (err) {
     status.textContent = '⚠ Buchung nicht möglich: ' + err.message;
     status.style.color = '#a61b1b';
@@ -514,6 +523,11 @@ function sonderaktionAnfragen(aktion){
   if(!nachricht||!hinweis)return;
   const titel=String(aktion.titel||'').trim().slice(0,120);
   if(!titel)return;
+  const exactSlot=Boolean(aktion.uhrzeit&&aktion.endzeit&&aktion.veranstaltungsort&&aktion.programm_id);
+  ausgewaehlteSonderaktion=exactSlot?aktion:null;
+  let specialInput=form.querySelector('input[name="sonderaktion_id"]');
+  if(!specialInput){specialInput=document.createElement('input');specialInput.type='hidden';specialInput.name='sonderaktion_id';form.append(specialInput);}
+  specialInput.value=exactSlot?(aktion.sonderaktion_id||''):'';
   const datumswert=typeof aktion.datum==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(aktion.datum)?
     aktion.datum:'';
   const prefix='Anfrage zur Sonderaktion: '+titel+
@@ -532,11 +546,16 @@ function sonderaktionAnfragen(aktion){
   // A special action can be independent of the programme catalogue. Avoid
   // silently retaining a programme selected for an earlier special.
   if(standortAuswahl){
-    standortAuswahl.value=programm?.veranstaltungsort||'';
+    standortAuswahl.value=aktion.veranstaltungsort||programm?.veranstaltungsort||'';
     standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
   }
   angebotAuswahl.value=programm?.name||'';
   angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+  const participants=document.getElementById('buchungs-teilnehmer');
+  if(participants&&Number.isInteger(Number(aktion.teilnehmer))&&Number(aktion.teilnehmer)>0){
+    participants.value=String(Number(aktion.teilnehmer));participants.readOnly=true;
+    participants.dispatchEvent(new Event('input',{bubbles:true}));
+  }
   const verfuegbar=programm?.verfuegbare_termine;
   const tagFreigegeben=!Array.isArray(verfuegbar)||!verfuegbar.length||
     verfuegbar.includes(datumswert);
@@ -544,9 +563,13 @@ function sonderaktionAnfragen(aktion){
     date.value=datumswert;
     date.dispatchEvent(new Event('change',{bubbles:true}));
   }
+  uhrzeitenAnzeigen();
 
   hinweis.hidden=false;
   hinweis.textContent='Ausgewählte Sonderaktion: '+titel+
+    (datumswert?' · '+datumswert:'')+
+    (aktion.uhrzeit?' · fester Zeitraum '+aktion.uhrzeit+'–'+(aktion.endzeit||'')+' Uhr':'')+
+    (aktion.veranstaltungsort?' · '+aktion.veranstaltungsort:'')+
     (programm?' · verknüpftes Programm: '+programm.name:
       ' · noch kein buchbares Programm verknüpft. Bitte Programm auswählen oder uns kontaktieren.')+
     ' Preis und Verfügbarkeit werden erst nach Prüfung der Anfrage bestätigt.';
@@ -593,6 +616,8 @@ async function specials() {
 
       const d = document.createElement('p');
       d.textContent = item.datum || 'Termin nach Vereinbarung';
+      if(item.uhrzeit)d.textContent+=' · '+item.uhrzeit+'–'+(item.endzeit||'')+' Uhr';
+      if(item.veranstaltungsort)d.textContent+=' · '+item.veranstaltungsort;
 
       const t = document.createElement('p');
       t.textContent = item.beschreibung || '';
@@ -833,9 +858,12 @@ async function preisanzeigeStarten() {
         ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
       date.onchange=()=>date.setCustomValidity(termine.length&&!termine.includes(date.value)
         ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
+      const specialPrice=ausgewaehlteSonderaktion&&String(ausgewaehlteSonderaktion.programm_id)===String(angebot.id)
+        ?Number(String(ausgewaehlteSonderaktion.preis??'').replace(',','.')):null;
 
       if(angebot.buchungsmodus==='einzelplatz'){
-        anzeige.textContent=`${Number(angebot.preis_pro_person).toLocaleString('de-DE',{style:'currency',currency:'EUR'})} pro Person · keine Anzahlung`;
+        const price=Number.isFinite(specialPrice)?specialPrice:Number(angebot.preis_pro_person);
+        anzeige.textContent=`${price.toLocaleString('de-DE',{style:'currency',currency:'EUR'})} ${Number.isFinite(specialPrice)?'Tagesangebotspreis':'pro Person · keine Anzahlung'}`;
         return;
       }
       const stufe=Array.isArray(angebot.gruppenstufen)?angebot.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max)):null;
@@ -845,8 +873,9 @@ async function preisanzeigeStarten() {
       const preis=stufe?.preis??(legacy?legacy[1]:null);
 
       if (preis !== undefined && preis !== null) {
-        anzeige.textContent = (termine.length?'Freigegebene Termine: '+termine.map(t=>new Date(t+'T12:00:00').toLocaleDateString('de-DE')).join(', ')+' · ':'')+'Gruppenpreis: ' +
-          Number(preis).toLocaleString('de-DE', {
+        anzeige.textContent = (termine.length?'Freigegebene Termine: '+termine.map(t=>new Date(t+'T12:00:00').toLocaleDateString('de-DE')).join(', ')+' · ':'')+
+          (Number.isFinite(specialPrice)?'Tagesangebotspreis: ':'Gruppenpreis: ') +
+          (Number.isFinite(specialPrice)?specialPrice:Number(preis)).toLocaleString('de-DE', {
             style: 'currency',
             currency: 'EUR'
           });
