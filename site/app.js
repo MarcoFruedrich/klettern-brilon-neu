@@ -28,6 +28,11 @@ function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
   const anzahl=Number(teilnehmer),basis=Number(programm?.dauer);
   if(!Number.isInteger(anzahl)||anzahl<1||!Number.isFinite(basis)||basis<15)return 150;
+  if(programm?.dauer_modus==='fest')return basis;
+  if(Array.isArray(programm?.gruppenstufen)&&programm.gruppenstufen.length){
+    const stufe=programm.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max));
+    return stufe?Number(stufe.dauer):null;
+  }
   const faktor=anzahl<=4?0.6:anzahl<=10?1:anzahl<=15?1.2:anzahl<=20?1.4:1.6;
   return Math.max(15,Math.round((basis*faktor)/5)*5);
 }
@@ -179,6 +184,7 @@ function buchungsdauerBerechnen() {
 
   const anzahl = Number(teilnehmerEingabe.value);
   const dauer=dauerFuer(anzahl,angebotAuswahl?.value);
+  if(!Number.isInteger(dauer)||dauer<15){dauerAnzeige.textContent='Für diese Gruppengröße ist keine Dauerstufe hinterlegt.';if(endzeitAnzeige)endzeitAnzeige.textContent='';return;}
 
   const dauerMinuten = dauer % 60;
   const stunden = Math.floor(dauer / 60);
@@ -819,7 +825,7 @@ async function preisanzeigeStarten() {
       const meta=angebot.veranstaltungsort?'Standort: '+angebot.veranstaltungsort:'';
       if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
       if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
-      teilnehmer.max=String(Math.min(150,Number(angebot.kapazitaet)||150));
+      teilnehmer.max=String(Math.min(1000,Number(angebot.kapazitaet)||1000));
       if(Number(teilnehmer.value)>Number(teilnehmer.max)){teilnehmer.value=teilnehmer.max;}
       const anzahl = Number(teilnehmer.value);
       const termine=Array.isArray(angebot.verfuegbare_termine)?angebot.verfuegbare_termine:[];
@@ -832,15 +838,11 @@ async function preisanzeigeStarten() {
         anzeige.textContent=`${Number(angebot.preis_pro_person).toLocaleString('de-DE',{style:'currency',currency:'EUR'})} pro Person · keine Anzahlung`;
         return;
       }
-      let gruppe = '';
-
-      if (anzahl >= 1 && anzahl <= 4) gruppe = '1-4';
-      else if (anzahl >= 5 && anzahl <= 10) gruppe = '5-10';
-      else if (anzahl <= 15 && anzahl >= 11) gruppe = '11-15';
-      else if (anzahl <= 20 && anzahl >= 16) gruppe = '16-20';
-      else if (anzahl <= 150 && anzahl >= 21) gruppe = '21-150';
-
-      const preis = angebot.preise?.[gruppe];
+      const stufe=Array.isArray(angebot.gruppenstufen)?angebot.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max)):null;
+      const legacy=Object.entries(angebot.preise||{}).find(([range])=>{
+        const match=range.match(/^(\d+)-(\d+)$/);return match&&anzahl>=Number(match[1])&&anzahl<=Number(match[2]);
+      });
+      const preis=stufe?.preis??(legacy?legacy[1]:null);
 
       if (preis !== undefined && preis !== null) {
         anzeige.textContent = (termine.length?'Freigegebene Termine: '+termine.map(t=>new Date(t+'T12:00:00').toLocaleDateString('de-DE')).join(', ')+' · ':'')+'Gruppenpreis: ' +
@@ -872,7 +874,7 @@ function einzelplatzFormAktualisieren(){
   if(einzel){input.value='1';input.min='1';input.max='1';
     if(hinweis)hinweis.textContent=`Einzelplatzreservierung. Der Termin findet ab ${Number(angebot.mindestteilnehmer)||5} Anmeldungen statt.`;
   }else{
-    input.min='1';input.max=String(Math.min(150,Number(angebot?.kapazitaet)||150));
+    input.min='1';input.max=String(Math.min(1000,Number(angebot?.kapazitaet)||1000));
     if(hinweis)hinweis.textContent='';
   }
 }

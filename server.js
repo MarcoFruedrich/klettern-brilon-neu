@@ -8,7 +8,7 @@ const { datenbankKonfiguration } = require('./lib/datenbank-konfiguration');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
 const { zugelasseneAnschlusszeiten, anschlussPreis, erzeugeZugang, pruefeZugang } = require('./lib/anschlussangebote');
 const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, preisBeiAnschlussstorno, zahlungErgaenzen } = require('./lib/buchungslogik');
-const { buchungsdauerBerechnen } = require('./lib/buchungsdauer');
+const { buchungsdauerBerechnen, buchungsdauerFuerProgramm } = require('./lib/buchungsdauer');
 const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpsspiel');
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 const { sameOriginMutation } = require('./lib/sicherheit');
@@ -62,6 +62,21 @@ function malwareScanReply(res,error){
 async function body(req,maxBytes=16000){const chunks=[];let total=0;for await(const chunk of req){total+=chunk.length;if(total>maxBytes)throw Error('Anfrage zu groß');chunks.push(chunk)}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){return rateLimiter.erlauben(key,max,window)}
 function safeText(v,n=200){return typeof v==='string'?v.trim().slice(0,n):''}
+function programmStufenPruefen(input){
+  if(!Array.isArray(input)||input.length>100)return {ok:false,fehler:'Bitte gültige Teilnehmerstufen angeben.'};
+  if(input.some(item=>item?.preis===null||item?.preis===undefined||item?.preis===''))
+    return {ok:false,fehler:'Bitte für jede Teilnehmerstufe einen Gruppenpreis eintragen.'};
+  const stufen=input.map(item=>({min:Number(item?.min),max:Number(item?.max),preis:Number(item?.preis),dauer:Number(item?.dauer)}))
+    .sort((a,b)=>a.min-b.min||a.max-b.max);
+  for(let index=0;index<stufen.length;index++){
+    const stufe=stufen[index];
+    if(!Number.isInteger(stufe.min)||!Number.isInteger(stufe.max)||stufe.min<1||stufe.max<stufe.min||stufe.max>1000||
+       !Number.isFinite(stufe.preis)||stufe.preis<0||!Number.isInteger(stufe.dauer)||stufe.dauer<15||stufe.dauer>1440)
+      return {ok:false,fehler:'Teilnehmerstufen benötigen gültige Grenzen, Gruppenpreise und Dauern (15–1440 Minuten).'};
+    if(index&&stufe.min<=stufen[index-1].max)return {ok:false,fehler:'Teilnehmerstufen dürfen sich nicht überschneiden.'};
+  }
+  return {ok:true,stufen};
+}
 const MUSTER_AGB=`1. Buchung und Zahlung
 Eine Buchungsanfrage ist zunächst unverbindlich. Ein Vertrag kommt erst mit der Bestätigung durch Klettern & Abenteuer zustande. Für Gruppenveranstaltungen wird eine Anzahlung in Höhe von 25 % vereinbart; die Zahlungsfrist steht in der Bestätigung. Der Restbetrag ist spätestens am Veranstaltungstag fällig.
 
@@ -299,7 +314,7 @@ function buchungsfenster(data){
   const n=Number(data.teilnehmer),start=minuten(data.uhrzeit);
   const gespeicherteDauer=Number(data.dauer);
   const dauer=Number.isInteger(gespeicherteDauer)&&gespeicherteDauer>0?gespeicherteDauer:
-    buchungsdauerBerechnen(n,150);
+    buchungsdauerBerechnen(n,1000);
   // Alte Buchungen ohne Startzeit oder individuelle Angebote belegen vorsichtshalber den ganzen Tag.
   return start===null||dauer===null?null:[start,start+dauer];
 }
@@ -368,20 +383,20 @@ async function anschlussApi(req,res,url,route,ip){
   }
   if(route==='/api/anschlussangebote/vorschau'&&req.method==='POST'){
     const [programs,bookings,blocked]=await Promise.all([
-      pool.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
+      pool.query(`SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
       pool.query(`SELECT id,data FROM brilon_buchungen WHERE data->>'datum'=$1 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum]),
       pool.query(`SELECT 1 FROM brilon_kalender WHERE typ='sperrzeit' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date LIMIT 1`,[base.datum])
     ]);
     if(blocked.rowCount)return reply(res,200,{datum:base.datum,teilnehmer:Number(base.teilnehmer)||0,programme:[]});
     const participants=Number(base.teilnehmer);
-    if(!Number.isInteger(participants)||participants<1||participants>150)
+    if(!Number.isInteger(participants)||participants<1||participants>1000)
       return reply(res,409,{error:'Die Gruppengröße der bestätigten Buchung ist ungültig.'});
     const occupied=bookings.rows.filter(b=>b.id!==parentId).map(b=>buchungsfenster(b.data));
     const suggestions=[];
     for(const p of programs.rows){
       if(p.name===base.angebot)continue;
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
-      const price=preisFuerTeilnehmer(p.preise,participants),duration=buchungsdauerBerechnen(participants,Number(p.dauer));
+      const price=preisFuerTeilnehmer(p.preise,participants,p.gruppenstufen),duration=buchungsdauerFuerProgramm(participants,p);
       if((dates.length&&!dates.includes(base.datum))||participants>Number(p.kapazitaet)||price===null||!Number.isInteger(duration)||duration<1)continue;
       const cap=await pool.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum,p.name]);
       if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))continue;
@@ -400,14 +415,14 @@ async function anschlussApi(req,res,url,route,ip){
       const q=await client.query('SELECT id,status,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[parentId]);
       if(!q.rowCount||q.rows[0].status!=='bestaetigt')return {ungueltig:true};
       const original=q.rows[0].data,oldWindow=buchungsfenster(original),participants=Number(original.teilnehmer);
-      const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
+      const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
       if(!pQuery.rowCount)return {programm:false};
-      const p=pQuery.rows[0],duration=Number(p.dauer),start=Number(time.slice(0,2))*60;
-      if(!oldWindow||!gueltigesDatum(original.datum)||original.datum<heuteInBerlin()||!Number.isInteger(participants)||participants<1||participants>150||p.name===original.angebot||!Number.isInteger(duration)||participants>Number(p.kapazitaet)||
+      const p=pQuery.rows[0],duration=buchungsdauerFuerProgramm(participants,p),start=Number(time.slice(0,2))*60;
+      if(!oldWindow||!gueltigesDatum(original.datum)||original.datum<heuteInBerlin()||!Number.isInteger(participants)||participants<1||participants>1000||p.name===original.angebot||!Number.isInteger(duration)||participants>Number(p.kapazitaet)||
          !zugelasseneAnschlusszeiten(oldWindow[0],oldWindow[1],duration).some(t=>t.beginnMinuten===start&&t.endeMinuten<=1440))return {zeit:false};
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
       if(dates.length&&!dates.includes(original.datum))return {freigabe:false};
-      const price=preisFuerTeilnehmer(p.preise,participants);if(price===null)return {preis:false};
+      const price=preisFuerTeilnehmer(p.preise,participants,p.gruppenstufen);if(price===null)return {preis:false};
       const duplicate=await client.query(`SELECT 1 FROM brilon_buchungen WHERE data->>'anschlussElternId'=$1
         AND data->>'angebot'=$2 AND data->>'uhrzeit'=$3 AND COALESCE(status,'offen') NOT IN ('abgelehnt','storniert') LIMIT 1`,
         [parentId,p.name,time]);
@@ -599,14 +614,14 @@ async function main(req,res){
       if(!vorname||!nachname||!/^\S+@\S+\.\S+$/.test(email)||
          (!gueltigesDatum(datum)||datum<heuteInBerlin())||
          !angebot||!Number.isInteger(teilnehmer)||
-         teilnehmer<1||teilnehmer>150||d.datenschutz!=='on'||
+         teilnehmer<1||teilnehmer>1000||d.datenschutz!=='on'||
          (rechnungsadresseErforderlich&&(!rechnungsadresse.strasse||!rechnungsadresse.plz||!rechnungsadresse.ort)))
         return reply(res,400,{error:'Bitte Pflichtfelder korrekt ausfüllen.'});
 
       let gesamtpreis = null;
       const preisAbfrage = await pool.query(
         `SELECT preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
-                veranstaltungsort,veranstaltungsorte,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer
+                veranstaltungsort,veranstaltungsorte,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer,dauer_modus,gruppenstufen
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
          LIMIT 1`,[angebot]
@@ -628,7 +643,7 @@ async function main(req,res){
         ?Math.round(Number(programm.preis_pro_person)*100):null;
       const preisCent=einzelplatz
         ?(einzelpreisCent>0?einzelpreisCent:null)
-        :preisFuerTeilnehmer(programm.preise,teilnehmer);
+        :preisFuerTeilnehmer(programm.preise,teilnehmer,programm.gruppenstufen);
       if(preisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
       gesamtpreis=preisCent/100;
       const istGast=d.istGast===undefined?'nein':d.istGast;
@@ -646,7 +661,7 @@ buchungsmodus: einzelplatz?'einzelplatz':'gruppe',
 mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
-       nachricht:safeText(d.nachricht,2000),dauer:buchungsdauerBerechnen(teilnehmer,Number(programm.dauer)),
+       nachricht:safeText(d.nachricht,2000),dauer:buchungsdauerFuerProgramm(teilnehmer,programm),
        datenschutz:'on',datenschutzBestaetigtAm:new Date().toISOString(),
        datenschutzTextVersion:BUCHUNGS_DATENSCHUTZ_VERSION,
        agbBestaetigtAm:new Date().toISOString(),agbTextVersion:Number(agbData.version),agbTextSnapshot:agbData.text
@@ -854,7 +869,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const teilnehmer = Number(u.searchParams.get('teilnehmer'));
 
       if (!Number.isInteger(teilnehmer) ||
-          teilnehmer < 1 || teilnehmer > 150) {
+          teilnehmer < 1 || teilnehmer > 1000) {
         return reply(res,400,{
           error:'Bitte eine gültige Teilnehmerzahl angeben.'
         });
@@ -862,11 +877,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
       const angebot=safeText(u.searchParams.get('angebot'),120);
       const programm=await pool.query(
-        `SELECT dauer,buchungsmodus,mindestteilnehmer,kapazitaet FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
+        `SELECT dauer,dauer_modus,gruppenstufen,preise,buchungsmodus,mindestteilnehmer,kapazitaet FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
       );
       if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
       const einzelplatz=programm.rows[0].buchungsmodus==='einzelplatz';
-      const dauer=buchungsdauerBerechnen(teilnehmer,Number(programm.rows[0].dauer));
+      if(teilnehmer>Number(programm.rows[0].kapazitaet))return reply(res,409,{error:'Die Gruppengröße überschreitet die maximale Kapazität.'});
+      if(!einzelplatz&&preisFuerTeilnehmer(programm.rows[0].preise,teilnehmer,programm.rows[0].gruppenstufen)===null)
+        return reply(res,409,{error:'Für diese Teilnehmerzahl ist keine Preisstufe hinterlegt.'});
+      const dauer=buchungsdauerFuerProgramm(teilnehmer,programm.rows[0]);
       if(!dauer)return reply(res,409,{error:'Für diese Gruppengröße konnte die Programmdauer nicht berechnet werden.'});
 
       const zeiten=[];
@@ -2699,7 +2717,7 @@ if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
     `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
             veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
-            buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert
+            buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,sortierung,archiviert
      FROM brilon_angebote
      ORDER BY archiviert ASC,sortierung ASC,id DESC`
   );
@@ -2741,6 +2759,7 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const name = safeText(d.name, 120);
   const beschreibung = safeText(d.beschreibung, 1000);
   const dauer = Number(d.dauer);
+  const dauerModus=d.dauer_modus==='fest'?'fest':'gruppenstufe';
   const kategorie=safeText(d.kategorie,60)||'Klettern';
   const zielgruppe=safeText(d.zielgruppe,120);
   const veranstaltungsort=safeText(d.veranstaltungsort,80)||'Brilon';
@@ -2751,10 +2770,13 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const buchungsmodus=d.buchungsmodus==='einzelplatz'?'einzelplatz':'gruppe';
   const mindestteilnehmer=Number(d.mindestteilnehmer??5);
   const preisProPerson=Number(d.preis_pro_person??0);
+  const stufenErgebnis=programmStufenPruefen(d.gruppenstufen||[]);
 
   if(!name)return reply(res,400,{error:'Bitte einen Namen für das Angebot eingeben.'});
   if(!Number.isInteger(dauer)||dauer<15||dauer>1440)
     return reply(res,400,{error:'Bitte eine Dauer zwischen 15 und 1440 Minuten eingeben.'});
+  if(buchungsmodus!=='einzelplatz'&&(!stufenErgebnis.ok||!stufenErgebnis.stufen.length))
+    return reply(res,400,{error:stufenErgebnis.fehler||'Bitte mindestens eine Teilnehmerstufe mit Gruppenpreis und Dauer hinterlegen.'});
   if(!Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>1000)
     return reply(res,400,{error:'Bitte eine Kapazität zwischen 1 und 1000 Teilnehmenden eingeben.'});
   if(!requestedSites.length)return reply(res,400,{error:'Bitte mindestens einen Veranstaltungsort auswählen.'});
@@ -2767,17 +2789,19 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
 
   const place=await pool.query('SELECT name FROM brilon_orte WHERE name=ANY($1::text[]) AND aktiv=true',[requestedSites]);
   if(place.rowCount!==requestedSites.length)return reply(res,400,{error:'Mindestens ein gewählter Veranstaltungsort ist nicht aktiv oder nicht angelegt.'});
+  const gruppenstufen=buchungsmodus==='einzelplatz'?[]:stufenErgebnis.stufen;
+  const gruppenPreise=Object.fromEntries(gruppenstufen.map(item=>[`${item.min}-${item.max}`,item.preis]));
 
   const q = await pool.query(
     `INSERT INTO brilon_angebote
-      (name,beschreibung,dauer,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,veranstaltungsorte,kapazitaet,
+      (name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,veranstaltungsorte,kapazitaet,
        verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert)
-     VALUES ($1,$2,$3,'{}',false,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10,$11,$12,$13,$14,
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,false,$7,$8,$9,$10::jsonb,$11,$12::jsonb,$13,$14,$15,$16,$17,$18,
        (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false)
      RETURNING id`,
-    [name,beschreibung,dauer,kategorie,zielgruppe,requestedSites[0],JSON.stringify(requestedSites),kapazitaet,
-      JSON.stringify(termine),hinweise,d.buchbar===true,d.veroeffentlicht===true,
-      buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
+    [name,beschreibung,dauer,dauerModus,JSON.stringify(gruppenstufen),JSON.stringify(gruppenPreise),kategorie,zielgruppe,
+      requestedSites[0],JSON.stringify(requestedSites),kapazitaet,JSON.stringify(termine),hinweise,
+      d.buchbar===true,d.veroeffentlicht===true,buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
       buchungsmodus==='einzelplatz'?preisProPerson:0]
   );
 
@@ -2798,33 +2822,24 @@ if (preisRoute && req.method === 'PATCH') {
   if(!bisher.rowCount)return reply(res,404,{error:'Angebot nicht gefunden.'});
   const alt=bisher.rows[0];
   const preise = d.preise;
-
-  if (!preise || typeof preise !== 'object' ||
-      Array.isArray(preise)) {
+  if(preise!==undefined&&(!preise||typeof preise!=='object'||Array.isArray(preise))) {
     return reply(res, 400, {
       error: 'Ungültige Preisangaben.'
     });
   }
-
-  const neuePreise = {};
-
-  for (const gruppe of ['1-4','5-10','11-15','16-20','21-150']) {
-    const wert = preise[gruppe];
-
-    if (wert === '' || wert === null || wert === undefined) {
-      continue;
-    }
-
-    const preis = Number(wert);
-
-    if (!Number.isFinite(preis) || preis < 0) {
-      return reply(res, 400, {
-        error: 'Bitte gültige Preise eingeben.'
-      });
-    }
-
-    neuePreise[gruppe] = preis;
-  }
+  const neueStufen=Array.isArray(d.gruppenstufen)?programmStufenPruefen(d.gruppenstufen):
+    programmStufenPruefen(alt.gruppenstufen||[]);
+  if(Array.isArray(d.gruppenstufen)&&(!neueStufen.ok||(!d.gruppenstufen.length&&d.buchungsmodus!=='einzelplatz')))
+    return reply(res,400,{error:neueStufen.fehler||'Gruppenangebote benötigen mindestens eine Teilnehmerstufe.'});
+  const gruppenstufen=neueStufen.ok?neueStufen.stufen:(alt.gruppenstufen||[]);
+  const neuePreise=Array.isArray(d.gruppenstufen)
+    ?Object.fromEntries(gruppenstufen.map(item=>[`${item.min}-${item.max}`,item.preis]))
+    :preise===undefined?(alt.preise||{}):Object.fromEntries(Object.entries(preise).filter(([key,value])=>{
+      if(!/^[1-9]\d{0,3}-[1-9]\d{0,3}$/.test(key))return false;
+      if(value===''||value==null)return false;
+      const match=key.split('-').map(Number),amount=Number(value);
+      return match[0]>=1&&match[1]>=match[0]&&match[1]<=1000&&Number.isFinite(amount)&&amount>=0;
+    }).map(([key,value])=>[key,Number(value)]));
 
   
 const aktiv = typeof d.aktiv === 'boolean' ? d.aktiv : null;
@@ -2836,6 +2851,7 @@ const veranstaltungsort=d.veranstaltungsort===undefined?alt.veranstaltungsort:sa
 const requestedSites=Array.isArray(d.veranstaltungsorte)?[...new Set(d.veranstaltungsorte.map(name=>safeText(name,80)).filter(Boolean))]:
   (alt.veranstaltungsorte?.length?alt.veranstaltungsorte:[veranstaltungsort]);
 const dauer=Number(d.dauer??alt.dauer);
+const dauerModus=d.dauer_modus===undefined?(alt.dauer_modus||'gruppenstufe'):d.dauer_modus==='fest'?'fest':'gruppenstufe';
 const kapazitaet=Number(d.kapazitaet??alt.kapazitaet);
 const hinweise=d.hinweise===undefined?alt.hinweise:safeText(d.hinweise,1000);
 const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:alt.verfuegbare_termine;
@@ -2861,11 +2877,11 @@ const q = await pool.query(
        name=$4,beschreibung = $5,
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,veranstaltungsorte=$9::jsonb,kapazitaet=$10,
        verfuegbare_termine=$11::jsonb,hinweise=$12,buchbar=$13,veroeffentlicht=$14,dauer=$15,
-       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18
+       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18,dauer_modus=$19,gruppenstufen=$20::jsonb
    WHERE id = $2
    RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
-             buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert`,
+             buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,sortierung,archiviert`,
   [
     JSON.stringify(neuePreise),
     preisRoute[1],
@@ -2873,7 +2889,7 @@ const q = await pool.query(
     name,beschreibung,kategorie,zielgruppe,requestedSites[0],JSON.stringify(requestedSites),kapazitaet,
     JSON.stringify(termine),hinweise,buchbar,veroeffentlicht,dauer,
     buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-    buchungsmodus==='einzelplatz'?preisProPerson:0
+    buchungsmodus==='einzelplatz'?preisProPerson:0,dauerModus,JSON.stringify(gruppenstufen)
   ]
 );
 
@@ -3130,7 +3146,7 @@ if (route === '/api/angebote' && req.method === 'GET') {
   }
 
   const q = await pool.query(
- `SELECT id,name,beschreibung,dauer,preise,bild_url,kategorie,zielgruppe,
+ `SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,bild_url,kategorie,zielgruppe,
         veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,
         buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert
      FROM brilon_angebote
@@ -3804,7 +3820,9 @@ await pool.query(`
     }
     if(process.env.MOCK_PG!=='1'){
       await pool.query(`ALTER TABLE brilon_angebote
-        ADD COLUMN IF NOT EXISTS veranstaltungsorte JSONB NOT NULL DEFAULT '[]'::jsonb`);
+        ADD COLUMN IF NOT EXISTS veranstaltungsorte JSONB NOT NULL DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS dauer_modus TEXT NOT NULL DEFAULT 'gruppenstufe',
+        ADD COLUMN IF NOT EXISTS gruppenstufen JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await pool.query(`UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array(veranstaltungsort)
         WHERE jsonb_array_length(CASE WHEN jsonb_typeof(veranstaltungsorte)='array' THEN veranstaltungsorte ELSE '[]'::jsonb END)=0`);
       console.log('Programmstandorte geprüft und vorhandene Standorte übernommen');

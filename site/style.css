@@ -1146,3 +1146,8 @@ header.site-header{overflow:visible}
 .angebot-standort-auswahl small{color:#49645b}
 .check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
 .check-grid label.check{display:flex;align-items:center;gap:8px;margin:0}
+.angebot-stufen-editor{display:grid;gap:10px}
+.angebot-stufen-zeile{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr)) auto;align-items:end;gap:10px;padding:12px;border:1px solid #bfd3c9;border-radius:9px;background:#f8faf8}
+.angebot-stufen-zeile label{font-size:13px}
+.angebot-stufen-zeile button{min-height:42px}
+@media(max-width:800px){.angebot-stufen-zeile{grid-template-columns:repeat(2,minmax(100px,1fr))}.angebot-stufen-zeile button{grid-column:1/-1}}

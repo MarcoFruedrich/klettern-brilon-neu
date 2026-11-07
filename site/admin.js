@@ -1723,18 +1723,58 @@ if (angeboteAdminListe) {
 
 /* Neues Erlebnisangebot speichern */
 
+function programmStufenEditor(container, initial=[], presets=[[1,5,"",60],[6,10,"",90],[11,15,"",120],[16,20,"",150]]){
+  if(!container)return;
+  const rows=Array.isArray(initial)&&initial.length?initial:presets.map(([min,max,preis,dauer])=>({min,max,preis,dauer}));
+  container.replaceChildren();
+  const addRow=(data={min:'',max:'',preis:'',dauer:''})=>{
+    const row=document.createElement('div');row.className='angebot-stufen-zeile';
+    const field=(labelText,name,value,type='number')=>{
+      const label=document.createElement('label');label.textContent=labelText;label.dataset.tierField=name;
+      const input=document.createElement('input');input.type=type;input.name=name;input.value=value??'';
+      input.min=name==='min'||name==='max'?'1':name==='preis'?'0':'15';
+      input.max=name==='min'||name==='max'?'1000':'1440';input.step=name==='preis'?'0.01':'1';input.required=true;
+      label.append(input);row.append(label);return input;
+    };
+    field('Von Teilnehmenden','min',data.min);
+    field('Bis Teilnehmende','max',data.max);
+    field('Gruppenpreis (€)','preis',data.preis??data.price??'');
+    field('Dauer (Minuten)','dauer',data.dauer??'');
+    const remove=document.createElement('button');remove.type='button';remove.className='btn danger';remove.textContent='Stufe entfernen';remove.addEventListener('click',()=>row.remove());row.append(remove);
+    container.append(row);
+  };
+  for(const row of rows)addRow(row);
+  container.onaddprogramtier=()=>addRow();
+}
+
+function programmStufenAuslesen(container){
+  return [...(container?.querySelectorAll('.angebot-stufen-zeile')||[])].map(row=>({
+    min:Number(row.querySelector('[name="min"]').value),
+    max:Number(row.querySelector('[name="max"]').value),
+    preis:row.querySelector('[name="preis"]').value===''?null:Number(row.querySelector('[name="preis"]').value),
+    dauer:Number(row.querySelector('[name="dauer"]').value)
+  }));
+}
+
 const neuesAngebotForm =
   document.getElementById('neues-angebot-form');
 
 if (neuesAngebotForm) {
+  const createTierEditor=document.getElementById('neues-angebot-stufen');
+  programmStufenEditor(createTierEditor);
+  document.getElementById('neues-angebot-stufe-hinzufuegen')?.addEventListener('click',()=>{createTierEditor?.onaddprogramtier?.();createTierDurationMode();});
   const angebotsModus = neuesAngebotForm.elements.buchungsmodus;
+  const createTierFieldset=createTierEditor?.closest('fieldset');
+  const einzelplatzFelder=neuesAngebotForm.querySelector('.two');
   const angebotsKapazitaet = neuesAngebotForm.elements.kapazitaet;
   const angebotsKapazitaetLabel = angebotsKapazitaet.closest('label');
   function angebotsKapazitaetPruefen() {
     const einzelplaetze = angebotsModus.value === 'einzelplatz';
+    if(einzelplatzFelder)einzelplatzFelder.hidden=!einzelplaetze;
     angebotsKapazitaet.min = einzelplaetze ? '5' : '1';
-    angebotsKapazitaet.max = einzelplaetze ? '12' : '500';
+    angebotsKapazitaet.max = einzelplaetze ? '12' : '1000';
     angebotsKapazitaetLabel.querySelector('.field-hint')?.remove();
+    if(createTierFieldset){createTierFieldset.hidden=einzelplaetze;createTierEditor?.querySelectorAll('input').forEach(input=>input.required=!einzelplaetze&&neuesAngebotForm.elements.dauer_modus.value!=='fest');}
     if (einzelplaetze) {
       const hinweis = document.createElement('span');
       hinweis.className = 'field-hint';
@@ -1742,8 +1782,16 @@ if (neuesAngebotForm) {
       angebotsKapazitaetLabel.append(hinweis);
     }
   }
+  function createTierDurationMode(){
+    const fixed=neuesAngebotForm.elements.dauer_modus.value==='fest'||angebotsModus.value==='einzelplatz';
+    createTierEditor?.querySelectorAll('[data-tier-field="dauer"]').forEach(label=>{
+      label.hidden=fixed;const input=label.querySelector('input');if(input)input.required=!fixed;
+    });
+  }
   angebotsModus.addEventListener('change', angebotsKapazitaetPruefen);
+  neuesAngebotForm.elements.dauer_modus.addEventListener('change',createTierDurationMode);
   angebotsKapazitaetPruefen();
+  createTierDurationMode();
 
   neuesAngebotForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1758,6 +1806,8 @@ if (neuesAngebotForm) {
     daten.veroeffentlicht=neuesAngebotForm.elements.veroeffentlicht.checked;
     daten.mindestteilnehmer=Number(daten.mindestteilnehmer||5);
     daten.preis_pro_person=Number(daten.preis_pro_person||0);
+    daten.gruppenstufen=angebotsModus.value==='einzelplatz'?[]:programmStufenAuslesen(createTierEditor);
+    if(daten.dauer_modus==='fest')daten.gruppenstufen.forEach(stufe=>stufe.dauer=Number(daten.dauer));
 
     try {
       await api('/api/admin/angebote', {
@@ -1769,6 +1819,9 @@ if (neuesAngebotForm) {
       });
 
       neuesAngebotForm.reset();
+      programmStufenEditor(createTierEditor);
+      angebotsKapazitaetPruefen();
+      createTierDurationMode();
       await refresh();
       status.textContent='Neues Erlebnisangebot wurde gespeichert.';
     } catch (fehler) {
@@ -1817,6 +1870,7 @@ document.getElementById('admin-place-form')?.addEventListener('submit',async eve
     const result=await api('/api/admin/orte',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name:form.elements.name.value})});
     await orteLaden();
+    await erlebnisangeboteLaden();
     const picker=document.getElementById('angebot-orte-auswahl');
     if(picker){const input=[...picker.querySelectorAll('input')].find(item=>item.value===result.name);if(input)input.checked=true;}
     form.reset();message.textContent=`Standort „${result.name}“ ist jetzt auswählbar.`;
@@ -1844,7 +1898,7 @@ document.getElementById('admin-place-list')?.addEventListener('click',async even
           const result=await api(`/api/admin/orte/${encodeURIComponent(button.dataset.placeId)}`,{
             method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:input.value.trim()})
           });
-          await orteLaden();message.textContent=`Standort „${current}“ wurde in „${result.name}“ umbenannt. Programme und zukünftige aktive Buchungen wurden aktualisiert.`;
+          await orteLaden();await erlebnisangeboteLaden();message.textContent=`Standort „${current}“ wurde in „${result.name}“ umbenannt. Programme und zukünftige aktive Buchungen wurden aktualisiert.`;
         }catch(error){message.textContent='Standort konnte nicht umbenannt werden: '+error.message;save.disabled=false;}
       };
       card.replaceChildren(form);input.focus();input.select();return;
@@ -1854,14 +1908,14 @@ document.getElementById('admin-place-list')?.addEventListener('click',async even
       const result=await api(`/api/admin/orte/${encodeURIComponent(button.dataset.placeId)}`,{
         method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({aktiv})
       });
-      await orteLaden();
+      await orteLaden();await erlebnisangeboteLaden();
       message.textContent=`Standort „${result.name}“ wurde ${aktiv?'aktiviert':'deaktiviert'}.`;
     }else if(button.dataset.placeAction==='delete'){
       const card=button.closest('article');
       const name=card?.querySelector('strong')?.textContent||'diesen Standort';
       if(!window.confirm(`Standort „${name}“ endgültig löschen? Das ist nur möglich, wenn kein Programm ihn verwendet.`))return;
       await api(`/api/admin/orte/${encodeURIComponent(button.dataset.placeId)}`,{method:'DELETE'});
-      await orteLaden();
+      await orteLaden();await erlebnisangeboteLaden();
       message.textContent=`Standort „${name}“ wurde gelöscht.`;
     }
   }catch(error){message.textContent='Standort konnte nicht geändert werden: '+error.message;}
@@ -2077,9 +2131,13 @@ beschreibung.style.width = '100%';
         label.append(input,el('span',ort+' (inaktiv, bestehende Zuordnung)'));standortAuswahl.append(label);
       }
       standortFeld.append(standortAuswahl);metadaten.append(standortFeld);
-      const dauer=feld('Dauer bei 5–10 Personen (Minuten)',angebot.dauer,'dauer','number');
+      const dauer=feld('Basisdauer / feste Dauer (Minuten)',angebot.dauer,'dauer','number');
       dauer.min='15';dauer.max='1440';dauer.step='1';
-      const dauerHinweis=el('p','Die angegebene Dauer gilt für 5–10 Personen. Für andere Gruppengrößen wird die voraussichtliche Dauer automatisch angepasst.');
+      const dauerModusLabel=document.createElement('label');dauerModusLabel.textContent='Dauerberechnung';
+      const dauerModus=document.createElement('select');
+      for(const [value,labelText] of [['gruppenstufe','Dauer je Teilnehmerstufe'],['fest','Feste Dauer für alle Gruppengrößen']]){const option=el('option',labelText);option.value=value;dauerModus.append(option);}
+      dauerModus.value=angebot.dauer_modus||'gruppenstufe';dauerModusLabel.append(dauerModus);metadaten.append(dauerModusLabel);
+      const dauerHinweis=el('p','Bei stufenweiser Dauer wird die Dauer aus der passenden Gruppenstufe übernommen. Bei fester Dauer gilt der oben eingetragene Wert für alle.');
       dauerHinweis.className='hint';metadaten.append(dauerHinweis);
       const kapazitaet=feld('Kapazität',angebot.kapazitaet,'kapazitaet','number');
       kapazitaet.min='1';kapazitaet.max='1000';
@@ -2102,7 +2160,7 @@ beschreibung.style.width = '100%';
 
       const details = document.createElement('p');
       details.textContent =
-        'Richtdauer für 5–10 Personen: ' + angebot.dauer + ' Minuten | ' +
+        (angebot.dauer_modus==='fest'?'Feste Dauer: '+angebot.dauer+' Minuten':'Dauer je Teilnehmerstufe') + ' | ' +
         (angebot.aktiv ? 'Aktiv' : 'Deaktiviert') + ' · ' +
         (angebot.buchbar ? 'buchbar' : 'nicht buchbar') + ' · ' +
         (angebot.veroeffentlicht ? 'veröffentlicht' : 'nicht veröffentlicht');
@@ -2111,43 +2169,35 @@ beschreibung.style.width = '100%';
 const preisbereich = document.createElement('div');
 const einzelPreisHinweis=el('p','Einzelplatzmodus: Preis gilt pro Person; Anmeldungen reservieren je einen Platz und der Termin findet ab der Mindestzahl statt.');
 einzelPreisHinweis.className='hint';
-const preiseGruppe=new Set();
-
-const gruppen = [
-  ['1-4', '1–4 Personen'],
-  ['5-10', '5–10 Personen'],
-  ['11-15', '11–15 Personen'],
-  ['16-20', '16–20 Personen'],
-  ['21-150', '21–150 Personen']
-];
-
-for (const [schluessel, bezeichnung] of gruppen) {
-  const label = document.createElement('label');
-  label.textContent = bezeichnung + ' – Preis in €';
-
-  const eingabe = document.createElement('input');
-  eingabe.type = 'number';
-  eingabe.min = '0';
-  eingabe.step = '0.01';
-  eingabe.placeholder = 'Preis eingeben';
-  eingabe.value = angebot.preise?.[schluessel] ?? '';
-
-  eingabe.dataset.gruppe = schluessel;
-
-  label.appendChild(eingabe);
-  preisbereich.appendChild(label);
-  preiseGruppe.add(label);
-}
+const legacyRanges=Object.entries(angebot.preise||{}).map(([key,price])=>{
+  const match=String(key).match(/^(\d+)-(\d+)$/);if(!match)return null;
+  const min=Number(match[1]),max=Number(match[2]),factor=max<=4?.6:max<=10?1:max<=15?1.2:max<=20?1.4:1.6;
+  return {min,max,preis:price,dauer:Math.max(15,Math.round((Number(angebot.dauer)*factor)/5)*5)};
+}).filter(Boolean);
+const tierEditor=document.createElement('div');tierEditor.className='angebot-stufen-editor';
+programmStufenEditor(tierEditor,angebot.gruppenstufen?.length?angebot.gruppenstufen:legacyRanges);
+const addTierButton=el('button','Teilnehmerstufe hinzufügen');addTierButton.type='button';addTierButton.className='btn secondary';
+addTierButton.addEventListener('click',()=>{tierEditor.onaddprogramtier?.();gruppenDauerEingabenAktualisieren();});
+const tierLegend=el('h4','Teilnehmerstufen · Preis je Gruppe');
+preisbereich.append(tierLegend,tierEditor,addTierButton);
 function preisEingabenAktualisieren(){
   const einzel=modus.value==='einzelplatz';
-  for(const label of preiseGruppe)label.hidden=einzel;
+  tierLegend.hidden=einzel;tierEditor.hidden=einzel;addTierButton.hidden=einzel;
   einzelPreisHinweis.hidden=!einzel;
   mindest.parentElement.hidden=!einzel;
   einzelpreis.parentElement.hidden=!einzel;
 }
+function gruppenDauerEingabenAktualisieren(){
+  const fest=dauerModus.value==='fest';
+  tierEditor.querySelectorAll('[data-tier-field="dauer"]').forEach(label=>{
+    label.hidden=fest;const input=label.querySelector('input');if(input)input.required=!fest;
+  });
+}
 modus.addEventListener('change',preisEingabenAktualisieren);
+dauerModus.addEventListener('change',gruppenDauerEingabenAktualisieren);
 preisbereich.append(einzelPreisHinweis);
 preisEingabenAktualisieren();
+gruppenDauerEingabenAktualisieren();
 
 
 
@@ -2235,22 +2285,24 @@ preisButton.className = 'btn';
 preisButton.textContent = 'Programm speichern';
 
 preisButton.addEventListener('click', async () => {
-  const preise = {};
-
-  for (const eingabe of preisbereich.querySelectorAll('input')) {
-    preise[eingabe.dataset.gruppe] = eingabe.value;
+  let gruppenstufen=programmStufenAuslesen(tierEditor);
+  if(dauerModus.value==='fest')gruppenstufen=gruppenstufen.map(stufe=>({...stufe,dauer:Number(dauer.value)}));
+  if(modus.value!=='einzelplatz'&&gruppenstufen.some(stufe=>!Number.isInteger(stufe.min)||!Number.isInteger(stufe.max)||
+      !Number.isFinite(stufe.preis)||!Number.isInteger(stufe.dauer))){
+    alert('Bitte für jede Teilnehmerstufe von/bis, Gruppenpreis und Dauer vollständig eintragen.');return;
   }
 
   preisButton.disabled = true;
 
   try {
+    const preise=Object.fromEntries(gruppenstufen.map(stufe=>[`${stufe.min}-${stufe.max}`,stufe.preis]));
     await api('/api/admin/angebote/' + angebot.id, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-  preise,
+  preise,gruppenstufen,dauer_modus:dauerModus.value,
   aktiv: aktivSchalter.checked,
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
@@ -2319,7 +2371,6 @@ aktivButton.addEventListener('click', async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        preise,
         aktiv: neuerStatus,
         beschreibung: beschreibung.value
       })
