@@ -6,7 +6,7 @@ const {createBrevoMailer}=require('../lib/brevo-mail');
 test('E-Mail-Versand baut den erwarteten Textversand und Empfänger auf einem Fetch-Test-Double',async()=>{
   const calls=[];
   const send=createBrevoMailer({
-    env:{BREVO_API_KEY:'test-key-never-a-real-secret',BREVO_SENDER_EMAIL:'sender@example.test'},
+    env:{BREVO_API_KEY:'test-key-never-a-real-secret',BREVO_SENDER_EMAIL:'sender@example.test',PUBLIC_BASE_URL:'https://example.test'},
     fetchImpl:async(...args)=>{calls.push(args);return {ok:true,status:201};}
   });
   await send('kunde@example.test','Buchung bestätigt','Hallo Max');
@@ -19,6 +19,10 @@ test('E-Mail-Versand baut den erwarteten Textversand und Empfänger auf einem Fe
   assert.deepEqual(message.to,[{email:'kunde@example.test'}]);
   assert.equal(message.subject,'Buchung bestätigt');
   assert.equal(message.textContent,'Hallo Max');
+  assert.match(message.htmlContent,/logo-klettern-abenteuer-email\.png/);
+  assert.match(message.htmlContent,/Klettern · Natur · Gemeinschaft · Abenteuer/);
+  assert.match(message.htmlContent,/https:\/\/example\.test\/logo-klettern-abenteuer-email\.png/);
+  assert.match(message.htmlContent,/Hallo Max/);
 });
 
 test('Ohne Mailkonfiguration wird kein Netzwerkaufruf gestartet',async()=>{
