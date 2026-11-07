@@ -3802,6 +3802,13 @@ await pool.query(`
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }
+    if(process.env.MOCK_PG!=='1'){
+      await pool.query(`ALTER TABLE brilon_angebote
+        ADD COLUMN IF NOT EXISTS veranstaltungsorte JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await pool.query(`UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array(veranstaltungsort)
+        WHERE jsonb_array_length(CASE WHEN jsonb_typeof(veranstaltungsorte)='array' THEN veranstaltungsorte ELSE '[]'::jsonb END)=0`);
+      console.log('Programmstandorte geprüft und vorhandene Standorte übernommen');
+    }
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'||process.env.RUN_STAFFING_MIGRATION==='true')
       await migrateEinsatzplanung();
     if(process.env.MOCK_PG!=='1'){
