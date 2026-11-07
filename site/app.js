@@ -627,7 +627,9 @@ specials();
 function angeboteUebersichtAnzeigen(standortFilter=''){
   const ausgabe=document.getElementById('angebote-uebersicht');
   if(!ausgabe)return;
-  const passend=angeboteCache.filter(angebot=>!standortFilter||angebot.veranstaltungsort===standortFilter);
+  const passend=angeboteCache.filter(angebot=>!standortFilter||
+    (Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
+      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standortFilter));
   ausgabe.replaceChildren();
   if(!passend.length){
     const hinweis=document.createElement('p');
@@ -662,7 +664,9 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       beschreibung.textContent=angebot.beschreibung;
       karte.append(beschreibung);
     }
-    const meta=angebot.veranstaltungsort?`Standort: ${angebot.veranstaltungsort}`:'';
+    const angebotOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
+      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
+    const meta=angebotOrte.length?`Standorte: ${angebotOrte.join(', ')}`:'';
     if(meta){
       const details=document.createElement('p');
       details.className='angebote-karte-meta';
@@ -678,7 +682,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     const anfrage=document.createElement('a');
     anfrage.className='angebote-anfragen-link';
     anfrage.href='#buchung';
-    anfrage.dataset.location=angebot.veranstaltungsort||'';
+    anfrage.dataset.location=standortFilter||angebotOrte[0]||'';
     anfrage.dataset.program=angebot.name;
     anfrage.textContent='Dieses Angebot anfragen →';
     karte.append(anfrage);
@@ -692,7 +696,8 @@ async function angeboteLaden() {
 
   function angeboteFuerStandortAnzeigen(){
     const standort=standortAuswahl.value;
-    const passend=angeboteCache.filter(angebot=>angebot.veranstaltungsort===standort);
+    const passend=angeboteCache.filter(angebot=>(Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
+      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standort));
     auswahl.replaceChildren();
     const platzhalter=document.createElement('option');
     platzhalter.value='';

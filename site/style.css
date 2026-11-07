@@ -726,7 +726,7 @@ footer a {
   outline-color: #123f32;
 }
 .staff-access-status { margin:10px 0; padding:10px 14px; border-radius:9px; font-weight:750; }
-.staff-access-status.is-active { background:#17483b; color:#fff; }
+.staff-access-status.is-active { background:#d9f582; color:#173f34; }
 .staff-access-status.is-pending { background:#fff4dc; color:#704b00; }
 .staff-access-status.is-inactive { background:#edf0ed; color:#46574f; }
 .staff-portal-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
@@ -1098,6 +1098,7 @@ header.site-header{overflow:visible}
 .staff-special-approval p {margin:0;color:#40594f;font-size:13px;line-height:1.4;}
 .staff-special-approval button {min-height:46px;padding:8px 14px;white-space:nowrap;}
 .staff-special-approval .staff-special-approval-status {grid-column:1/-1;min-height:1.35em;}
+.staff-grants .staff-grant-place[type="radio"] {accent-color:#087847;}
 @media(max-width:1100px){
   #kundenbestaetigung-settings-form {grid-template-columns:repeat(3,minmax(0,1fr));}
   #kundenbestaetigung-settings-form>small {grid-column:1/3;align-self:start;}
@@ -1140,3 +1141,8 @@ header.site-header{overflow:visible}
   .site-header .navlinks.open {display:grid;}
   .site-header .navlinks>a {width:100%;min-height:50px;font-size:15px;}
 }
+.angebot-standort-auswahl{border:1px solid #bfd3c9;border-radius:10px;padding:14px;display:grid;gap:10px}
+.angebot-standort-auswahl legend{font-weight:700;padding:0 6px}
+.angebot-standort-auswahl small{color:#49645b}
+.check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
+.check-grid label.check{display:flex;align-items:center;gap:8px;margin:0}
