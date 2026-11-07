@@ -368,10 +368,12 @@
   </label>
 
   <label>
-    Dauer in Minuten
+    Basisdauer in Minuten (für feste Dauer oder als Fallback)
     <input name="dauer" type="number"
       min="15" max="1440" step="1" required placeholder="z. B. 90">
   </label>
+  <label>Dauerberechnung<select name="dauer_modus"><option value="gruppenstufe">Dauer je Teilnehmerstufe</option><option value="fest">Feste Dauer für alle Gruppengrößen</option></select></label>
+  <fieldset class="angebot-standort-auswahl"><legend>Teilnehmerstufen (Gruppenpreis und Dauer je Gruppe)</legend><div id="neues-angebot-stufen" class="angebot-stufen-editor"></div><button type="button" class="btn secondary" id="neues-angebot-stufe-hinzufuegen">Teilnehmerstufe hinzufügen</button><small>Die Grenzen und die Dauer sind frei einstellbar. Der Preis gilt für die gesamte Gruppe.</small></fieldset>
   <label>Kategorie<input name="kategorie" maxlength="60" placeholder="Klettern"></label>
   <label>Zielgruppe<input name="zielgruppe" maxlength="120" placeholder="Familien, Schulklassen"></label>
   <fieldset class="angebot-standort-auswahl"><legend>Veranstaltungsorte (Mehrfachauswahl)</legend><div id="angebot-orte-auswahl" class="check-grid"></div><small>Das Programm wird an allen angehakten Standorten auf der Website angezeigt.</small></fieldset>
@@ -668,7 +670,7 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261107-program-location-multiselect"></script>
+  <script src="/admin.js?v=20261107-program-groups"></script>
   <script src="/pruefung-admin.js?v=20261107-single-location-employment-special-approval"></script>
   <script src="/feedback-admin.js"></script>
   <script src="/einsatzplanung-admin.js?v=20261106-settings-persist-check"></script>
