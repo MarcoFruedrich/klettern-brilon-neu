@@ -158,9 +158,10 @@
       const statusText=person.status==='eingeladen'?'Einladung offen – Registrierung noch ausstehend':
         person.status==='geloescht'?'Konto gelöscht – Prüfprotokolle anonymisiert erhalten':
         person.status==='freigabe_ausstehend'?'Registrierung abgeschlossen – Freigabe erforderlich':
-        person.aktiv?'Zugang aktiv':person.freigegeben?'Zugang pausiert':'Zugang deaktiviert';
+        person.aktiv?(person.freigaben?.length?'✓ Freigabe erteilt · Zugang aktiv':'Zugang aktiv · Standortfreigabe fehlt'):
+        person.freigegeben?'Zugang pausiert':'Zugang deaktiviert';
       const accessStatus=elt('p',statusText);
-      accessStatus.className='staff-access-status '+(person.aktiv?'is-active':
+      accessStatus.className='staff-access-status '+(person.aktiv&&person.freigaben?.length?'is-active':
         person.status==='freigabe_ausstehend'?'is-pending':'is-inactive');
       card.append(accessStatus);
       if(person.status==='geloescht'){target.append(card);continue;}
@@ -172,6 +173,24 @@
       if(person.strasse||person.plz||person.wohnort)
         card.append(elt('p','Anschrift: '+[person.strasse,[person.plz,person.wohnort].filter(Boolean).join(' ')].filter(Boolean).join(', ')));
       if(person.qualifikationen)card.append(elt('p','Qualifikationen / Erfahrung: '+person.qualifikationen));
+      if(person.art==='konto'){
+        const employmentLabels={nicht_hinterlegt:'Noch nicht hinterlegt',minijob:'Geringfügig beschäftigt (Minijob)',
+          teilzeit:'Festanstellung · Teilzeit',vollzeit:'Festanstellung · Vollzeit',honorar:'Honorarbasis'};
+        const employment=employmentLabels[person.beschaeftigungsart]||employmentLabels.nicht_hinterlegt;
+        const hours=person.wochenstunden?Number(person.wochenstunden)+' Wochenstunden':
+          person.monatsstunden?Number(person.monatsstunden)+' Monatsstunden':'';
+        const rate=person.stundenlohn_cent!=null?'Stundensatz '+(Number(person.stundenlohn_cent)/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'}):'';
+        const cap=person.beschaeftigungsart==='minijob'&&person.minijob_grenze_cent!=null
+          ?'Monatsgrenze '+(Number(person.minijob_grenze_cent)/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'}):'';
+        card.append(elt('p','Beschäftigungsverhältnis: '+employment+
+          ([hours,rate,cap].filter(Boolean).length?' · '+[hours,rate,cap].filter(Boolean).join(' · '):'')));
+        const employmentLink=elt('button','Beschäftigungsdaten bearbeiten');employmentLink.type='button';employmentLink.className='btn secondary';
+        employmentLink.addEventListener('click',()=>{
+          window.adminNavigateToElement?.('mitarbeiter-section');
+          find('arbeitsvertraege-heading')?.scrollIntoView({behavior:'smooth',block:'start'});
+        });
+        card.append(employmentLink);
+      }
       if(person.status==='freigabe_ausstehend'){
         const subject='Nachweis zu deinen Qualifikationen';
         const message='Hallo '+person.name+',\n\nbitte sende uns einen Nachweis zu den angegebenen Qualifikationen, sofern vorhanden.\n\nViele Grüße\nKlettern & Abenteuer Brilon';
@@ -191,12 +210,12 @@
         link.href=image.src;link.download=certificate.dateiname;item.append(link);card.append(item);
       }
       if((person.freigaben||[]).length)
-        card.append(elt('p','Zugewiesene Freigaben: '+person.freigaben.map(item=>item.ort+' · '+item.qualifikation+
+        card.append(elt('p','Freigegebener Standort: '+person.freigaben.map(item=>item.ort+
           (item.ortAktiv===false?' (Standort inaktiv)':'')).join('; ')));
       if(person.status==='freigabe_ausstehend'||person.freigegeben){
         const pending=person.status==='freigabe_ausstehend';
         const grantPanel=elt('div');grantPanel.className='staff-grants';
-        grantPanel.append(elt('h4',pending?'Standorte und geprüfte Qualifikationen freigeben':'Standort- und Qualifikationsfreigaben verwalten'));
+        grantPanel.append(elt('h4',pending?'Einen Standort freigeben':'Standortfreigabe verwalten'));
         const trustPanel=elt('div');trustPanel.className='staff-special-approval';
         const trustLabel=elt('label','Besondere Freigabe erteilt');
         const trustSelect=document.createElement('select');
@@ -207,7 +226,7 @@
         }
         trustSelect.value=person.sonderfreigabe?'ja':'nein';
         trustLabel.append(trustSelect);
-        const trustHelp=elt('p','Bei „Ja“ kann der Mitarbeiter nach aktiver Standortfreigabe passende Buchungen verbindlich übernehmen. Die Kundenbestätigung wird nach den eingestellten Zeiten ausgelöst.');
+        const trustHelp=elt('p','Bei „Ja“ darf der Mitarbeiter passende Buchungen bis auf Widerruf selbst verbindlich übernehmen. Mit der Übernahme trägt er die Verantwortung für die Durchführung. Die Kundenbestätigung und Zahlungsaufforderung werden nach den eingestellten Zeiten ausgelöst.');
         const trustStatus=elt('p');trustStatus.className='staff-special-approval-status';trustStatus.setAttribute('role','status');
         const trustSave=elt('button','Sonderfreigabe speichern');trustSave.type='button';trustSave.className='btn secondary';
         trustSave.addEventListener('click',async()=>{
@@ -219,61 +238,52 @@
               method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({erteilt:granted})
             });
             person.sonderfreigabe=granted;
-            trustStatus.textContent=result.erteilt?'Besondere Freigabe erteilt.':'Besondere Freigabe entzogen.';
+            trustStatus.textContent=result.erteilt
+              ?'✓ Besondere Freigabe gespeichert; Mitarbeiter informiert'+(result.emailVersand==='gesendet'?'. Der Mailanbieter hat die Nachricht angenommen.':' – E-Mail-Versand konnte nicht bestätigt werden.')
+              :'Besondere Freigabe widerrufen'+(result.emailVersand==='gesendet'?'; Mitarbeiter informiert.':'; E-Mail-Versand konnte nicht bestätigt werden.');
             // Lokales Update lässt noch nicht gespeicherte Standort-/Qualifikationshäkchen stehen.
           }catch(error){trustStatus.textContent='Sonderfreigabe konnte nicht gespeichert werden: '+error.message;trustSave.disabled=false;}
         });
         trustPanel.append(trustLabel,trustHelp,trustSave,trustStatus);grantPanel.append(trustPanel);
-        const placeField=elt('fieldset');placeField.append(elt('legend','Standorte (mehrere auswählbar)'));
+        const placeField=elt('fieldset');placeField.append(elt('legend','Genau einen Standort freigeben'));
         const assignedPlaces=(person.freigaben||[]).filter(grant=>!places.some(place=>Number(place.id)===Number(grant.ortId)))
           .map(grant=>({id:grant.ortId,name:grant.ort,aktiv:grant.ortAktiv}));
         const availablePlaces=[...places,...assignedPlaces];
+        const currentPlaceIds=[...new Set((person.freigaben||[]).map(grant=>Number(grant.ortId)))];
+        if(currentPlaceIds.length>1)
+          placeField.append(elt('p','Es bestehen mehrere ältere Standortfreigaben. Wähle genau einen Standort und speichere, um die übrigen Freigaben zu entfernen.'));
         for(const place of availablePlaces){
           const label=elt('label');label.className='check';
-          const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(place.id);
-          checkbox.checked=(person.freigaben||[]).some(grant=>Number(grant.ortId)===Number(place.id));
-          checkbox.className='staff-grant-place';label.append(checkbox,elt('span',place.name));placeField.append(label);
+          const radio=document.createElement('input');radio.type='radio';radio.name='staff-grant-place';radio.value=String(place.id);
+          radio.checked=currentPlaceIds.length===1&&currentPlaceIds[0]===Number(place.id);
+          radio.className='staff-grant-place';label.append(radio,elt('span',place.name));placeField.append(label);
         }
         if(!availablePlaces.length)placeField.append(elt('p','Keine aktiven Standorte vorhanden.'));
+        placeField.append(elt('p','Qualifikationen und Bescheinigungen bleiben im Mitarbeiterprofil zur Prüfung hinterlegt. Die Standortfreigabe gilt unabhängig von den bisherigen Nummern 1 und 2.'));
         grantPanel.append(placeField);
-        const qualifications=[...(person.qualifikationen||'').split(/[\r\n,;]+/),
-          ...(person.bescheinigungen||[]).map(item=>item.bezeichnung),
-          ...(person.freigaben||[]).map(item=>item.qualifikation)]
-          .map(value=>value.trim()).filter(Boolean);
-        const uniqueQualifications=[...new Set(qualifications)];
-        const qualificationField=elt('fieldset');qualificationField.append(elt('legend','Geprüfte Qualifikationen'));
-        for(const qualification of uniqueQualifications){
-          const label=elt('label');label.className='check';
-          const checkbox=document.createElement('input');checkbox.type='checkbox';
-          checkbox.value=qualification;checkbox.className='staff-grant-qualification';
-          checkbox.checked=(person.freigaben||[]).some(grant=>grant.qualifikation===qualification);
-          label.append(checkbox,elt('span',qualification));qualificationField.append(label);
-        }
-        if(!uniqueQualifications.length)qualificationField.append(elt('p','Keine Qualifikationen oder Bescheinigungen eingetragen.'));
-        grantPanel.append(qualificationField);
         const approve=elt('button',pending?'Auswahl freigeben und Zugang aktivieren':'Freigaben speichern');
-        approve.type='button';approve.className='btn';approve.disabled=!availablePlaces.length||!uniqueQualifications.length;
+        approve.type='button';approve.className='btn';approve.disabled=!availablePlaces.length;
         approve.addEventListener('click',async()=>{
-          const standorte=[...grantPanel.querySelectorAll('.staff-grant-place:checked')].map(input=>Number(input.value));
-          const qualifikationen=[...grantPanel.querySelectorAll('.staff-grant-qualification:checked')].map(input=>input.value);
-          if(pending&&(!standorte.length||!qualifikationen.length)){
-            find('pruef-personal-status').textContent='Mindestens einen Standort und eine geprüfte Qualifikation auswählen.';return;
+          const selected=grantPanel.querySelector('.staff-grant-place:checked');
+          const standort=selected?Number(selected.value):null;
+          if(pending&&!standort){
+            find('pruef-personal-status').textContent='Bitte genau einen Standort auswählen.';return;
           }
-          const confirmation=pending?'Ausgewählte Standorte und Qualifikationen freigeben und Mitarbeiterzugang aktivieren?':
-            standorte.length&&qualifikationen.length?'Freigaben durch die ausgewählten Standorte und Qualifikationen ersetzen?':
-            'Alle Standort- und Qualifikationsfreigaben entziehen? Laufende Sitzungen werden beendet.';
+          const confirmation=pending?'Standort '+availablePlaces.find(place=>Number(place.id)===standort)?.name+' freigeben und Mitarbeiterzugang aktivieren?':
+            standort?'Standortfreigabe auf '+availablePlaces.find(place=>Number(place.id)===standort)?.name+' setzen? Alle anderen Standortfreigaben werden entfernt. Laufende Sitzungen werden beendet.':
+            'Alle Standortfreigaben entziehen? Laufende Sitzungen werden beendet.';
           if(!confirm(confirmation))return;
           approve.disabled=true;
           try{
             const result=await api('/api/admin/pruefung/mitarbeitende/'+encodeURIComponent(person.id)+
               (pending?'/freigeben':'/freigaben'),{
               method:pending?'PATCH':'PUT',headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({standorte,qualifikationen})
+              body:JSON.stringify({standort})
             });
             find('pruef-personal-status').textContent=pending?result.emailVersand==='gesendet'?
-              'Ausgewählte Freigaben erstellt und Mitarbeiterzugang aktiviert. Der Mailanbieter hat die Nachricht angenommen; eine Zustellung ist damit nicht bestätigt.':
-              'Ausgewählte Freigaben erstellt und Mitarbeiterzugang aktiviert. Die Benachrichtigung konnte nicht bestätigt werden; bitte die Person direkt informieren.':
-              standorte.length?'Freigaben aktualisiert. Alle laufenden Mitarbeitersitzungen wurden beendet.':'Alle Freigaben entzogen. Alle laufenden Mitarbeitersitzungen wurden beendet.';
+              'Standortfreigabe erstellt und Mitarbeiterzugang aktiviert. Der Mailanbieter hat die Nachricht angenommen; eine Zustellung ist damit nicht bestätigt.':
+              'Standortfreigabe erstellt und Mitarbeiterzugang aktiviert. Die Benachrichtigung konnte nicht bestätigt werden; bitte die Person direkt informieren.':
+              standort?'Standortfreigabe gespeichert; alle anderen Standorte wurden entfernt. Laufende Mitarbeitersitzungen wurden beendet.':'Alle Standortfreigaben entzogen. Laufende Mitarbeitersitzungen wurden beendet.';
             await refresh();
           }catch(err){find('pruef-personal-status').textContent='Freigabe fehlgeschlagen: '+err.message;approve.disabled=false;}
         });

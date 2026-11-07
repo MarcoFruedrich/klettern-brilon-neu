@@ -42,11 +42,19 @@
         box.append(input);return box;
       };
       const typ=el('label','Beschäftigungsart');typ.append(select);form.append(typ);
-      form.append(field('Stundenlohn brutto (€)','stundenlohn',p.stundenlohn_cent==null?'':p.stundenlohn_cent/100));
+      const rateField=field('Stundenlohn brutto (€)','stundenlohn',p.stundenlohn_cent==null?'':p.stundenlohn_cent/100);
+      form.append(rateField);
       form.append(field('Vertragliche Wochenstunden','wochenstunden',p.wochenstunden));
       form.append(field('Vertragliche Monatsstunden','monatsstunden',p.monatsstunden));
-      form.append(field('Individuelle Minijob-Grenze (€; leer = 2026 gesetzlich)','minijobGrenze',
+      const minijobLimit=field('Individuelle Minijob-Grenze (€; leer = gesetzlicher Wert)','minijobGrenze',
         p.minijob_grenze_cent==null?'':p.minijob_grenze_cent/100));
+      const updateContractFields=()=>{
+        rateField.firstChild.textContent=select.value==='honorar'?'Honorarsatz pro Stunde (€)':
+          select.value==='nicht_hinterlegt'?'Stundenlohn / Honorarsatz (€)':'Stundenlohn brutto (€)';
+        minijobLimit.hidden=select.value!=='minijob';
+      };
+      select.addEventListener('change',updateContractFields);updateContractFields();
+      form.append(minijobLimit);
       const save=el('button','Vertragsdaten speichern');save.className='btn secondary';save.type='submit';
       const state=el('p');state.setAttribute('role','status');form.append(save,state);
       form.onsubmit=async event=>{
@@ -63,9 +71,10 @@
         try{
           const date=monat+'-15',res=await api('/api/admin/einsatzplanung/stunden/'+p.id+'?datum='+date);
           const l=res.load;
-          summary.textContent='Kalenderwoche: '+stunden(l.weekWorkedMin)+' geleistet, '+stunden(l.weekMin)+' inklusive Planung. Monat: '+
+        summary.textContent='Kalenderwoche: '+stunden(l.weekWorkedMin)+' geleistet, '+stunden(l.weekMin)+' inklusive Planung. Monat: '+
             stunden(l.monthWorkedMin)+' geleistet, '+stunden(l.monthMin)+' inklusive Planung.'+
-            (res.minijobGrenzeEuro!=null?' Geplanter Verdienst: '+res.geplantMonatEuro.toFixed(2)+' € von '+res.minijobGrenzeEuro.toFixed(2)+' €.':'');
+            (res.minijobGrenzeEuro!=null?' Geplanter Verdienst: '+res.geplantMonatEuro.toFixed(2)+' € von '+res.minijobGrenzeEuro.toFixed(2)+' €.':
+              p.stundenlohn_cent!=null?' Geplanter Verdienst auf Basis des hinterlegten Stundensatzes: '+res.geplantMonatEuro.toFixed(2)+' €.':'');
         }catch(err){summary.textContent=err.message;}
       };
       card.append(form,stats,summary);personalRoot.append(card);
@@ -108,11 +117,15 @@
       const row=el('div');row.className='einsatz-zuweisung';
       const select=document.createElement('select');select.setAttribute('aria-label','Mitarbeiter auswählen');
       const placeholder=document.createElement('option');placeholder.textContent='Mitarbeiter auswählen';placeholder.value='';select.append(placeholder);
-      for(const person of personen.filter(x=>x.aktiv&&x.art)){
+      const eligible=personen.filter(x=>x.aktiv&&x.art&&x.art!=='nicht_hinterlegt'&&
+        Array.isArray(x.standorte)&&x.standorte.includes(b.ort));
+      for(const person of eligible){
         const opt=document.createElement('option');opt.value=person.id;
         opt.textContent=person.name+(matches.some(e=>e.mitarbeiter_id===person.id&&e.status==='beworben')?' · beworben':'');
         select.append(opt);
       }
+      if(!eligible.length){const empty=document.createElement('option');empty.value='';empty.disabled=true;
+        empty.textContent='Kein freigegebener Mitarbeiter mit vollständigen Beschäftigungsdaten';select.append(empty);}
       const button=el('button','Einteilen');button.type='button';button.className='btn';
       const status=el('p');status.setAttribute('role','status');
       button.onclick=async()=>{

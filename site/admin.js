@@ -1751,6 +1751,8 @@ if (neuesAngebotForm) {
     const daten = Object.fromEntries(
       new FormData(neuesAngebotForm).entries()
     );
+    daten.veranstaltungsorte=[...document.querySelectorAll('#angebot-orte-auswahl input[name="veranstaltungsorte"]:checked')].map(input=>input.value);
+    daten.veranstaltungsort=daten.veranstaltungsorte[0]||'';
     daten.verfuegbare_termine=(daten.verfuegbare_termine||'').split('\n').map(x=>x.trim()).filter(Boolean);
     daten.buchbar=neuesAngebotForm.elements.buchbar.checked;
     daten.veroeffentlicht=neuesAngebotForm.elements.veroeffentlicht.checked;
@@ -1776,12 +1778,21 @@ if (neuesAngebotForm) {
 }
 
 async function orteLaden(){
-  const select=document.getElementById('angebot-ort');
+  const sitePicker=document.getElementById('angebot-orte-auswahl');
   const liste=document.getElementById('admin-place-list');
-  if(!select&&!liste)return;
+  if(!sitePicker&&!liste)return;
   try{
     const orte=await api('/api/admin/orte');
-    if(select){select.replaceChildren();for(const ort of orte.filter(item=>item.aktiv)){const o=el('option',ort.name);o.value=ort.name;select.append(o);}}
+    if(sitePicker){
+      const selected=new Set([...sitePicker.querySelectorAll('input:checked')].map(input=>input.value));
+      sitePicker.replaceChildren();
+      for(const ort of orte.filter(item=>item.aktiv)){
+        const label=document.createElement('label');label.className='check';
+        const input=document.createElement('input');input.type='checkbox';input.name='veranstaltungsorte';input.value=ort.name;input.checked=selected.has(ort.name);
+        label.append(input,el('span',ort.name));sitePicker.append(label);
+      }
+      if(!sitePicker.children.length)sitePicker.append(el('p','Bitte zuerst einen aktiven Standort anlegen.'));
+    }
     if(liste){
       liste.replaceChildren();
       if(!orte.length)liste.append(el('p','Noch keine Standorte angelegt.'));
@@ -1806,7 +1817,8 @@ document.getElementById('admin-place-form')?.addEventListener('submit',async eve
     const result=await api('/api/admin/orte',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name:form.elements.name.value})});
     await orteLaden();
-    const select=document.getElementById('angebot-ort');if(select)select.value=result.name;
+    const picker=document.getElementById('angebot-orte-auswahl');
+    if(picker){const input=[...picker.querySelectorAll('input')].find(item=>item.value===result.name);if(input)input.checked=true;}
     form.reset();message.textContent=`Standort „${result.name}“ ist jetzt auswählbar.`;
   }catch(error){message.textContent='Standort konnte nicht gespeichert werden: '+error.message;}
   finally{button.disabled=false;}
@@ -1955,7 +1967,7 @@ async function erlebnisangeboteLaden() {
   if (!liste) return;
 
   try {
-    const angebote = await api('/api/admin/angebote');
+    const [angebote,verwaltungsOrte] = await Promise.all([api('/api/admin/angebote'),api('/api/admin/orte')]);
     adminBuchbareProgramme=angebote.filter(a=>!a.archiviert&&a.aktiv&&a.buchbar&&a.veroeffentlicht);
     const specialSelect=document.getElementById('special-program-select');
     if(specialSelect){
@@ -2048,13 +2060,29 @@ beschreibung.style.width = '100%';
       const programmName=feld('Programmname',angebot.name,'name');
       const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
       const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
-      const veranstaltungsort=feld('Veranstaltungsort',angebot.veranstaltungsort,'veranstaltungsort');
+      const standortFeld=document.createElement('fieldset');
+      const standortLegende=document.createElement('legend');standortLegende.textContent='Veröffentlichte Standorte';standortFeld.append(standortLegende);
+      const standortAuswahl=document.createElement('div');standortAuswahl.className='check-grid';
+      const aktiveOrte=verwaltungsOrte.filter(item=>item.aktiv);
+      const bestehendeOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
+        ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
+      for(const ort of aktiveOrte){
+        const label=document.createElement('label');label.className='check';
+        const input=document.createElement('input');input.type='checkbox';input.name='programm-standort';input.value=ort.name;input.checked=bestehendeOrte.includes(ort.name);
+        label.append(input,el('span',ort.name));standortAuswahl.append(label);
+      }
+      for(const ort of bestehendeOrte.filter(name=>!aktiveOrte.some(item=>item.name===name))){
+        const label=document.createElement('label');label.className='check';
+        const input=document.createElement('input');input.type='checkbox';input.name='programm-standort';input.value=ort;input.checked=true;
+        label.append(input,el('span',ort+' (inaktiv, bestehende Zuordnung)'));standortAuswahl.append(label);
+      }
+      standortFeld.append(standortAuswahl);metadaten.append(standortFeld);
       const dauer=feld('Dauer bei 5–10 Personen (Minuten)',angebot.dauer,'dauer','number');
       dauer.min='15';dauer.max='1440';dauer.step='1';
       const dauerHinweis=el('p','Die angegebene Dauer gilt für 5–10 Personen. Für andere Gruppengrößen wird die voraussichtliche Dauer automatisch angepasst.');
       dauerHinweis.className='hint';metadaten.append(dauerHinweis);
       const kapazitaet=feld('Kapazität',angebot.kapazitaet,'kapazitaet','number');
-      kapazitaet.min='1';kapazitaet.max='500';
+      kapazitaet.min='1';kapazitaet.max='1000';
       const termine=feld('Verfügbare Termine (ein Datum je Zeile)',(angebot.verfuegbare_termine||[]).join('\n'),'verfuegbare_termine','textarea');
       const hinweise=feld('Besondere Hinweise',angebot.hinweise,'hinweise','textarea');
       const modusLabel=document.createElement('label');modusLabel.textContent='Buchungsart';
@@ -2226,7 +2254,8 @@ preisButton.addEventListener('click', async () => {
   aktiv: aktivSchalter.checked,
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
-        veranstaltungsort:veranstaltungsort.value,dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
+        veranstaltungsorte:[...standortAuswahl.querySelectorAll('input:checked')].map(input=>input.value),
+        veranstaltungsort:standortAuswahl.querySelector('input:checked')?.value||'',dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
         verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),
         hinweise:hinweise.value,buchbar:bookable.checked,veroeffentlicht:publish.checked
         ,buchungsmodus:modus.value,mindestteilnehmer:Number(mindest.value),preis_pro_person:Number(einzelpreis.value||0)

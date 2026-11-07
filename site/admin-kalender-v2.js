@@ -277,18 +277,16 @@
           const b=planBookings.get(id)||{};
           const row=details.get(id);
           const source=row?.data||{};
-          // Die Einsatzplanungs-API liefert die Zeitplanfelder; die Buchungsliste
-          // ergänzt fehlende Werte und enthält auch offene Anfragen. Standort und
-          // Zeit aus der Buchung bleiben erhalten, wenn ältere Plan-Datensätze
-          // diese Felder noch nicht enthalten.
+          // Die Buchungsliste ist die maßgebliche Quelle für Kundendaten und
+          // Terminzeit. Der Einsatzplan ergänzt nur Felder, die dort fehlen.
           bookings.push({
-            ...source,...b,
+            ...b,...source,
             id:row?.id||b.id||source.id,
-            datum:b.datum||source.datum,
-            uhrzeit:b.uhrzeit||source.uhrzeit,
-            dauer:b.dauer??source.dauer,
-            angebot:b.angebot||source.angebot,
-            ort:b.ort||b.veranstaltungsort||source.veranstaltungsort||source.ort,
+            datum:source.datum||b.datum,
+            uhrzeit:source.uhrzeit||b.uhrzeit,
+            dauer:source.dauer??b.dauer,
+            angebot:source.angebot||b.angebot,
+            ort:source.veranstaltungsort||source.ort||b.ort||b.veranstaltungsort,
             status:row?.status||b.status||'offen',
             staff:staffing.get(id)||staffing.get(b.id)||[]
           });

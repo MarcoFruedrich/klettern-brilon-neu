@@ -374,8 +374,8 @@
   </label>
   <label>Kategorie<input name="kategorie" maxlength="60" placeholder="Klettern"></label>
   <label>Zielgruppe<input name="zielgruppe" maxlength="120" placeholder="Familien, Schulklassen"></label>
-  <label>Veranstaltungsort<select name="veranstaltungsort" id="angebot-ort" required></select></label>
-  <label>Kapazität (Teilnehmende)<input name="kapazitaet" type="number" min="1" max="500" value="20" required></label>
+  <fieldset class="angebot-standort-auswahl"><legend>Veranstaltungsorte (Mehrfachauswahl)</legend><div id="angebot-orte-auswahl" class="check-grid"></div><small>Das Programm wird an allen angehakten Standorten auf der Website angezeigt.</small></fieldset>
+  <label>Kapazität (Teilnehmende)<input name="kapazitaet" type="number" min="1" max="1000" value="20" required></label>
   <label>Buchungsart<select name="buchungsmodus"><option value="gruppe">Gruppenanfrage</option><option value="einzelplatz">Einzelplätze reservieren</option></select></label>
   <div class="two"><label>Mindestanmeldungen für Durchführung<input name="mindestteilnehmer" type="number" min="5" max="12" value="5"></label>
   <label>Preis pro Person (€)<input name="preis_pro_person" type="number" min="0.01" step="0.01"></label></div>
@@ -668,8 +668,8 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261105-admin-login-fix"></script>
-  <script src="/pruefung-admin.js?v=20261106-freigabe-pause-fix"></script>
+  <script src="/admin.js?v=20261107-program-location-multiselect"></script>
+  <script src="/pruefung-admin.js?v=20261107-single-location-employment-special-approval"></script>
   <script src="/feedback-admin.js"></script>
   <script src="/einsatzplanung-admin.js?v=20261106-settings-persist-check"></script>
   <script src="/wissensportal-admin.js?v=20261106-hierarchical-categories"></script>
