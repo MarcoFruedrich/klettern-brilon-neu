@@ -19,9 +19,9 @@ test('E-Mail-Versand baut den erwarteten Textversand und Empfänger auf einem Fe
   assert.deepEqual(message.to,[{email:'kunde@example.test'}]);
   assert.equal(message.subject,'Buchung bestätigt');
   assert.equal(message.textContent,'Hallo Max');
-  assert.match(message.htmlContent,/logo-klettern-abenteuer\.svg/);
+  assert.match(message.htmlContent,/logo-klettern-abenteuer-email\.png/);
   assert.match(message.htmlContent,/Klettern · Natur · Gemeinschaft · Abenteuer/);
-  assert.match(message.htmlContent,/https:\/\/example\.test\/logo-klettern-abenteuer\.svg/);
+  assert.match(message.htmlContent,/https:\/\/example\.test\/logo-klettern-abenteuer-email\.png/);
   assert.match(message.htmlContent,/Hallo Max/);
 });
 
