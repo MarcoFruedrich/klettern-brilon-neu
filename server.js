@@ -2546,10 +2546,36 @@ if(route==='/api/admin/orte'&&req.method==='POST'){
 const placeRoute=route.match(/^\/api\/admin\/orte\/(\d+)$/);
 if(placeRoute&&req.method==='PATCH'){
   const d=await body(req);
-  if(typeof d.aktiv!=='boolean')return reply(res,400,{error:'Der Aktiv-Status muss angegeben werden.'});
-  const q=await pool.query('UPDATE brilon_orte SET aktiv=$1 WHERE id=$2 RETURNING id,name,aktiv',[d.aktiv,placeRoute[1]]);
-  if(!q.rowCount)return reply(res,404,{error:'Standort nicht gefunden.'});
-  return reply(res,200,q.rows[0]);
+  const name=d.name===undefined?null:safeText(d.name,80);
+  const aktiv=d.aktiv===undefined?null:d.aktiv;
+  if(aktiv!==null&&typeof aktiv!=='boolean')return reply(res,400,{error:'Der Aktiv-Status muss Ja oder Nein sein.'});
+  if(name!==null&&!name)return reply(res,400,{error:'Die Standortbezeichnung darf nicht leer sein.'});
+  if(name===null&&aktiv===null)return reply(res,400,{error:'Bitte eine Standortbezeichnung oder den Aktiv-Status ändern.'});
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const current=await client.query('SELECT id,name,aktiv FROM brilon_orte WHERE id=$1 FOR UPDATE',[placeRoute[1]]);
+    if(!current.rowCount){await client.query('ROLLBACK');return reply(res,404,{error:'Standort nicht gefunden.'});}
+    const oldName=current.rows[0].name,newName=name||oldName;
+    if(name&&name!==oldName){
+      const duplicate=await client.query('SELECT 1 FROM brilon_orte WHERE lower(name)=lower($1) AND id<>$2',[name,placeRoute[1]]);
+      if(duplicate.rowCount){await client.query('ROLLBACK');return reply(res,409,{error:'Ein Standort mit dieser Bezeichnung ist bereits vorhanden.'});}
+    }
+    const updated=await client.query(`UPDATE brilon_orte SET name=$1,aktiv=COALESCE($2,aktiv)
+      WHERE id=$3 RETURNING id,name,aktiv`,[newName,aktiv,placeRoute[1]]);
+    if(name&&name!==oldName){
+      await client.query('UPDATE brilon_angebote SET veranstaltungsort=$1 WHERE veranstaltungsort=$2',[newName,oldName]);
+      await client.query(`UPDATE brilon_buchungen SET data=jsonb_set(data,'{veranstaltungsort}',to_jsonb($1::text),true)
+        WHERE status IN ('offen','bestaetigt') AND data->>'veranstaltungsort'=$2
+          AND data->>'datum'>=CURRENT_DATE::text`,[newName,oldName]);
+    }
+    await client.query('COMMIT');
+    return reply(res,200,updated.rows[0]);
+  }catch(error){
+    await client.query('ROLLBACK');
+    if(error.code==='23505')return reply(res,409,{error:'Ein Standort mit dieser Bezeichnung ist bereits vorhanden.'});
+    throw error;
+  }finally{client.release();}
 }
 if(placeRoute&&req.method==='DELETE'){
   const place=await pool.query('SELECT id,name FROM brilon_orte WHERE id=$1',[placeRoute[1]]);
@@ -3219,6 +3245,9 @@ async function ensureKundenbestaetigungEinstellungen(){
   // Keep this small settings table available even when the broad staffing migration
   // has already been switched off after its first run.
   await pool.query('SELECT 1 FROM brilon_kundenbestaetigungen LIMIT 0');
+  const assignments=await pool.query("SELECT to_regclass('public.brilon_einsaetze') AS table_name");
+  if(assignments.rows[0]?.table_name)
+    await pool.query("ALTER TABLE brilon_einsaetze ADD COLUMN IF NOT EXISTS anschluss_option TEXT CHECK(anschluss_option IN ('keine','davor','danach','beides'))");
   await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigung_einstellungen (
     id SMALLINT PRIMARY KEY CHECK(id=1),
     verzoegerung_minuten INTEGER NOT NULL DEFAULT 120 CHECK(verzoegerung_minuten BETWEEN 1 AND 1440),
@@ -3248,6 +3277,13 @@ async function start(){
       await pool.query(sql);
       console.log('Rechnungs- und AGB-Schema geprüft (RUN_INVOICE_MIGRATION=true)');
     }
+    try{
+      const cleaned=await pool.query(`UPDATE brilon_rechnungsdaten
+        SET data=jsonb_set(data,'{agbText}',to_jsonb(regexp_replace(data->>'agbText',E'^MUSTER[^\\n]*\\n[[:space:]]*\\n','')),true),
+            aktualisiert_am=NOW()
+        WHERE id=1 AND data->>'agbText' LIKE 'MUSTER – bitte vor der Veröffentlichung%'`);
+      if(cleaned.rowCount)console.log('Musterhinweis aus der AGB-Fassung entfernt.');
+    }catch(error){if(error.code!=='42P01')console.warn('AGB-Musterhinweis konnte nicht bereinigt werden:',error.message);}
     // Idempotente, eng begrenzte Einsatzplanungs-Migration nach Freigabe.
     // Nur ausführen, wenn die bestehenden Buchungs- und Mitarbeitertabellen vorhanden sind.
     if(process.env.RUN_MARKETING_MIGRATION==='true'){

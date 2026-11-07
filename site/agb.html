@@ -10,7 +10,6 @@
   <main class="narrow">
     <a href="/">← Zurück zur Website</a>
     <h1>Allgemeine Geschäftsbedingungen</h1>
-    <p id="agb-version" role="status" aria-live="polite">Die aktuelle Fassung wird geladen …</p>
     <article id="agb-text" style="white-space:pre-wrap"></article>
     <p id="agb-error" role="alert"></p>
     <p><a href="/impressum.html">Impressum</a> · <a href="/datenschutz.html">Datenschutz</a></p>
@@ -19,8 +18,7 @@
     fetch('/api/agb').then(async response=>{
       const data=await response.json();
       if(!response.ok||!data.aktiv)throw new Error(data.error||'Die Geschäftsbedingungen sind derzeit nicht veröffentlicht.');
-      document.getElementById('agb-version').textContent=`Fassung ${data.version}`;
-      document.getElementById('agb-text').textContent=data.text;
+      document.getElementById('agb-text').textContent=String(data.text||'').replace(/^MUSTER[^\n]*\n\s*\n/i,'').trimStart();
     }).catch(error=>{document.getElementById('agb-error').textContent=error.message;});
   </script>
 </body>

@@ -520,6 +520,19 @@
         const applicants=staffNames(e,['beworben']);
         card.append(mk('p','','Eingeteilt: '+(assigned.join(', ')||'noch niemand')));
         card.append(mk('p','','Bewerbungen: '+(applicants.join(', ')||'keine')));
+        const connectionLabels={davor:'Termin davor',danach:'Termin danach',beides:'Termin davor und danach'};
+        const connectionStaff=(e.staff||[]).filter(person=>connectionLabels[person.anschluss_option]);
+        if(connectionStaff.length){
+          const info=mk('p','ck-followup-availability','Zusatztermine für Sonder- oder Tagesangebote möglich: '+
+            connectionStaff.map(person=>person.name+' ('+connectionLabels[person.anschluss_option]+')').join(', '));
+          card.append(info);
+          card.append(btn('Sonder-/Tagesangebot vorbereiten','ck-plan-followup',()=>{
+            window.dispatchEvent(new CustomEvent('klettern:sonderangebot-vorbereiten',{detail:{
+              date:e.date,title:e.title,site:e.site,time:e.start==null?'':prettyTime(e.start),
+              staff:connectionStaff.map(person=>person.name+' ('+connectionLabels[person.anschluss_option]+')')
+            }}));
+          }));
+        }
         const applicantsList=(e.staff||[]).filter(s=>s.status==='beworben');
         if(applicantsList.length){
           const assignment=mk('div','ck-booking-actions');

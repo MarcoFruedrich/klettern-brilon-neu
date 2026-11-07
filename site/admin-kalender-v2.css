@@ -70,6 +70,7 @@
 .ck-detail-card {display:grid;gap:5px;padding:11px 12px;margin:10px 0;border:1px solid var(--ck-line,#cddbd4);border-left:4px solid var(--ck-strong,#0f7c53);border-radius:9px;background:var(--ck-pale,#fff);color:#1a3b32;}
 .ck-detail-card h4 {margin:0;color:#173d32;font-size:14px;line-height:1.3;}
 .ck-detail-card p {margin:0!important;color:#28473b!important;font-size:12px;}
+.ck-detail-card .ck-followup-availability {padding:8px 10px;border:1px solid #b9dfc6;border-radius:8px;background:#e8f6eb;color:#125b39!important;font-weight:700;}
 .ck-detail-card button {justify-self:start;background:#fff;border:1px solid #bfd3c7;color:#164333;padding:7px 10px;border-radius:7px;font-weight:700;}
 .ck-detail-note {margin:10px 0;padding:10px;border-radius:10px;background:#e7f6eb;color:#145a39;font-weight:650;font-size:12px;}
 .ck-detail-note.is-warning {background:#fff2db;color:#7c4a11;}
