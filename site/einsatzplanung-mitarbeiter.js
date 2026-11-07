@@ -19,7 +19,7 @@
         statusBadge.className='staff-assignment-status';
         if(t.mein_status==='bestaetigt'){
           statusBadge.classList.add('is-confirmed');
-          statusBadge.textContent='Programm verbindlich angenommen';
+          statusBadge.textContent='Bewerbung verbindlich übernommen – Programm angenommen';
         }else if(t.mein_status==='eingeteilt'){
           statusBadge.classList.add('is-assigned');
           statusBadge.textContent='Programm zugewiesen – bitte noch verbindlich bestätigen';

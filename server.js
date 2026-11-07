@@ -3189,11 +3189,55 @@ async function migrateEinsatzplanung(){
 )`);
       await pool.query(`CREATE INDEX IF NOT EXISTS brilon_kundenbestaetigungen_faellig_idx
   ON brilon_kundenbestaetigungen(faellig_ab) WHERE status='geplant'`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigung_einstellungen (
+  id SMALLINT PRIMARY KEY CHECK(id=1),
+  verzoegerung_minuten INTEGER NOT NULL DEFAULT 120 CHECK(verzoegerung_minuten BETWEEN 1 AND 1440),
+  ruhebeginn TEXT NOT NULL DEFAULT '18:00' CHECK(ruhebeginn ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  ruheende TEXT NOT NULL DEFAULT '09:00' CHECK(ruheende ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+      await pool.query(`INSERT INTO brilon_kundenbestaetigung_einstellungen
+  (id,verzoegerung_minuten,ruhebeginn,ruheende)
+  SELECT 1,
+    CASE WHEN data->>'kundenbestaetigungVerzoegerungMinuten' ~ '^[0-9]{1,4}$'
+      AND (data->>'kundenbestaetigungVerzoegerungMinuten')::integer BETWEEN 1 AND 1440
+      THEN (data->>'kundenbestaetigungVerzoegerungMinuten')::integer ELSE 120 END,
+    CASE WHEN data->>'kundenbestaetigungRuhebeginn' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+      THEN data->>'kundenbestaetigungRuhebeginn' ELSE '18:00' END,
+    CASE WHEN data->>'kundenbestaetigungRuheende' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+      THEN data->>'kundenbestaetigungRuheende' ELSE '09:00' END
+  FROM brilon_rechnungsdaten WHERE id=1
+  ON CONFLICT(id) DO NOTHING`);
       console.log('Einsatzplanungsschema geprüft');
     }else{
       console.warn('Einsatzplanungsschema zurückgestellt: Grundtabellen noch nicht vorhanden.');
     }
 
+}
+
+async function ensureKundenbestaetigungEinstellungen(){
+  // Keep this small settings table available even when the broad staffing migration
+  // has already been switched off after its first run.
+  await pool.query('SELECT 1 FROM brilon_kundenbestaetigungen LIMIT 0');
+  await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigung_einstellungen (
+    id SMALLINT PRIMARY KEY CHECK(id=1),
+    verzoegerung_minuten INTEGER NOT NULL DEFAULT 120 CHECK(verzoegerung_minuten BETWEEN 1 AND 1440),
+    ruhebeginn TEXT NOT NULL DEFAULT '18:00' CHECK(ruhebeginn ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+    ruheende TEXT NOT NULL DEFAULT '09:00' CHECK(ruheende ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
+    aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await pool.query(`INSERT INTO brilon_kundenbestaetigung_einstellungen
+    (id,verzoegerung_minuten,ruhebeginn,ruheende)
+    SELECT 1,
+      CASE WHEN data->>'kundenbestaetigungVerzoegerungMinuten' ~ '^[0-9]{1,4}$'
+        AND (data->>'kundenbestaetigungVerzoegerungMinuten')::integer BETWEEN 1 AND 1440
+        THEN (data->>'kundenbestaetigungVerzoegerungMinuten')::integer ELSE 120 END,
+      CASE WHEN data->>'kundenbestaetigungRuhebeginn' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        THEN data->>'kundenbestaetigungRuhebeginn' ELSE '18:00' END,
+      CASE WHEN data->>'kundenbestaetigungRuheende' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        THEN data->>'kundenbestaetigungRuheende' ELSE '09:00' END
+    FROM brilon_rechnungsdaten WHERE id=1
+    ON CONFLICT(id) DO NOTHING`);
 }
 
 async function start(){
@@ -3698,13 +3742,14 @@ await pool.query(`
       await migrateEinsatzplanung();
     if(process.env.MOCK_PG!=='1'){
       try{
+        await ensureKundenbestaetigungEinstellungen();
         await pool.query('SELECT buchung_id FROM brilon_kundenbestaetigungen LIMIT 0');
         const confirmationTimer=setInterval(()=>{
           kundenService.processQueue().catch(error=>console.error('Kundenbestätigungen prüfen:',error.message));
         },60_000);
         confirmationTimer.unref();
         kundenService.processQueue().catch(error=>console.error('Kundenbestätigungen bei Start:',error.message));
-      }catch(error){console.warn('Automatische Kundenbestätigung nicht gestartet: Versandtabelle fehlt.',error.message);}
+      }catch(error){console.warn('Automatische Kundenbestätigung oder Zeiteinstellungen nicht gestartet:',error.message);}
     }
     if(process.env.MOCK_PG!=='1'){
       try{
