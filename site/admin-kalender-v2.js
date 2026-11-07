@@ -216,7 +216,7 @@
       if (!/^\d{4}-\d{2}-\d{2}$/.test(b.datum||'')) continue;
       normalized.push({
         id:String(b.id),type:'buchung',date:b.datum,last:b.datum,start,end,reliable,
-        title:b.angebot||'Programm',site:b.ort||'',status:b.status||'offen',
+        title:b.angebot||'Programm',site:b.ort||b.veranstaltungsort||b.standort||'',status:b.status||'offen',
         staff:Array.isArray(b.staff)?b.staff:[],name:b.name||'',email:b.email||'',telefon:b.telefon||'',
         buchungsnummer:b.buchungsnummer||'',teilnehmer:b.teilnehmer||'',nachricht:b.nachricht||'',
         duration:reliable?length:null
@@ -277,9 +277,21 @@
           const b=planBookings.get(id)||{};
           const row=details.get(id);
           const source=row?.data||{};
-          bookings.push({...b,...source,id:row?.id||b.id,
+          // Die Einsatzplanungs-API liefert die Zeitplanfelder; die Buchungsliste
+          // ergänzt fehlende Werte und enthält auch offene Anfragen. Standort und
+          // Zeit aus der Buchung bleiben erhalten, wenn ältere Plan-Datensätze
+          // diese Felder noch nicht enthalten.
+          bookings.push({
+            ...source,...b,
+            id:row?.id||b.id||source.id,
+            datum:b.datum||source.datum,
+            uhrzeit:b.uhrzeit||source.uhrzeit,
+            dauer:b.dauer??source.dauer,
+            angebot:b.angebot||source.angebot,
+            ort:b.ort||b.veranstaltungsort||source.veranstaltungsort||source.ort,
             status:row?.status||b.status||'offen',
-            staff:staffing.get(id)||staffing.get(b.id)||[]});
+            staff:staffing.get(id)||staffing.get(b.id)||[]
+          });
         }
       }
       knownSites=Array.isArray(places)?places.filter(place=>place.aktiv!==false).map(place=>place.name).filter(Boolean):[];
