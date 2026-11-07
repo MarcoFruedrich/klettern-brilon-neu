@@ -785,9 +785,13 @@ try{
     const adresse=safeText(person.email,180);
     if(!/^\S+@\S+\.\S+$/.test(adresse))continue;
     const anrede=safeText(person.name,120);
+    const kontaktperson=safeText(data.name||[data.vorname,data.nachname].filter(Boolean).join(' '),160)||'Nicht angegeben';
+    const besonderheiten=safeText(data.nachricht,2000).trim();
     enqueueMail(adresse,
       'Neue Terminanfrage am Standort '+data.veranstaltungsort+' – Bewerbung möglich',
-      `Hallo${anrede?' '+anrede:''},\n\nfür deinen freigegebenen Standort ist eine neue Buchungsanfrage eingegangen.\n\nProgramm: ${data.angebot}\nTermin: ${data.datum} um ${data.uhrzeit||'Uhrzeit offen'} Uhr\nStandort: ${data.veranstaltungsort||'—'}\nTeilnehmer: ${data.teilnehmer}\nBuchungsnummer: ${data.buchungsnummer}\n\nBitte melde dich im Mitarbeiterbereich an und öffne den Termin unter „Termine und meine Bewerbungen“: ${mitarbeiterUrl}\nDort kannst du dich auf die Anfrage bewerben. Die Anfrage ist noch nicht verbindlich bestätigt; die Verwaltung entscheidet über die Einteilung.\n\nViele Grüße\nKlettern & Abenteuer Brilon`
+      `Hallo${anrede?' '+anrede:''},\n\nfür deinen freigegebenen Standort ist eine neue Buchungsanfrage eingegangen.\n\nProgramm: ${data.angebot}\nTermin: ${data.datum} um ${data.uhrzeit||'Uhrzeit offen'} Uhr\nStandort: ${data.veranstaltungsort||'—'}\nTeilnehmer: ${data.teilnehmer}\nBuchung erfolgte über: ${kontaktperson}`+
+      (besonderheiten?`\n\nBesondere Hinweise des Buchers:\n${besonderheiten}`:'')+
+      `\n\nBitte melde dich im Mitarbeiterbereich an und öffne den Termin unter „Termine und meine Bewerbungen“: ${mitarbeiterUrl}\nDort kannst du dich auf die Anfrage bewerben. Die Anfrage ist noch nicht verbindlich bestätigt; die Verwaltung entscheidet über die Einteilung.\n\nViele Grüße\nKlettern & Abenteuer Brilon`
     );
   }
 }catch(error){
