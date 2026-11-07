@@ -3284,6 +3284,17 @@ async function start(){
         WHERE id=1 AND data->>'agbText' LIKE 'MUSTER – bitte vor der Veröffentlichung%'`);
       if(cleaned.rowCount)console.log('Musterhinweis aus der AGB-Fassung entfernt.');
     }catch(error){if(error.code!=='42P01')console.warn('AGB-Musterhinweis konnte nicht bereinigt werden:',error.message);}
+    try{
+      const published=await pool.query(`UPDATE brilon_rechnungsdaten
+        SET data=data||jsonb_build_object('agbAktiv',true,'agbInitialfassungAktiviert',true),aktualisiert_am=NOW()
+        WHERE id=1 AND data->>'agbAktiv'='false'
+          AND COALESCE(data->>'agbInitialfassungAktiviert','false')<>'true'
+          AND data->>'agbText' LIKE '1. Buchung und Zahlung%'
+          AND data->>'agbText' LIKE '%25 % Anzahlung%'
+          AND data->>'agbText' LIKE '%zehn Kalendertage%'
+          AND data->>'agbText' LIKE '%geringerer Schaden%'`);
+      if(published.rowCount)console.log('Bereinigte AGB-Erstfassung veröffentlicht.');
+    }catch(error){if(error.code!=='42P01')console.warn('AGB-Fassung konnte nicht aktiviert werden:',error.message);}
     // Idempotente, eng begrenzte Einsatzplanungs-Migration nach Freigabe.
     // Nur ausführen, wenn die bestehenden Buchungs- und Mitarbeitertabellen vorhanden sind.
     if(process.env.RUN_MARKETING_MIGRATION==='true'){
