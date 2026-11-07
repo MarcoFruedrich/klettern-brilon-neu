@@ -190,10 +190,8 @@
     return [first,addDays(first,6)];
   }
   function visibleEntries(day) {
-    const allSitesVisible=!chosen.siteOptions.length ||
-      (chosen.sites.length===chosen.siteOptions.length&&chosen.siteOptions.every(site=>chosen.sites.includes(site)));
     return chosen.events.filter(e => e.date <= day && day <= e.last &&
-      (e.type !== 'buchung' || chosen.sites.includes(e.site) || (allSitesVisible&&!e.site)));
+      (e.type !== 'buchung' || !e.site || chosen.sites.includes(e.site)));
   }
   function bookingStaff(plan) {
     const map=new Map();
@@ -216,7 +214,7 @@
       if (!/^\d{4}-\d{2}-\d{2}$/.test(b.datum||'')) continue;
       normalized.push({
         id:String(b.id),type:'buchung',date:b.datum,last:b.datum,start,end,reliable,
-        title:b.angebot||'Programm',site:b.ort||'',status:b.status||'offen',
+        title:b.angebot||'Programm',site:b.ort||b.veranstaltungsort||b.standort||b.location||'',status:b.status||'offen',
         staff:Array.isArray(b.staff)?b.staff:[],name:b.name||'',email:b.email||'',telefon:b.telefon||'',
         buchungsnummer:b.buchungsnummer||'',teilnehmer:b.teilnehmer||'',nachricht:b.nachricht||'',
         duration:reliable?length:null
@@ -277,7 +275,7 @@
           const b=planBookings.get(id)||{};
           const row=details.get(id);
           const source=row?.data||{};
-          bookings.push({...b,...source,id:row?.id||b.id,
+          bookings.push({...b,...row,...source,id:row?.id||b.id,
             status:row?.status||b.status||'offen',
             staff:staffing.get(id)||staffing.get(b.id)||[]});
         }
@@ -301,7 +299,8 @@
     const previous=chosen.siteOptions;
     const allWereSelected=!previous.length ||
       (chosen.sites.length===previous.length&&previous.every(site=>chosen.sites.includes(site)));
-    chosen.sites=!chosen.siteFilterInitialized||allWereSelected?[...sites]:chosen.sites.filter(site=>sites.includes(site));
+    const retained=chosen.sites.filter(site=>sites.includes(site));
+    chosen.sites=!chosen.siteFilterInitialized||allWereSelected||!retained.length?[...sites]:retained;
     chosen.siteOptions=sites;
     chosen.siteFilterInitialized=true;
   }

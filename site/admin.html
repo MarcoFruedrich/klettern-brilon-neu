@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
-  <link rel="stylesheet" href="/style.css?v=20261107-program-title-image">
+  <link rel="stylesheet" href="/style.css?v=20261107-admin-calendar-fixes">
   <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-site-label-inline">
 </head>
@@ -230,71 +230,6 @@
       </section>
 
       
-<!-- Eigene Termine und Sperrzeiten verwalten -->
-<h2>Eigene Termine & Sperrzeiten</h2>
-<p>
-  Hier kannst du Kletterveranstaltungen eintragen
-  oder Tage und Zeiträume für Buchungen sperren.
-</p>
-
-<form id="calendar-form">
-  <label>
-    Art des Eintrags
-    <select name="typ" required>
-      <option value="termin">Eigener Klettertermin</option>
-      <option value="sperrzeit">Sperrzeit / Nicht verfügbar</option>
-    </select>
-  </label>
-
-  <label>
-    Titel
-    <input
-      name="titel"
-      maxlength="120"
-      placeholder="z. B. Schulklasse, Geburtstag oder Urlaub"
-      required
-    >
-  </label>
-
-  <label>
-    Beginn (Datum)
-    <input name="datum" type="date" required>
-  </label>
-
-  <label>
-    Ende (Datum, optional)
-    <input name="enddatum" type="date">
-  </label>
-
-  <label>
-    Beginn (Uhrzeit, optional)
-    <input name="uhrzeit" type="time">
-  </label>
-
-  <label>
-    Ende (Uhrzeit, optional)
-    <input name="endzeit" type="time">
-  </label>
-
-  <label>
-    Beschreibung / Interne Hinweise
-    <textarea
-      name="beschreibung"
-      maxlength="1000"
-      rows="3"
-      placeholder="Weitere Informationen zum Termin"
-    ></textarea>
-  </label>
-
-  <button type="submit" class="btn">
-    Termin oder Sperrzeit speichern
-  </button>
-</form>
-
-<p id="calendar-form-status" role="status"></p>
-
-<h3>Meine eingetragenen Termine und Sperrzeiten</h3>
-<div id="calendar-entries" class="admin-grid"></div>
       </section>
 
       <section id="anschlussrabatt-section" class="booking admin-view" data-admin-view aria-labelledby="anschlussrabatt-heading">
@@ -682,11 +617,11 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261107-program-title-image"></script>
+  <script src="/admin.js?v=20261107-calendar-and-place-fixes"></script>
   <script src="/pruefung-admin.js?v=20261106-freigabe-pause-fix"></script>
   <script src="/feedback-admin.js"></script>
-  <script src="/einsatzplanung-admin.js?v=20261106-settings-persist-check"></script>
+  <script src="/einsatzplanung-admin.js?v=20261107-settings-readback"></script>
   <script src="/wissensportal-admin.js?v=20261106-hierarchical-categories"></script>
-  <script src="/admin-kalender-v2.js?v=20261106-open-bookings-editable"></script>
+  <script src="/admin-kalender-v2.js?v=20261107-week-requests-site-fallback"></script>
 </body>
 </html>
