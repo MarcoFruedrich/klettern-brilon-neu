@@ -62,6 +62,9 @@ test('Zahlungsinformationen verwenden die stabile Buchungsnummer als Überweisun
   assert.match(text,/Anzahlung von 25 %: 30,13\s?€/);
   assert.match(text,/Restbetrag vor Ort: 90,37\s?€/);
   assert.match(text,/Verwendungszweck: MUELLER-MAX-151126/);
+  assert.match(text,/Bis dahin bleibt es eine unverbindliche Buchungsanfrage/);
+  assert.match(text,/Wir prüfen die Zahlungseingänge regelmäßig/);
+  assert.match(text,/Erst mit dieser Bestätigung ist deine Buchung verbindlich/);
   assert.doesNotMatch(text,/fallback-id/);
 });
 
