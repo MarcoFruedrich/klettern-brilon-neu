@@ -692,7 +692,7 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
 
     for (const a of offers) {
       const c = el('div');
-      c.className = 'booking';
+      c.className = 'booking'+(a.status==='vorschlag'?' special-offer-proposal':'');
 
       c.append(
         el('strong', a.titel),
@@ -702,6 +702,21 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
           ' (Verfügbarkeit wird bei Anfragen neu geprüft)':
           'Unabhängige Aktion – kein Programm automatisch ausgewählt')
       );
+
+      if(a.status==='vorschlag'){
+        const direction=a.vorschlagsrichtung==='davor'?'vor dem gebuchten Programm':'nach dem gebuchten Programm';
+        const staff=Array.isArray(a.vorschlagsmitarbeiter)?a.vorschlagsmitarbeiter.map(person=>person.name).filter(Boolean).join(', '):'';
+        const prominent=el('p',`⚠ VERWALTUNGSVORSCHLAG · ${a.datum||'Datum offen'} · ${a.uhrzeit||'--:--'}–${a.endzeit||'--:--'} Uhr · ${a.veranstaltungsort||'Standort offen'} · ${direction}`);
+        prominent.className='special-offer-proposal-badge';c.append(prominent);
+        c.append(el('p',`Anschluss an „${a.quellprogramm||'gebuchtes Programm'}“ · ${Number(a.teilnehmer)||'Gruppengröße offen'} Teilnehmende · Mitarbeiter: ${staff||'—'}`));
+        const titleInput=document.createElement('input');titleInput.value=a.titel||'';titleInput.maxLength=120;titleInput.required=true;
+        const titleLabel=el('label','Angebotstitel');titleLabel.append(titleInput);
+        const descriptionInput=document.createElement('textarea');descriptionInput.value=a.beschreibung||'';descriptionInput.maxLength=1000;descriptionInput.rows=3;
+        const descriptionLabel=el('label','Kurzbeschreibung');descriptionLabel.append(descriptionInput);
+        const priceInput=document.createElement('input');priceInput.type='number';priceInput.min='0';priceInput.step='0.01';priceInput.required=true;priceInput.value=a.preis??'';
+        const priceLabel=el('label','Aktionspreis für die Gruppe (€)');priceLabel.append(priceInput);
+        c.append(titleLabel,descriptionLabel,priceLabel);
+      }
 
       const offerLabel=el('label','Buchbares Programm der Aktion');
       const offerSelect=document.createElement('select');
@@ -814,11 +829,11 @@ bildButton.onclick = async () => {
 
 bildBereich.append(bildAuswahl, bildButton);
 c.append(bildBereich);
-      const btn = el('button', 'Löschen');
+      const btn = el('button', a.status==='vorschlag'?'Vorschlag verwerfen':'Löschen');
       btn.className = 'danger';
 
       btn.onclick = async () => {
-        if (confirm('Angebot wirklich löschen?')) {
+        if (confirm(a.status==='vorschlag'?'Diesen Verwaltungsvorschlag verwerfen?':'Angebot wirklich löschen?')) {
           try {
             await api('/api/admin/aktionen/' + a.id, {
               method: 'DELETE'
@@ -830,6 +845,20 @@ c.append(bildBereich);
         }
       };
 
+      if(a.status==='vorschlag'){
+        const publish=el('button','Vorschlag prüfen und veröffentlichen');publish.type='button';publish.className='btn';
+        const proposalTitle=c.querySelector('input'),proposalDescription=c.querySelector('textarea'),proposalPrice=c.querySelector('input[type="number"]');
+        publish.addEventListener('click',async()=>{
+          publish.disabled=true;
+          try{
+            await api(`/api/admin/aktionen/${encodeURIComponent(a.id)}/freigeben`,{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({titel:proposalTitle.value,beschreibung:proposalDescription.value,preis:proposalPrice.value,programm_id:offerSelect.value})});
+            status.textContent='Tagesangebot veröffentlicht und für die vorgeschlagene Uhrzeit buchbar.';
+            await refresh();
+          }catch(error){status.textContent='Vorschlag konnte nicht freigegeben werden: '+error.message;publish.disabled=false;}
+        });
+        c.append(publish);
+      }
       c.append(btn);
       list.append(c);
     }
@@ -1273,6 +1302,7 @@ window.addEventListener('klettern:sonderangebot-vorbereiten',event=>{
   window.adminNavigateToElement?.('special-offers-section');
   form.elements.titel.focus();
 });
+window.addEventListener('klettern:sonderangebote-aktualisieren',()=>refresh());
 
 document.getElementById('special-form').onsubmit = async e => {
   e.preventDefault();

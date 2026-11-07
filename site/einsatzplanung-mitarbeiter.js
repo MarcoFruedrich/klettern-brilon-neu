@@ -56,8 +56,13 @@
             {className:'staff-customer-mail-status'}));
         const action=async(url,data={})=>{
           try{
-            await request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+            const result=await request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
             await loadPlanning();
+            if(data.anschlussOption&&data.anschlussOption!=='keine'){
+              const proposal=result?.tagesangebotVorschlaege;
+              status.textContent=proposal?.ok?proposal.nachricht||'Deine zusätzliche Verfügbarkeit wurde der Verwaltung als Tagesangebot vorgeschlagen.':
+                proposal?.error||'Deine zusätzliche Verfügbarkeit wurde gespeichert; die Verwaltung prüft mögliche Anschlussangebote.';
+            }
           }catch(error){status.textContent='Aktion nicht möglich: '+error.message;}
         };
         if(t.sonderfreigabe&&(!t.mein_status||['beworben','abgelehnt'].includes(t.mein_status))){
