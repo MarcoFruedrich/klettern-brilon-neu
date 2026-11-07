@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
-  <link rel="stylesheet" href="/style.css?v=20261106-admin-form-align">
+  <link rel="stylesheet" href="/style.css?v=20261107-program-title-image">
   <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-site-label-inline">
 </head>
@@ -367,6 +367,20 @@
       placeholder="Was erwartet die Teilnehmer?"></textarea>
   </label>
 
+  <fieldset class="program-image-fields">
+    <legend>Titelbild des Programms</legend>
+    <label>Vorhandenes Bild vom Server auswählen
+      <select name="bild_url" id="angebot-bild-bibliothek">
+        <option value="">Kein vorhandenes Bild auswählen</option>
+      </select>
+    </label>
+    <p class="hint">Oder lade ein neues JPG-, PNG- oder WebP-Bild hoch (maximal 5 MB).</p>
+    <label>Bilddatei hochladen
+      <input name="bildDatei" id="angebot-bild-datei" type="file" accept="image/jpeg,image/png,image/webp">
+    </label>
+    <img id="angebot-bild-vorschau" alt="Vorschau des Programm-Titelbilds" hidden>
+  </fieldset>
+
   <label>
     Dauer in Minuten
     <input name="dauer" type="number"
@@ -668,7 +682,7 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261105-admin-login-fix"></script>
+  <script src="/admin.js?v=20261107-program-title-image"></script>
   <script src="/pruefung-admin.js?v=20261106-freigabe-pause-fix"></script>
   <script src="/feedback-admin.js"></script>
   <script src="/einsatzplanung-admin.js?v=20261106-settings-persist-check"></script>

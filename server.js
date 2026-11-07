@@ -2659,6 +2659,24 @@ if(staffArea&&req.method==='DELETE'){
   return reply(res,200,{success:true});
 }
 
+if(route==='/api/admin/angebote/bilder'&&req.method==='GET'){
+  if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
+  const storage=supabase.storage.from('angebotsbilder'),bilder=[];
+  async function bilderLaden(ordner='',tiefe=0){
+    if(tiefe>3)return;
+    const {data,error}=await storage.list(ordner,{limit:100,sortBy:{column:'created_at',order:'desc'}});
+    if(error)throw error;
+    for(const item of data||[]){
+      const pfad=ordner?ordner+'/'+item.name:item.name;
+      if(item.id===null&&!item.metadata){await bilderLaden(pfad,tiefe+1);continue;}
+      const {data:publicData}=storage.getPublicUrl(pfad);
+      if(publicData?.publicUrl)bilder.push({name:item.name,url:publicData.publicUrl});
+    }
+  }
+  try{await bilderLaden();return reply(res,200,bilder.slice(0,200));}
+  catch{return reply(res,502,{error:'Gespeicherte Angebotsbilder konnten nicht geladen werden.'});}
+}
+
 if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
     `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
@@ -2714,6 +2732,7 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const buchungsmodus=d.buchungsmodus==='einzelplatz'?'einzelplatz':'gruppe';
   const mindestteilnehmer=Number(d.mindestteilnehmer??5);
   const preisProPerson=Number(d.preis_pro_person??0);
+  const bildUrl=safeText(d.bild_url,1000);
 
   if(!name)return reply(res,400,{error:'Bitte einen Namen für das Angebot eingeben.'});
   if(!Number.isInteger(dauer)||dauer<15||dauer>1440)
@@ -2733,14 +2752,14 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const q = await pool.query(
     `INSERT INTO brilon_angebote
       (name,beschreibung,dauer,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
-       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert)
-     VALUES ($1,$2,$3,'{}',false,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,
+       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,bild_url,sortierung,archiviert)
+     VALUES ($1,$2,$3,'{}',false,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,
        (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false)
      RETURNING id`,
     [name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
       JSON.stringify(termine),hinweise,d.buchbar===true,d.veroeffentlicht===true,
       buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-      buchungsmodus==='einzelplatz'?preisProPerson:0]
+      buchungsmodus==='einzelplatz'?preisProPerson:0,bildUrl||null]
   );
 
   return reply(res, 201, {

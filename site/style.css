@@ -1140,3 +1140,10 @@ header.site-header{overflow:visible}
   .site-header .navlinks.open {display:grid;}
   .site-header .navlinks>a {width:100%;min-height:50px;font-size:15px;}
 }
+
+
+/* Titelbilder in der Programmverwaltung */
+.program-image-fields{margin:1rem 0;padding:1rem;border:1px solid #cbd8d2;border-radius:12px}
+.program-image-fields legend{padding:0 .4rem;font-weight:700;color:#123f32}
+#angebot-bild-vorschau{display:block;width:min(100%,420px);max-height:260px;object-fit:cover;margin-top:.75rem;border-radius:10px}
+#angebot-bild-vorschau[hidden]{display:none}

@@ -1741,6 +1741,8 @@ if (neuesAngebotForm) {
     const daten = Object.fromEntries(
       new FormData(neuesAngebotForm).entries()
     );
+    const bildDatei=neuesAngebotForm.elements.bildDatei.files[0];
+    delete daten.bildDatei;
     daten.verfuegbare_termine=(daten.verfuegbare_termine||'').split('\n').map(x=>x.trim()).filter(Boolean);
     daten.buchbar=neuesAngebotForm.elements.buchbar.checked;
     daten.veroeffentlicht=neuesAngebotForm.elements.veroeffentlicht.checked;
@@ -1748,15 +1750,25 @@ if (neuesAngebotForm) {
     daten.preis_pro_person=Number(daten.preis_pro_person||0);
 
     try {
-      await api('/api/admin/angebote', {
+      const neuesAngebot=await api('/api/admin/angebote', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(daten)
       });
+      if(bildDatei){
+        const upload=await fetch('/api/admin/angebote/'+encodeURIComponent(neuesAngebot.id)+'/bild',{
+          method:'POST',credentials:'same-origin',
+          headers:{'Content-Type':bildDatei.type,'X-CSRF-Token':await adminCsrfTokenLaden()},
+          body:bildDatei
+        });
+        const ergebnis=await upload.json();
+        if(!upload.ok)throw new Error(ergebnis.error||'Bild-Upload fehlgeschlagen.');
+      }
 
       neuesAngebotForm.reset();
+      if(bildVorschau){if(bildVorschau.dataset.objectUrl)URL.revokeObjectURL(bildVorschau.dataset.objectUrl);bildVorschau.dataset.objectUrl='';bildVorschau.removeAttribute('src');bildVorschau.hidden=true;}
       await refresh();
       status.textContent='Neues Erlebnisangebot wurde gespeichert.';
     } catch (fehler) {
@@ -1765,13 +1777,40 @@ if (neuesAngebotForm) {
   });
 }
 
+const bildBibliothek=document.getElementById('angebot-bild-bibliothek');
+const bildDateiInput=document.getElementById('angebot-bild-datei');
+const bildVorschau=document.getElementById('angebot-bild-vorschau');
+function programmBildVorschauAktualisieren(){
+  if(!bildVorschau)return;
+  const file=bildDateiInput?.files?.[0];
+  const url=file?URL.createObjectURL(file):(bildBibliothek?.value||'');
+  if(bildVorschau.dataset.objectUrl)URL.revokeObjectURL(bildVorschau.dataset.objectUrl);
+  bildVorschau.dataset.objectUrl=file?url:'';
+  bildVorschau.src=url;
+  bildVorschau.hidden=!url;
+}
+bildBibliothek?.addEventListener('change',()=>{if(bildDateiInput)bildDateiInput.value='';programmBildVorschauAktualisieren();});
+bildDateiInput?.addEventListener('change',()=>{if(bildDateiInput.files?.length&&bildBibliothek)bildBibliothek.value='';programmBildVorschauAktualisieren();});
+
 async function orteLaden(){
   const select=document.getElementById('angebot-ort');
+  const imageSelect=document.getElementById('angebot-bild-bibliothek');
   const liste=document.getElementById('admin-place-list');
-  if(!select&&!liste)return;
+  if(!select&&!liste&&!imageSelect)return;
   try{
     const orte=await api('/api/admin/orte');
     if(select){select.replaceChildren();for(const ort of orte.filter(item=>item.aktiv)){const o=el('option',ort.name);o.value=ort.name;select.append(o);}}
+    if(imageSelect){
+      try{
+        const bilder=await api('/api/admin/angebote/bilder');
+        imageSelect.replaceChildren();
+        const leer=el('option','Kein vorhandenes Bild auswählen');leer.value='';imageSelect.append(leer);
+        for(const bild of bilder){const option=el('option',bild.name);option.value=bild.url;imageSelect.append(option);}
+      }catch{
+        imageSelect.replaceChildren();
+        const option=el('option','Bilddateien konnten nicht geladen werden');option.value='';imageSelect.append(option);
+      }
+    }
     if(liste){
       liste.replaceChildren();
       if(!orte.length)liste.append(el('p','Noch keine Standorte angelegt.'));
