@@ -4,6 +4,14 @@
   const status=document.getElementById('staff-planning-status');
   if(!root)return;
   const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
+  const anschlussAuswahl=()=>{
+    const label=el('label','Kannst du zusätzliche Termine übernehmen?');
+    const select=document.createElement('select');select.required=true;
+    for(const [value,text] of [['','Bitte auswählen'],['keine','Nein, keine Anschlusskapazität'],['davor','Ja, einen Termin davor'],['danach','Ja, einen Termin danach'],['beides','Ja, davor und danach']]){
+      const option=el('option',text);option.value=value;select.append(option);
+    }
+    label.append(select);return select;
+  };
   async function loadPlanning(){
     status.textContent='Termine werden geladen …';
     try{
@@ -30,6 +38,10 @@
           statusBadge.textContent='Für diesen Termin hast du noch keine Bewerbung abgegeben';
         }
         card.append(statusBadge);
+        if(t.mein_status==='bestaetigt'&&t.anschluss_option){
+          const descriptions={keine:'Keine zusätzliche Kapazität',davor:'Zusätzlicher Termin davor möglich',danach:'Zusätzlicher Termin danach möglich',beides:'Zusätzliche Termine davor und danach möglich'};
+          card.append(Object.assign(el('p',descriptions[t.anschluss_option]||''),{className:'staff-customer-mail-status'}));
+        }
         if(t.kundenbestaetigung_status==='geplant'&&t.kundenbestaetigung_faellig_ab)
           card.append(Object.assign(el('p','Kundenbestätigung geplant für '+new Date(t.kundenbestaetigung_faellig_ab).toLocaleString('de-DE')),
             {className:'staff-customer-mail-status'}));
@@ -49,9 +61,10 @@
           }catch(error){status.textContent='Aktion nicht möglich: '+error.message;}
         };
         if(t.sonderfreigabe&&(!t.mein_status||['beworben','abgelehnt'].includes(t.mein_status))){
+          const option=anschlussAuswahl();card.append(option.closest('label'));
           const direct=el('button','Programm verbindlich übernehmen');
           direct.type='button';direct.className='btn';
-          direct.onclick=()=>action('/api/pruefung/einsatzplanung/direkt-annehmen/'+encodeURIComponent(t.id));
+          direct.onclick=()=>{if(option.reportValidity())action('/api/pruefung/einsatzplanung/direkt-annehmen/'+encodeURIComponent(t.id),{anschlussOption:option.value});};
           card.append(direct,el('small','Deine Zusage ist verbindlich. Die Kundenbestätigung wird gemäß Verwaltungseinstellung zeitversetzt versandt.'));
         }else if(!t.sonderfreigabe&&(!t.mein_status||['beworben','abgelehnt'].includes(t.mein_status))){
           const button=el('button',t.mein_status==='beworben'?'Bewerbung aktualisieren':'Für Termin bewerben');
@@ -60,8 +73,9 @@
           card.append(button);
         }
         if(t.mein_status==='eingeteilt'){
+          const option=anschlussAuswahl();card.append(option.closest('label'));
           const yes=el('button','Einsatz verbindlich bestätigen');
-          yes.type='button';yes.className='btn';yes.onclick=()=>action('/api/pruefung/einsatzplanung/antwort/'+encodeURIComponent(t.id),{status:'bestaetigt'});
+          yes.type='button';yes.className='btn';yes.onclick=()=>{if(option.reportValidity())action('/api/pruefung/einsatzplanung/antwort/'+encodeURIComponent(t.id),{status:'bestaetigt',anschlussOption:option.value});};
           const no=el('button','Einsatz ablehnen');
           no.type='button';no.className='btn secondary';no.onclick=()=>action('/api/pruefung/einsatzplanung/antwort/'+encodeURIComponent(t.id),{status:'abgelehnt'});
           card.append(yes,no);
