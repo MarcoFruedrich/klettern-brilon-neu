@@ -1526,169 +1526,6 @@ if (!workspace.hidden) {
   kalenderLaden();
 }
 
-/* Eigene Termine und Sperrzeiten speichern und anzeigen */
-
-const kalenderFormular = document.getElementById('calendar-form');
-const kalenderFormStatus = document.getElementById('calendar-form-status');
-const kalenderEintraege = document.getElementById('calendar-entries');
-
-async function eigeneKalenderEintraegeLaden() {
-  try {
-    const eintraege = await api('/api/admin/kalender');
-    eigeneKalenderTermine = eintraege;
-kalenderAnzeigen();
-    kalenderEintraege.replaceChildren();
-
-    if (!eintraege.length) {
-      kalenderEintraege.append(
-        el('p', 'Noch keine eigenen Termine oder Sperrzeiten eingetragen.')
-      );
-      return;
-    }
-
-    for (const eintrag of eintraege) {
-      const karte = el('div');
-      karte.className = 'booking';
-
-      karte.append(
-        el('strong',
-          (eintrag.typ === 'sperrzeit' ? 'Gesperrt: ' : 'Termin: ') +
-          eintrag.titel
-        )
-      );
-
-      let zeitraum = eintrag.datum;
-
-      if (eintrag.enddatum) {
-        zeitraum += ' bis ' + eintrag.enddatum;
-      }
-
-      if (eintrag.uhrzeit) {
-        zeitraum += ' | ' + eintrag.uhrzeit.slice(0, 5) + ' Uhr';
-      }
-
-      if (eintrag.endzeit) {
-        zeitraum += ' bis ' + eintrag.endzeit.slice(0, 5) + ' Uhr';
-      }
-
-      karte.append(el('p', zeitraum));
-
-      if (eintrag.beschreibung) {
-        karte.append(el('p', eintrag.beschreibung));
-      }
-
-      const bearbeitenButton = document.createElement('button');
-bearbeitenButton.type = 'button';
-bearbeitenButton.className = 'btn secondary';
-bearbeitenButton.textContent = 'Termin bearbeiten';
-
-bearbeitenButton.onclick = () => {
-  kalenderBearbeitenId = eintrag.id;
-
-  for (const name of [
-    'typ', 'titel', 'datum', 'enddatum',
-    'uhrzeit', 'endzeit', 'beschreibung'
-  ]) {
-    const feld = kalenderFormular.elements.namedItem(name);
-    if (feld) feld.value = eintrag[name] || '';
-  }
-
-  kalenderFormular.querySelector('button[type="submit"]').textContent =
-    'Änderungen speichern';
-
-  kalenderFormStatus.textContent =
-    'Du bearbeitest jetzt: ' + eintrag.titel;
-
-  kalenderFormular.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start'
-  });
-};
-
-karte.append(bearbeitenButton);
-          const loeschenButton = document.createElement('button');
-    loeschenButton.type = 'button';
-    loeschenButton.className = 'btn secondary';
-    loeschenButton.textContent = 'Termin löschen';
-
-    loeschenButton.onclick = async () => {
-      if (!confirm('Diesen Termin oder diese Sperrzeit wirklich löschen?')) {
-        return;
-      }
-
-      loeschenButton.disabled = true;
-
-      try {
-        await api('/api/admin/kalender/' + encodeURIComponent(eintrag.id), {
-          method: 'DELETE'
-        });
-
-        await eigeneKalenderEintraegeLaden();
-        kalenderFormStatus.textContent = 'Kalendereintrag erfolgreich gelöscht.';
-      } catch (err) {
-        kalenderFormStatus.textContent = 'Löschen fehlgeschlagen: ' + err.message;
-        loeschenButton.disabled = false;
-      }
-    };
-
-    karte.append(loeschenButton);
-      kalenderEintraege.append(karte);
-    }
-  } catch (err) {
-    kalenderFormStatus.textContent =
-      'Kalendereinträge konnten nicht geladen werden: ' + err.message;
-  }
-}
-
-let kalenderBearbeitenId = null;
-kalenderFormular.onsubmit = async event => {
-  event.preventDefault();
-
-  const knopf = kalenderFormular.querySelector('button[type="submit"]');
-  knopf.disabled = true;
-  kalenderFormStatus.textContent = 'Termin wird gespeichert ...';
-
-  try {
-    const daten = Object.fromEntries(
-      new FormData(kalenderFormular).entries()
-    );
-
-    await api(
-  kalenderBearbeitenId
-    ? '/api/admin/kalender/' + encodeURIComponent(kalenderBearbeitenId)
-    : '/api/admin/kalender',
-  {
-     method: kalenderBearbeitenId ? 'PATCH' : 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(daten)
-    });
-
-    kalenderFormular.reset();
-    kalenderBearbeitenId = null;
-knopf.textContent = 'Termin oder Sperrzeit speichern';
-    kalenderFormStatus.textContent = 'Termin erfolgreich gespeichert.';
-
-    await eigeneKalenderEintraegeLaden();
-  } catch (err) {
-    kalenderFormStatus.textContent =
-      'Fehler beim Speichern: ' + err.message;
-  } finally {
-    knopf.disabled = false;
-  }
-};
-
-const bisherigesKalenderLaden = kalenderLaden;
-
-kalenderLaden = async function() {
-  await bisherigesKalenderLaden();
-
-  if (!workspace.hidden) {
-    await eigeneKalenderEintraegeLaden();
-  }
-};
-
 /* ==========================================
    ANGEBOTE UND PREISE VERWALTEN
    ========================================== */
@@ -1818,9 +1655,10 @@ async function orteLaden(){
         const card=el('article');card.className='booking';
         const details=el('div');details.append(el('strong',ort.name),el('p',ort.aktiv?'Aktiv · für neue Programme auswählbar':'Inaktiv · bestehende Programme und Buchungen bleiben erhalten'));
         const actions=el('div');actions.className='button-row';
+        const rename=el('button','Bezeichnung ändern');rename.type='button';rename.className='btn secondary';rename.dataset.placeAction='rename';rename.dataset.placeId=ort.id;rename.dataset.placeName=ort.name;
         const toggle=el('button',ort.aktiv?'Deaktivieren':'Aktivieren');toggle.type='button';toggle.className='btn secondary';toggle.dataset.placeAction='toggle';toggle.dataset.placeId=ort.id;toggle.dataset.active=String(ort.aktiv);
         const remove=el('button','Löschen');remove.type='button';remove.className='btn danger';remove.dataset.placeAction='delete';remove.dataset.placeId=ort.id;
-        actions.append(toggle,remove);card.append(details,actions);liste.append(card);
+        actions.append(rename,toggle,remove);card.append(details,actions);liste.append(card);
       }
     }
   }catch(error){const message=document.getElementById('admin-place-status');if(message)message.textContent='Standorte konnten nicht geladen werden: '+error.message;}
@@ -1846,7 +1684,16 @@ document.getElementById('admin-place-list')?.addEventListener('click',async even
   const message=document.getElementById('admin-place-status');
   button.disabled=true;
   try{
-    if(button.dataset.placeAction==='toggle'){
+    if(button.dataset.placeAction==='rename'){
+      const bisherigerName=button.dataset.placeName||'';
+      const name=window.prompt('Neue Bezeichnung für diesen Standort:',bisherigerName)?.trim();
+      if(!name||name===bisherigerName)return;
+      const result=await api(`/api/admin/orte/${encodeURIComponent(button.dataset.placeId)}`,{
+        method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})
+      });
+      await orteLaden();
+      message.textContent=`Standort „${bisherigerName}“ wurde in „${result.name}“ umbenannt.`;
+    }else if(button.dataset.placeAction==='toggle'){
       const aktiv=button.dataset.active!=='true';
       const result=await api(`/api/admin/orte/${encodeURIComponent(button.dataset.placeId)}`,{
         method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({aktiv})

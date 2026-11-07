@@ -2546,10 +2546,31 @@ if(route==='/api/admin/orte'&&req.method==='POST'){
 const placeRoute=route.match(/^\/api\/admin\/orte\/(\d+)$/);
 if(placeRoute&&req.method==='PATCH'){
   const d=await body(req);
-  if(typeof d.aktiv!=='boolean')return reply(res,400,{error:'Der Aktiv-Status muss angegeben werden.'});
-  const q=await pool.query('UPDATE brilon_orte SET aktiv=$1 WHERE id=$2 RETURNING id,name,aktiv',[d.aktiv,placeRoute[1]]);
-  if(!q.rowCount)return reply(res,404,{error:'Standort nicht gefunden.'});
-  return reply(res,200,q.rows[0]);
+  if(d.name===undefined&&typeof d.aktiv!=='boolean')
+    return reply(res,400,{error:'Bitte eine neue Bezeichnung oder den Aktiv-Status angeben.'});
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const current=await client.query('SELECT id,name,aktiv FROM brilon_orte WHERE id=$1 FOR UPDATE',[placeRoute[1]]);
+    if(!current.rowCount){await client.query('ROLLBACK');return reply(res,404,{error:'Standort nicht gefunden.'});}
+    const oldName=current.rows[0].name;
+    const name=d.name===undefined?oldName:safeText(d.name,80);
+    if(!name){await client.query('ROLLBACK');return reply(res,400,{error:'Die Standortbezeichnung darf nicht leer sein.'});}
+    const aktiv=typeof d.aktiv==='boolean'?d.aktiv:current.rows[0].aktiv;
+    const saved=await client.query('UPDATE brilon_orte SET name=$1,aktiv=$2 WHERE id=$3 RETURNING id,name,aktiv',[name,aktiv,placeRoute[1]]);
+    if(name!==oldName){
+      await client.query('UPDATE brilon_angebote SET veranstaltungsort=$1 WHERE veranstaltungsort=$2',[name,oldName]);
+      for(const key of ['veranstaltungsort','ort','standort']){
+        await client.query(`UPDATE brilon_buchungen SET data=jsonb_set(data,'{${key}}',to_jsonb($1::text),true) WHERE data->>'${key}'=$2`,[name,oldName]);
+      }
+    }
+    await client.query('COMMIT');
+    return reply(res,200,saved.rows[0]);
+  }catch(error){
+    try{await client.query('ROLLBACK');}catch{}
+    if(error?.code==='23505')return reply(res,409,{error:'Diese Standortbezeichnung ist bereits vergeben.'});
+    throw error;
+  }finally{client.release();}
 }
 if(placeRoute&&req.method==='DELETE'){
   const place=await pool.query('SELECT id,name FROM brilon_orte WHERE id=$1',[placeRoute[1]]);
