@@ -628,7 +628,7 @@
       panel.append(audit,details);target.append(panel);
     }
   }
-  function renderTablets(target,devices){
+  function renderTablets(target,devices,places=[]){
     target.replaceChildren();
     if(!devices.length)target.append(elt('p','Noch kein Werbetablet gekoppelt.'));
     for(const device of devices){
@@ -642,7 +642,45 @@
         elt('p',device.pruefdisplay?'Ausgewähltes Prüfdisplay für sechsstellige Codes':
           'Nur Werbeanzeige – keine Prüfcodes'),
         elt('p','Zuletzt gemeldet: '+lastSeen),
-        elt('p','Gekoppelt: '+new Date(device.gekoppelt_am).toLocaleString('de-DE')));
+        elt('p','Gekoppelt: '+new Date(device.gekoppelt_am).toLocaleString('de-DE')),
+        elt('p','Werbestandort: '+(device.standort||'Nicht zugewiesen – keine Programmwerbung')));
+      if(device.aktiv){
+        const siteLabel=elt('label','Standort für die Programmwerbung');
+        const siteSelect=elt('select');siteSelect.name='tabletStandort';
+        const empty=elt('option','Kein Standort – keine Programmwerbung');
+        empty.value='';siteSelect.append(empty);
+        for(const place of places){
+          const option=elt('option',place.name);
+          option.value=String(place.id);siteSelect.append(option);
+        }
+        const assigned=device.ort_id==null?'':String(device.ort_id);
+        if(assigned&&!places.some(place=>String(place.id)===assigned)){
+          const disabled=elt('option','Bisheriger Standort nicht mehr aktiv');
+          disabled.value=assigned;disabled.disabled=true;siteSelect.append(disabled);
+        }
+        siteSelect.value=assigned;
+        siteLabel.append(siteSelect);
+        const saveSite=elt('button','Werbestandort speichern');
+        saveSite.type='button';saveSite.className='btn secondary';
+        saveSite.addEventListener('click',async()=>{
+          saveSite.disabled=true;
+          try{
+            const ortId=siteSelect.value?Number(siteSelect.value):null;
+            await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id)+'/standort',{
+              method:'PATCH',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({ortId})
+            });
+            find('tablet-admin-status').textContent=ortId===null
+              ?'Werbestandort entfernt. Das Tablet zeigt keine Programme mehr.'
+              :'Werbestandort gespeichert. Das Tablet zeigt nur die dort veröffentlichten Programme.';
+            await refresh();
+          }catch(error){
+            find('tablet-admin-status').textContent='Werbestandort konnte nicht gespeichert werden: '+error.message;
+            saveSite.disabled=false;
+          }
+        });
+        block.append(siteLabel,saveSite);
+      }
       if(device.aktiv&&!device.pruefdisplay){
         const select=elt('button','Als Prüfdisplay auswählen');select.type='button';
         select.className='btn secondary';

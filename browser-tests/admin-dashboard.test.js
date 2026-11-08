@@ -66,6 +66,16 @@ function fakeAdminApi(page) {
       tablet.aktiv=false;tablet.online=false;tablet.pruefdisplay=false;
       return json(201,{code:'00654321',gueltigSekunden:600,bisherigesGeraet:{id:tablet.id,name:tablet.name}});
     }
+    const tabletSite=endpoint.match(/^\/api\/admin\/pruefung\/tablets\/([^/]+)\/standort$/);
+    if(tabletSite&&method==='PATCH'){
+      const data=readBody();
+      const tablet=state.inspectionTablets.find(x=>x.id===tabletSite[1]&&x.aktiv);
+      const place=data.ortId===null?null:state.places.find(x=>x.id===data.ortId&&x.aktiv);
+      if(!tablet||data.ortId!==null&&!place)return json(404,{error:'Tablet/Standort nicht aktiv'});
+      tablet.ort_id=data.ortId;
+      tablet.standort=place?.name||null;
+      return json(200,{id:tablet.id,ort_id:tablet.ort_id,standort:tablet.standort});
+    }
     const chooseTablet=endpoint.match(/^\/api\/admin\/pruefung\/tablets\/([^/]+)\/pruefdisplay$/);
     if(chooseTablet&&method==='PATCH'){
       const device=state.inspectionTablets.find(x=>x.id===chooseTablet[1]&&x.aktiv);
@@ -888,6 +898,31 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(state.inspectionTablets.find(x=>x.id===second).pruefdisplay,true);
     assert.equal(state.inspectionTablets.find(x=>x.id===first).pruefdisplay,false);
     assert.equal(state.mutations.filter(m=>m.endpoint.endsWith('/pruefdisplay')).length,1);
+    await page.close();
+  });
+
+  await t.test('Werbetablet lässt sich einem Standort zuordnen und wieder neutral schalten',async()=>{
+    const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const id='550e8400-e29b-41d4-a716-446655441044';
+    state.places.push({id:2,name:'Winterberg',aktiv:true});
+    state.inspectionTablets=[{id,name:'Werbemonitor Winterberg',aktiv:true,online:true,
+      pruefdisplay:false,ort_id:null,standort:null,
+      gekoppelt_am:'2027-01-01T12:00:00Z',zuletzt_gesehen_am:'2027-01-01T12:05:00Z'}];
+    await login(page,root);
+    await openAdminView(page,'#stationspruefung');
+    const card=page.locator('#tablet-admin-list article').filter({hasText:'Werbemonitor Winterberg'});
+    await card.getByText(/Nicht zugewiesen – keine Programmwerbung/).waitFor();
+    await card.locator('select[name="tabletStandort"]').selectOption('2');
+    await card.getByRole('button',{name:'Werbestandort speichern'}).click();
+    await page.waitForFunction(()=>document.querySelector('#tablet-admin-list')?.textContent?.includes('Werbestandort: Winterberg'));
+    assert.equal(state.inspectionTablets[0].ort_id,2);
+    assert.equal(state.inspectionTablets[0].standort,'Winterberg');
+    assert.equal(state.mutations.filter(x=>x.endpoint.endsWith('/standort')).length,1);
+    await card.locator('select[name="tabletStandort"]').selectOption('');
+    await card.getByRole('button',{name:'Werbestandort speichern'}).click();
+    await page.waitForFunction(()=>document.querySelector('#tablet-admin-list')?.textContent?.includes('Werbestandort: Nicht zugewiesen'));
+    assert.equal(state.inspectionTablets[0].ort_id,null);
     await page.close();
   });
 
