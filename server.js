@@ -55,11 +55,20 @@ const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCA
   ?async()=>({sauber:true}):createClamScanner();
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
 function malwareScanReply(res,error){
-  const detected=error?.code==='MALWARE_FOUND';
-  console.error('Bildprüfung abgebrochen:',error?.code||'unbekannter Fehler');
-  return reply(res,detected?422:503,{error:detected?
-    'Die Bilddatei wurde als Schadsoftware erkannt und abgewiesen.':
-    'Bildprüfung ist nicht verfügbar. Die Bilddatei wurde nicht gespeichert.'});
+  const code=error?.code||'MALWARE_SCAN_ERROR';
+  const detected=code==='MALWARE_FOUND';
+  const messages={
+    MALWARE_FOUND:'Die Bilddatei wurde als Schadsoftware erkannt und abgewiesen.',
+    MALWARE_SCAN_NOT_CONFIGURED:'Der Virenscanner ist auf dem Server nicht eingerichtet. Bitte die Scanner-Verbindung in Render konfigurieren.',
+    MALWARE_SCAN_UNAVAILABLE:'Der Virenscanner ist derzeit nicht erreichbar. Die Bilddatei wurde nicht gespeichert.',
+    MALWARE_SCAN_BUSY:'Der Virenscanner ist ausgelastet. Bitte den Upload später erneut versuchen.',
+    MALWARE_SCAN_INVALID_INPUT:'Die Bilddatei ist für die Sicherheitsprüfung nicht zulässig.'
+  };
+  console.error('Bildprüfung abgebrochen:',code);
+  return reply(res,detected||code==='MALWARE_SCAN_INVALID_INPUT'?422:503,{
+    error:messages[code]||'Die Sicherheitsprüfung konnte nicht abgeschlossen werden. Die Bilddatei wurde nicht gespeichert.',
+    code
+  });
 }
 async function body(req,maxBytes=16000){const chunks=[];let total=0;for await(const chunk of req){total+=chunk.length;if(total>maxBytes)throw Error('Anfrage zu groß');chunks.push(chunk)}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw Error('Ungültiges JSON')}}
 function limit(key,max=12,window=600000){return rateLimiter.erlauben(key,max,window)}

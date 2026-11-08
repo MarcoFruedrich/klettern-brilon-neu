@@ -1,0 +1,11 @@
+# Optional standalone Blueprint. DO NOT sync without approving the additional service cost.
+# Use Render > New > Blueprint, selecting this YAML file, then configure the existing app.
+services:
+  - type: pserv
+    name: klettern-clamav
+    runtime: docker
+    region: oregon
+    plan: standard
+    dockerfilePath: ./infra/clamav/Dockerfile
+    dockerContext: .
+    autoDeployTrigger: commit
