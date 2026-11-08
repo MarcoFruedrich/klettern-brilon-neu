@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - entwicklung/phase-1-buchungen-sonderangebote-gps
+      - fix/buchungen-mitarbeiter-mail-tests-20261108
   workflow_dispatch:
 
 permissions:
