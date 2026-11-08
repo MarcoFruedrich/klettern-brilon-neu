@@ -3009,10 +3009,15 @@ if(angebotLoeschenRoute&&req.method==='DELETE'){
       await client.query('ROLLBACK');
       return reply(res,409,{error:'Zu diesem Programm gibt es bereits Buchungen. Bitte stattdessen archivieren, damit Rechnungen und Buchungsverläufe erhalten bleiben.'});
     }
-    const touren=await client.query('SELECT 1 FROM brilon_gps_touren WHERE angebot_id=$1 LIMIT 1',[angebotId]);
-    if(touren.rowCount){
-      await client.query('ROLLBACK');
-      return reply(res,409,{error:'Das Programm ist mit einer GPS-Tour verbunden. Bitte zunächst die GPS-Tour entfernen oder das Programm archivieren.'});
+    // GPS tables are optional until their migration is installed.
+    // Guard against missing tables instead of returning HTTP 500.
+    const gpsTabelle=await client.query("SELECT to_regclass('brilon_gps_touren') AS tabellenname");
+    if(gpsTabelle.rows[0]?.tabellenname){
+      const touren=await client.query('SELECT 1 FROM brilon_gps_touren WHERE angebot_id=$1 LIMIT 1',[angebotId]);
+      if(touren.rowCount){
+        await client.query('ROLLBACK');
+        return reply(res,409,{error:'Das Programm ist mit einer GPS-Tour verbunden. Bitte zunächst die GPS-Tour entfernen oder das Programm archivieren.'});
+      }
     }
     await client.query('DELETE FROM brilon_angebote WHERE id=$1',[angebotId]);
     await client.query('COMMIT');
