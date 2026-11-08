@@ -3093,6 +3093,26 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
      
 const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
 
+// Echte Löschung nur bei unbenutzten Programmen: vorhandene Kundenbuchungen,
+// Sonderaktionen und GPS-Touren dürfen niemals stillschweigend verloren gehen.
+if(preisRoute&&req.method==='DELETE'){
+  const id=Number(preisRoute[1]);
+  const existing=await pool.query('SELECT id,name FROM brilon_angebote WHERE id=$1',[id]);
+  if(!existing.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+  const programmeName=existing.rows[0].name;
+  const used=await pool.query(`SELECT
+    EXISTS(SELECT 1 FROM brilon_buchungen WHERE data->>'angebot'=$1) AS gebucht,
+    EXISTS(SELECT 1 FROM brilon_gps_touren WHERE angebot_id=$2) AS gps,
+    EXISTS(SELECT 1 FROM brilon_aktionen WHERE data->>'programm_id'=$3) AS aktion`,
+    [programmeName,id,String(id)]);
+  const refs=used.rows[0]||{};
+  if(refs.gebucht||refs.gps||refs.aktion)
+    return reply(res,409,{error:'Das Programm ist mit Buchungen, GPS-Touren oder Sonderaktionen verbunden. Bitte stattdessen deaktivieren oder archivieren; bestehende Nachweise müssen erhalten bleiben.'});
+  const q=await pool.query('DELETE FROM brilon_angebote WHERE id=$1 RETURNING id',[id]);
+  if(!q.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+  return reply(res,200,{success:true,geloescht:true,id});
+}
+
 if (preisRoute && req.method === 'PATCH') {
   const d = await body(req);
   const bisher=await pool.query(
