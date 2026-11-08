@@ -25,6 +25,39 @@ let angeboteCache=[];
 let verfuegbarkeitsAnfrage=0;
 let sonderaktionsPrefix='';
 let ausgewaehlteSonderaktion=null;
+let angeboteFertig=false;
+let geladeneAktionen=null;
+let angebotslinkAngewendet=false;
+// Angebote aus WhatsApp führen in dasselbe reguläre Buchungsformular.
+function angebotBuchungslink(typ,id){
+  const url=new URL('/',window.location.origin);
+  url.searchParams.set(typ,String(id));
+  url.hash='buchung';
+  return url.pathname+url.search+url.hash;
+}
+function angebotslinkAnwenden(){
+  if(!angeboteFertig||angebotslinkAngewendet)return;
+  const query=new URLSearchParams(window.location.search);
+  const id=query.get('programm'),aktionId=query.get('aktion');
+  if(!id&&!aktionId)return;
+  if(aktionId&&geladeneAktionen===null)return;
+  angebotslinkAngewendet=true;
+  if(aktionId){
+    const aktion=geladeneAktionen.find(item=>String(item.id||item.sonderaktion_id)===aktionId);
+    if(aktion)sonderaktionAnfragen(aktion);
+    return;
+  }
+  const programm=angeboteCache.find(item=>String(item.id)===id);
+  if(!programm)return;
+  const orte=Array.isArray(programm.veranstaltungsorte)&&programm.veranstaltungsorte.length?
+    programm.veranstaltungsorte:[programm.veranstaltungsort].filter(Boolean);
+  const ort=orte.find(name=>Array.from(standortAuswahl.options).some(option=>option.value===name));
+  if(!ort)return;
+  standortAuswahl.value=ort;
+  standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+  angebotAuswahl.value=programm.name;
+  angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+}
 function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
   const anzahl=Number(teilnehmer),basis=Number(programm?.dauer);
@@ -581,7 +614,7 @@ function sonderaktionAnfragen(aktion){
  // wann und an welchen Chat ein Angebot geschickt wird. Kein automatischer Massenversand.
 function whatsappTeilLink(titel,hinweise,ziel){
   const url=new URL(ziel,window.location.origin).href;
-  const nachricht='Klettern & Abenteuer: '+titel+'\n'+hinweise+'\nDetails und unverbindliche Terminanfrage: '+url;
+  const nachricht='Klettern & Abenteuer: '+titel+'\n'+hinweise+'\nJetzt auf der Webseite das reguläre Buchungsformular nutzen: '+url+'\nTermine, Preise und Verfügbarkeit werden bei der Buchungsanfrage geprüft.';
   return 'https://api.whatsapp.com/send?text='+encodeURIComponent(nachricht);
 }
 function whatsappTeilButton(titel,hinweise,ziel){
@@ -603,6 +636,9 @@ async function specials() {
     if (!r.ok) throw Error();
 
     const items = await r.json();
+    if(!Array.isArray(items))throw Error('Ungültige Sonderangebote');
+    geladeneAktionen=items;
+    angebotslinkAnwenden();
     root.replaceChildren();
 
     if (!items.length) {
@@ -664,7 +700,7 @@ anfrageButton.style.marginTop = '12px';
 
 a.append(anfrageButton);
       const shareInfo=[d.textContent,t.textContent].filter(Boolean).join(' · ');
-      a.append(whatsappTeilButton(item.titel,shareInfo,'/#aktionen'));
+      a.append(whatsappTeilButton(item.titel,shareInfo,item.id!=null?angebotBuchungslink('aktion',item.id):'/#buchung'));
       root.append(a);
     }
   } catch {
@@ -736,7 +772,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     anfrage.dataset.program=angebot.name;
     anfrage.textContent='Dieses Angebot anfragen →';
     karte.append(anfrage);
-    karte.append(whatsappTeilButton(angebot.name,meta,'/#angebote'));
+    karte.append(whatsappTeilButton(angebot.name,meta,angebot.id!=null?angebotBuchungslink('programm',angebot.id):'/#buchung'));
     ausgabe.append(karte);
   }
 }
@@ -815,6 +851,8 @@ async function angeboteLaden() {
     }
     angeboteFuerStandortAnzeigen();
     einzelplatzFormAktualisieren();
+    angeboteFertig=true;
+    angebotslinkAnwenden();
   } catch (fehler) {
     console.error('Erlebnisangebote oder Veranstaltungsorte konnten nicht geladen werden:', fehler);
     uhrzeitHinweis.textContent='Standorte und Angebote konnten nicht geladen werden. Bitte lade die Seite erneut.';
