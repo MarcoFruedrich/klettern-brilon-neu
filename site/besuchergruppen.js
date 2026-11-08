@@ -12,7 +12,7 @@
   ];
   let gruppen=defaults;
   const synonyms={
-    familien:/famil|eltern|kind|alle/i,
+    familien:/famil|eltern|kind/i,
     kindergeburtstage:/geburtstag|kindergeburtstag|party/i,
     schulen:/schul|klasse|projekt|lehrer/i,
     vereine:/verein|sportgruppe/i,
