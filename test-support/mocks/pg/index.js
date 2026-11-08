@@ -69,6 +69,10 @@ class Pool {
       return {rows:[{id:1}],rowCount:1};
     }
     if(sql.includes('UPDATE brilon_kundenbestaetigungen SET faellig_ab=$1'))return {rows:[],rowCount:0};
+    if (sql.includes('UPDATE brilon_rechnungsdaten')&&sql.includes('jsonb_set')) {
+      this.rechnungsdaten.hintergrundEffekte=JSON.parse(params[0]);
+      return {rows:[{id:1}],rowCount:1};
+    }
     if (sql.includes('UPDATE brilon_rechnungsdaten')) {
       const patch=typeof params[0]==='string'?JSON.parse(params[0]):(params[0]||{});
       this.rechnungsdaten={...this.rechnungsdaten,...patch};
