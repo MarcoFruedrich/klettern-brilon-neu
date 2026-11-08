@@ -400,7 +400,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const form=page.locator('#neues-angebot-form');
     await form.locator('[name="name"]').fill('Bouldern Kinder');
     await form.locator('[name="beschreibung"]').fill('Browsertestangebot');
-    await form.locator('[name="dauer"]').fill('75');
+    await form.locator(':scope > label > input[name="dauer"]').fill('75');
     await form.locator('[name="kapazitaet"]').fill('12');
     await form.locator('[name="zielgruppe"]').fill('Kinder');
     await form.locator('[name="verfuegbare_termine"]').fill('2027-03-15');
