@@ -47,7 +47,7 @@
       form.append(field('Vertragliche Wochenstunden','wochenstunden',p.wochenstunden));
       form.append(field('Vertragliche Monatsstunden','monatsstunden',p.monatsstunden));
       const minijobLimit=field('Individuelle Minijob-Grenze (€; leer = gesetzlicher Wert)','minijobGrenze',
-        p.minijob_grenze_cent==null?'':p.minijob_grenze_cent/100));
+        p.minijob_grenze_cent==null?'':p.minijob_grenze_cent/100);
       const updateContractFields=()=>{
         rateField.firstChild.textContent=select.value==='honorar'?'Honorarsatz pro Stunde (€)':
           select.value==='nicht_hinterlegt'?'Stundenlohn / Honorarsatz (€)':'Stundenlohn brutto (€)';
