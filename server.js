@@ -16,6 +16,7 @@ const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben }
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { leseWebsiteEffekte,pruefeWebsiteEffekte } = require('./lib/website-effekte');
+const { standard:standardSocialLinks, normalisiereGespeichert, validiereAenderung, fuerWebsite } = require('./lib/social-links');
 const { createPdf: erstelleRechnungsPdf, formatDate: rechnungsDatumFormatieren } = require('./lib/rechnung');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
@@ -492,6 +493,46 @@ async function main(req,res){
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    // Kanalweise Sichtbarkeit: öffentlich sind nur freigeschaltete Links verfügbar.
+    // Die Administration speichert Links und Status dauerhaft im vorhandenen Website-Konfigurationsdatensatz.
+    if(route==='/api/social-links'&&req.method==='GET'){
+      if(!pool)return reply(res,200,{kanäle:fuerWebsite(standardSocialLinks())});
+      try{
+        const q=await pool.query("SELECT data->'socialLinks' AS links FROM brilon_rechnungsdaten WHERE id=1");
+        return reply(res,200,{kanäle:fuerWebsite(normalisiereGespeichert(q.rows[0]?.links))});
+      }catch(error){
+        console.error('Öffentliche Social-Media-Konfiguration nicht abrufbar:',error.message);
+        return reply(res,503,{error:'Social-Media-Links vorübergehend nicht verfügbar.'});
+      }
+    }
+    if(route==='/api/admin/social-links'&&(req.method==='GET'||req.method==='PUT')){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      if(req.method==='GET'){
+        try{
+          const q=await pool.query("SELECT data->'socialLinks' AS links FROM brilon_rechnungsdaten WHERE id=1");
+          if(!q.rowCount)return reply(res,503,{error:'Website-Einstellungen noch nicht verfügbar.'});
+          return reply(res,200,{kanäle:normalisiereGespeichert(q.rows[0].links)});
+        }catch(error){
+          console.error('Social-Media-Einstellungen konnten nicht geladen werden:',error.message);
+          return reply(res,503,{error:'Social-Media-Einstellungen vorübergehend nicht verfügbar.'});
+        }
+      }
+      const input=await body(req,12000);
+      let kanäle;
+      try{kanäle=validiereAenderung(input);}
+      catch(error){return reply(res,400,{error:error.message});}
+      try{
+        const q=await pool.query(`UPDATE brilon_rechnungsdaten
+          SET data=jsonb_set(COALESCE(data,'{}'::jsonb),'{socialLinks}',$1::jsonb,true),
+            aktualisiert_am=NOW() WHERE id=1 RETURNING id`,[JSON.stringify(kanäle)]);
+        if(!q.rowCount)return reply(res,503,{error:'Website-Einstellungen noch nicht verfügbar.'});
+        return reply(res,200,{success:true,kanäle});
+      }catch(error){
+        console.error('Social-Media-Einstellungen konnten nicht gespeichert werden:',error.message);
+        return reply(res,503,{error:'Social-Media-Einstellungen konnten nicht gespeichert werden.'});
+      }
+    }
     // Nur freigegebene grafische Einstellungen, keinerlei Verwaltungs- oder Kundendaten.
     if(route==='/api/website-effekte'&&req.method==='GET'){
       if(!pool)return reply(res,200,leseWebsiteEffekte(null));
