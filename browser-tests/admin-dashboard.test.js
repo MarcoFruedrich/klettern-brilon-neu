@@ -58,6 +58,13 @@ function fakeAdminApi(page) {
       return json(200,state.inspectionOverview);
     if(endpoint==='/api/admin/pruefung/tablets'&&method==='GET')
       return json(200,state.inspectionTablets);
+    const remove=endpoint.match(/^\/api\/admin\/pruefung\/tablets\/([^/]+)$/);
+    if(remove&&method==='DELETE'){
+      const index=state.inspectionTablets.findIndex(tablet=>tablet.id===remove[1]);
+      if(index<0)return json(404,{error:'Tablet nicht vorhanden'});
+      state.inspectionTablets.splice(index,1);
+      return json(200,{success:true,gelöscht:true,zugangGesperrt:true});
+    }
     const replacement=endpoint.match(/^\/api\/admin\/pruefung\/tablets\/([^/]+)\/ersetzen$/);
     if(replacement&&method==='POST'){
       const d=readBody(),tablet=state.inspectionTablets.find(x=>x.id===replacement[1]&&x.aktiv);
@@ -923,6 +930,30 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await card.getByRole('button',{name:'Werbestandort speichern'}).click();
     await page.waitForFunction(()=>document.querySelector('#tablet-admin-list')?.textContent?.includes('Werbestandort: Nicht zugewiesen'));
     assert.equal(state.inspectionTablets[0].ort_id,null);
+    await page.close();
+  });
+
+  await t.test('Tablet vollständig über Verwaltung löschen, sofort ausblenden und serverseitig sperren',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const id='550e8400-e29b-41d4-a716-446655441066';
+    state.inspectionTablets=[{id,name:'Testtablet löschen',aktiv:true,online:true,
+      pruefdisplay:true,ort_id:1,standort:'Brilon',
+      gekoppelt_am:'2027-01-01T12:00:00Z',zuletzt_gesehen_am:'2027-01-01T12:05:00Z'}];
+    const prompts=[];
+    page.on('dialog',async dialog=>{prompts.push(dialog.message());await dialog.accept();});
+    await login(page,root);
+    await openAdminView(page,'#stationspruefung');
+    const tablet=page.locator('#tablet-admin-list article').filter({hasText:'Testtablet löschen'});
+    await tablet.getByRole('button',{name:'Tablet löschen'}).click();
+    await page.waitForFunction(()=>document.getElementById('tablet-admin-status')?.textContent?.includes('serverseitig gesperrt'));
+    assert.equal(await page.locator('#tablet-admin-list article').filter({hasText:'Testtablet löschen'}).count(),0);
+    assert.equal(state.inspectionTablets.length,0);
+    assert.equal(prompts.length,1);
+    assert.match(prompts[0],/sofort gesperrt/);
+    assert.equal(state.mutations.filter(m=>m.endpoint===
+      '/api/admin/pruefung/tablets/'+id&&m.method==='DELETE').length,1);
+    assert.equal(await page.locator('#tablet-admin-list').getByText('Noch kein Werbetablet gekoppelt.').isVisible(),true);
     await page.close();
   });
 
