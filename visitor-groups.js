@@ -42,7 +42,13 @@ function sichereBesucherBildUrl(value) {
 
 function prepareVisitorGroups(input) {
   const configured=Array.isArray(input)?input:[];
-  return DEFAULT_VISITOR_GROUPS.map(defaults=>{
+  const orderedDefaults=Array.isArray(input)
+    ?[...DEFAULT_VISITOR_GROUPS].sort((a,b)=>{
+      const ai=input.findIndex(g=>g?.id===a.id),bi=input.findIndex(g=>g?.id===b.id);
+      return (ai<0?DEFAULT_VISITOR_GROUPS.indexOf(a):ai)-(bi<0?DEFAULT_VISITOR_GROUPS.indexOf(b):bi);
+    })
+    :DEFAULT_VISITOR_GROUPS;
+  return orderedDefaults.map(defaults=>{
     const source=configured.find(g=>g&&g.id===defaults.id)||{};
     const text=(key,max)=>typeof source[key]==='string'&&source[key].trim()
       ?source[key].trim().slice(0,max):defaults[key];
