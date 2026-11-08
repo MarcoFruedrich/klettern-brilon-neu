@@ -1825,7 +1825,7 @@ if (angeboteAdminListe) {
 
 /* Neues Erlebnisangebot speichern */
 
-function programmStufenEditor(container, initial=[], presets=[[1,5,"",60],[6,10,"",90],[11,15,"",120],[16,20,"",150]]){
+function programmStufenEditor(container, initial=[], presets=[[1,5,"",60]]){
   if(!container)return;
   const rows=Array.isArray(initial)&&initial.length?initial:presets.map(([min,max,preis,dauer])=>({min,max,preis,dauer}));
   container.replaceChildren();
@@ -1908,6 +1908,7 @@ if (neuesAngebotForm) {
     daten.veroeffentlicht=neuesAngebotForm.elements.veroeffentlicht.checked;
     daten.mindestteilnehmer=Number(daten.mindestteilnehmer||5);
     daten.preis_pro_person=Number(daten.preis_pro_person||0);
+    daten.weitere_gruppen_auf_anfrage=angebotsModus.value!=='einzelplatz'&&neuesAngebotForm.elements.weitere_gruppen_auf_anfrage.checked;
     daten.gruppenstufen=angebotsModus.value==='einzelplatz'?[]:programmStufenAuslesen(createTierEditor);
     if(daten.dauer_modus==='fest')daten.gruppenstufen.forEach(stufe=>stufe.dauer=Number(daten.dauer));
 
@@ -2315,9 +2316,18 @@ const addTierButton=el('button','Teilnehmerstufe hinzufügen');addTierButton.typ
 addTierButton.addEventListener('click',()=>{tierEditor.onaddprogramtier?.();gruppenDauerEingabenAktualisieren();});
 const tierLegend=el('h4','Teilnehmerstufen · Preis je Gruppe');
 preisbereich.append(tierLegend,tierEditor,addTierButton);
+const weitereGruppenLabel=document.createElement('label');
+weitereGruppenLabel.className='check gruppen-anfrage-option';
+const weitereGruppenCheck=document.createElement('input');
+weitereGruppenCheck.type='checkbox';
+weitereGruppenCheck.checked=angebot.weitere_gruppen_auf_anfrage===true;
+const weitereGruppenText=el('span','Weitere Gruppengrößen auf Anfrage – individuelles Angebot ohne festen Preis oder feste Dauer ermöglichen');
+weitereGruppenLabel.append(weitereGruppenCheck,weitereGruppenText);
+preisbereich.append(weitereGruppenLabel);
 function preisEingabenAktualisieren(){
   const einzel=modus.value==='einzelplatz';
   tierLegend.hidden=einzel;tierEditor.hidden=einzel;addTierButton.hidden=einzel;
+  weitereGruppenLabel.hidden=einzel;
   einzelPreisHinweis.hidden=!einzel;
   mindest.parentElement.hidden=!einzel;
   einzelpreis.parentElement.hidden=!einzel;
@@ -2438,6 +2448,7 @@ preisButton.addEventListener('click', async () => {
       },
       body: JSON.stringify({
   preise,gruppenstufen,dauer_modus:dauerModus.value,
+  weitere_gruppen_auf_anfrage:modus.value==='gruppe'&&weitereGruppenCheck.checked,
   aktiv: aktivSchalter.checked,
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
