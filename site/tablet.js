@@ -4,6 +4,7 @@ const safeText=value=>typeof value==='string'?value:'';
 const POLL_MS=3000,OFFER_REFRESH_MS=5*60*1000,API_TIMEOUT_MS=7000;
 let expiry=0,selected=-1,offers=[],activeOffer='',polling=false,loadingOffers=false;
 let displayCode='',wakeLock=null,displayGeneration=0;
+let currentSiteId=null,paired=false;
 
 async function api(url,options={}){
   const controller=new AbortController();
@@ -28,6 +29,9 @@ function hideCode(){
 }
 function showPairing(message){
   hideCode();
+  paired=false;currentSiteId=null;offers=[];selected=-1;activeOffer='';
+  $('tablet-site').textContent='Standort wird geladen …';
+  renderOffer();
   $('tablet-pairing').hidden=false;$('tablet-screen').hidden=true;
   if(message)$('tablet-pair-message').textContent=message;
 }
@@ -37,8 +41,9 @@ function showScreen(){
 function renderOffer(){
   if(!offers.length){
     $('tablet-offer-title').textContent='Klettern, Bouldern & Abenteuer';
-    $('tablet-offer-description').textContent=
-      'Programme für Gruppen, Schulklassen und Familien – fragt an der Rezeption nach!';
+    $('tablet-offer-description').textContent=currentSiteId===null
+      ?'Dieses Tablet muss in der Verwaltung noch einem Veranstaltungsstandort zugeordnet werden.'
+      :'Für diesen Standort sind aktuell keine freigegebenen Programme verfügbar.';
     return;
   }
   const offer=offers[selected>=0?selected:0];
@@ -47,12 +52,14 @@ function renderOffer(){
     safeText(offer.beschreibung||offer.hinweise||'Jetzt Programm anfragen!').slice(0,420);
 }
 async function loadOffers(){
-  if(loadingOffers)return;
+  if(loadingOffers||!paired||currentSiteId===null)return;
   loadingOffers=true;
+  const requestedSite=currentSiteId;
   try{
-    const data=await api('/api/angebote');
-    if(!Array.isArray(data))throw Error('Angebotsformat ungültig.');
-    const updated=data.filter(x=>x&&typeof x.name==='string'&&x.name.trim())
+    const data=await api('/api/pruefung/tablet/angebote');
+    if(!Array.isArray(data.angebote))throw Error('Angebotsformat ungültig.');
+    if(currentSiteId!==requestedSite||String(data.ortId??'')!==requestedSite)return;
+    const updated=data.angebote.filter(x=>x&&typeof x.name==='string'&&x.name.trim())
       .slice(0,16);
     const former=offers[selected]?.id||activeOffer;
     offers=updated;
@@ -86,6 +93,15 @@ async function checkTablet(){
     if(document.hidden||checkGeneration!==displayGeneration)return;
     showScreen();
     $('tablet-connection').textContent='Gekoppeltes Tablet: '+safeText(display.name);
+    const site=display.ortId==null?null:String(display.ortId);
+    paired=true;
+    $('tablet-site').textContent=display.standort||'Noch kein Standort zugewiesen';
+    if(site!==currentSiteId){
+      currentSiteId=site;
+      offers=[];selected=-1;activeOffer='';
+      renderOffer();
+      if(site!==null)loadOffers();
+    }
     const seconds=Number(display.gueltigSekunden);
     if(typeof display.code==='string'&&/^\d{6}$/.test(display.code)&&
       Number.isFinite(seconds)&&seconds>0&&seconds<=120){
