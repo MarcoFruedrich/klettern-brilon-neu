@@ -429,6 +429,81 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.close();
   });
 
+  await t.test('Beschäftigungsdaten sind bearbeitbar und lassen sich für einen Mitarbeiter speichern',async()=>{
+    const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    const id='550e8400-e29b-41d4-a716-446655441234';
+    state.inspectionStaff.push({id,name:'Vertrags-Testperson',email:'testperson@example.test',
+      art:'konto',status:'aktiv',aktiv:true,qualifikationen:'Klettern',freigaben:[],
+      beschaeftigungsart:'nicht_hinterlegt'});
+    let contract={id,name:'Vertrags-Testperson',art:null,wochenstunden:null,monatsstunden:null,
+      stundenlohn_cent:null,minijob_grenze_cent:null};
+    const respond=(route,body)=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
+    await page.route('**/api/admin/einsatzplanung/personen',route=>respond(route,[contract]));
+    await page.route('**/api/admin/einsatzplanung/vertrag/*',route=>{
+      assert.equal(route.request().headers()['x-csrf-token'],state.csrf);
+      const data=JSON.parse(route.request().postData());
+      contract={...contract,art:data.art,wochenstunden:Number(data.wochenstunden),
+        monatsstunden:data.monatsstunden===''?null:Number(data.monatsstunden),
+        stundenlohn_cent:Math.round(Number(data.stundenlohn)*100)};
+      return respond(route,contract);
+    });
+    await login(page,root);
+    const card=page.locator('#pruef-personal-list .booking').filter({hasText:'Vertrags-Testperson'});
+    await card.getByRole('button',{name:'Beschäftigungsdaten bearbeiten'}).click();
+    assert.equal(await page.locator('#mitarbeiter-section').isVisible(),true);
+    const form=page.locator('.arbeitsvertrag-karte[data-mitarbeiter-id="'+id+'"] form');
+    await form.waitFor({state:'visible'});
+    await form.locator('select[name="art"]').selectOption('teilzeit');
+    await form.locator('input[name="wochenstunden"]').fill('30');
+    await form.locator('input[name="stundenlohn"]').fill('21.50');
+    await form.getByRole('button',{name:'Vertragsdaten speichern'}).click();
+    await page.waitForFunction(()=>document.getElementById('arbeitsvertraege-status')?.textContent.includes('erfolgreich gespeichert'));
+    assert.equal(contract.art,'teilzeit');
+    assert.equal(contract.wochenstunden,30);
+    assert.equal(contract.stundenlohn_cent,2150);
+    assert.equal(await form.locator('select[name="art"]').inputValue(),'teilzeit');
+    await form.locator('select[name="art"]').selectOption('honorar');
+    await form.locator('input[name="monatsstunden"]').fill('80');
+    await form.getByRole('button',{name:'Vertragsdaten speichern'}).click();
+    await page.waitForFunction(()=>document.querySelector('#arbeitsvertraege-status')?.textContent.includes('erfolgreich gespeichert'));
+    assert.equal(contract.art,'honorar');
+    assert.equal(contract.monatsstunden,80);
+    await page.close();
+  });
+
+  await t.test('Öffentlichkeitsarbeit: WhatsApp-Button und weitere Social-Media-Links einzeln steuern',async()=>{
+    const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    let links=[
+      {id:'whatsapp',name:'WhatsApp Business',url:'https://wa.me/message/JXO6HLT34O37B1',aktiv:true},
+      ...['instagram','facebook','youtube','tiktok','x'].map(id=>({id,name:id,url:'',aktiv:false}))
+    ];
+    await page.route('**/api/admin/social-links',route=>{
+      if(route.request().method()==='PUT'){
+        assert.equal(route.request().headers()['x-csrf-token'],state.csrf);
+        links=JSON.parse(route.request().postData()).kanäle;
+      }
+      return route.fulfill({status:200,contentType:'application/json',
+        body:JSON.stringify({success:true,kanäle:links})});
+    });
+    await login(page,root);
+    await openAdminView(page,'#whatsapp-admin-section');
+    await page.locator('#whatsapp-visibility-toggle').waitFor({state:'visible'});
+    await page.getByRole('button',{name:'WhatsApp-Button deaktivieren'}).click();
+    await page.waitForFunction(()=>document.getElementById('whatsapp-visibility-status')?.textContent.includes('ausgeblendet'));
+    assert.equal(links[0].aktiv,false);
+    assert.match(links[0].url,/wa.me/);
+    await openAdminView(page,'#social-media-section');
+    const youtube=page.locator('.social-link-admin-card[data-social-channel="youtube"]');
+    await youtube.locator('input[type="url"]').fill('https://www.youtube.com/@KletternAbenteuer');
+    await youtube.getByRole('button',{name:'Veröffentlichen'}).click();
+    await page.waitForFunction(()=>document.getElementById('social-link-admin-status')?.textContent.includes('gespeichert'));
+    assert.equal(links.find(item=>item.id==='youtube').aktiv,true);
+    assert.match(links.find(item=>item.id==='youtube').url,/youtube.com/);
+    await page.close();
+  });
+
   await t.test('Walddesign und zweiter Programmstreifen: einzelnes Programm direkt öffnen',async()=>{
     const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
     const state=fakeAdminApi(page);
