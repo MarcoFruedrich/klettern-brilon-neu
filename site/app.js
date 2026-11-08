@@ -577,6 +577,23 @@ function sonderaktionAnfragen(aktion){
   nachricht.focus({preventScroll:true});
 }
 
+// Veröffentlichung für WhatsApp vorbereitet: Der Kunde bzw. die Verwaltung entscheidet,
+ // wann und an welchen Chat ein Angebot geschickt wird. Kein automatischer Massenversand.
+function whatsappTeilLink(titel,hinweise,ziel){
+  const url=new URL(ziel,window.location.origin).href;
+  const nachricht='Klettern & Abenteuer: '+titel+'\n'+hinweise+'\nDetails und unverbindliche Terminanfrage: '+url;
+  return 'https://api.whatsapp.com/send?text='+encodeURIComponent(nachricht);
+}
+function whatsappTeilButton(titel,hinweise,ziel){
+  const link=document.createElement('a');
+  link.href=whatsappTeilLink(titel,hinweise,ziel);
+  link.target='_blank';link.rel='noopener noreferrer';
+  link.className='whatsapp-share-link';
+  link.textContent='Über WhatsApp teilen';
+  link.setAttribute('aria-label',titel+' über WhatsApp teilen');
+  return link;
+}
+
 // Tages- und Sonderangebote
 async function specials() {
   const root = document.getElementById('specials');
@@ -646,6 +663,8 @@ anfrageButton.style.display = 'inline-block';
 anfrageButton.style.marginTop = '12px';
 
 a.append(anfrageButton);
+      const shareInfo=[d.textContent,t.textContent].filter(Boolean).join(' · ');
+      a.append(whatsappTeilButton(item.titel,shareInfo,'/#aktionen'));
       root.append(a);
     }
   } catch {
@@ -717,6 +736,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     anfrage.dataset.program=angebot.name;
     anfrage.textContent='Dieses Angebot anfragen →';
     karte.append(anfrage);
+    karte.append(whatsappTeilButton(angebot.name,meta,'/#angebote'));
     ausgabe.append(karte);
   }
 }
