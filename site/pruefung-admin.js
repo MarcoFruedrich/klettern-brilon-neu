@@ -186,8 +186,12 @@
           ([hours,rate,cap].filter(Boolean).length?' · '+[hours,rate,cap].filter(Boolean).join(' · '):'')));
         const employmentLink=elt('button','Beschäftigungsdaten bearbeiten');employmentLink.type='button';employmentLink.className='btn secondary';
         employmentLink.addEventListener('click',()=>{
-          window.adminNavigateToElement?.('mitarbeiter-section');
-          find('arbeitsvertraege-heading')?.scrollIntoView({behavior:'smooth',block:'start'});
+          if(typeof window.adminMitarbeiterVertragOeffnen==='function'){
+            window.adminMitarbeiterVertragOeffnen(person.id);
+          }else{
+            window.adminNavigateToElement?.('mitarbeiter-section');
+            find('arbeitsvertraege-heading')?.scrollIntoView({behavior:'smooth',block:'start'});
+          }
         });
         card.append(employmentLink);
       }
