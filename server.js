@@ -3013,7 +3013,7 @@ if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
     `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
             veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
-            buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,sortierung,archiviert
+            buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,weitere_gruppen_auf_anfrage,sortierung,archiviert
      FROM brilon_angebote
      ORDER BY archiviert ASC,sortierung ASC,id DESC`
   );
@@ -3066,6 +3066,7 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const buchungsmodus=d.buchungsmodus==='einzelplatz'?'einzelplatz':'gruppe';
   const mindestteilnehmer=Number(d.mindestteilnehmer??5);
   const preisProPerson=Number(d.preis_pro_person??0);
+  const weitereGruppenAnfrage=buchungsmodus==='gruppe'&&d.weitere_gruppen_auf_anfrage===true;
   const stufenErgebnis=programmStufenPruefen(d.gruppenstufen||[]);
 
   if(!name)return reply(res,400,{error:'Bitte einen Namen für das Angebot eingeben.'});
@@ -3091,14 +3092,14 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const q = await pool.query(
     `INSERT INTO brilon_angebote
       (name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,veranstaltungsorte,kapazitaet,
-       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,false,$7,$8,$9,$10::jsonb,$11,$12::jsonb,$13,$14,$15,$16,$17,$18,
+       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,weitere_gruppen_auf_anfrage,sortierung,archiviert)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,false,$7,$8,$9,$10::jsonb,$11,$12::jsonb,$13,$14,$15,$16,$17,$18,$19,
        (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false)
      RETURNING id`,
     [name,beschreibung,dauer,dauerModus,JSON.stringify(gruppenstufen),JSON.stringify(gruppenPreise),kategorie,zielgruppe,
       requestedSites[0],JSON.stringify(requestedSites),kapazitaet,JSON.stringify(termine),hinweise,
       d.buchbar===true,d.veroeffentlicht===true,buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-      buchungsmodus==='einzelplatz'?preisProPerson:0]
+      buchungsmodus==='einzelplatz'?preisProPerson:0,weitereGruppenAnfrage]
   );
 
   return reply(res, 201, {
@@ -3157,6 +3158,8 @@ const buchungsmodus=d.buchungsmodus===undefined?(alt.buchungsmodus||'gruppe'):
   d.buchungsmodus==='einzelplatz'?'einzelplatz':'gruppe';
 const mindestteilnehmer=Number(d.mindestteilnehmer??alt.mindestteilnehmer??5);
 const preisProPerson=Number(d.preis_pro_person??alt.preis_pro_person??0);
+const weitereGruppenAnfrage=buchungsmodus==='gruppe'&&
+  (d.weitere_gruppen_auf_anfrage===undefined?alt.weitere_gruppen_auf_anfrage===true:d.weitere_gruppen_auf_anfrage===true);
 if(!name||!kategorie||!requestedSites.length||!Number.isInteger(dauer)||dauer<15||dauer>1440||
    !Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>1000||termine.some(t=>!gueltigesDatum(t))||
    (buchungsmodus==='einzelplatz'&&(!Number.isInteger(kapazitaet)||kapazitaet<5||kapazitaet>12||
@@ -3173,11 +3176,12 @@ const q = await pool.query(
        name=$4,beschreibung = $5,
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,veranstaltungsorte=$9::jsonb,kapazitaet=$10,
        verfuegbare_termine=$11::jsonb,hinweise=$12,buchbar=$13,veroeffentlicht=$14,dauer=$15,
-       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18,dauer_modus=$19,gruppenstufen=$20::jsonb
+       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18,dauer_modus=$19,gruppenstufen=$20::jsonb,
+       weitere_gruppen_auf_anfrage=$21
    WHERE id = $2
    RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
-             buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,sortierung,archiviert`,
+             buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,weitere_gruppen_auf_anfrage,sortierung,archiviert`,
   [
     JSON.stringify(neuePreise),
     preisRoute[1],
@@ -3185,7 +3189,7 @@ const q = await pool.query(
     name,beschreibung,kategorie,zielgruppe,requestedSites[0],JSON.stringify(requestedSites),kapazitaet,
     JSON.stringify(termine),hinweise,buchbar,veroeffentlicht,dauer,
     buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-    buchungsmodus==='einzelplatz'?preisProPerson:0,dauerModus,JSON.stringify(gruppenstufen)
+    buchungsmodus==='einzelplatz'?preisProPerson:0,dauerModus,JSON.stringify(gruppenstufen),weitereGruppenAnfrage
   ]
 );
 
@@ -3444,7 +3448,7 @@ if (route === '/api/angebote' && req.method === 'GET') {
   const q = await pool.query(
  `SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,bild_url,kategorie,zielgruppe,
         veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,
-        buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert
+        buchungsmodus,mindestteilnehmer,preis_pro_person,weitere_gruppen_auf_anfrage,sortierung,archiviert
      FROM brilon_angebote
      WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
      ORDER BY sortierung ASC,name ASC`
@@ -4118,7 +4122,8 @@ await pool.query(`
       await pool.query(`ALTER TABLE brilon_angebote
         ADD COLUMN IF NOT EXISTS veranstaltungsorte JSONB NOT NULL DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS dauer_modus TEXT NOT NULL DEFAULT 'gruppenstufe',
-        ADD COLUMN IF NOT EXISTS gruppenstufen JSONB NOT NULL DEFAULT '[]'::jsonb`);
+        ADD COLUMN IF NOT EXISTS gruppenstufen JSONB NOT NULL DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS weitere_gruppen_auf_anfrage BOOLEAN NOT NULL DEFAULT false`);
       await pool.query(`UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array(veranstaltungsort)
         WHERE jsonb_array_length(CASE WHEN jsonb_typeof(veranstaltungsorte)='array' THEN veranstaltungsorte ELSE '[]'::jsonb END)=0`);
       console.log('Programmstandorte geprüft und vorhandene Standorte übernommen');
