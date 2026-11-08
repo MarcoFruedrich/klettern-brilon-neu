@@ -89,6 +89,31 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     }
   });
 
+  await t.test('WhatsApp-Schalter blendet sowohl Floating-Button als auch Kontaktlink aus',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    await fakePublicApi(page);
+    let enabled=true;
+    await page.route('**/api/social-links',route=>route.fulfill({
+      status:200,contentType:'application/json',
+      body:JSON.stringify({kanäle:enabled
+        ?[{id:'whatsapp',name:'WhatsApp Business',url:'https://wa.me/message/JXO6HLT34O37B1'}]
+        :[]})
+    }));
+    await page.goto(root+'/');
+    await page.locator('#social-whatsapp-button').waitFor({state:'visible'});
+    assert.equal(await page.locator('#social-contact-links a[data-social-channel="whatsapp"]').count(),1);
+    enabled=false;
+    await page.reload();
+    await page.waitForResponse(response=>response.url().includes('/api/social-links'));
+    assert.equal(await page.locator('#social-whatsapp-button').count(),0);
+    assert.equal(await page.locator('#social-contact-links a[data-social-channel="whatsapp"]').count(),0);
+    enabled=true;
+    await page.reload();
+    await page.locator('#social-whatsapp-button').waitFor({state:'visible'});
+    assert.equal(await page.locator('#social-contact-links a[data-social-channel="whatsapp"]').count(),1);
+    await page.close();
+  });
+
   await t.test('WhatsApp-Angebote öffnen das vorhandene Buchungsformular statt eines WhatsApp-Chats',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
     await fakePublicApi(page);
