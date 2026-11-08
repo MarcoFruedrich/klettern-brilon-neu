@@ -8,6 +8,32 @@ let bookingPage=1;
 let zahlungsPage=1,zahlungsLadeSequenz=0;
 let csrfToken=null;
 let adminBuchbareProgramme=[];
+let ausgewaehltesAdminProgramm=null;
+let zuletztAngelegtesAdminProgramm=null;
+function adminProgrammEinzelansicht(id,{focus=false}={}){
+  const liste=document.getElementById('angebote-admin-liste');
+  const picker=document.getElementById('admin-program-picker');
+  if(!liste||!picker)return;
+  ausgewaehltesAdminProgramm=id;
+  for(const karte of liste.querySelectorAll(':scope > .card')){
+    karte.hidden=id!=='alle'&&karte.dataset.programId!==String(id);
+  }
+  for(const button of picker.querySelectorAll('button[data-program-id]')){
+    button.setAttribute('aria-pressed',String(button.dataset.programId===String(id)));
+  }
+  if(focus){
+    const selected=liste.querySelector(':scope > .card:not([hidden])');
+    if(selected){
+      selected.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+      const heading=selected.querySelector('h3');
+      if(heading){
+        heading.setAttribute('tabindex','-1');
+        heading.focus({preventScroll:true});
+      }
+    }
+  }
+}
+
 
 const adminViews=Array.from(document.querySelectorAll('[data-admin-view]'));
 const adminViewLinks=Array.from(document.querySelectorAll('[data-admin-view-link]'));
@@ -45,6 +71,8 @@ function adminAnsichtAnzeigen(target,{hash=false,focus=false}={}){
     if(active||groupActive)link.setAttribute('aria-current','page');
     else link.removeAttribute('aria-current');
   }
+  const programSwitcher=document.getElementById('admin-program-secondary');
+  if(programSwitcher)programSwitcher.hidden=programTab==='neu';
   const programForm=document.getElementById('neues-angebot-form');
   const programList=document.getElementById('angebote-admin-liste');
   const programHeading=programForm?.previousElementSibling;
@@ -1884,13 +1912,14 @@ if (neuesAngebotForm) {
     if(daten.dauer_modus==='fest')daten.gruppenstufen.forEach(stufe=>stufe.dauer=Number(daten.dauer));
 
     try {
-      await api('/api/admin/angebote', {
+      const erstellt=await api('/api/admin/angebote', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(daten)
       });
+      zuletztAngelegtesAdminProgramm={id:erstellt?.id??erstellt?.angebot?.id??null,name:daten.name};
 
       neuesAngebotForm.reset();
       programmStufenEditor(createTierEditor);
@@ -2113,17 +2142,47 @@ async function erlebnisangeboteLaden() {
       if([...specialSelect.options].some(o=>o.value===selected))specialSelect.value=selected;
     }
 
-    liste.innerHTML = '';
-
+    liste.replaceChildren();
+    const picker=document.getElementById('admin-program-picker');
+    const band=document.getElementById('admin-program-secondary');
+    if(picker){
+      picker.replaceChildren();
+      const filterButton=(id,label)=>{
+        const button=document.createElement('button');
+        button.type='button';
+        button.dataset.programId=String(id);
+        button.textContent=label;
+        button.setAttribute('aria-pressed','false');
+        button.addEventListener('click',()=>adminProgrammEinzelansicht(id,{focus:true}));
+        picker.append(button);
+      };
+      filterButton('alle','Alle anzeigen');
+      for(const angebot of angebote){
+        filterButton(angebot.id,(angebot.archiviert?'Archiviert · ':'')+angebot.name);
+      }
+    }
+    if(band)band.hidden=programTab==='neu';
     if (!angebote.length) {
       liste.textContent = 'Noch keine Angebote gespeichert.';
       return;
+    }
+
+    if(zuletztAngelegtesAdminProgramm){
+      const match=angebote.find(item=>(
+        (zuletztAngelegtesAdminProgramm.id!=null&&String(item.id)===String(zuletztAngelegtesAdminProgramm.id))||
+        item.name===zuletztAngelegtesAdminProgramm.name));
+      if(match)ausgewaehltesAdminProgramm=String(match.id);
+      zuletztAngelegtesAdminProgramm=null;
+    }
+    if(ausgewaehltesAdminProgramm!=='alle'&&!angebote.some(item=>String(item.id)===String(ausgewaehltesAdminProgramm))){
+      ausgewaehltesAdminProgramm=String((angebote.find(item=>!item.archiviert)||angebote[0]).id);
     }
 
     const aktiveAngebote=angebote.filter(a=>!a.archiviert);
     for (const angebot of angebote) {
       const eintrag = document.createElement('div');
       eintrag.className = 'card';
+      eintrag.dataset.programId=String(angebot.id);
 
       const titel = document.createElement('h3');
       titel.textContent = angebot.name;
@@ -2481,6 +2540,7 @@ eintrag.appendChild(archivierenButton);
 
       liste.appendChild(eintrag);
     }
+    adminProgrammEinzelansicht(ausgewaehltesAdminProgramm);
   } catch (fehler) {
     liste.textContent = 'Laden fehlgeschlagen: ' + fehler.message;
   }
