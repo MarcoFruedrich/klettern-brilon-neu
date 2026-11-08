@@ -1,6 +1,9 @@
 name: Entwicklung – isolierte Buchungs- und PostgreSQL-Tests
 
 on:
+  pull_request:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
   push:
     branches:
       - entwicklung/phase-1-buchungen-sonderangebote-gps
@@ -48,6 +51,8 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Laufzeit-Abhängigkeiten auf bekannte hohe Sicherheitslücken prüfen
         run: npm audit --audit-level=high
+      - name: Browser-JavaScript vor Ausführung syntaktisch prüfen
+        run: find site -maxdepth 1 -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Alle Tests einschließlich isolierter PostgreSQL-Integration
         env:
           NODE_OPTIONS: --require=./test-support/mocks/force-mock-modules.js

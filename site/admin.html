@@ -49,6 +49,7 @@
             <a href="#angebote-verwaltung" data-admin-view-link>Programme</a>
             <a href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
             <a href="#anschlussrabatt-section" data-admin-view-link>Anschlussrabatte</a>
+            <a href="#website-effekte-section" data-admin-view-link>Website-Effekte</a>
             <a href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
             <a href="#kundenfeedback-section" data-admin-view-link>Kundenfeedback</a>
             <a href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
@@ -297,7 +298,21 @@
 <div id="calendar-entries" class="admin-grid"></div>
       </section>
 
-      <section id="anschlussrabatt-section" class="booking admin-view" data-admin-view aria-labelledby="anschlussrabatt-heading">
+      <section id="website-effekte-section" class="booking admin-view" data-admin-view aria-labelledby="website-effekte-heading">
+  <h2 id="website-effekte-heading">Website-Effekte und Animationen</h2>
+  <p>Hier lassen sich Hintergrundeffekte aktivieren, deaktivieren, bearbeiten oder neu speichern. Die Effekte sind rein dekorativ, behindern keine Buchung und respektieren reduzierte Bewegung. Die Sonnen-/Mondbewegung im Logo bleibt unabhängig davon erhalten.</p>
+  <form id="website-effekte-form">
+    <label class="check"><input id="website-effekte-aktiv" type="checkbox"> <span>Hintergrundeffekte auf der Startseite aktivieren</span></label>
+    <label>Aktiver Effekt <select id="website-effekte-auswahl"><option value="">Kein Effekt</option></select></label>
+    <div id="website-effekte-liste" class="admin-grid"></div>
+    <button type="button" class="btn secondary" id="website-effekte-neu">Neuen Effekt anlegen</button>
+    <button type="submit" class="btn" id="website-effekte-speichern">Einstellungen speichern</button>
+  </form>
+  <p class="hint">Zahl und Dauer bestimmen die Animation. Neue Effekte lassen sich mit eigenem Namen und Symbol speichern. Für komplexe Szenen (z. B. ein laufendes GPS-Team) sind eigene Grafikdateien erforderlich.</p>
+  <p id="website-effekte-status" role="status" aria-live="polite"></p>
+</section>
+
+<section id="anschlussrabatt-section" class="booking admin-view" data-admin-view aria-labelledby="anschlussrabatt-heading">
         <h2 id="anschlussrabatt-heading">Anschlussrabatt berechnen</h2>
         <p>Unverbindliche Vorschau: Bei direkt aufeinanderfolgenden Programmen
           werden beide Programme um 10 % reduziert. Ein Programm erhaelt
@@ -671,6 +686,7 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261107-special-offer-availability"></script>
+  <script src="/website-effekte-admin.js?v=20261108"></script>
   <script src="/pruefung-admin.js?v=20261107-single-location-employment-special-approval"></script>
   <script src="/feedback-admin.js"></script>
   <script src="/einsatzplanung-admin.js?v=20261106-settings-persist-check"></script>

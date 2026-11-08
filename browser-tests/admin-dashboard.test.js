@@ -284,7 +284,8 @@ function fakeAdminApi(page) {
     if(endpoint==='/api/admin/angebote'&&method==='GET')return json(200,state.programs);
     if(endpoint==='/api/admin/angebote'&&method==='POST'){
       const values=readBody();
-      const program={...values,id:20+state.programs.length,aktiv:false,preise:{},bild_url:null};
+      const program={...values,id:20+state.programs.length,aktiv:false,
+        preise:Object.fromEntries((values.gruppenstufen||[]).map(x=>[`${x.min}-${x.max}`,x.preis])),bild_url:null};
       state.programs.push(program);
       return json(201,{id:program.id});
     }
@@ -400,7 +401,10 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const form=page.locator('#neues-angebot-form');
     await form.locator('[name="name"]').fill('Bouldern Kinder');
     await form.locator('[name="beschreibung"]').fill('Browsertestangebot');
-    await form.locator('[name="dauer"]').fill('75');
+    await form.locator('input[name="dauer"]').first().fill('75');
+    for(const [index,price] of ['85','135','180','230'].entries())
+      await form.locator('#neues-angebot-stufen .angebot-stufen-zeile').nth(index).locator('input[name="preis"]').fill(price);
+    await form.locator('#angebot-orte-auswahl input[value="Brilon"]').check();
     await form.locator('[name="kapazitaet"]').fill('12');
     await form.locator('[name="zielgruppe"]').fill('Kinder');
     await form.locator('[name="verfuegbare_termine"]').fill('2027-03-15');
@@ -412,12 +416,12 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(created.aktiv,false,'Neue Programme dürfen nicht ungeprüft aktiviert werden');
     assert.deepEqual(created.verfuegbare_termine,['2027-03-15']);
     const entry=page.locator('#angebote-admin-liste .card').filter({has:page.getByRole('heading',{name:'Bouldern Kinder'})});
-    await entry.locator('[name="dauer"]').fill('120');
-    await entry.locator('[data-gruppe="1-4"]').fill('85');
+    await entry.locator('input[name="dauer"]').first().fill('120');
+    await entry.locator('.angebot-stufen-zeile').first().locator('input[name="preis"]').fill('85');
     await entry.getByRole('button',{name:'Programm speichern'}).click();
     await page.waitForFunction(()=>document.querySelector('#angebote-admin-liste')?.textContent.includes('Bouldern Kinder'));
     assert.equal(created.dauer,120);
-    assert.equal(created.preise['1-4'],'85');
+    assert.equal(Number(created.gruppenstufen[0].preis),85);
     const reactivateEntry=page.locator('#angebote-admin-liste .card').filter({has:page.getByRole('heading',{name:'Bouldern Kinder'})});
     await reactivateEntry.getByRole('button',{name:/Deaktiviert/}).click();
     await page.waitForFunction(()=>document.querySelector('#angebote-admin-liste')?.textContent.includes('Bouldern Kinder'));
@@ -903,7 +907,8 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await placeForm.locator('button[type="submit"]').click();
     await page.waitForFunction(() => document.getElementById('admin-place-status')?.textContent.includes('Rüthen'));
     assert.equal(state.places.some(ort=>ort.name==='Rüthen'),true);
-    assert.equal(await page.locator('#angebot-ort').inputValue(),'Rüthen');
+    await openAdminView(page,'#angebote-verwaltung');
+    assert.equal(await page.locator('#angebot-orte-auswahl input[value="Rüthen"]').isChecked(),true);
     assert.ok(state.mutations.every(item=>['POST','PATCH','DELETE'].includes(item.method)));
     await page.close();
   });
@@ -947,8 +952,8 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await grant.locator('.staff-grant-place').nth(0).check();
     await grant.locator('.staff-grant-place').nth(1).check();
     await grant.locator('.staff-grant-qualification').nth(0).check();
-    await grant.getByRole('button',{name:'Auswahl freigeben und Zugang aktivieren'}).click();
-    await page.waitForFunction(()=>document.getElementById('pruef-personal-status')?.textContent.includes('Freigaben erstellt'));
+    await grant.getByRole('button',{name:'Standorte und Qualifikationen freigeben'}).click();
+    await page.waitForFunction(()=>document.getElementById('pruef-personal-status')?.textContent.includes('Mitarbeiterzugang freigeschaltet'));
     const saved=state.mutations.find(item=>item.endpoint.endsWith('/freigeben'));
     assert.deepEqual(saved.body.standorte,[1,2]);
     assert.deepEqual(saved.body.qualifikationen,['Kletterqualifikation']);

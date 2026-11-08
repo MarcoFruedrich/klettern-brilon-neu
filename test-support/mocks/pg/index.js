@@ -11,6 +11,7 @@ class Pool {
     this.placesTableReady=process.env.MOCK_PLACES_TABLE!=='missing';
     this.gpsTours = JSON.parse(process.env.MOCK_GPS_TOURS || '[]');
     this.nextOfferId = this.offers.reduce((next,offer)=>Math.max(next,Number(offer.id)||0),0)+1;
+    this.kundenbestaetigungEinstellungen={verzoegerungMinuten:120,ruhebeginn:'18:00',ruheende:'09:00'};
     this.adminSessions = new Map();
     this.adminTotpSteps = new Map();
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
@@ -60,7 +61,18 @@ class Pool {
         aktiv:String(this.rechnungsdaten.agbAktiv),version:String(this.rechnungsdaten.agbVersion)}],rowCount:1};
       return {rows:[{data:this.rechnungsdaten}],rowCount:1};
     }
+    if(sql.includes('FROM brilon_kundenbestaetigung_einstellungen'))
+      return {rows:[{...this.kundenbestaetigungEinstellungen}],rowCount:1};
+    if(sql.includes('INSERT INTO brilon_kundenbestaetigung_einstellungen')){
+      const [verzoegerungMinuten,ruhebeginn,ruheende]=params;
+      this.kundenbestaetigungEinstellungen={verzoegerungMinuten,ruhebeginn,ruheende};
+      return {rows:[{id:1}],rowCount:1};
+    }
     if(sql.includes('UPDATE brilon_kundenbestaetigungen SET faellig_ab=$1'))return {rows:[],rowCount:0};
+    if (sql.includes('UPDATE brilon_rechnungsdaten')&&sql.includes('jsonb_set')) {
+      this.rechnungsdaten.hintergrundEffekte=JSON.parse(params[0]);
+      return {rows:[{id:1}],rowCount:1};
+    }
     if (sql.includes('UPDATE brilon_rechnungsdaten')) {
       const patch=typeof params[0]==='string'?JSON.parse(params[0]):(params[0]||{});
       this.rechnungsdaten={...this.rechnungsdaten,...patch};
@@ -87,6 +99,17 @@ class Pool {
     if(sql.includes('INSERT INTO brilon_angebote(name,beschreibung,dauer,preise,aktiv)')){
       const [name,beschreibung,dauer,rawPrices,aktiv]=params;
       const offer={id:this.nextOfferId++,name,beschreibung,dauer,preise:JSON.parse(rawPrices),aktiv};
+      this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
+    }
+    if(/INSERT INTO brilon_angebote\s*\(name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv,kategorie/.test(sql)){
+      const [name,beschreibung,dauer,dauer_modus,rawTiers,rawPrices,kategorie,zielgruppe,veranstaltungsort,
+        rawSites,kapazitaet,rawDates,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person]=params;
+      const sortierung=Math.max(0,...this.offers.map(item=>Number(item.sortierung)||0))+1;
+      const offer={id:this.nextOfferId++,name,beschreibung,dauer,dauer_modus,gruppenstufen:JSON.parse(rawTiers),
+        preise:JSON.parse(rawPrices),aktiv:false,kategorie,zielgruppe,veranstaltungsort,
+        veranstaltungsorte:JSON.parse(rawSites),kapazitaet,verfuegbare_termine:JSON.parse(rawDates),
+        hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,
+        sortierung,archiviert:false};
       this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
     }
     if(/INSERT INTO brilon_angebote\s*\(name,beschreibung,dauer,preise,aktiv,kategorie/.test(sql)){
@@ -160,13 +183,16 @@ class Pool {
     }
     if (/^\s*SELECT 1\s*;?\s*$/i.test(sql)) return { rows:[{ '?column?':1 }], rowCount:1 };
     if (/UPDATE brilon_angebote\s+SET preise/.test(sql)) {
-      const [prices,id,active,name,description,category,audience,place,capacity,dates,notes,bookable,published,duration,mode,minPeople,personPrice]=params;
+      const [prices,id,active,name,description,category,audience,place,rawSites,capacity,dates,
+        notes,bookable,published,duration,mode,minPeople,personPrice,durationMode,rawTiers]=params;
       const offer=this.offers.find(item=>String(item.id)===String(id));
       if(!offer)return {rows:[],rowCount:0};
-      Object.assign(offer,{preise:JSON.parse(prices),aktiv:active===null?offer.aktiv:active,name,beschreibung:description,
-        kategorie:category,zielgruppe:audience,veranstaltungsort:place,kapazitaet:capacity,
-        verfuegbare_termine:JSON.parse(dates),hinweise:notes,buchbar:bookable,veroeffentlicht:published,dauer:duration,
-        buchungsmodus:mode,mindestteilnehmer:minPeople,preis_pro_person:personPrice});
+      Object.assign(offer,{preise:JSON.parse(prices),aktiv:active===null?offer.aktiv:active,name,
+        beschreibung:description,kategorie:category,zielgruppe:audience,veranstaltungsort:place,
+        veranstaltungsorte:JSON.parse(rawSites),kapazitaet:capacity,
+        verfuegbare_termine:JSON.parse(dates),hinweise:notes,buchbar:bookable,
+        veroeffentlicht:published,dauer:duration,buchungsmodus:mode,mindestteilnehmer:minPeople,
+        preis_pro_person:personPrice,dauer_modus:durationMode,gruppenstufen:JSON.parse(rawTiers)});
       return {rows:[offer],rowCount:1};
     }
     if (sql.includes('FROM brilon_angebote')) {
