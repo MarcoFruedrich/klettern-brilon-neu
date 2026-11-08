@@ -2988,6 +2988,44 @@ if(route==='/api/admin/angebote/reihenfolge'&&req.method==='PATCH'){
   return reply(res,200,{success:true});
 }
 
+const angebotLoeschenRoute=route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
+if(angebotLoeschenRoute&&req.method==='DELETE'){
+  const angebotId=angebotLoeschenRoute[1];
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const angebot=await client.query('SELECT id,name FROM brilon_angebote WHERE id=$1 FOR UPDATE',[angebotId]);
+    if(!angebot.rowCount){
+      await client.query('ROLLBACK');
+      return reply(res,404,{error:'Programm nicht gefunden.'});
+    }
+    // Buchungsbelege und Buchungsverlauf dürfen niemals mit dem Programm gelöscht werden.
+    const buchungen=await client.query(`SELECT 1 FROM brilon_buchungen
+      WHERE data->>'angebot'=$1
+         OR data->>'programmId'=$2
+         OR data->>'programm_id'=$2
+      LIMIT 1`,[angebot.rows[0].name,String(angebotId)]);
+    if(buchungen.rowCount){
+      await client.query('ROLLBACK');
+      return reply(res,409,{error:'Zu diesem Programm gibt es bereits Buchungen. Bitte stattdessen archivieren, damit Rechnungen und Buchungsverläufe erhalten bleiben.'});
+    }
+    const touren=await client.query('SELECT 1 FROM brilon_gps_touren WHERE angebot_id=$1 LIMIT 1',[angebotId]);
+    if(touren.rowCount){
+      await client.query('ROLLBACK');
+      return reply(res,409,{error:'Das Programm ist mit einer GPS-Tour verbunden. Bitte zunächst die GPS-Tour entfernen oder das Programm archivieren.'});
+    }
+    await client.query('DELETE FROM brilon_angebote WHERE id=$1',[angebotId]);
+    await client.query('COMMIT');
+    return reply(res,200,{success:true,id:Number(angebotId)});
+  }catch(error){
+    await client.query('ROLLBACK');
+    if(error.code==='23503')return reply(res,409,{error:'Das Programm wird noch in anderen Bereichen verwendet. Bitte stattdessen archivieren.'});
+    throw error;
+  }finally{
+    client.release();
+  }
+}
+
 const archivRoute=route.match(/^\/api\/admin\/angebote\/([0-9]+)\/archivieren$/);
 if(archivRoute&&req.method==='PATCH'){
   const d=await body(req);
