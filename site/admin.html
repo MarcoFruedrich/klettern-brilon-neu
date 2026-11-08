@@ -445,7 +445,11 @@
       min="15" max="1440" step="1" required placeholder="z. B. 90">
   </label>
   <label>Dauerberechnung<select name="dauer_modus"><option value="gruppenstufe">Dauer je Teilnehmerstufe</option><option value="fest">Feste Dauer für alle Gruppengrößen</option></select></label>
-  <fieldset class="angebot-standort-auswahl"><legend>Teilnehmerstufen (Gruppenpreis und Dauer je Gruppe)</legend><div id="neues-angebot-stufen" class="angebot-stufen-editor"></div><button type="button" class="btn secondary" id="neues-angebot-stufe-hinzufuegen">Teilnehmerstufe hinzufügen</button><small>Die Grenzen und die Dauer sind frei einstellbar. Der Preis gilt für die gesamte Gruppe.</small></fieldset>
+  <fieldset class="angebot-standort-auswahl"><legend>Teilnehmerstufen (Gruppenpreis und Dauer je Gruppe)</legend><div id="neues-angebot-stufen" class="angebot-stufen-editor"></div><button type="button" class="btn secondary" id="neues-angebot-stufe-hinzufuegen">Teilnehmerstufe hinzufügen</button>
+  <small>Nur ausgefüllte Teilnehmerstufen werden gespeichert. Weitere Stufen entstehen ausschließlich über „Teilnehmerstufe hinzufügen“.</small>
+  <label class="check gruppen-anfrage-option"><input type="checkbox" name="weitere_gruppen_auf_anfrage" id="neues-angebot-gruppenanfrage">
+    <span><strong>Weitere Gruppengrößen auf Anfrage</strong> – individuelle Preis- und Dauerabsprache außerhalb der eingetragenen Teilnehmerstufen zulassen</span>
+  </label></fieldset>
   <label>Kategorie<input name="kategorie" maxlength="60" placeholder="Klettern"></label>
   <label>Zielgruppe<input name="zielgruppe" maxlength="120" placeholder="Familien, Schulklassen"></label>
   <fieldset class="angebot-standort-auswahl"><legend>Veranstaltungsorte (Mehrfachauswahl)</legend><div id="angebot-orte-auswahl" class="check-grid"></div><small>Das Programm wird an allen angehakten Standorten auf der Website angezeigt.</small></fieldset>
