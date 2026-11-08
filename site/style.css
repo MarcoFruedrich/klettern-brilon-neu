@@ -1293,3 +1293,14 @@ header.site-header{overflow:visible}
   .tablet-page .tablet-site-info strong{font-size:16px;}
   .tablet-page .tablet-clock{font-size:11px;padding:3px;}
 }
+
+/* Wunschtermin: identische Gruppenstaffeln wie in der Programmverwaltung. */
+.booking-group-tiers{
+  margin:15px 0;padding:16px 18px;border-radius:13px;
+  border:1px solid #9fc6ab;background:linear-gradient(120deg,#ecf5ed,#fafef9);
+  color:#143f2d;
+}
+.booking-group-tiers[hidden]{display:none!important;}
+.booking-group-tiers label{display:flex;flex-direction:column;gap:7px;font-weight:850;}
+.booking-group-tiers select{width:100%;min-height:45px;background:#fff;color:#103f2d;}
+.booking-group-tiers small{display:block;margin-top:9px;color:#42644c;font-size:12px;line-height:1.45;}
