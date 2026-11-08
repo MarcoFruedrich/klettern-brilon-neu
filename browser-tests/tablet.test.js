@@ -27,11 +27,11 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       const page=await browser.newPage({viewport:{width,height:780},locale:'de-DE'});
       let paired=false,enabled=true,code=null,connectionBroken=false;
       const errors=[];page.on('pageerror',e=>errors.push(e.message));
-      await page.route('**/api/pruefung/tablet/angebote',async route=>route.fulfill({status:200,
-        contentType:'application/json',body:JSON.stringify({ortId:1,standort:'Brilon',angebote:[
-          {name:'Klettern & Abenteuer',beschreibung:'Spannende Programme für Familien und Schulklassen.'},
-          {name:'Bouldern und Teamspiele',beschreibung:'Gemeinsam Herausforderungen meistern.'}
-        ]})}));
+      let advertisedOffers=[
+        {name:'Klettern & Abenteuer',beschreibung:'Spannende Programme für Familien und Schulklassen.'},
+        {name:'Bouldern und Teamspiele',beschreibung:'Gemeinsam Herausforderungen meistern.'}
+      ];
+      let offersOffline=false;
       await page.route('**/api/pruefung/tablet/**',async route=>{
         const url=new URL(route.request().url());
         const send=(status,body)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
@@ -42,6 +42,10 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
         }
         if(!paired||!enabled)return send(401,{error:'Tablet gesperrt'});
         if(connectionBroken)return send(503,{error:'Netzwerk vorübergehend nicht verfügbar'});
+        if(url.pathname==='/api/pruefung/tablet/angebote'){
+          if(offersOffline)return send(503,{error:'Testweise offline'});
+          return send(200,{ortId:1,standort:'Brilon',angebote:advertisedOffers});
+        }
         return send(200,{name:'Testtablet',ortId:1,standort:'Brilon',code,gueltigSekunden:code?120:0});
       });
       await page.goto(root+'/tablet.html');
@@ -52,15 +56,9 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       await page.waitForFunction(()=>document.getElementById('tablet-offer-title')?.textContent==='Klettern & Abenteuer');
       assert.equal(await page.locator('#tablet-digits').textContent(),'');
       // Anwendungsstart und Angebotswechsel ohne Neustart des Geräts.
-      const refreshedOffer='Neues Teamprogramm';let offersOffline=false;
-      await page.unroute('**/api/pruefung/tablet/angebote');
-      await page.route('**/api/pruefung/tablet/angebote',async route=>{
-        if(offersOffline)return route.fulfill({status:503,contentType:'application/json',
-          body:JSON.stringify({error:'Testweise offline'})});
-        return route.fulfill({status:200,contentType:'application/json',
-          body:JSON.stringify({ortId:1,standort:'Brilon',angebote:[{id:'neu',name:refreshedOffer,
-            beschreibung:'Frisch veröffentlichte Programme für Familien.'}]})});
-      });
+      const refreshedOffer='Neues Teamprogramm';
+      advertisedOffers=[{id:'neu',name:refreshedOffer,
+        beschreibung:'Frisch veröffentlichte Programme für Familien.'}];
       await page.evaluate(()=>loadOffers());
       await page.waitForFunction(()=>document.getElementById('tablet-offer-title').textContent==='Neues Teamprogramm');
       offersOffline=true;
