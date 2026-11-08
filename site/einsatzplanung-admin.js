@@ -14,20 +14,32 @@
     const status=document.getElementById('einsatzplanung-status');
     status.textContent='Einsatzplanung wird geladen …';
     try{
-      const [liste,plan,settings]=await Promise.all([
+      // Vertragsdaten dürfen auch bei einem Kalender- oder Einstellungsfehler editierbar bleiben.
+      const [staffResult,calendarResult,settingsResult]=await Promise.allSettled([
         api('/api/admin/einsatzplanung/personen'),
         api('/api/admin/einsatzplanung/kalender?monat='+encodeURIComponent(monat)),
         api('/api/admin/einsatzplanung/kundenbestaetigung-einstellungen')
       ]);
-      personen=liste;personalAnzeigen();termineAnzeigen(plan);
-      if(pendingMitarbeiterId&&vertragFokussieren(pendingMitarbeiterId))pendingMitarbeiterId=null;
+      const staffStatus=document.getElementById('arbeitsvertraege-status');
+      if(staffResult.status==='fulfilled'){
+        personen=staffResult.value;personalAnzeigen();
+        if(pendingMitarbeiterId&&vertragFokussieren(pendingMitarbeiterId))pendingMitarbeiterId=null;
+        if(staffStatus)staffStatus.textContent=personen.length
+          ?personen.length+' Beschäftigungsdatensätze geladen. Änderungen können jetzt gespeichert werden.'
+          :'Noch keine Mitarbeiter vorhanden.';
+      }else{
+        if(staffStatus)staffStatus.textContent='Beschäftigungsdaten konnten nicht geladen werden: '+staffResult.reason.message;
+      }
+      if(calendarResult.status==='fulfilled')termineAnzeigen(calendarResult.value);
       const settingsForm=document.getElementById('kundenbestaetigung-settings-form');
-      if(settingsForm){
+      if(settingsForm&&settingsResult.status==='fulfilled'){
+        const settings=settingsResult.value;
         settingsForm.elements.namedItem('verzoegerungMinuten').value=settings?.verzoegerungMinuten??120;
         settingsForm.elements.namedItem('ruhebeginn').value=settings?.ruhebeginn??'18:00';
         settingsForm.elements.namedItem('ruheende').value=settings?.ruheende??'09:00';
       }
-      status.textContent='Kalender, Bewerbungen und Mitarbeiterdaten aktualisiert.';
+      status.textContent=calendarResult.status==='fulfilled'
+        ?'Einsatzplanung aktualisiert.':'Einsatzplanung konnte nicht geladen werden: '+calendarResult.reason.message;
     }catch(err){status.textContent='Einsatzplanung nicht verfügbar: '+err.message;}
   }
   function personalAnzeigen(){
@@ -70,7 +82,10 @@
           const data=Object.fromEntries(new FormData(form).entries());
           await api('/api/admin/einsatzplanung/vertrag/'+encodeURIComponent(p.id),{
             method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-          state.textContent='Vertragsdaten gespeichert.';await personalAktualisieren();
+          await personalAktualisieren();
+          const globalStatus=document.getElementById('arbeitsvertraege-status');
+          if(globalStatus)globalStatus.textContent='Vertragsdaten für '+p.name+' erfolgreich gespeichert.';
+          vertragFokussieren(p.id);
         }catch(err){state.textContent='Fehler: '+err.message;}finally{save.disabled=false;}
       };
       const stats=el('button','Wochen-/Monatsstunden anzeigen');stats.type='button';stats.className='btn secondary';
