@@ -11,13 +11,19 @@ let adminBuchbareProgramme=[];
 
 const adminViews=Array.from(document.querySelectorAll('[data-admin-view]'));
 const adminViewLinks=Array.from(document.querySelectorAll('[data-admin-view-link]'));
-// Klappmenüs bleiben auf ihren Unterseiten geöffnet, andere Gruppen schließen automatisch.
-const adminNavGroups=Array.from(document.querySelectorAll('.admin-navigation .admin-nav-group'));
-for(const group of adminNavGroups){
-  group.addEventListener('toggle',()=>{
-    if(group.open)for(const other of adminNavGroups)if(other!==group)other.open=false;
-  });
-}
+const adminSubnavigation=document.getElementById('admin-subnavigation');
+const adminSubnavGroups=Array.from(document.querySelectorAll('[data-subnav-group]'));
+const adminSections={
+  buchungen:['bookings-section','payment-overview-section','rechnungen-agb-section','admin-guestbook-section'],
+  programme:['angebote-verwaltung','gps-verwaltung','special-offers-view','anschlussrabatt-section'],
+  kontakte:['mitarbeiter-einladen-section','mitarbeiter-section','netzwerkpartner-einladen-section',
+    'netzwerkpartner-section','mitarbeiterbereiche-admin-section'],
+  oeffentlichkeit:['whatsapp-admin-section','feedback-admin-section','social-media-section',
+    'marketing-campaign-section','kundenfeedback-section']
+};
+let bookingTab='alle';
+let programTab='liste';
+const adminSectionGroup=id=>Object.keys(adminSections).find(group=>adminSections[group].includes(id))||null;
 function adminViewFinden(target){
   const element=typeof target==='string'?document.getElementById(target):target;
   return element?.matches?.('[data-admin-view]')?element:element?.closest?.('[data-admin-view]')||null;
@@ -26,17 +32,26 @@ function adminAnsichtAnzeigen(target,{hash=false,focus=false}={}){
   const view=adminViewFinden(target)||document.getElementById('bookings-section');
   if(!view)return;
   for(const item of adminViews)item.hidden=item!==view;
+  const group=adminSectionGroup(view.id);
+  if(adminSubnavigation)adminSubnavigation.hidden=!group;
+  for(const row of adminSubnavGroups)row.hidden=row.dataset.subnavGroup!==group;
   for(const link of adminViewLinks){
-    const active=link.hash==='#'+view.id;
-    if(active)link.setAttribute('aria-current','page');
+    const groupParent=link.closest('.admin-navigation');
+    const active=link.hash==='#'+view.id &&
+      (!link.dataset.bookingStatus||link.dataset.bookingStatus===bookingTab) &&
+      (!link.dataset.programTab||link.dataset.programTab===programTab);
+    const groupActive=groupParent&&link.classList.contains('admin-nav-main-group') &&
+      group===adminSectionGroup(link.hash.slice(1));
+    if(active||groupActive)link.setAttribute('aria-current','page');
     else link.removeAttribute('aria-current');
   }
-  const selectedLink=Array.from(document.querySelectorAll('.admin-navigation [data-admin-view-link]'))
-    .find(link=>link.hash==='#'+view.id);
-  const activeGroup=selectedLink?.closest('.admin-nav-group')||null;
-  for(const group of adminNavGroups){
-    group.classList.toggle('is-current',group===activeGroup);
-    group.open=group===activeGroup;
+  const programForm=document.getElementById('neues-angebot-form');
+  const programList=document.getElementById('angebote-admin-liste');
+  const programHeading=programForm?.previousElementSibling;
+  if(programForm&&programList){
+    programForm.hidden=programTab!=='neu';
+    if(programHeading?.tagName==='H3')programHeading.hidden=programTab!=='neu';
+    programList.hidden=programTab==='neu';
   }
   if(hash&&location.hash!=='#'+view.id)history.pushState(null,'','#'+view.id);
   if(focus){
@@ -63,7 +78,21 @@ window.adminNavigateToElement=id=>{
 for(const link of adminViewLinks){
   link.addEventListener('click',event=>{
     event.preventDefault();
+    if(link.dataset.bookingStatus){
+      bookingTab=link.dataset.bookingStatus;
+      const filter=document.getElementById('bookings-status-filter');
+      if(filter)filter.value=bookingTab;
+      bookingPage=1;
+    } else if(link.hash==='#bookings-section'){
+      bookingTab='alle';
+      const filter=document.getElementById('bookings-status-filter');
+      if(filter)filter.value='alle';
+      bookingPage=1;
+    }
+    if(link.dataset.programTab)programTab=link.dataset.programTab;
+    else if(link.hash==='#angebote-verwaltung')programTab='liste';
     adminAnsichtAnzeigen(link.hash.slice(1),{hash:true,focus:true});
+    if(link.dataset.bookingStatus||link.hash==='#bookings-section')refresh();
   });
 }
 window.addEventListener('hashchange',adminAnsichtAusHash);
@@ -1267,7 +1296,7 @@ document.getElementById('bookings-search')?.addEventListener('input', () => {
   bookingPage=1;
   bookingFilterTimer=setTimeout(refresh,250);
 });
-document.getElementById('bookings-status-filter')?.addEventListener('change', () => {bookingPage=1;refresh();});
+document.getElementById('bookings-status-filter')?.addEventListener('change', () => {bookingTab=document.getElementById('bookings-status-filter').value;bookingPage=1;adminAnsichtAnzeigen('bookings-section');refresh();});
 document.getElementById('bookings-prev')?.addEventListener('click',()=>{if(bookingPage>1){bookingPage--;refresh();}});
 document.getElementById('bookings-next')?.addEventListener('click',()=>{bookingPage++;refresh();});
 document.getElementById('payment-overview-filter')?.addEventListener('change', () => {zahlungsPage=1;zahlungsuebersichtLaden();});
