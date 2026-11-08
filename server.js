@@ -4112,6 +4112,20 @@ await pool.query(`
         console.warn('Bereinigung abgelaufener Prüfsitzungen und Codes nicht gestartet:',error.message);
       }
     }
+    // Diagnose beim Start: niemals Geheimnisse oder Codes ausgeben.
+    if(process.env.MOCK_PG!=='1'){
+      try{
+        const required=['brilon_pruef_tablet_kopplungen','brilon_pruef_tablets','brilon_pruef_codes'];
+        const names=await pool.query('SELECT relname FROM pg_class WHERE relkind IN (\'r\',\'p\') AND relname = ANY($1::text[])',[required]);
+        const missing=required.filter(name=>!names.rows.some(row=>row.relname===name));
+        const configured=typeof process.env.STATION_CHECK_SECRET==='string'&&
+          process.env.STATION_CHECK_SECRET.length>=32;
+        console.log('Tablet-Kopplung Status:',missing.length?'Tabellen fehlen: '+missing.join(', '):'Tabellen bereit',
+          configured?'Sicherheitsgeheimnis bereit':'Sicherheitsgeheimnis fehlt');
+      }catch(error){
+        console.warn('Tablet-Kopplung Vorprüfung nicht verfügbar:',error?.code||'DB_FEHLER');
+      }
+    }
     console.log('PostgreSQL verbunden');
   }else{
     console.warn('DATABASE_URL fehlt: Datenbankfunktionen nicht verfügbar');
