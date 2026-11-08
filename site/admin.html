@@ -187,6 +187,11 @@
   <p>Der öffentliche WhatsApp-Kontakt für Klettern &amp; Abenteuer ist verlinkt. Nachrichten werden direkt in WhatsApp Business geöffnet, nicht in dieser Verwaltungsoberfläche empfangen.</p>
   <p><strong>Benutzername:</strong> @Klettern_und_Abenteuer</p>
   <p><a class="btn" target="_blank" rel="noopener noreferrer" href="https://wa.me/message/JXO6HLT34O37B1">WhatsApp Business öffnen</a></p>
+  <h3>Programme und Sonderangebote über WhatsApp teilen</h3>
+  <p>Hier erscheinen veröffentlichte Angebote der Webseite. Du kannst sie mit einem Klick in WhatsApp zum Teilen vorbereiten. Freie Plätze und Termine werden vor einer verbindlichen Buchung gesondert geprüft.</p>
+  <button type="button" class="btn secondary" id="whatsapp-angebote-aktualisieren">Aktuelle Angebote laden</button>
+  <p id="whatsapp-angebote-status" role="status" aria-live="polite"></p>
+  <div id="whatsapp-angebote-liste" class="whatsapp-share-list"></div>
   <p class="hint">Die Integration eines eigenen Nachrichtenpostfachs erfordert zusätzlich eine autorisierte Anbindung an die WhatsApp Business Platform. Diese ist noch nicht eingerichtet.</p>
 </section>
 
@@ -715,6 +720,7 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261108-admin-horizontal-tabs-whatsapp"></script>
+  <script src="/whatsapp-admin.js?v=20261108"></script>
   <script src="/website-effekte-admin.js?v=20261108"></script>
   <script src="/pruefung-admin.js?v=20261107-single-location-employment-special-approval"></script>
   <script src="/feedback-admin.js"></script>
