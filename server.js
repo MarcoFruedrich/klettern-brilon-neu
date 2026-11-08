@@ -3,6 +3,7 @@
 'use strict';
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
+const {werbedauerLesen,werbedauerPruefen}=require('./lib/tablet-werbedauer');
 const { heuteInBerlin } = require('./lib/kalendertag');
 const { datenbankKonfiguration } = require('./lib/datenbank-konfiguration');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
@@ -493,6 +494,36 @@ async function main(req,res){
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    // Ein Zeitintervall für sämtliche Werbetablets: zentrale Verwaltung,
+    // geräteübergreifend gespeichert, keine standortspezifische Abweichung.
+    if(route==='/api/admin/tablet-werbedauer'&&(req.method==='GET'||req.method==='PUT')){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht verfügbar.'});
+      if(req.method==='GET'){
+        try{
+          const q=await pool.query("SELECT data->>'tabletWerbedauerSekunden' AS sekunden FROM brilon_rechnungsdaten WHERE id=1");
+          if(!q.rowCount)return reply(res,503,{error:'Website-Einstellungen fehlen.'});
+          return reply(res,200,{sekunden:werbedauerLesen(q.rows[0].sekunden)});
+        }catch(error){
+          console.error('Tablet-Werbezeit konnte nicht geladen werden:',error.message);
+          return reply(res,503,{error:'Werbedauer momentan nicht verfügbar.'});
+        }
+      }
+      const d=await body(req,2000);
+      let sekunden;
+      try{sekunden=werbedauerPruefen(d);}catch(error){return reply(res,400,{error:error.message});}
+      try{
+        const q=await pool.query(`UPDATE brilon_rechnungsdaten
+          SET data=jsonb_set(COALESCE(data,'{}'::jsonb),
+            '{tabletWerbedauerSekunden}',to_jsonb($1::integer),true),
+            aktualisiert_am=NOW() WHERE id=1 RETURNING id`,[sekunden]);
+        if(!q.rowCount)return reply(res,503,{error:'Website-Einstellungen fehlen.'});
+        return reply(res,200,{success:true,sekunden});
+      }catch(error){
+        console.error('Tablet-Werbedauer konnte nicht gespeichert werden:',error.message);
+        return reply(res,503,{error:'Werbedauer konnte nicht gespeichert werden.'});
+      }
+    }
     // Kanalweise Sichtbarkeit: öffentlich sind nur freigeschaltete Links verfügbar.
     // Die Administration speichert Links und Status dauerhaft im vorhandenen Website-Konfigurationsdatensatz.
     if(route==='/api/social-links'&&req.method==='GET'){
