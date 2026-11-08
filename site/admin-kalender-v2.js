@@ -434,7 +434,7 @@
             (e.id===chosen.entryId?' is-selected':''),()=>selectEntry(e));
           b.style.left='calc('+width*e._column+'% + 2px)';
           b.style.width='calc('+width+'% - 4px)';
-          b.style.top=(((e.start-hourStart)/60)*hourHeight+2)+'px';
+          b.style.top=(((e.start-hourStart*60)/60)*hourHeight+2)+'px';
           b.style.height=Math.max(25,((e.end-e.start)/60)*hourHeight-4)+'px';
           paint(b,e);
           b.append(mk('span','ck-time',prettyTime(e.start)+' – '+prettyTime(e.end)));
