@@ -11,6 +11,7 @@ class Pool {
     this.placesTableReady=process.env.MOCK_PLACES_TABLE!=='missing';
     this.gpsTours = JSON.parse(process.env.MOCK_GPS_TOURS || '[]');
     this.nextOfferId = this.offers.reduce((next,offer)=>Math.max(next,Number(offer.id)||0),0)+1;
+    this.kundenbestaetigungEinstellungen={verzoegerungMinuten:120,ruhebeginn:'18:00',ruheende:'09:00'};
     this.adminSessions = new Map();
     this.adminTotpSteps = new Map();
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
@@ -59,6 +60,13 @@ class Pool {
       if (sql.includes("data->>'agbText'")) return {rows:[{text:this.rechnungsdaten.agbText,
         aktiv:String(this.rechnungsdaten.agbAktiv),version:String(this.rechnungsdaten.agbVersion)}],rowCount:1};
       return {rows:[{data:this.rechnungsdaten}],rowCount:1};
+    }
+    if(sql.includes('FROM brilon_kundenbestaetigung_einstellungen'))
+      return {rows:[{...this.kundenbestaetigungEinstellungen}],rowCount:1};
+    if(sql.includes('INSERT INTO brilon_kundenbestaetigung_einstellungen')){
+      const [verzoegerungMinuten,ruhebeginn,ruheende]=params;
+      this.kundenbestaetigungEinstellungen={verzoegerungMinuten,ruhebeginn,ruheende};
+      return {rows:[{id:1}],rowCount:1};
     }
     if(sql.includes('UPDATE brilon_kundenbestaetigungen SET faellig_ab=$1'))return {rows:[],rowCount:0};
     if (sql.includes('UPDATE brilon_rechnungsdaten')) {
