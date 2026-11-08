@@ -91,6 +91,31 @@ class Pool {
         this.places.push({id:this.places.length+1,name:'Brilon',aktiv:true});
       return {rows:[],rowCount:1};
     }
+    // Aktuelles Schema: Teilnehmerstaffeln und Dauer sind eigene Spalten.
+    if(/INSERT INTO brilon_angebote\\s*\\(name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv/i.test(sql)){
+      const [name,beschreibung,dauer,dauer_modus,rawStages,rawPrices,kategorie,zielgruppe,
+        veranstaltungsort,rawSites,kapazitaet,rawDates,hinweise,buchbar,veroeffentlicht,
+        buchungsmodus,mindestteilnehmer,preis_pro_person]=params;
+      const offer={id:this.nextOfferId++,name,beschreibung,dauer,dauer_modus,
+        gruppenstufen:JSON.parse(rawStages),preise:JSON.parse(rawPrices),aktiv:false,kategorie,zielgruppe,
+        veranstaltungsort,veranstaltungsorte:JSON.parse(rawSites),kapazitaet,
+        verfuegbare_termine:JSON.parse(rawDates),hinweise,buchbar,veroeffentlicht,
+        buchungsmodus,mindestteilnehmer,preis_pro_person,
+        sortierung:Math.max(0,...this.offers.map(x=>Number(x.sortierung)||0))+1,archiviert:false};
+      this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
+    }
+    if(/^\\s*UPDATE brilon_angebote\\s+SET preise\\s*=\\s*\\$1::jsonb/i.test(sql)){
+      const id=params[1],offer=this.offers.find(x=>String(x.id)===String(id));
+      if(!offer)return {rows:[],rowCount:0};
+      const [rawPrices,,aktiv,name,beschreibung,kategorie,zielgruppe,veranstaltungsort,
+        rawSites,kapazitaet,rawDates,hinweise,buchbar,veroeffentlicht,dauer,buchungsmodus,
+        mindestteilnehmer,preis_pro_person,dauer_modus,rawStages]=params;
+      Object.assign(offer,{preise:JSON.parse(rawPrices),aktiv:aktiv==null?offer.aktiv:aktiv,
+        name,beschreibung,kategorie,zielgruppe,veranstaltungsort,veranstaltungsorte:JSON.parse(rawSites),
+        kapazitaet,verfuegbare_termine:JSON.parse(rawDates),hinweise,buchbar,veroeffentlicht,
+        dauer,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen:JSON.parse(rawStages)});
+      return {rows:[{...offer}],rowCount:1};
+    }
     if(sql.includes('INSERT INTO brilon_angebote(name,beschreibung,dauer,preise,aktiv)')){
       const [name,beschreibung,dauer,rawPrices,aktiv]=params;
       const offer={id:this.nextOfferId++,name,beschreibung,dauer,preise:JSON.parse(rawPrices),aktiv};
