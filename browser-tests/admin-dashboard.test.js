@@ -314,7 +314,33 @@ async function login(page,root){
 }
 
 async function openAdminView(page,href){
-  await page.locator('.admin-navigation a[href="'+href+'"]').click();
+  const direct=page.locator('.admin-navigation a[href="'+href+'"]');
+  if(await direct.count()){
+    await direct.click();
+  }else{
+    const group=await page.locator('#admin-subnavigation a[href="'+href+'"]').first().getAttribute('href').catch(()=>null);
+    assert.ok(group,'Kein Menülink für '+href);
+    const groups={
+      '#payment-overview-section':'#bookings-section',
+      '#rechnungen-agb-section':'#bookings-section',
+      '#admin-guestbook-section':'#bookings-section',
+      '#gps-verwaltung':'#angebote-verwaltung',
+      '#special-offers-view':'#angebote-verwaltung',
+      '#anschlussrabatt-section':'#angebote-verwaltung',
+      '#mitarbeiter-section':'#mitarbeiter-einladen-section',
+      '#netzwerkpartner-section':'#mitarbeiter-einladen-section',
+      '#netzwerkpartner-einladen-section':'#mitarbeiter-einladen-section',
+      '#mitarbeiterbereiche-admin-section':'#mitarbeiter-einladen-section',
+      '#whatsapp-admin-section':'#whatsapp-admin-section',
+      '#social-media-section':'#whatsapp-admin-section',
+      '#marketing-campaign-section':'#whatsapp-admin-section',
+      '#kundenfeedback-section':'#whatsapp-admin-section'
+    };
+    const landing=groups[href];
+    assert.ok(landing,'Keine Hauptkategorie für '+href);
+    await page.locator('.admin-navigation a[href="'+landing+'"]').click();
+    await page.locator('#admin-subnavigation a[href="'+href+'"]').first().click();
+  }
   await page.locator(href).waitFor({state:'visible'});
 }
 
@@ -373,16 +399,27 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(await navigation.evaluate(node=>getComputedStyle(node).flexDirection),'column');
 
     const startHash=await page.evaluate(()=>location.hash);
-    await navigation.locator('a[href="#payment-overview-section"]').click();
+    await navigation.locator('a[href="#bookings-section"]').click();
+    assert.equal(await page.locator('#admin-subnavigation [data-subnav-group="buchungen"]').isVisible(),true);
+    await page.locator('#admin-subnavigation a[href="#payment-overview-section"]').click();
     await page.waitForFunction(()=>location.hash==='#payment-overview-section');
     assert.equal(await visibleViews(),1);
     assert.equal(await page.locator('#payment-overview-section').isVisible(),true);
     assert.equal(await page.locator('#bookings-section').isVisible(),false);
-    assert.equal(await navigation.locator('[aria-current="page"]').getAttribute('href'),'#payment-overview-section');
+    assert.equal(await navigation.locator('[aria-current="page"]').getAttribute('href'),'#bookings-section');
+    assert.equal(await page.locator('#admin-subnavigation [data-subnav-group="programme"]').isVisible(),false);
+    await navigation.locator('a[href="#mitarbeiter-einladen-section"]').click();
+    assert.equal(await page.locator('#admin-subnavigation [data-subnav-group="kontakte"]').isVisible(),true);
+    await page.locator('#admin-subnavigation a[href="#netzwerkpartner-section"]').click();
+    assert.equal(await page.locator('#netzwerkpartner-section').isVisible(),true);
+    await navigation.locator('a[href="#angebote-verwaltung"]').click();
+    assert.equal(await page.locator('#admin-subnavigation [data-subnav-group="programme"]').isVisible(),true);
+    await page.locator('#admin-subnavigation a[href="#gps-verwaltung"]').click();
+    assert.equal(await page.locator('#gps-verwaltung').isVisible(),true);
 
     await page.goBack();
-    await page.waitForFunction(expected=>location.hash===expected,startHash);
-    assert.equal(await page.locator('#admin-dashboard').isVisible(),true,
+    await page.waitForFunction(()=>location.hash==='#angebote-verwaltung');
+    assert.equal(await page.locator('#angebote-verwaltung').isVisible(),true,
       'Browser-Zurück soll die vorherige Ansicht wiederherstellen');
 
     await page.setViewportSize({width:390,height:844});
