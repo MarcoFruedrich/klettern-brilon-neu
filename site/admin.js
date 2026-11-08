@@ -78,6 +78,7 @@ window.adminNavigateToElement=id=>{
 for(const link of adminViewLinks){
   link.addEventListener('click',event=>{
     event.preventDefault();
+    const vorherigerBuchungsfilter=bookingTab;
     if(link.dataset.bookingStatus){
       bookingTab=link.dataset.bookingStatus;
       const filter=document.getElementById('bookings-status-filter');
@@ -92,7 +93,7 @@ for(const link of adminViewLinks){
     if(link.dataset.programTab)programTab=link.dataset.programTab;
     else if(link.hash==='#angebote-verwaltung')programTab='liste';
     adminAnsichtAnzeigen(link.hash.slice(1),{hash:true,focus:true});
-    if(link.dataset.bookingStatus||link.hash==='#bookings-section')refresh();
+    if(link.dataset.bookingStatus||(link.hash==='#bookings-section'&&vorherigerBuchungsfilter!=='alle'))refresh();
   });
 }
 window.addEventListener('hashchange',adminAnsichtAusHash);
@@ -1896,6 +1897,8 @@ if (neuesAngebotForm) {
       angebotsKapazitaetPruefen();
       createTierDurationMode();
       await refresh();
+      programTab='liste';
+      adminAnsichtAnzeigen('angebote-verwaltung');
       status.textContent='Neues Erlebnisangebot wurde gespeichert.';
     } catch (fehler) {
       alert('Speichern fehlgeschlagen: ' + fehler.message);
