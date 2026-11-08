@@ -15,6 +15,7 @@ const { sameOriginMutation } = require('./lib/sicherheit');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben } = require('./lib/sicherheitszustand');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
+const { leseWebsiteEffekte,pruefeWebsiteEffekte } = require('./lib/website-effekte');
 const { createPdf: erstelleRechnungsPdf, formatDate: rechnungsDatumFormatieren } = require('./lib/rechnung');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
@@ -491,6 +492,35 @@ async function main(req,res){
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    // Nur freigegebene grafische Einstellungen, keinerlei Verwaltungs- oder Kundendaten.
+    if(route==='/api/website-effekte'&&req.method==='GET'){
+      if(!pool)return reply(res,200,leseWebsiteEffekte(null));
+      try{
+        const q=await pool.query('SELECT data FROM brilon_rechnungsdaten WHERE id=1');
+        return reply(res,200,leseWebsiteEffekte(q.rows[0]?.data?.hintergrundEffekte));
+      }catch{return reply(res,200,leseWebsiteEffekte(null));}
+    }
+    if(route==='/api/admin/website-effekte'&&(req.method==='GET'||req.method==='PUT')){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      if(req.method==='GET'){
+        try{
+          const q=await pool.query('SELECT data FROM brilon_rechnungsdaten WHERE id=1');
+          return reply(res,200,leseWebsiteEffekte(q.rows[0]?.data?.hintergrundEffekte));
+        }catch{return reply(res,503,{error:'Verwaltungseinstellungen noch nicht verfügbar.'});}
+      }
+      const input=await body(req,12000);
+      let config;
+      try{config=pruefeWebsiteEffekte(input);}
+      catch(error){return reply(res,400,{error:error.message});}
+      try{
+        const q=await pool.query(`UPDATE brilon_rechnungsdaten
+          SET data=jsonb_set(COALESCE(data,'{}'::jsonb),'{hintergrundEffekte}',$1::jsonb,true),
+            aktualisiert_am=NOW() WHERE id=1 RETURNING id`,[JSON.stringify(config)]);
+        if(!q.rowCount)return reply(res,503,{error:'Verwaltungseinstellungen noch nicht verfügbar.'});
+        return reply(res,200,{success:true,...config});
+      }catch{return reply(res,503,{error:'Website-Effekte konnten nicht gespeichert werden.'});}
+    }
     if(route==='/api/empfehlung/bestaetigen'&&req.method==='GET'){
       const token=String(u.searchParams.get('token')||'');
       if(!/^[a-f0-9]{64}$/.test(token))return reply(res,400,{error:'Der Bestätigungslink ist ungültig.'});
