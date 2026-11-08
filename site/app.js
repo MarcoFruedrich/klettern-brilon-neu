@@ -713,16 +713,33 @@ specials();
 function angeboteUebersichtAnzeigen(standortFilter=''){
   const ausgabe=document.getElementById('angebote-uebersicht');
   if(!ausgabe)return;
-  const passend=angeboteCache.filter(angebot=>!standortFilter||
+  const passend=angeboteCache.filter(angebot=>(!standortFilter||
     (Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
-      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standortFilter));
+      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standortFilter))&&
+    (!window.besuchergruppePasst||window.besuchergruppePasst(angebot)));
+  const filterhinweis=document.getElementById('besuchergruppen-filterhinweis');
+  if(filterhinweis){
+    filterhinweis.replaceChildren();
+    const gruppenname=window.besuchergruppeName?.();
+    filterhinweis.hidden=!gruppenname;
+    if(gruppenname){
+      const label=document.createElement('span');
+      label.textContent='Angebote für: '+gruppenname;
+      const clear=document.createElement('button');
+      clear.type='button';clear.textContent='Alle Besuchergruppen anzeigen';
+      clear.addEventListener('click',()=>window.besuchergruppeZuruecksetzen?.());
+      filterhinweis.append(label,clear);
+    }
+  }
   ausgabe.replaceChildren();
   if(!passend.length){
     const hinweis=document.createElement('p');
     hinweis.className='hint';
     hinweis.textContent=standortFilter
-      ?'Für diesen Standort sind derzeit keine veröffentlichten Angebote verfügbar.'
-      :'Derzeit sind keine veröffentlichten Angebote verfügbar.';
+      ?'Für diesen Standort und diese Auswahl gibt es derzeit keine passenden veröffentlichten Programme.'
+      :window.aktiveBesuchergruppe
+        ?'Für diese Besuchergruppe sind noch keine passenden veröffentlichten Programme zugeordnet. Du kannst die gesamte Angebotsübersicht anzeigen.'
+        :'Derzeit sind keine veröffentlichten Angebote verfügbar.';
     ausgabe.append(hinweis);
     return;
   }
@@ -776,6 +793,10 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     ausgabe.append(karte);
   }
 }
+
+document.addEventListener('besuchergruppenwechsel',()=>angeboteUebersichtAnzeigen(
+  document.getElementById('angebote-standort-filter')?.value||''
+));
 
 async function angeboteLaden() {
   const auswahl = document.getElementById('angebot-auswahl');
