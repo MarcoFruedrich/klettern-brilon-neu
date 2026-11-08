@@ -106,6 +106,28 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.close();
   });
 
+  await t.test('Geteilte WhatsApp-Sonderaktion führt in reguläre, vorausgefüllte Anfrage',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    await fakePublicApi(page);
+    await page.route('**/api/aktionen',route=>route.fulfill({status:200,
+      contentType:'application/json',body:JSON.stringify([
+        {id:'aktion-77',titel:'Kletter-Extra',datum:'2027-03-15',
+          uhrzeit:'11:00',endzeit:'12:00',veranstaltungsort:'Brilon',programm_id:1,
+          beschreibung:'Sonderaktion mit regulärer Buchung'}
+      ])}));
+    await page.goto(root+'/?aktion=aktion-77#buchung');
+    await page.waitForFunction(()=>document.getElementById('selected-special')?.textContent.includes('Kletter-Extra'));
+    assert.equal(await page.locator('#angebot-auswahl').inputValue(),'Klettertest');
+    assert.equal(await page.locator('#buchungs-standort').inputValue(),'Brilon');
+    assert.equal(await page.locator('#booking input[name="datum"]').inputValue(),'2027-03-15');
+    assert.match(await page.locator('#booking textarea[name="nachricht"]').inputValue(),/Anfrage zur Sonderaktion: Kletter-Extra/);
+    const share=page.locator('#specials .whatsapp-share-link').first();
+    const message=new URL(await share.getAttribute('href')).searchParams.get('text');
+    assert.match(message,/\?aktion=aktion-77#buchung/);
+    assert.equal(await page.locator('#booking').isVisible(),true);
+    await page.close();
+  });
+
   await t.test('Smartphone-Menü öffnet und schließt per Tastatur', async () => {
     const page = await browser.newPage({viewport: {width: 390, height: 844}});
     await fakePublicApi(page);
