@@ -2121,6 +2121,26 @@ document.getElementById('mitarbeiterbereich-form')?.elements.art?.addEventListen
 
 /* Gespeicherte Erlebnisangebote anzeigen */
 
+async function adminProgrammLoeschen(angebot){
+  if(!confirm('Programm „'+angebot.name+'“ vollständig löschen? Diese Aktion kann nicht rückgängig gemacht werden. Bereits gebuchte oder mit anderen Inhalten verknüpfte Programme werden aus Sicherheitsgründen nicht gelöscht.'))return;
+  try{
+    await api('/api/admin/angebote/'+angebot.id,{method:'DELETE'});
+    ausgewaehltesAdminProgramm=null;
+    await erlebnisangeboteLaden();
+  }catch(error){alert('Löschen nicht möglich: '+error.message);}
+}
+function adminProgrammLoeschbutton(angebot){
+  const button=document.createElement('button');
+  button.type='button';button.className='btn danger program-delete-button';
+  button.textContent='Programm löschen';
+  button.addEventListener('click',async()=>{
+    button.disabled=true;
+    try{await adminProgrammLoeschen(angebot);}
+    finally{button.disabled=false;}
+  });
+  return button;
+}
+
 async function erlebnisangeboteLaden() {
   const liste = document.getElementById('angebote-admin-liste');
   if (!liste) return;
@@ -2197,7 +2217,10 @@ async function erlebnisangeboteLaden() {
             body:JSON.stringify({archiviert:false})});await erlebnisangeboteLaden();}
           catch(error){wiederherstellen.disabled=false;alert('Wiederherstellen fehlgeschlagen: '+error.message);}
         });
-        eintrag.append(titel,el('p','Archivierte Angebote bleiben für bisherige Buchungen und deren Verlauf gespeichert.'),wiederherstellen);
+        wiederherstellen.className='btn secondary';
+        const archivActions=document.createElement('div');archivActions.className='program-action-row';
+        archivActions.append(wiederherstellen,adminProgrammLoeschbutton(angebot));
+        eintrag.append(titel,el('p','Archivierte Angebote bleiben für bisherige Buchungen und deren Verlauf gespeichert.'),archivActions);
         liste.append(eintrag);
         continue;
       }
@@ -2231,7 +2254,10 @@ async function erlebnisangeboteLaden() {
             body:JSON.stringify({archiviert:true})});await erlebnisangeboteLaden();}
           catch(error){alert('Archivieren fehlgeschlagen: '+error.message);}
         });
-        eintrag.append(archivieren);liste.append(eintrag);continue;
+        archivieren.className='btn secondary';
+        const gpsActions=document.createElement('div');gpsActions.className='program-action-row';
+        gpsActions.append(archivieren,adminProgrammLoeschbutton(angebot));
+        eintrag.append(gpsActions);liste.append(eintrag);continue;
       }
 
      const beschreibung = document.createElement('textarea');
@@ -2411,7 +2437,7 @@ bildButton.addEventListener('click', async () => {
   }
 });
 
-bildBereich.append(bildAuswahl, bildButton);
+bildBereich.append(bildAuswahl);
 eintrag.appendChild(bildBereich);
 
 const preisButton = document.createElement('button');
@@ -2474,16 +2500,8 @@ function aktivButtonAktualisieren() {
     ? '✓ Aktiviert'
     : '✕ Deaktiviert';
 
-  aktivButton.style.backgroundColor = aktiv
-    ? '#168447'
-    : '#bd3030';
-
-  aktivButton.style.color = '#ffffff';
-  aktivButton.style.border = 'none';
-  aktivButton.style.borderRadius = '8px';
-  aktivButton.style.padding = '12px 20px';
-  aktivButton.style.fontWeight = 'bold';
-  aktivButton.style.cursor = 'pointer';
+  aktivButton.className=aktiv?'btn secondary':'btn danger';
+  aktivButton.setAttribute('aria-pressed',String(aktiv));
 }
 
 aktivButtonAktualisieren();
@@ -2521,12 +2539,8 @@ aktivButton.addEventListener('click', async () => {
   }
 });
 
-eintrag.appendChild(aktivButton);
-
-eintrag.appendChild(preisButton);
-
 const archivierenButton=document.createElement('button');
-archivierenButton.type='button';archivierenButton.textContent='Angebot archivieren';
+archivierenButton.type='button';archivierenButton.className='btn secondary';archivierenButton.textContent='Angebot archivieren';
 archivierenButton.addEventListener('click',async()=>{
   if(!confirm(`„${angebot.name}“ archivieren? Bestehende Buchungen bleiben erhalten.`))return;
   archivierenButton.disabled=true;
@@ -2536,7 +2550,10 @@ archivierenButton.addEventListener('click',async()=>{
     await erlebnisangeboteLaden();
   }catch(error){archivierenButton.disabled=false;alert('Archivieren fehlgeschlagen: '+error.message);}
 });
-eintrag.appendChild(archivierenButton);
+const programActions=document.createElement('div');
+programActions.className='program-action-row';
+programActions.append(bildButton,aktivButton,preisButton,archivierenButton,adminProgrammLoeschbutton(angebot));
+eintrag.appendChild(programActions);
 
       liste.appendChild(eintrag);
     }
