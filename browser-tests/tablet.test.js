@@ -44,7 +44,7 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
         if(connectionBroken)return send(503,{error:'Netzwerk vorübergehend nicht verfügbar'});
         if(url.pathname==='/api/pruefung/tablet/angebote'){
           if(offersOffline)return send(503,{error:'Testweise offline'});
-          return send(200,{ortId:1,standort:'Brilon',angebote:advertisedOffers});
+          return send(200,{ortId:1,standort:'Brilon',anzeigedauerSekunden:23,angebote:advertisedOffers});
         }
         return send(200,{name:'Testtablet',ortId:1,standort:'Brilon',code,gueltigSekunden:code?120:0});
       });
@@ -55,12 +55,18 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       await page.locator('#tablet-marketing').waitFor({state:'visible'});
       await page.waitForFunction(()=>document.getElementById('tablet-offer-title')?.textContent==='Klettern & Abenteuer');
       assert.equal(await page.locator('#tablet-digits').textContent(),'');
+      assert.equal(await page.locator('.tablet-brand-logo').getAttribute('src'),'/logo-klettern-abenteuer.svg');
+      assert.match(await page.locator('#tablet-datetime').textContent(),/\d{2}:\d{2}/);
+      assert.equal(await page.locator('.tablet-site-caption').textContent(),'Agentur-Standort');
+      assert.equal(await page.evaluate(()=>werbezeitMs),23000);
       // Anwendungsstart und Angebotswechsel ohne Neustart des Geräts.
       const refreshedOffer='Neues Teamprogramm';
       advertisedOffers=[{id:'neu',name:refreshedOffer,
-        beschreibung:'Frisch veröffentlichte Programme für Familien.'}];
+        beschreibung:'Frisch veröffentlichte Programme für Familien.',bild_url:'https://example.org/klettern.jpg'}];
       await page.evaluate(()=>loadOffers());
       await page.waitForFunction(()=>document.getElementById('tablet-offer-title').textContent==='Neues Teamprogramm');
+      assert.equal(await page.locator('#tablet-offer-image').getAttribute('src'),'https://example.org/klettern.jpg');
+      assert.equal(await page.locator('#tablet-offer-image').isVisible(),true);
       offersOffline=true;
       await page.evaluate(()=>loadOffers());
       assert.equal(await page.locator('#tablet-offer-title').textContent(),refreshedOffer,
