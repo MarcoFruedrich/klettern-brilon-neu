@@ -8,15 +8,22 @@
   <link rel="stylesheet" href="/style.css?v=20261108-admin-horizontal-tabs-whatsapp">
   <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-site-label-inline">
+  <link rel="stylesheet" href="/admin-forest.css?v=20261108-forest-v1">
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
   <header class="admin-topbar">
-    <a class="logo" href="/">
-      🧗 Klettern <span>& Abenteuer</span>
-      <small>Verwaltung</small>
+    <a class="admin-brand" href="/" aria-label="Klettern und Abenteuer – zur Website">
+      <span class="admin-brand-icon" aria-hidden="true">🌲</span>
+      <span class="admin-brand-text">
+        <strong>Klettern &amp; Abenteuer – Verwaltung</strong>
+        <small>Web-Admin-Dashboard für Buchungen, Programme, Kontakte, Öffentlichkeitsarbeit und Wissensmanagement</small>
+      </span>
     </a>
-    <a class="admin-back-link" href="/">Zur Website</a>
+    <div class="admin-top-actions">
+      <span class="admin-top-mode">Verwaltung</span>
+      <a class="admin-back-link" href="/">Zur Website</a>
+    </div>
   </header>
 
   <main class="narrow admin-main" id="main-content" tabindex="-1">
@@ -38,6 +45,7 @@
     <div id="workspace" hidden>
       <div class="admin-layout">
         <aside class="admin-sidebar" aria-label="Verwaltung">
+          <div class="admin-sidebar-label" aria-hidden="true"><span class="admin-sidebar-tree">🌲</span><span><strong>Klettern &amp; Abenteuer</strong><small>VERWALTUNG</small></span></div>
           <button id="logout" class="btn secondary">Abmelden</button>
           <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
             <a href="#admin-dashboard" data-admin-view-link>Übersicht</a>
@@ -441,6 +449,13 @@
   </button>
 </form>
 
+  <div id="admin-program-secondary" class="admin-program-secondary" hidden>
+    <div class="admin-program-secondary-heading">
+      <span aria-hidden="true">🌲</span>
+      <span><strong>Erstellte Programme</strong><small>Programm wählen – Angaben, Preise und Bilder direkt bearbeiten</small></span>
+    </div>
+    <nav id="admin-program-picker" class="admin-program-picker" aria-label="Erstellte Programme auswählen"></nav>
+  </div>
   <div id="angebote-admin-liste"></div>
 </section>
 
