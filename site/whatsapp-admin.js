@@ -9,7 +9,8 @@
   function offerLink(title,information,anchor){
     const url=new URL(anchor,location.origin).href;
     const message='Klettern & Abenteuer: '+title+'\n'+information+
-      '\nDetails und unverbindliche Terminanfrage: '+url;
+      '\nDas reguläre Buchungsformular auf der Webseite nutzen: '+url+
+      '\nPreis, Termin und Verfügbarkeit werden bei der Anfrage geprüft.';
     const link=document.createElement('a');
     link.className='whatsapp-share-link';
     link.href='https://api.whatsapp.com/send?text='+encodeURIComponent(message);
@@ -43,12 +44,14 @@
           offer.veranstaltungsorte.filter(x=>typeof x==='string'):
           [offer.veranstaltungsort].filter(x=>typeof x==='string');
         item(offer.name,(places.length?'Standorte: '+places.join(', '):'Termin auf Anfrage')+
-          (offer.beschreibung?' · '+offer.beschreibung:''),'/#angebote');
+          (offer.beschreibung?' · '+offer.beschreibung:''),
+          offer.id!=null?'/?programm='+encodeURIComponent(String(offer.id))+'#buchung':'/#buchung');
       }
       for(const action of a){
         if(!action||typeof action.titel!=='string')continue;
         item(action.titel,[action.datum||'Termin auf Anfrage',action.uhrzeit||'',
-          action.veranstaltungsort||'',action.beschreibung||''].filter(Boolean).join(' · '),' /#aktionen'.trim());
+          action.veranstaltungsort||'',action.beschreibung||''].filter(Boolean).join(' · '),
+          action.id!=null?'/?aktion='+encodeURIComponent(String(action.id))+'#buchung':'/#buchung');
       }
       if(!root.childElementCount){
         const p=document.createElement('p');p.textContent='Aktuell keine veröffentlichten Angebote vorhanden.';
