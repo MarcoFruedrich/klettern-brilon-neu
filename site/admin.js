@@ -298,6 +298,7 @@ async function refresh() {
     await rechnungenLaden();
 
     await erlebnisangeboteLaden();
+    await window.besuchergruppenAdminLaden?.();
     await orteLaden();
     await mitarbeiterbereicheLaden();
     await gpsTourenLaden();
