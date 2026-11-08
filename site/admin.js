@@ -2119,6 +2119,29 @@ document.getElementById('mitarbeiterbereich-form')?.addEventListener('submit',as
 document.getElementById('mitarbeiterbereich-form')?.elements.art?.addEventListener('change',event=>
   mitarbeiterbereichArtSynchronisieren(event.currentTarget.form));
 
+function programmDauerhaftLoeschenButton(angebot){
+  const button=document.createElement('button');
+  button.type='button';
+  button.textContent='Dauerhaft löschen';
+  button.className='btn secondary';
+  button.style.borderColor='#b42318';
+  button.style.color='#b42318';
+  button.addEventListener('click',async()=>{
+    const bestaetigung=prompt(`Programm „${angebot.name}“ endgültig löschen? Dieser Vorgang kann nicht rückgängig gemacht werden. Bestehende Buchungen und verknüpfte GPS-Touren verhindern das Löschen. Bitte LÖSCHEN eingeben:`);
+    if(bestaetigung!=='LÖSCHEN')return;
+    button.disabled=true;
+    try{
+      await api(`/api/admin/angebote/${angebot.id}`,{method:'DELETE'});
+      ausgewaehltesAdminProgramm='alle';
+      await erlebnisangeboteLaden();
+    }catch(error){
+      button.disabled=false;
+      alert('Dauerhaftes Löschen nicht möglich: '+error.message);
+    }
+  });
+  return button;
+}
+
 /* Gespeicherte Erlebnisangebote anzeigen */
 
 async function erlebnisangeboteLaden() {
@@ -2197,7 +2220,7 @@ async function erlebnisangeboteLaden() {
             body:JSON.stringify({archiviert:false})});await erlebnisangeboteLaden();}
           catch(error){wiederherstellen.disabled=false;alert('Wiederherstellen fehlgeschlagen: '+error.message);}
         });
-        eintrag.append(titel,el('p','Archivierte Angebote bleiben für bisherige Buchungen und deren Verlauf gespeichert.'),wiederherstellen);
+        eintrag.append(titel,el('p','Archivierte Angebote bleiben für bisherige Buchungen und deren Verlauf gespeichert.'),wiederherstellen,programmDauerhaftLoeschenButton(angebot));
         liste.append(eintrag);
         continue;
       }
@@ -2537,6 +2560,7 @@ archivierenButton.addEventListener('click',async()=>{
   }catch(error){archivierenButton.disabled=false;alert('Archivieren fehlgeschlagen: '+error.message);}
 });
 eintrag.appendChild(archivierenButton);
+eintrag.appendChild(programmDauerhaftLoeschenButton(angebot));
 
       liste.appendChild(eintrag);
     }
