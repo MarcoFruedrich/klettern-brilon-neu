@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Verwaltung | Klettern Brilon</title>
-  <link rel="stylesheet" href="/style.css?v=20261106-admin-form-align">
+  <link rel="stylesheet" href="/style.css?v=20261108-admin-nav-groups">
   <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-site-label-inline">
 </head>
@@ -42,7 +42,14 @@
           <nav class="admin-navigation" aria-label="Verwaltungsbereiche">
             <a href="#admin-dashboard" data-admin-view-link>Übersicht</a>
             <a href="#bookings-section" data-admin-view-link>Buchungen</a>
-            <a href="#feedback-admin-section" data-admin-view-link>Feedback</a><a href="#social-media-section" data-admin-view-link>Social Media</a><a href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
+            <details class="admin-nav-group" data-admin-nav-group="oeffentlichkeit">
+              <summary>Öffentlichkeitsarbeit</summary>
+              <div class="admin-nav-submenu">
+                <a href="#feedback-admin-section" data-admin-view-link>Feedback</a>
+                <a href="#social-media-section" data-admin-view-link>Social Media</a>
+                <a href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
+              </div>
+            </details>
             <a href="#payment-overview-section" data-admin-view-link>Zahlungsübersicht</a>
             <a href="#rechnungen-agb-section" data-admin-view-link>Rechnungen &amp; AGB</a>
             <a href="#calendar-view" data-admin-view-link>Kalender</a>
@@ -55,11 +62,16 @@
             <a href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
             <a href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
             <a href="#standorte-section" data-admin-view-link>Standorte</a>
-            <a class="employee-area-link" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiter</a>
-            <a class="employee-area-link" href="#mitarbeiter-einladen-section" data-admin-view-link>Neue Mitarbeiter</a>
-            <a class="employee-area-link" href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a>
-            <a class="employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
-            <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
+            <details class="admin-nav-group" data-admin-nav-group="kontakte">
+              <summary>Kontaktverwaltung</summary>
+              <div class="admin-nav-submenu">
+                <a class="employee-area-link" href="#mitarbeiter-section" data-admin-view-link>Mitarbeiter</a>
+                <a class="employee-area-link" href="#mitarbeiter-einladen-section" data-admin-view-link>Neue Mitarbeiter</a>
+                <a class="employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
+                <a class="employee-area-link" href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a>
+                <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
+              </div>
+            </details>
             <a class="employee-area-link" href="#wissensportal-admin-section" data-admin-view-link>Wissensportal</a>
           </nav>
         </aside>
@@ -685,7 +697,7 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261107-special-offer-availability"></script>
+  <script src="/admin.js?v=20261108-admin-nav-groups"></script>
   <script src="/website-effekte-admin.js?v=20261108"></script>
   <script src="/pruefung-admin.js?v=20261107-single-location-employment-special-approval"></script>
   <script src="/feedback-admin.js"></script>
