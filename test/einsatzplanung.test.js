@@ -26,9 +26,9 @@ test('Nur bestätigte, eingeteilte und tatsächliche Stunden belasten das Konto'
 test('2026 Minijobgrenze mit individuellem Stundenlohn',()=>{
   assert.equal(moneyLimit({},2026),60300);
   assert.equal(moneyLimit({},2027),null);
-  assert.deepEqual(checkLimits({art:'minijob',stundenlohn_cent:1500},
+  assert.deepEqual(checkLimits({art:'minijob',stundenlohn_cent:1500,monatsstunden:40},
     {weekMin:0,monthMin:2400,yearMin:2400},10,'2026-11-05'),[]);
-  assert.match(checkLimits({art:'minijob',stundenlohn_cent:1500},
+  assert.match(checkLimits({art:'minijob',stundenlohn_cent:1500,monatsstunden:40},
     {weekMin:0,monthMin:2400,yearMin:2400},60,'2026-11-05').join(' '),/Monat/);
 });
 test('30-Stunden-Vertrag meldet Überschreitungen',()=>{
@@ -36,4 +36,9 @@ test('30-Stunden-Vertrag meldet Überschreitungen',()=>{
     {weekMin:1740,monthMin:1740,yearMin:1740},120,'2026-11-05').join(' '),/Woche/);
   assert.deepEqual(checkLimits({art:'vollzeit',wochenstunden:40},
     {weekMin:1800,monthMin:1800,yearMin:1800},120,'2026-11-05'),[]);
+});
+
+test('Minijob ohne vertragliche Stunden wird nicht freigegeben',()=>{
+  assert.match(checkLimits({art:'minijob',stundenlohn_cent:1500},
+    {weekMin:0,monthMin:0,yearMin:0},60,'2026-11-05').join(' '),/Vertragliche/);
 });
