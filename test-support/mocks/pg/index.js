@@ -97,6 +97,17 @@ class Pool {
       const offer={id:this.nextOfferId++,name,beschreibung,dauer,preise:JSON.parse(rawPrices),aktiv};
       this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
     }
+    if(/INSERT INTO brilon_angebote\s*\(name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv,kategorie/.test(sql)){
+      const [name,beschreibung,dauer,dauer_modus,rawTiers,rawPrices,kategorie,zielgruppe,veranstaltungsort,
+        rawSites,kapazitaet,rawDates,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person]=params;
+      const sortierung=Math.max(0,...this.offers.map(item=>Number(item.sortierung)||0))+1;
+      const offer={id:this.nextOfferId++,name,beschreibung,dauer,dauer_modus,gruppenstufen:JSON.parse(rawTiers),
+        preise:JSON.parse(rawPrices),aktiv:false,kategorie,zielgruppe,veranstaltungsort,
+        veranstaltungsorte:JSON.parse(rawSites),kapazitaet,verfuegbare_termine:JSON.parse(rawDates),
+        hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,
+        sortierung,archiviert:false};
+      this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
+    }
     if(/INSERT INTO brilon_angebote\s*\(name,beschreibung,dauer,preise,aktiv,kategorie/.test(sql)){
       const [name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,kapazitaet,rawDates,hinweise,buchbar,veroeffentlicht,buchungsmodus='gruppe',mindestteilnehmer=1,preis_pro_person=0]=params;
       const sortierung=Math.max(0,...this.offers.map(item=>Number(item.sortierung)||0))+1;
@@ -168,13 +179,16 @@ class Pool {
     }
     if (/^\s*SELECT 1\s*;?\s*$/i.test(sql)) return { rows:[{ '?column?':1 }], rowCount:1 };
     if (/UPDATE brilon_angebote\s+SET preise/.test(sql)) {
-      const [prices,id,active,name,description,category,audience,place,capacity,dates,notes,bookable,published,duration,mode,minPeople,personPrice]=params;
+      const [prices,id,active,name,description,category,audience,place,rawSites,capacity,dates,
+        notes,bookable,published,duration,mode,minPeople,personPrice,durationMode,rawTiers]=params;
       const offer=this.offers.find(item=>String(item.id)===String(id));
       if(!offer)return {rows:[],rowCount:0};
-      Object.assign(offer,{preise:JSON.parse(prices),aktiv:active===null?offer.aktiv:active,name,beschreibung:description,
-        kategorie:category,zielgruppe:audience,veranstaltungsort:place,kapazitaet:capacity,
-        verfuegbare_termine:JSON.parse(dates),hinweise:notes,buchbar:bookable,veroeffentlicht:published,dauer:duration,
-        buchungsmodus:mode,mindestteilnehmer:minPeople,preis_pro_person:personPrice});
+      Object.assign(offer,{preise:JSON.parse(prices),aktiv:active===null?offer.aktiv:active,name,
+        beschreibung:description,kategorie:category,zielgruppe:audience,veranstaltungsort:place,
+        veranstaltungsorte:JSON.parse(rawSites),kapazitaet:capacity,
+        verfuegbare_termine:JSON.parse(dates),hinweise:notes,buchbar:bookable,
+        veroeffentlicht:published,dauer:duration,buchungsmodus:mode,mindestteilnehmer:minPeople,
+        preis_pro_person:personPrice,dauer_modus:durationMode,gruppenstufen:JSON.parse(rawTiers)});
       return {rows:[offer],rowCount:1};
     }
     if (sql.includes('FROM brilon_angebote')) {
