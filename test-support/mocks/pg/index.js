@@ -16,6 +16,7 @@ class Pool {
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
     this.rechnungsdaten = {agbText:'Test-AGB', agbAktiv:true, agbVersion:1,
       empfehlungAktiv:false, empfehlungRabattArt:'prozent', empfehlungRabattWert:''};
+    this.confirmationSettings={verzoegerungMinuten:120,ruhebeginn:'18:00',ruheende:'09:00'};
     this.advisoryLockOwner = null;
     this.advisoryLockWaiters = [];
   }
@@ -59,6 +60,12 @@ class Pool {
       if (sql.includes("data->>'agbText'")) return {rows:[{text:this.rechnungsdaten.agbText,
         aktiv:String(this.rechnungsdaten.agbAktiv),version:String(this.rechnungsdaten.agbVersion)}],rowCount:1};
       return {rows:[{data:this.rechnungsdaten}],rowCount:1};
+    }
+    if(sql.includes('FROM brilon_kundenbestaetigung_einstellungen WHERE id=1'))
+      return {rows:[{...this.confirmationSettings}],rowCount:1};
+    if(sql.includes('INSERT INTO brilon_kundenbestaetigung_einstellungen')){
+      this.confirmationSettings={verzoegerungMinuten:Number(params[0]),ruhebeginn:params[1],ruheende:params[2]};
+      return {rows:[{id:1}],rowCount:1};
     }
     if(sql.includes('UPDATE brilon_kundenbestaetigungen SET faellig_ab=$1'))return {rows:[],rowCount:0};
     if (sql.includes('UPDATE brilon_rechnungsdaten')) {
