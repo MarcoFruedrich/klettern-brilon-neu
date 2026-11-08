@@ -663,6 +663,54 @@ async function main(req,res){
       return reply(res,201,{success:true,emailVersand,
         message:emailVersand==='angenommen'?'Danke! Dein Feedback wurde gespeichert. Der Versanddienst hat die Bestätigungs-E-Mail angenommen; die Zustellung ist damit nicht bestätigt.':'Danke! Dein Feedback wurde gespeichert. Der Versand der Bestätigungs-E-Mail konnte nicht bestätigt werden.'});
     }
+    // Unverbindliche Sonderanfrage: keine Buchung, kein Preis, keine Zahlungsforderung.
+    if(route==='/api/gruppenanfragen'&&req.method==='POST'){
+      if(!pool)return reply(res,503,{error:'Anfragen derzeit nicht verfügbar.'});
+      if(!limit('group-quote:'+ip,5,600000))return reply(res,429,{error:'Bitte später erneut versuchen.'});
+      const d=await body(req);
+      if(d?.website)return reply(res,201,{success:true});
+      const vorname=safeText(d.vorname,80),nachname=safeText(d.nachname,80),
+        email=safeText(d.email,180),angebot=safeText(d.angebot,120),
+        datum=safeText(d.datum,10),uhrzeit=safeText(d.uhrzeit,5),
+        standort=safeText(d.veranstaltungsort,80),teilnehmer=Number(d.teilnehmer),
+        telefon=safeText(d.telefon,40),nachricht=safeText(d.nachricht,2000);
+      if(!vorname||!nachname||!/^\S+@\S+\.\S+$/.test(email)||
+        !angebot||!standort||!Number.isInteger(teilnehmer)||teilnehmer<1||teilnehmer>1000||
+        !gueltigesDatum(datum)||datum<heuteInBerlin()||
+        !/^(?:09:(?:00|15|30|45)|1[0-8]:(?:00|15|30|45)|19:00)$/.test(uhrzeit)||
+        d.datenschutz!=='on')
+        return reply(res,400,{error:'Bitte die Kontaktdaten, Gruppengröße und den Wunschtermin korrekt eingeben.'});
+      const agb=await pool.query("SELECT data->>'agbText' AS text,data->>'agbAktiv' AS aktiv,data->>'agbVersion' AS version FROM brilon_rechnungsdaten WHERE id=1");
+      const agbData=agb.rows[0];
+      if(!agbData||agbData.aktiv!=='true'||d.agbBestaetigt!=='on')
+        return reply(res,400,{error:'Bitte die Geschäftsbedingungen bestätigen.'});
+      if(String(d.agbVersion)!==String(agbData.version))
+        return reply(res,409,{error:'Geschäftsbedingungen wurden aktualisiert. Bitte neu laden und bestätigen.'});
+      const q=await pool.query(`SELECT id,veranstaltungsort,veranstaltungsorte,gruppenstufen,
+         weitere_gruppen_auf_anfrage,buchungsmodus,verfuegbare_termine
+         FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true
+           AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]);
+      const program=q.rows[0];
+      if(!program||program.buchungsmodus==='einzelplatz'||program.weitere_gruppen_auf_anfrage!==true)
+        return reply(res,409,{error:'Für dieses Programm sind individuelle Gruppenanfragen nicht freigeschaltet.'});
+      const orte=Array.isArray(program.veranstaltungsorte)&&program.veranstaltungsorte.length?
+        program.veranstaltungsorte:[program.veranstaltungsort];
+      if(!orte.includes(standort))return reply(res,409,{error:'Dieser Standort ist für das Programm nicht freigegeben.'});
+      const stufen=Array.isArray(program.gruppenstufen)?program.gruppenstufen:[];
+      if(stufen.some(item=>teilnehmer>=Number(item.min)&&teilnehmer<=Number(item.max)))
+        return reply(res,409,{error:'Für diese Gruppengröße ist eine reguläre Preisstufe hinterlegt. Bitte normale Buchungsanfrage verwenden.'});
+      const daten={typ:'individuelle_gruppenanfrage',name:(vorname+' '+nachname).trim(),vorname,
+        nachname,email,telefon,angebot,veranstaltungsort:standort,teilnehmer,
+        wunschdatum:datum,wunschuhrzeit:uhrzeit,nachricht,preis:null,dauer:null,
+        buchung:false,reserviert:false,status:'neu',datenschutz:'on',
+        datenschutzBestaetigtAm:new Date().toISOString(),
+        agbVersion:Number(agbData.version),agbBestaetigtAm:new Date().toISOString()};
+      const id=crypto.randomUUID();
+      await pool.query('INSERT INTO brilon_individuelle_gruppenanfragen(id,data) VALUES($1,$2::jsonb)',[id,JSON.stringify(daten)]);
+      return reply(res,201,{success:true,anfragenummer:'GRUPPE-'+id.slice(0,8).toUpperCase(),
+        individuell:true,message:'Deine unverbindliche Anfrage wurde gespeichert. Ein Preis und ein Termin werden persönlich abgestimmt.'});
+    }
+
     if(route==='/api/buchungen'&&req.method==='POST'){
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       if(!limit('booking:'+ip,6))return reply(res,429,{error:'Bitte später erneut versuchen.'});
@@ -2548,6 +2596,26 @@ preis=safeText(d.preis,50);
         }
       }
 
+      if(route==='/api/admin/gruppenanfragen'&&req.method==='GET'){
+        if(!await admin(req,res))return;
+        if(!pool)return reply(res,503,{error:'Datenbank nicht verfügbar.'});
+        const q=await pool.query(`SELECT id,data,bearbeitungsnotiz,bearbeitet_am,created_at
+          FROM brilon_individuelle_gruppenanfragen ORDER BY created_at DESC LIMIT 100`);
+        return reply(res,200,q.rows);
+      }
+      const groupUpdate=route.match(/^\/api\/admin\/gruppenanfragen\/([0-9a-f-]{36})$/i);
+      if(groupUpdate&&req.method==='PATCH'){
+        if(!await admin(req,res))return;
+        const d=await body(req);
+        const note=safeText(d?.bearbeitungsnotiz,2000),done=d?.bearbeitet===true;
+        const q=await pool.query(`UPDATE brilon_individuelle_gruppenanfragen
+          SET bearbeitungsnotiz=$2,bearbeitet_am=CASE WHEN $3 THEN NOW() ELSE NULL END
+          WHERE id=$1 RETURNING id,data,bearbeitungsnotiz,bearbeitet_am,created_at`,
+          [groupUpdate[1],note,done]);
+        if(!q.rowCount)return reply(res,404,{error:'Gruppenanfrage nicht gefunden.'});
+        return reply(res,200,q.rows[0]);
+      }
+
       if(route==='/api/admin/buchungen'&&req.method==='GET'){
         const statusFilter=safeText(u.searchParams.get('status'),20)||'alle';
         const allowedStatus=['alle','offen','bestaetigt','abgelehnt','storniert'];
@@ -4126,6 +4194,14 @@ await pool.query(`
         ADD COLUMN IF NOT EXISTS weitere_gruppen_auf_anfrage BOOLEAN NOT NULL DEFAULT false`);
       await pool.query(`UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array(veranstaltungsort)
         WHERE jsonb_array_length(CASE WHEN jsonb_typeof(veranstaltungsorte)='array' THEN veranstaltungsorte ELSE '[]'::jsonb END)=0`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_individuelle_gruppenanfragen (
+        id UUID PRIMARY KEY,
+        data JSONB NOT NULL,
+        bearbeitungsnotiz TEXT,
+        bearbeitet_am TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await pool.query('CREATE INDEX IF NOT EXISTS brilon_individuelle_gruppenanfragen_created_idx ON brilon_individuelle_gruppenanfragen(created_at DESC)');
       console.log('Programmstandorte geprüft und vorhandene Standorte übernommen');
     }
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'||process.env.RUN_STAFFING_MIGRATION==='true')
