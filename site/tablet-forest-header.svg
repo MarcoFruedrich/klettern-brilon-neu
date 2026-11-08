@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 156" role="img" aria-label="Berglandschaft mit Tannen">
+<defs>
+<linearGradient id="sky" x2="0" y2="1"><stop stop-color="#f9fbf4"/><stop offset="1" stop-color="#e4f1e3"/></linearGradient>
+<linearGradient id="hills" x2="0" y2="1"><stop stop-color="#a9cdb6"/><stop offset="1" stop-color="#619c81"/></linearGradient>
+<symbol id="pine" viewBox="0 0 40 100"><path d="M19 4 7 34h7L3 56h11L0 80h16v15h8V80h16L26 56h11L26 34h7z" fill="currentColor"/></symbol>
+</defs>
+<rect width="1600" height="156" fill="url(#sky)"/>
+
+<path d="M0 86 92 72l85 15 106-25 100 23 98-29 91 19 133-30 104 14 123-27 122 30 96-39 85 22 132-22 136 28 97-15v100H0Z" fill="#d6e8d8"/>
+<path d="m0 101 108-21 110 19 107-33 116 32 98-25 126 27 120-37 119 27 118-43 121 30 115-29 110 36 132-28v94H0Z" fill="#b7d6bf"/>
+<path d="m0 113 86-24 114 27 123-32 105 24 135-29 95 26 126-22 142 22 111-36 112 23 121-24 118 36 112-21v78H0Z" fill="url(#hills)" opacity=".72"/>
+<path d="M0 130c102-45 178 5 285-21s153 24 256 0 182 23 274-4 137 12 252-7 174 35 267 8 177 12 266 1v49H0Z" fill="#3f8069" opacity=".42"/>
+<g color="#124d3a" opacity=".96">
+<use href="#pine" x="0" y="19" width="66" height="137"/>
+<use href="#pine" x="45" y="37" width="52" height="119"/>
+<use href="#pine" x="83" y="62" width="34" height="94"/>
+<use href="#pine" x="1370" y="72" width="34" height="84"/>
+<use href="#pine" x="1410" y="36" width="47" height="120"/>
+<use href="#pine" x="1463" y="54" width="40" height="102"/>
+<use href="#pine" x="1514" y="24" width="59" height="132"/>
+<use href="#pine" x="1570" y="51" width="35" height="105"/>
+</g>
+<g color="#1b634b" opacity=".84">
+<use href="#pine" x="1010" y="96" width="21" height="60"/>
+<use href="#pine" x="1044" y="79" width="30" height="77"/>
+<use href="#pine" x="1080" y="98" width="20" height="58"/>
+<use href="#pine" x="1130" y="85" width="30" height="71"/>
+<use href="#pine" x="1168" y="98" width="22" height="58"/>
+<use href="#pine" x="1284" y="104" width="20" height="52"/>
+<use href="#pine" x="1320" y="90" width="27" height="66"/>
+</g>
+<rect x="0" y="152" width="1600" height="4" fill="#154c39" opacity=".4"/>
+</svg>
