@@ -1,6 +1,8 @@
 'use strict';
 (() => {
-  const root=document.getElementById('einsatzplanung-admin');
+  // Beide Bereiche existieren in getrennten Admin-Ansichten. Der alte Container
+  // `einsatzplanung-admin` wurde beim Umbau der Navigation entfernt.
+  const root=document.getElementById('einsatzplanung-termine');
   const personalRoot=document.getElementById('arbeitsvertraege-admin');
   if(!root||!personalRoot)return;
   const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
@@ -18,6 +20,7 @@
         api('/api/admin/einsatzplanung/kundenbestaetigung-einstellungen')
       ]);
       personen=liste;personalAnzeigen();termineAnzeigen(plan);
+      if(pendingMitarbeiterId&&vertragFokussieren(pendingMitarbeiterId))pendingMitarbeiterId=null;
       const settingsForm=document.getElementById('kundenbestaetigung-settings-form');
       if(settingsForm){
         settingsForm.elements.namedItem('verzoegerungMinuten').value=settings?.verzoegerungMinuten??120;
@@ -30,7 +33,9 @@
   function personalAnzeigen(){
     personalRoot.replaceChildren();
     for(const p of personen){
-      const card=el('article');card.className='booking';const h=el('h3',p.name);card.append(h);
+      const card=el('article');card.className='booking arbeitsvertrag-karte';
+      card.dataset.mitarbeiterId=String(p.id);
+      const h=el('h3',p.name);card.append(h);
       const form=document.createElement('form');form.className='einsatz-vertragsformular';
       const select=document.createElement('select');select.name='art';
       for(const [value,name] of [['nicht_hinterlegt','Bitte auswählen'],['minijob','Minijob'],['teilzeit','Teilzeit'],['vollzeit','Vollzeit'],['honorar','Honorarkraft']]){
@@ -41,7 +46,9 @@
         input.name=name;input.type='number';input.min='0';input.step=step;input.value=value??'';
         box.append(input);return box;
       };
-      const typ=el('label','Beschäftigungsart');typ.append(select);form.append(typ);
+      const typ=el('label','Beschäftigungsart / Vertragsmodell');typ.append(select);form.append(typ);
+      const info=el('p','Beschäftigungstyp, Stundenumfang und Vergütung können hier jederzeit angepasst werden. Änderungen werden erst mit „Vertragsdaten speichern“ übernommen.');
+      info.className='hint';form.append(info);
       const rateField=field('Stundenlohn brutto (€)','stundenlohn',p.stundenlohn_cent==null?'':p.stundenlohn_cent/100);
       form.append(rateField);
       form.append(field('Vertragliche Wochenstunden','wochenstunden',p.wochenstunden));
@@ -80,7 +87,29 @@
       card.append(form,stats,summary);personalRoot.append(card);
     }
   }
-  async function personalAktualisieren(){personen=await api('/api/admin/einsatzplanung/personen');}
+  async function personalAktualisieren(){
+    personen=await api('/api/admin/einsatzplanung/personen');
+    personalAnzeigen();
+  }
+  // Aus der Mitarbeiterkarte unmittelbar das eigene Vertragsformular öffnen.
+  let pendingMitarbeiterId=null;
+  function vertragFokussieren(mitarbeiterId){
+    const card=Array.from(personalRoot.querySelectorAll('.arbeitsvertrag-karte'))
+      .find(item=>item.dataset.mitarbeiterId===String(mitarbeiterId));
+    if(!card)return false;
+    card.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
+    card.classList.add('is-contract-target');
+    for(const other of personalRoot.querySelectorAll('.arbeitsvertrag-karte')){
+      if(other!==card)other.classList.remove('is-contract-target');
+    }
+    card.querySelector('select[name="art"]')?.focus({preventScroll:true});
+    return true;
+  }
+  window.adminMitarbeiterVertragOeffnen=mitarbeiterId=>{
+    pendingMitarbeiterId=String(mitarbeiterId);
+    window.adminNavigateToElement?.('mitarbeiter-section');
+    if(vertragFokussieren(pendingMitarbeiterId))pendingMitarbeiterId=null;
+  };
   function termineAnzeigen(plan){
     const list=document.getElementById('einsatzplanung-termine');list.replaceChildren();
     const notificationMap=new Map((plan.kundenMails||[]).map(row=>[row.buchung_id,row]));
