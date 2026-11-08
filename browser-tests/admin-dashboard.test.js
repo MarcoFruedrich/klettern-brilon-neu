@@ -392,6 +392,38 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.close();
   });
 
+  await t.test('Wochenkalender: Sonntag 09:00–10:10 liegt in der 09-Uhr-Zeile',async()=>{
+    const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
+    await page.clock.install({time:new Date('2026-11-08T12:00:00+01:00')});
+    fakeAdminApi(page);
+    const json=body=>({status:200,contentType:'application/json; charset=utf-8',
+      body:JSON.stringify(body)});
+    await page.route('**/api/admin/einsatzplanung/kalender?*',route=>route.fulfill(json({
+      buchungen:[],einsaetze:[]})));
+    await page.route('**/api/admin/kalenderbuchungen?*',route=>route.fulfill(json([{
+      id:'kalender-november-test',status:'bestaetigt',
+      data:{datum:'2026-11-08',uhrzeit:'09:00',dauer:70,angebot:'Auf die Bäume',
+        veranstaltungsort:'Brilon',teilnehmer:8}
+    }])));
+    await login(page,root);
+    await openAdminView(page,'#calendar-view');
+    const event=page.locator('.ck-week-grid .ck-daylane').nth(6).locator('.ck-event')
+      .filter({hasText:'Auf die Bäume'});
+    await event.waitFor({state:'visible'});
+    const placement=await page.evaluate(()=>{
+      const entry=[...document.querySelectorAll('.ck-week-grid .ck-daylane')]
+        .at(6)?.querySelector('.ck-event');
+      const nine=[...document.querySelectorAll('.ck-week-grid .ck-hour')]
+        .find(node=>node.textContent==='09:00');
+      return {entry:parseFloat(entry?.style.top),nine:parseFloat(nine?.style.top),
+        label:entry?.textContent};
+    });
+    assert.equal(placement.entry,placement.nine+2,
+      'Der Termin 09:00–10:10 muss direkt an der 09:00-Zeile liegen: '+JSON.stringify(placement));
+    assert.match(placement.label,/09:00\s*–\s*10:10/);
+    await page.close();
+  });
+
   await t.test('Programm erstellen, editieren und aktivieren mit CSRF-Token',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
     const state=fakeAdminApi(page);
