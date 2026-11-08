@@ -25,3 +25,10 @@ test('Anzahlung und Vollzahlung sind unterschiedliche Zahlungsstände', () => {
   const paid=zahlungsstand(10000,[{betragCent:10000,methode:'ueberweisung'}]);
   assert.equal(paid.vollstaendigBezahlt,true);
 });
+
+test('Trainerzusage kurz vor Ende der Ruhezeit: Verwaltungsfenster bleibt erhalten', () => {
+  assert.equal(customerConfirmationDue('2026-11-09T08:30:00+01:00').toISOString(), '2026-11-09T09:30:00.000Z');
+});
+test('Trainerzusage um 07 Uhr: Versand erst nach Ablauf der zwei Stunden', () => {
+  assert.equal(customerConfirmationDue('2026-11-09T07:00:00+01:00').toISOString(), '2026-11-09T08:00:00.000Z');
+});
