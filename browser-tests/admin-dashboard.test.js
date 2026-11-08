@@ -467,6 +467,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.accept();});
     await login(page,root);
     await openAdminView(page,'#angebote-verwaltung');
+    await page.locator('#admin-subnavigation a[data-program-tab="neu"]').click();
     const form=page.locator('#neues-angebot-form');
     await form.locator('[name="name"]').fill('Bouldern Kinder');
     await form.locator('[name="beschreibung"]').fill('Browsertestangebot');
