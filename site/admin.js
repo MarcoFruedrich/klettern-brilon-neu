@@ -49,8 +49,8 @@ function adminAnsichtAnzeigen(target,{hash=false,focus=false}={}){
   const programList=document.getElementById('angebote-admin-liste');
   const programHeading=programForm?.previousElementSibling;
   if(programForm&&programList){
-    programForm.hidden=programTab!=='neu';
-    if(programHeading?.tagName==='H3')programHeading.hidden=programTab!=='neu';
+    programForm.hidden=programTab!=='neu'&&programTab!=='preise';
+    if(programHeading?.tagName==='H3')programHeading.hidden=programTab!=='neu'&&programTab!=='preise';
     programList.hidden=programTab==='neu';
   }
   if(hash&&location.hash!=='#'+view.id)history.pushState(null,'','#'+view.id);
