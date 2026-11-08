@@ -284,7 +284,8 @@ function fakeAdminApi(page) {
     if(endpoint==='/api/admin/angebote'&&method==='GET')return json(200,state.programs);
     if(endpoint==='/api/admin/angebote'&&method==='POST'){
       const values=readBody();
-      const program={...values,id:20+state.programs.length,aktiv:false,preise:{},bild_url:null};
+      const program={...values,id:20+state.programs.length,aktiv:false,
+        preise:Object.fromEntries((values.gruppenstufen||[]).map(x=>[`${x.min}-${x.max}`,x.preis])),bild_url:null};
       state.programs.push(program);
       return json(201,{id:program.id});
     }
@@ -401,7 +402,8 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await form.locator('[name="name"]').fill('Bouldern Kinder');
     await form.locator('[name="beschreibung"]').fill('Browsertestangebot');
     await form.locator('input[name="dauer"]').first().fill('75');
-    await form.locator('#neues-angebot-stufen .angebot-stufen-zeile').first().locator('input[name="preis"]').fill('85');
+    for(const [index,price] of ['85','135','180','230'].entries())
+      await form.locator('#neues-angebot-stufen .angebot-stufen-zeile').nth(index).locator('input[name="preis"]').fill(price);
     await form.locator('#angebot-orte-auswahl input[value="Brilon"]').check();
     await form.locator('[name="kapazitaet"]').fill('12');
     await form.locator('[name="zielgruppe"]').fill('Kinder');
