@@ -5,8 +5,22 @@
   const elt=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n;};
   let initialized=false;
   let activePlaces=[];
+  async function werbezeitLaden(){
+    const target=find('tablet-ad-duration-seconds');
+    const status=find('tablet-ad-duration-status');
+    if(!target||!status)return;
+    try{
+      const settings=await api('/api/admin/tablet-werbedauer');
+      target.value=String(settings.sekunden);
+      status.textContent='Für alle Standorte gespeichert: '+settings.sekunden+
+        ' Sekunden je Programm. Die Tablets übernehmen Änderungen innerhalb einer Minute.';
+    }catch(error){
+      status.textContent='Werbedauer konnte nicht geladen werden: '+error.message;
+    }
+  }
   async function refresh(){
     if(!initialized||find('workspace')?.hidden)return;
+    await werbezeitLaden();
     try{activePlaces=(await api('/api/admin/orte')).filter(place=>place.aktiv);}
     catch{activePlaces=[];}
     const stationPlace=find('pruef-station-ort');
@@ -907,6 +921,29 @@
       form.reset();find('pruef-station-status').textContent='Station gespeichert.';
       await refresh();
     }catch(err){find('pruef-station-status').textContent='Fehler: '+err.message;}
+  });
+  find('tablet-ad-duration-form')?.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+    const input=find('tablet-ad-duration-seconds'),status=find('tablet-ad-duration-status');
+    const sekunden=Number(input.value);
+    if(!Number.isSafeInteger(sekunden)||sekunden<5||sekunden>120){
+      status.textContent='Bitte einen Wert zwischen 5 und 120 Sekunden eingeben.';
+      return;
+    }
+    button.disabled=true;
+    status.textContent='Werbedauer wird für alle Standorte gespeichert …';
+    try{
+      const result=await api('/api/admin/tablet-werbedauer',{
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({sekunden})
+      });
+      input.value=String(result.sekunden);
+      status.textContent='Gespeichert: '+result.sekunden+
+        ' Sekunden je Werbeeinspielung für alle Standorte. Tablets übernehmen den Wert innerhalb einer Minute.';
+    }catch(error){
+      status.textContent='Werbedauer konnte nicht gespeichert werden: '+error.message;
+    }finally{button.disabled=false;}
   });
   find('tablet-pair-generate')?.addEventListener('click',async()=>{
     const display=find('tablet-pair-code');display.textContent='Kopplungscode wird erzeugt …';
