@@ -449,6 +449,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       return respond(route,contract);
     });
     await login(page,root);
+    await openAdminView(page,'#mitarbeiter-section');
     const card=page.locator('#pruef-personal-list .booking').filter({hasText:'Vertrags-Testperson'});
     await card.getByRole('button',{name:'Beschäftigungsdaten bearbeiten'}).click();
     assert.equal(await page.locator('#mitarbeiter-section').isVisible(),true);
