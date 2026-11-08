@@ -2500,6 +2500,54 @@ preis=safeText(d.preis,50);
           'Nur Zeituebersicht. Rabatte, Kapazitaet und Zahlungen muessen gesondert geprueft werden.'});
       }
 
+      // Nur ungelesene neue Anfragen und seitdem erfolgte Stornierungen melden.
+      // Gelesen-Zeitpunkte pro Verwaltungsbereich, geräteübergreifend gespeichert.
+      if(route==='/api/admin/benachrichtigungen'&&req.method==='GET'){
+        if(!await admin(req,res))return;
+        if(!pool)return reply(res,503,{error:'Datenbank nicht verfügbar.'});
+        try{
+          const state=await pool.query("SELECT data->'adminBenachrichtigungenGelesen' AS gelesen FROM brilon_rechnungsdaten WHERE id=1");
+          if(!state.rowCount)return reply(res,503,{error:'Benachrichtigungseinstellungen sind nicht eingerichtet.'});
+          const gelesen=state.rows[0]?.gelesen||{};
+          const epoch='1970-01-01T00:00:00Z';
+          const since=key=>{
+            const raw=gelesen[key];
+            return typeof raw==='string'&&Number.isFinite(Date.parse(raw))?raw:epoch;
+          };
+          const q=await pool.query(`SELECT
+              COUNT(*) FILTER (WHERE COALESCE(status,'offen')='offen' AND created_at>$1::timestamptz)::integer AS anfragen,
+              COUNT(*) FILTER (WHERE status='storniert' AND COALESCE(updated_at,created_at)>$2::timestamptz)::integer AS stornierungen
+            FROM brilon_buchungen`,[since('offen'),since('storniert')]);
+          return reply(res,200,{offen:Number(q.rows[0]?.anfragen||0),
+            storniert:Number(q.rows[0]?.stornierungen||0)});
+        }catch(error){
+          console.error('Benachrichtigungen konnten nicht geladen werden:',error.message);
+          return reply(res,503,{error:'Benachrichtigungen derzeit nicht verfügbar.'});
+        }
+      }
+      if(route==='/api/admin/benachrichtigungen/lesen'&&req.method==='POST'){
+        if(!await admin(req,res))return;
+        if(!pool)return reply(res,503,{error:'Datenbank nicht verfügbar.'});
+        const d=await body(req,2000);
+        const bereich=d?.bereich;
+        if(!['offen','storniert'].includes(bereich))
+          return reply(res,400,{error:'Unbekannter Benachrichtigungsbereich.'});
+        try{
+          const q=await pool.query(`UPDATE brilon_rechnungsdaten
+            SET data=jsonb_set(COALESCE(data,'{}'::jsonb),
+              '{adminBenachrichtigungenGelesen}',
+              COALESCE(data->'adminBenachrichtigungenGelesen','{}'::jsonb) ||
+                jsonb_build_object($1::text, NOW()::text),true),
+              aktualisiert_am=NOW()
+            WHERE id=1 RETURNING id`,[bereich]);
+          if(!q.rowCount)return reply(res,503,{error:'Benachrichtigungseinstellungen nicht eingerichtet.'});
+          return reply(res,200,{erfolg:true,bereich});
+        }catch(error){
+          console.error('Benachrichtigung konnte nicht bestätigt werden:',error.message);
+          return reply(res,503,{error:'Benachrichtigung konnte nicht als gelesen markiert werden.'});
+        }
+      }
+
       if(route==='/api/admin/buchungen'&&req.method==='GET'){
         const statusFilter=safeText(u.searchParams.get('status'),20)||'alle';
         const allowedStatus=['alle','offen','bestaetigt','abgelehnt','storniert'];
