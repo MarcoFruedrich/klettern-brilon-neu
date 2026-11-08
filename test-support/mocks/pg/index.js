@@ -125,6 +125,8 @@ class Pool {
       const tour={id,angebot_id,data:JSON.parse(raw),aktiv,erstellt_am:new Date().toISOString(),aktualisiert_am:null};
       this.gpsTours.push(tour);return {rows:[],rowCount:1};
     }
+    if(sql.includes("SELECT to_regclass('brilon_gps_touren')"))
+      return {rows:[{tabellenname:process.env.MOCK_GPS_TABLE_MISSING==='1'?null:'brilon_gps_touren'}],rowCount:1};
     if(sql.includes('FROM brilon_gps_touren')&&sql.includes('ORDER BY erstellt_am DESC'))
       return {rows:[...this.gpsTours].reverse(),rowCount:this.gpsTours.length};
     if(sql.includes('SELECT id FROM brilon_gps_touren WHERE angebot_id=$1 AND aktiv=true')){
