@@ -89,6 +89,40 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     }
   });
 
+  await t.test('Tablet zeigt ausschließlich Standortangebote und priorisiert Sicherheitscode',async()=>{
+    const page=await browser.newPage({viewport:{width:1024,height:768},locale:'de-DE'});
+    let siteId=2,code=null,offerCalls=0;
+    await page.route('**/api/pruefung/tablet/**',route=>{
+      const u=new URL(route.request().url());
+      let data;
+      if(u.pathname==='/api/pruefung/tablet/anzeige'){
+        data={name:'Tablet Winterberg',ortId:siteId,
+          standort:siteId===2?'Winterberg':null,pruefdisplay:true,
+          code,gueltigSekunden:code?120:0};
+      }else if(u.pathname==='/api/pruefung/tablet/angebote'){
+        offerCalls++;
+        data={ortId:siteId,standort:siteId===2?'Winterberg':null,
+          angebote:siteId===2?[{id:7,name:'Klettern Winterberg',
+            beschreibung:'Nur Standort Winterberg'}]:[]};
+      }else{
+        return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+      }
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
+    });
+    await page.goto(root+'/tablet.html');
+    await page.waitForFunction(()=>document.getElementById('tablet-offer-title')?.textContent==='Klettern Winterberg');
+    assert.equal(await page.locator('#tablet-site').textContent(),'Winterberg');
+    assert.equal(offerCalls>0,true);
+    code='123456';
+    await page.waitForFunction(()=>document.getElementById('tablet-digits')?.textContent==='123456');
+    assert.equal(await page.locator('#tablet-marketing').isVisible(),false);
+    siteId=null;code=null;
+    await page.waitForFunction(()=>document.getElementById('tablet-site')?.textContent==='Noch kein Standort zugewiesen');
+    assert.match(await page.locator('#tablet-offer-description').textContent(),/Standort zugeordnet/);
+    assert.equal(await page.locator('#tablet-marketing').isVisible(),true);
+    await page.close();
+  });
+
   await t.test('WhatsApp-Schalter blendet sowohl Floating-Button als auch Kontaktlink aus',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
     await fakePublicApi(page);
