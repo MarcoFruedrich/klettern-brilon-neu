@@ -1,7 +1,9 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const safeText=value=>typeof value==='string'?value:'';
-const POLL_MS=3000,OFFER_REFRESH_MS=5*60*1000,API_TIMEOUT_MS=7000;
+const POLL_MS=3000,OFFER_REFRESH_MS=60000,API_TIMEOUT_MS=7000;
+const STANDARD_WERBEZEIT_MS=11000;
+let werbezeitMs=STANDARD_WERBEZEIT_MS,cycleTimeout=null;
 let expiry=0,selected=-1,offers=[],activeOffer='',polling=false,loadingOffers=false;
 let displayCode='',wakeLock=null,displayGeneration=0;
 let currentSiteId=null,paired=false;
@@ -41,12 +43,24 @@ function showScreen(){
 function renderOffer(){
   if(!offers.length){
     $('tablet-offer-title').textContent='Klettern, Bouldern & Abenteuer';
+    const image=$('tablet-offer-image');
+    if(image){image.hidden=true;image.removeAttribute('src');}
     $('tablet-offer-description').textContent=currentSiteId===null
       ?'Dieses Tablet muss in der Verwaltung noch einem Veranstaltungsstandort zugeordnet werden.'
       :'Für diesen Standort sind aktuell keine freigegebenen Programme verfügbar.';
     return;
   }
   const offer=offers[selected>=0?selected:0];
+  const image=$('tablet-offer-image');
+  if(image){
+    const url=typeof offer.bild_url==='string'?offer.bild_url.trim():'';
+    if(/^https:\/\//i.test(url)){
+      image.src=url;image.alt='Programmbild: '+safeText(offer.name).slice(0,120);
+      image.hidden=false;
+    }else{
+      image.hidden=true;image.removeAttribute('src');
+    }
+  }
   $('tablet-offer-title').textContent=safeText(offer.name).slice(0,120);
   $('tablet-offer-description').textContent=
     safeText(offer.beschreibung||offer.hinweise||'Jetzt Programm anfragen!').slice(0,420);
@@ -59,6 +73,13 @@ async function loadOffers(){
     const data=await api('/api/pruefung/tablet/angebote');
     if(!Array.isArray(data.angebote))throw Error('Angebotsformat ungültig.');
     if(currentSiteId!==requestedSite||String(data.ortId??'')!==requestedSite)return;
+    const seconds=Number(data.anzeigedauerSekunden);
+    if(Number.isSafeInteger(seconds)&&seconds>=5&&seconds<=120){
+      if(werbezeitMs!==seconds*1000){
+        werbezeitMs=seconds*1000;
+        scheduleCycle();
+      }
+    }
     const updated=data.angebote.filter(x=>x&&typeof x.name==='string'&&x.name.trim())
       .slice(0,16);
     const former=offers[selected]?.id||activeOffer;
@@ -78,6 +99,13 @@ function cycle(){
   selected=(selected+1)%offers.length;
   activeOffer=offers[selected]?.id||'';
   renderOffer();
+}
+function scheduleCycle(){
+  if(cycleTimeout!==null)clearTimeout(cycleTimeout);
+  cycleTimeout=setTimeout(()=>{
+    if(!document.hidden)cycle();
+    scheduleCycle();
+  },werbezeitMs);
 }
 async function checkTablet(){
   // Hidden browser tabs must not keep reporting the physically visible display as online.
@@ -180,7 +208,7 @@ window.addEventListener('offline',()=>{
 });
 setInterval(countdown,500);
 setInterval(checkTablet,POLL_MS);
-setInterval(cycle,11000);
+scheduleCycle();
 setInterval(loadOffers,OFFER_REFRESH_MS);
 loadOffers();
 checkTablet();
