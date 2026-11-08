@@ -429,6 +429,31 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.close();
   });
 
+  await t.test('Walddesign und zweiter Programmstreifen: einzelnes Programm direkt öffnen',async()=>{
+    const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    state.programs.push({...state.programs[0],id:12,name:'Bouldern für Gruppen',aktiv:true});
+    await login(page,root);
+    assert.equal(await page.locator('.admin-brand-text').isVisible(),true);
+    assert.equal(await page.locator('.admin-sidebar-label').isVisible(),true);
+    assert.match(await page.locator('head link[href*="admin-forest.css"]').getAttribute('href'),/admin-forest/);
+    await openAdminView(page,'#angebote-verwaltung');
+    const band=page.locator('#admin-program-secondary');
+    assert.equal(await band.isVisible(),true);
+    assert.equal(await page.locator('#admin-program-picker button[data-program-id]').count(),3);
+    await band.getByRole('button',{name:'Bouldern für Gruppen'}).click();
+    const visible=page.locator('#angebote-admin-liste > .card:visible');
+    assert.equal(await visible.count(),1);
+    assert.match(await visible.first().locator('h3').first().textContent(),/Bouldern für Gruppen/);
+    assert.equal(await visible.first().getByRole('button',{name:'Programm speichern'}).isVisible(),true);
+    await band.getByRole('button',{name:'Alle anzeigen'}).click();
+    assert.equal(await visible.count(),2);
+    await page.locator('#admin-subnavigation a[data-program-tab="neu"]').click();
+    assert.equal(await band.isVisible(),false);
+    assert.equal(await page.locator('#neues-angebot-form').isVisible(),true);
+    await page.close();
+  });
+
   await t.test('Wochenkalender: Sonntag 09:00–10:10 liegt in der 09-Uhr-Zeile',async()=>{
     const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
     await page.clock.install({time:new Date('2026-11-08T12:00:00+01:00')});
