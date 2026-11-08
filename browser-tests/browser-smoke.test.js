@@ -89,6 +89,23 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     }
   });
 
+  await t.test('WhatsApp-Angebote öffnen das vorhandene Buchungsformular statt eines WhatsApp-Chats',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    await fakePublicApi(page);
+    await page.goto(root+'/?programm=1#buchung');
+    await page.locator('#angebot-auswahl option[value="Klettertest"]').waitFor({state:'attached'});
+    await page.waitForFunction(()=>document.getElementById('angebot-auswahl')?.value==='Klettertest');
+    assert.equal(await page.locator('#buchungs-standort').inputValue(),'Brilon');
+    assert.equal(await page.locator('#angebot-auswahl').inputValue(),'Klettertest');
+    const share=page.locator('#angebote-uebersicht .whatsapp-share-link').first();
+    assert.match(await share.getAttribute('href'),/api\.whatsapp\.com\/send\?text=/);
+    const message=new URL(await share.getAttribute('href')).searchParams.get('text');
+    assert.match(message,/\?programm=1#buchung/);
+    assert.match(message,/reguläre Buchungsformular/);
+    assert.equal(await page.locator('#booking').isVisible(),true);
+    await page.close();
+  });
+
   await t.test('Smartphone-Menü öffnet und schließt per Tastatur', async () => {
     const page = await browser.newPage({viewport: {width: 390, height: 844}});
     await fakePublicApi(page);
