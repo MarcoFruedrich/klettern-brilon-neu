@@ -54,6 +54,16 @@ const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEma
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
+// Free mode is intentionally limited to authenticated admin image uploads.
+// This performs strict decode/re-encode in bereinigeBild, but is NOT antivirus scanning.
+const imageUploadSecurityMode=process.env.IMAGE_UPLOAD_SECURITY_MODE==='sanitized_images'
+  ?'sanitized_images':'clamav_required';
+async function pruefeBereinigtenBildUpload(bild){
+  if(imageUploadSecurityMode==='sanitized_images')return {sauber:true,modus:'bild_neucodierung_ohne_virenscanner'};
+  const verdict=await scanForMalware(bild);
+  if(verdict?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
+  return verdict;
+}
 function malwareScanReply(res,error){
   const code=error?.code||'MALWARE_SCAN_ERROR';
   const detected=code==='MALWARE_FOUND';
@@ -3259,8 +3269,7 @@ if (bildRoute && req.method === 'POST') {
   }
 
   try{
-    const verdict=await scanForMalware(bild);
-    if(verdict?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
+    await pruefeBereinigtenBildUpload(bild);
   }catch(error){return malwareScanReply(res,error);}
 
   const vorhanden = await pool.query(
@@ -3368,8 +3377,7 @@ if (aktionsBildRoute && req.method === 'POST') {
   }
 
   try{
-    const verdict=await scanForMalware(bild);
-    if(verdict?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
+    await pruefeBereinigtenBildUpload(bild);
   }catch(error){return malwareScanReply(res,error);}
 
   const vorhanden = await pool.query(
