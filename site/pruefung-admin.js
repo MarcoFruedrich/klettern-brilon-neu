@@ -261,7 +261,7 @@
         if(!availablePlaces.length)placeField.append(elt('p','Keine Standorte vorhanden.'));
         grantPanel.append(placeField);
         const qualificationField=elt('fieldset');qualificationField.append(elt('legend','Geprüfte Qualifikationen auswählen'));
-        const declaredQualifications=[...new Set(String(person.qualifikationen||'').split(/[\\n,;]/)
+        const declaredQualifications=[...new Set(String(person.qualifikationen||'').split(/[\n,;]/)
           .map(value=>value.trim()).filter(Boolean))];
         const grantedQualifications=new Set(currentGrants.map(grant=>grant.qualifikation).filter(Boolean));
         for(const qualification of declaredQualifications){
