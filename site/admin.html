@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-site-label-inline">
   <link rel="stylesheet" href="/admin-forest.css?v=20261108-tablet-delete">
+  <link rel="stylesheet" href="/besuchergruppen.css?v=20261108">
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -472,6 +473,15 @@
     <nav id="admin-program-picker" class="admin-program-picker" aria-label="Erstellte Programme auswählen"></nav>
   </div>
   <div id="angebote-admin-liste"></div>
+<section id="besuchergruppen-admin-section" class="booking admin-anchor" aria-labelledby="besuchergruppen-admin-heading">
+  <h3 id="besuchergruppen-admin-heading">Für wen? – Besuchergruppen verwalten</h3>
+  <p>Die sechs Bildkacheln auf der öffentlichen Webseite lassen sich hier bearbeiten. Bilder können aus bereits hochgeladenen Programmbildern gewählt werden. Programme können mehreren Gruppen zugeordnet werden. Ohne Auswahl erfolgt eine automatische Zuordnung anhand von Name und Zielgruppentext.</p>
+  <p class="hint">Neue Bilder bitte zuerst bei einem passenden Programm hochladen. Anschließend stehen sie hier zur Auswahl. Änderungen werden erst nach „Besuchergruppen speichern“ veröffentlicht.</p>
+  <div class="actions"><button class="btn secondary" type="button" id="besuchergruppen-admin-neuladen">Daten neu laden</button>
+    <button class="btn" type="button" id="besuchergruppen-admin-speichern">Besuchergruppen speichern</button></div>
+  <p id="besuchergruppen-admin-status" role="status" aria-live="polite">Die Besuchergruppen werden nach der Anmeldung geladen.</p>
+  <div id="besuchergruppen-admin-liste" class="admin-grid"></div>
+</section>
 </section>
 
 <section id="standorte-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="standorte-heading">
@@ -752,6 +762,7 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261108-admin-horizontal-tabs-whatsapp"></script>
+  <script src="/besuchergruppen-admin.js?v=20261108"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
   <script src="/website-effekte-admin.js?v=20261108"></script>
   <script src="/pruefung-admin.js?v=20261108-delete-tablet"></script>
