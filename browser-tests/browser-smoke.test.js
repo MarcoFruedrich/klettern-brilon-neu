@@ -137,8 +137,10 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.locator('#social-whatsapp-button').waitFor({state:'visible'});
     assert.equal(await page.locator('#social-contact-links a[data-social-channel="whatsapp"]').count(),1);
     enabled=false;
+    const hiddenReply=page.waitForResponse(response=>response.url().includes('/api/social-links'));
     await page.reload();
-    await page.waitForResponse(response=>response.url().includes('/api/social-links'));
+    await hiddenReply;
+    await page.waitForFunction(()=>document.readyState==='complete');
     assert.equal(await page.locator('#social-whatsapp-button').count(),0);
     assert.equal(await page.locator('#social-contact-links a[data-social-channel="whatsapp"]').count(),0);
     enabled=true;
