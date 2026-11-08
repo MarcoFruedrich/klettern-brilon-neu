@@ -92,7 +92,7 @@ class Pool {
       return {rows:[],rowCount:1};
     }
     // Aktuelles Schema: Teilnehmerstaffeln und Dauer sind eigene Spalten.
-    if(/INSERT INTO brilon_angebote\\s*\\(name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv/i.test(sql)){
+    if(/INSERT INTO brilon_angebote\s*\(name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv/i.test(sql)){
       const [name,beschreibung,dauer,dauer_modus,rawStages,rawPrices,kategorie,zielgruppe,
         veranstaltungsort,rawSites,kapazitaet,rawDates,hinweise,buchbar,veroeffentlicht,
         buchungsmodus,mindestteilnehmer,preis_pro_person]=params;
@@ -104,7 +104,7 @@ class Pool {
         sortierung:Math.max(0,...this.offers.map(x=>Number(x.sortierung)||0))+1,archiviert:false};
       this.offers.push(offer);return {rows:[{id:offer.id}],rowCount:1};
     }
-    if(/^\\s*UPDATE brilon_angebote\\s+SET preise\\s*=\\s*\\$1::jsonb/i.test(sql)){
+    if(/^\s*UPDATE brilon_angebote\s+SET preise\s*=\s*\$1::jsonb/i.test(sql)){
       const id=params[1],offer=this.offers.find(x=>String(x.id)===String(id));
       if(!offer)return {rows:[],rowCount:0};
       const [rawPrices,,aktiv,name,beschreibung,kategorie,zielgruppe,veranstaltungsort,
