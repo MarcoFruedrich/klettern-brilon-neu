@@ -357,3 +357,47 @@ body.admin-page{
   .admin-page .social-channel-panel{padding:12px;}
   .admin-page .social-channel-actions .btn{flex:1 1 120px;}
 }
+
+/* Optisch gut erkennbare, aber dezente rote Glocken bei ungelesenen Vorgängen. */
+.admin-page .admin-notifications-button{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;position:relative;
+  min-height:39px;padding:7px 11px;border-radius:23px;border:1px solid #bd2838;
+  background:#fff1f0;color:#a00e26;font-weight:900;font-size:13px;
+  cursor:pointer;box-shadow:0 3px 12px #a31c2b26;
+}
+.admin-page .admin-notifications-button:hover,
+.admin-page .admin-notifications-button:focus-visible{outline:2px solid #a31c2b;outline-offset:2px;}
+.admin-page .admin-notifications-bell{font-size:16px;line-height:1;}
+.admin-page .admin-unread-count{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  min-width:30px;margin-left:4px;padding:3px 7px;border-radius:18px;
+  background:#c71831;color:#fff;font-size:11px;line-height:1.25;font-weight:900;
+  box-shadow:0 2px 6px #7e11192e;
+}
+.admin-page #admin-notifications-button[hidden],
+.admin-page .admin-unread-count[hidden]{display:none!important;}
+.admin-page .admin-navigation .admin-unread-count,
+.admin-page .admin-subnavigation .admin-unread-count{color:#fff;background:#c51831;}
+.admin-page .admin-navigation a[data-notification-summary]::after{
+  content:none!important; /* Die Glocke ersetzt nicht den Navigationstext. */
+}
+.admin-page .admin-navigation a[data-notification-summary] .admin-unread-count{margin-left:auto;}
+.admin-page .admin-subnav-row a[data-notification-target]{
+  display:inline-flex;align-items:center;gap:5px;
+}
+.admin-page .admin-view .gruppen-anfrage-option{
+  display:flex;align-items:flex-start;gap:11px;
+  margin:12px 0 8px;padding:13px 15px;
+  border:1px solid #afcfb7;border-radius:11px;
+  background:linear-gradient(110deg,#ecf7ed,#fff);
+  color:#153f2e;font-size:14px;line-height:1.35;
+}
+.admin-page .gruppen-anfrage-option input[type="checkbox"]{
+  flex:0 0 auto;width:19px;height:19px;margin:1px 0 0;
+  accent-color:#0e7c4d;cursor:pointer;
+}
+.admin-page .gruppen-anfrage-option[hidden]{display:none!important;}
+@media(max-width:600px){
+  .admin-page .admin-notifications-button{padding:6px 8px;min-height:35px;}
+  .admin-page .admin-notifications-bell{font-size:14px;}
+}
