@@ -1,6 +1,7 @@
 
 // Klettern & Abenteuer Brilon – Node.js / PostgreSQL
 'use strict';
+const {DEFAULT_VISITOR_GROUPS,prepareVisitorGroups,validateVisitorGroups}=require('./visitor-groups');
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
 const { heuteInBerlin } = require('./lib/kalendertag');
@@ -1411,6 +1412,42 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           .catch(error=>console.error('Entscheidungs-E-Mail zur Umbuchung fehlgeschlagen:',error.code||'unbekannter Fehler'));
       }
       return reply(res,200,{success:true,status:result.status});
+    }
+
+    // Besuchergruppen verwenden vorhandene JSONB-Einstellungen, ohne eigene Migration.
+    if(route==='/api/besuchergruppen'&&req.method==='GET'){
+      if(!pool)return reply(res,200,DEFAULT_VISITOR_GROUPS);
+      try{
+        const q=await pool.query("SELECT data->'besuchergruppen' AS gruppen FROM brilon_rechnungsdaten WHERE id=1");
+        return reply(res,200,prepareVisitorGroups(q.rows[0]?.gruppen));
+      }catch(error){
+        console.error('Besuchergruppen konnten nicht gelesen werden:',error.code||error.message);
+        return reply(res,200,DEFAULT_VISITOR_GROUPS);
+      }
+    }
+    if(route==='/api/admin/besuchergruppen'&&['GET','PUT'].includes(req.method)){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank ist nicht konfiguriert.'});
+      if(req.method==='GET'){
+        try{
+          const q=await pool.query("SELECT data->'besuchergruppen' AS gruppen FROM brilon_rechnungsdaten WHERE id=1");
+          if(!q.rowCount)return reply(res,503,{error:'Website-Einstellungen sind noch nicht eingerichtet.'});
+          return reply(res,200,prepareVisitorGroups(q.rows[0]?.gruppen));
+        }catch(error){return reply(res,503,{error:'Besuchergruppen konnten nicht geladen werden.'});}
+      }
+      const data=await body(req,50000);
+      const checked=validateVisitorGroups(data?.gruppen);
+      if(checked.error)return reply(res,400,{error:checked.error});
+      try{
+        const result=await pool.query(
+          "UPDATE brilon_rechnungsdaten SET data=jsonb_set(COALESCE(data,'{}'::jsonb),'{besuchergruppen}',$1::jsonb,true),aktualisiert_am=NOW() WHERE id=1 RETURNING id",
+          [JSON.stringify(checked.gruppen)]);
+        if(!result.rowCount)return reply(res,503,{error:'Website-Einstellungen sind noch nicht eingerichtet.'});
+        return reply(res,200,{success:true,gruppen:checked.gruppen});
+      }catch(error){
+        console.error('Besuchergruppen-Speicherung fehlgeschlagen:',error.code||error.message);
+        return reply(res,503,{error:'Besuchergruppen konnten nicht gespeichert werden.'});
+      }
     }
 
     if(route==='/api/admin/rechnungsdaten'&&req.method==='GET'){
