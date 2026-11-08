@@ -11,6 +11,13 @@ let adminBuchbareProgramme=[];
 
 const adminViews=Array.from(document.querySelectorAll('[data-admin-view]'));
 const adminViewLinks=Array.from(document.querySelectorAll('[data-admin-view-link]'));
+// Klappmenüs bleiben auf ihren Unterseiten geöffnet, andere Gruppen schließen automatisch.
+const adminNavGroups=Array.from(document.querySelectorAll('.admin-navigation .admin-nav-group'));
+for(const group of adminNavGroups){
+  group.addEventListener('toggle',()=>{
+    if(group.open)for(const other of adminNavGroups)if(other!==group)other.open=false;
+  });
+}
 function adminViewFinden(target){
   const element=typeof target==='string'?document.getElementById(target):target;
   return element?.matches?.('[data-admin-view]')?element:element?.closest?.('[data-admin-view]')||null;
@@ -23,6 +30,13 @@ function adminAnsichtAnzeigen(target,{hash=false,focus=false}={}){
     const active=link.hash==='#'+view.id;
     if(active)link.setAttribute('aria-current','page');
     else link.removeAttribute('aria-current');
+  }
+  const selectedLink=Array.from(document.querySelectorAll('.admin-navigation [data-admin-view-link]'))
+    .find(link=>link.hash==='#'+view.id);
+  const activeGroup=selectedLink?.closest('.admin-nav-group')||null;
+  for(const group of adminNavGroups){
+    group.classList.toggle('is-current',group===activeGroup);
+    group.open=group===activeGroup;
   }
   if(hash&&location.hash!=='#'+view.id)history.pushState(null,'','#'+view.id);
   if(focus){
