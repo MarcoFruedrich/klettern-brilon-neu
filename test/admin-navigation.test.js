@@ -27,9 +27,12 @@ test('Mitarbeiter und Portal-Inhalte haben eigene Verwaltungsansichten und gesch
   const portalJs=fs.readFileSync(path.join(root,'mitarbeiterbereich.js'),'utf8');
   const staffApi=fs.readFileSync(path.join(__dirname,'..','lib','stationspruefung-api.js'),'utf8');
   for(const target of ['mitarbeiter-section','mitarbeiter-einladen-section','mitarbeiterbereiche-admin-section']){
-    assert.match(admin,new RegExp(`<a class="employee-area-link" href="#${target}" data-admin-view-link>`));
+    assert.match(admin,new RegExp(`<a[^>]*href="#${target}"[^>]*data-admin-view-link>`));
     assert.match(admin,new RegExp(`id="${target}"[^>]*data-admin-view`));
   }
+  assert.match(admin,/data-subnav-group="kontakte"/,'Kontaktverwaltung erhält eigene waagerechte Untermenüs');
+  assert.match(admin,/>Kontaktverwaltung<\/a>/);
+  assert.match(admin,/data-subnav-group="programme"[\s\S]*href="#gps-verwaltung"/,'GPS-Touren liegen im Programm-Untermenü');
   assert.match(portal,/id="staff-login"/);
   assert.match(portal,/id="staff-profile-form"/);
   assert.match(portalJs,/\/api\/pruefung\/login/);

@@ -1153,3 +1153,56 @@ header.site-header{overflow:visible}
 @media(max-width:800px){.angebot-stufen-zeile{grid-template-columns:repeat(2,minmax(100px,1fr))}.angebot-stufen-zeile button{grid-column:1/-1}}
 .special-offer-proposal{border:3px solid #c7352e!important;background:#fff8f3!important}
 .special-offer-proposal-badge{font-weight:800;color:#a1221d;background:#ffe5dc;border:2px solid #d94a3d;border-radius:10px;padding:12px}
+
+/* Kompakte Verwaltung: die Untermenüs werden nur für den aktuellen Bereich angezeigt. */
+.admin-page .admin-subnavigation{
+  display:block; margin:0 0 20px; padding:10px 12px;
+  border:1px solid #d6e3d9; border-radius:14px; background:#f3f7f2;
+}
+.admin-page .admin-subnav-row{
+  display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+}
+.admin-page .admin-subnav-row a{
+  display:inline-flex; align-items:center; justify-content:center; min-height:40px;
+  padding:8px 13px; border:1px solid #bfd6c6; border-radius:10px;
+  background:#fff; color:#174333; text-decoration:none; font-size:13px;
+  line-height:1.3; font-weight:760; text-align:center;
+}
+.admin-page .admin-subnav-row a:hover,.admin-page .admin-subnav-row a:focus-visible{
+  border-color:#087847; outline:2px solid #087847; outline-offset:1px;
+}
+.admin-page .admin-subnav-row a[aria-current="page"]{
+  background:#087847; border-color:#087847; color:#fff;
+}
+.admin-page .admin-navigation a.admin-nav-main-group::after{
+  content:"›"; margin-left:auto; padding-left:8px; font-size:18px; line-height:1;
+}
+.admin-page .admin-navigation a.admin-nav-main-group[aria-current="page"]{
+  background:#174c3b; color:#fff;
+}
+@media(max-width:760px){
+  .admin-page .admin-subnavigation{
+    padding:8px; margin-bottom:14px; overflow-x:auto;
+    scrollbar-width:thin; overscroll-behavior-inline:contain;
+  }
+  .admin-page .admin-subnav-row{flex-wrap:nowrap; width:max-content; min-width:100%;}
+  .admin-page .admin-subnav-row a{flex:0 0 auto; white-space:nowrap;}
+}
+/* WhatsApp-Button auf der öffentlichen Seite: ohne Buchungselemente zu blockieren. */
+.whatsapp-float{
+  position:fixed; right:max(18px,env(safe-area-inset-right)); bottom:max(18px,env(safe-area-inset-bottom));
+  z-index:35; display:inline-flex; gap:8px; align-items:center; min-height:48px;
+  padding:12px 19px; border-radius:30px; background:#087b50;
+  color:#fff!important; border:2px solid #fff; box-shadow:0 7px 24px #113f2c42;
+  font:750 15px/1.25 system-ui,-apple-system,Segoe UI,sans-serif; text-decoration:none;
+}
+.whatsapp-float:hover,.whatsapp-float:focus-visible{background:#075b3d;outline:3px solid #c7e7d0;outline-offset:2px;}
+@media(max-width:540px){.whatsapp-float{min-height:44px;padding:10px 13px;font-size:13px;}}
+
+/* WhatsApp-Freigabe innerhalb öffentlich gelisteter Programme und Aktionen. */
+.whatsapp-share-link{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 12px;margin:12px 0 0 9px;border-radius:10px;background:#e5f6ea;border:1px solid #8ccfa6;color:#125b3a!important;font-size:13px;font-weight:760;text-decoration:none;line-height:1.25;}
+.whatsapp-share-link:hover,.whatsapp-share-link:focus-visible{background:#c7ecd4;outline:2px solid #0c6842;outline-offset:1px;}
+@media(max-width:440px){.whatsapp-share-link{margin:10px 0 0;}}
+.whatsapp-share-list{display:grid;gap:10px;max-width:920px;}
+.whatsapp-share-list article{background:#fff;border:1px solid #d7e3d9;border-radius:10px;padding:12px;}
+.whatsapp-share-list article p{margin:4px 0;font-size:13px;}
