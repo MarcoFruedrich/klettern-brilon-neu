@@ -577,6 +577,9 @@ form.addEventListener('submit', async e => {
     });
 
     form.reset();
+    if(gruppenstufenAuswahl)gruppenstufenAuswahl.value='';
+    gruppenStaffelnAktualisieren();
+    buchungsdauerBerechnen();
     sonderaktionsPrefix='';
     const angebotHinweis=document.getElementById('selected-special');
     if(angebotHinweis)angebotHinweis.hidden=true;
@@ -927,13 +930,8 @@ async function preisanzeigeStarten() {
   if (!auswahl || !teilnehmer || !anzeige) return;
 
   try {
-    const res = await fetch('/api/angebote');
-    if (!res.ok) throw new Error('Preise nicht erreichbar');
-
-    const angebote = await res.json();
-
     function preisAktualisieren() {
-      const angebot = angebote.find(a => a.name === auswahl.value);
+      const angebot = angeboteCache.find(a => a.name === auswahl.value);
 
       anzeige.textContent = '';
 
@@ -966,8 +964,7 @@ async function preisanzeigeStarten() {
       if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
       if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
       teilnehmer.max=String(Math.min(1000,Number(angebot.kapazitaet)||1000));
-      if(Number(teilnehmer.value)>Number(teilnehmer.max)){teilnehmer.value=teilnehmer.max;}
-      const anzahl = Number(teilnehmer.value);
+      const anzahl=teilnehmer.value.trim()?Number(teilnehmer.value):0;
       const termine=Array.isArray(angebot.verfuegbare_termine)?angebot.verfuegbare_termine:[];
       date.setCustomValidity(termine.length&&!termine.includes(date.value)
         ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
@@ -995,7 +992,9 @@ async function preisanzeigeStarten() {
             currency: 'EUR'
           });
       } else {
-        anzeige.textContent = 'Preis auf Anfrage';
+        anzeige.textContent=anzahl
+          ?'Für diese Teilnehmerzahl ist kein buchbarer Gruppenpreis hinterlegt.'
+          :'Bitte die Teilnehmerzahl wählen, um den Gruppenpreis zu sehen.';
       }
     }
 
@@ -1019,7 +1018,9 @@ function einzelplatzFormAktualisieren(){
     if(hinweis)hinweis.textContent=`Einzelplatzreservierung. Der Termin findet ab ${Number(angebot.mindestteilnehmer)||5} Anmeldungen statt.`;
   }else{
     input.min='1';input.max=String(Math.min(1000,Number(angebot?.kapazitaet)||1000));
-    if(hinweis)hinweis.textContent='';
+    if(hinweis)hinweis.textContent=angebot
+      ?'Gruppenanfrage: Bitte eine Preisstaffel und die genaue Teilnehmerzahl auswählen.':'';
+    if(angebot&&input.value==='1')input.value='';
   }
 }
 
