@@ -372,3 +372,42 @@ body.admin-page{
   outline:2px solid #942633;outline-offset:2px;filter:brightness(1.08);
 }
 .admin-page #tablet-admin-list .tablet-delete-button:disabled{opacity:.6;cursor:wait;}
+
+/* Aktionen an jedem Programm: gleiche Größen, flexibler einzeiliger Streifen. */
+.admin-page .program-action-row{
+  display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;
+  margin:17px 0 4px;padding:13px 0 0;border-top:1px solid #c4dbc8;
+}
+.admin-page .program-action-row .btn,
+.admin-page .program-action-row button{
+  display:inline-flex;flex:1 1 140px;align-items:center;justify-content:center;
+  min-height:43px;min-width:0;padding:9px 12px;
+  font-size:13px;font-weight:850;border-radius:10px;
+}
+.admin-page .program-action-row .btn.danger,
+.admin-page .program-action-row .program-delete-button,
+.admin-page .program-delete-button{
+  background:linear-gradient(100deg,#b92d3e,#8b2230)!important;
+  color:#fff!important;border:1px solid #8c1c2e!important;
+}
+.admin-page .program-action-row .program-delete-button:hover,
+.admin-page .program-action-row .program-delete-button:focus-visible{
+  outline:2px solid #a52636;outline-offset:2px;
+}
+.admin-page .tablet-global-ad-settings{
+  margin:16px 0 22px;padding:17px 20px;
+  background:linear-gradient(120deg,#f4faf2,#e6f4e6);
+  border:1px solid #b9d5bd;border-radius:13px;
+}
+.admin-page .tablet-global-ad-settings h3{margin:0 0 9px;color:#0a5137;}
+.admin-page .tablet-global-ad-settings form{
+  display:flex;flex-wrap:wrap;gap:10px;align-items:end;
+  background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;
+}
+.admin-page .tablet-global-ad-settings label{font-weight:800;flex:1 1 230px;}
+.admin-page .tablet-global-ad-settings input{
+  max-width:105px;min-height:42px;font-size:18px;font-weight:900;text-align:center;
+}
+.admin-page .tablet-global-ad-settings button{min-height:43px;}
+.admin-page .tablet-global-ad-settings [role="status"]{margin:10px 0 0;font-weight:750;}
+@media(max-width:670px){.admin-page .program-action-row .btn{flex-basis:45%;}}
