@@ -118,7 +118,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     assert.equal(await page.locator('#tablet-marketing').isVisible(),false);
     siteId=null;code=null;
     await page.waitForFunction(()=>document.getElementById('tablet-site')?.textContent==='Noch kein Standort zugewiesen');
-    assert.match(await page.locator('#tablet-offer-description').textContent(),/Standort zugeordnet/);
+    assert.match(await page.locator('#tablet-offer-description').textContent(),/Veranstaltungsstandort zugeordnet/);
     assert.equal(await page.locator('#tablet-marketing').isVisible(),true);
     await page.close();
   });
