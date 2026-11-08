@@ -58,15 +58,56 @@ function angebotslinkAnwenden(){
   angebotAuswahl.value=programm.name;
   angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
 }
+const gruppenstufenFeld=document.getElementById('buchungs-gruppenstufen');
+const gruppenstufenAuswahl=document.getElementById('buchungs-gruppenstufe');
+function buchbareGruppenstufen(programm){
+  const groups=Array.isArray(programm?.gruppenstufen)?programm.gruppenstufen:[];
+  if(groups.length)return groups.filter(stufe=>
+    Number.isInteger(Number(stufe.min))&&Number.isInteger(Number(stufe.max))&&
+    Number(stufe.min)>0&&Number(stufe.max)>=Number(stufe.min)&&
+    Number(stufe.dauer)>=15&&Number.isFinite(Number(stufe.preis)));
+  return Object.entries(programm?.preise||{}).flatMap(([range,preis])=>{
+    const match=/^(\d+)-(\d+)$/.exec(range);
+    return match?[{min:Number(match[1]),max:Number(match[2]),preis:Number(preis),dauer:Number(programm?.dauer)||0}]:[];
+  }).filter(stufe=>stufe.dauer>=15);
+}
+const eur=wert=>Number(wert).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+function gruppenStaffelnAktualisieren(){
+  const programm=angeboteCache.find(item=>item.name===angebotAuswahl?.value);
+  const gruppe=programm&&programm.buchungsmodus!=='einzelplatz';
+  if(!gruppenstufenFeld||!gruppenstufenAuswahl)return;
+  gruppenstufenFeld.hidden=!gruppe;
+  gruppenstufenAuswahl.replaceChildren();
+  const empty=document.createElement('option');empty.value='';
+  empty.textContent=gruppe?'Bitte Gruppenstaffel auswählen':'Keine Gruppenstaffel';
+  gruppenstufenAuswahl.append(empty);
+  if(!gruppe)return;
+  for(const stufe of buchbareGruppenstufen(programm)){
+    const option=document.createElement('option');
+    option.value=stufe.min+'-'+stufe.max;
+    option.textContent=stufe.min+'–'+stufe.max+' Personen · '+Number(stufe.dauer)+' Minuten · '+eur(stufe.preis)+' Gruppenpreis';
+    gruppenstufenAuswahl.append(option);
+  }
+  const n=Number(teilnehmerEingabe?.value);
+  const match=buchbareGruppenstufen(programm).find(item=>n>=Number(item.min)&&n<=Number(item.max));
+  gruppenstufenAuswahl.value=match?match.min+'-'+match.max:'';
+}
+gruppenstufenAuswahl?.addEventListener('change',()=>{
+  const match=/^(\d+)-(\d+)$/.exec(gruppenstufenAuswahl.value);
+  if(!match||!teilnehmerEingabe)return;
+  teilnehmerEingabe.value=String(Number(match[1]));
+  teilnehmerEingabe.dispatchEvent(new Event('input',{bubbles:true}));
+});
 function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
   const anzahl=Number(teilnehmer),basis=Number(programm?.dauer);
-  if(!Number.isInteger(anzahl)||anzahl<1||!Number.isFinite(basis)||basis<15)return 150;
-  if(programm?.dauer_modus==='fest')return basis;
-  if(Array.isArray(programm?.gruppenstufen)&&programm.gruppenstufen.length){
-    const stufe=programm.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max));
-    return stufe?Number(stufe.dauer):null;
+  if(!programm||!Number.isInteger(anzahl)||anzahl<1||!Number.isFinite(basis)||basis<15)return null;
+  if(programm.buchungsmodus!=='einzelplatz'){
+    const tier=buchbareGruppenstufen(programm).find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max));
+    if(!tier)return null;
+    return programm.dauer_modus==='fest'?basis:Number(tier.dauer);
   }
+  if(programm?.dauer_modus==='fest')return basis;
   const faktor=anzahl<=4?0.6:anzahl<=10?1:anzahl<=15?1.2:anzahl<=20?1.4:1.6;
   return Math.max(15,Math.round((basis*faktor)/5)*5);
 }
@@ -127,15 +168,18 @@ async function belegteUhrzeitenLaden() {
     uhrzeitHinweis.textContent='Dieser Tag ist gesperrt. Bitte wähle ein anderes Datum.';
     return;
   }
-  const teilnehmer = Number(
-    document.getElementById('buchungs-teilnehmer')?.value
-  );
+  const teilnehmer=Number(document.getElementById('buchungs-teilnehmer')?.value||0);
   const angebot=angebotAuswahl?.value;
   const teilnehmerWert=document.getElementById('buchungs-teilnehmer')?.value;
   if(!angebot){
     uhrzeitenAnzeigen();
     uhrzeitAuswahl.disabled=true;
     uhrzeitHinweis.textContent='Bitte zuerst Standort und Angebot auswählen.';
+    return;
+  }
+  if(!Number.isInteger(teilnehmer)||teilnehmer<1||!Number.isInteger(dauerFuer(teilnehmer,angebot))){
+    uhrzeitenAnzeigen();uhrzeitAuswahl.disabled=true;
+    uhrzeitHinweis.textContent='Bitte zuerst eine gültige Teilnehmerzahl und Gruppenstaffel wählen.';
     return;
   }
   const vorherigeAuswahl = uhrzeitAuswahl.value;
@@ -221,9 +265,19 @@ const endzeitAnzeige = document.getElementById('buchungs-endzeit');
 function buchungsdauerBerechnen() {
   if (!teilnehmerEingabe || !dauerAnzeige) return;
 
-  const anzahl = Number(teilnehmerEingabe.value);
+  const anzahl=teilnehmerEingabe.value.trim()?Number(teilnehmerEingabe.value):0;
   const dauer=dauerFuer(anzahl,angebotAuswahl?.value);
-  if(!Number.isInteger(dauer)||dauer<15){dauerAnzeige.textContent='Für diese Gruppengröße ist keine Dauerstufe hinterlegt.';if(endzeitAnzeige)endzeitAnzeige.textContent='';return;}
+  const programm=angeboteCache.find(item=>item.name===angebotAuswahl?.value);
+  if(programm&&programm.buchungsmodus!=='einzelplatz'){
+    const tier=buchbareGruppenstufen(programm).find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max));
+    teilnehmerEingabe.setCustomValidity(!anzahl?'Bitte die Teilnehmerzahl angeben.':
+      !tier?'Bitte eine hinterlegte Gruppengröße auswählen.':'');
+    if(gruppenstufenAuswahl)gruppenstufenAuswahl.value=tier?tier.min+'-'+tier.max:'';
+  }else teilnehmerEingabe.setCustomValidity('');
+  if(!Number.isInteger(dauer)||dauer<15){
+    dauerAnzeige.textContent=angebotAuswahl?.value?'Bitte eine gültige Gruppenstaffel und Teilnehmerzahl wählen.':'';
+    if(endzeitAnzeige)endzeitAnzeige.textContent='';return;
+  }
 
   const dauerMinuten = dauer % 60;
   const stunden = Math.floor(dauer / 60);
@@ -523,6 +577,9 @@ form.addEventListener('submit', async e => {
     });
 
     form.reset();
+    if(gruppenstufenAuswahl)gruppenstufenAuswahl.value='';
+    gruppenStaffelnAktualisieren();
+    buchungsdauerBerechnen();
     sonderaktionsPrefix='';
     const angebotHinweis=document.getElementById('selected-special');
     if(angebotHinweis)angebotHinweis.hidden=true;
@@ -800,12 +857,14 @@ async function angeboteLaden() {
     auswahl.value='';
     auswahl.disabled=!standort||!passend.length;
     einzelplatzFormAktualisieren();
+    gruppenStaffelnAktualisieren();
     buchungsdauerBerechnen();
     belegteUhrzeitenLaden();
   }
 
   auswahl.addEventListener('change',()=>{
     einzelplatzFormAktualisieren();
+    gruppenStaffelnAktualisieren();
     buchungsdauerBerechnen();
     belegteUhrzeitenLaden();
   });
@@ -851,6 +910,7 @@ async function angeboteLaden() {
     }
     angeboteFuerStandortAnzeigen();
     einzelplatzFormAktualisieren();
+    gruppenStaffelnAktualisieren();
     angeboteFertig=true;
     angebotslinkAnwenden();
   } catch (fehler) {
@@ -870,13 +930,8 @@ async function preisanzeigeStarten() {
   if (!auswahl || !teilnehmer || !anzeige) return;
 
   try {
-    const res = await fetch('/api/angebote');
-    if (!res.ok) throw new Error('Preise nicht erreichbar');
-
-    const angebote = await res.json();
-
     function preisAktualisieren() {
-      const angebot = angebote.find(a => a.name === auswahl.value);
+      const angebot = angeboteCache.find(a => a.name === auswahl.value);
 
       anzeige.textContent = '';
 
@@ -909,8 +964,7 @@ async function preisanzeigeStarten() {
       if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
       if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
       teilnehmer.max=String(Math.min(1000,Number(angebot.kapazitaet)||1000));
-      if(Number(teilnehmer.value)>Number(teilnehmer.max)){teilnehmer.value=teilnehmer.max;}
-      const anzahl = Number(teilnehmer.value);
+      const anzahl=teilnehmer.value.trim()?Number(teilnehmer.value):0;
       const termine=Array.isArray(angebot.verfuegbare_termine)?angebot.verfuegbare_termine:[];
       date.setCustomValidity(termine.length&&!termine.includes(date.value)
         ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
@@ -938,7 +992,9 @@ async function preisanzeigeStarten() {
             currency: 'EUR'
           });
       } else {
-        anzeige.textContent = 'Preis auf Anfrage';
+        anzeige.textContent=anzahl
+          ?'Für diese Teilnehmerzahl ist kein buchbarer Gruppenpreis hinterlegt.'
+          :'Bitte die Teilnehmerzahl wählen, um den Gruppenpreis zu sehen.';
       }
     }
 
@@ -962,7 +1018,9 @@ function einzelplatzFormAktualisieren(){
     if(hinweis)hinweis.textContent=`Einzelplatzreservierung. Der Termin findet ab ${Number(angebot.mindestteilnehmer)||5} Anmeldungen statt.`;
   }else{
     input.min='1';input.max=String(Math.min(1000,Number(angebot?.kapazitaet)||1000));
-    if(hinweis)hinweis.textContent='';
+    if(hinweis)hinweis.textContent=angebot
+      ?'Gruppenanfrage: Bitte eine Preisstaffel und die genaue Teilnehmerzahl auswählen.':'';
+    if(angebot&&input.value==='1')input.value='';
   }
 }
 

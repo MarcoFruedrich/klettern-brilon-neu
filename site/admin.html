@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/style.css?v=20261108-admin-horizontal-tabs-whatsapp">
   <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261106-site-label-inline">
-  <link rel="stylesheet" href="/admin-forest.css?v=20261108-tablet-delete">
+  <link rel="stylesheet" href="/admin-forest.css?v=20261108-program-actions-ad-duration">
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -714,6 +714,16 @@
       </form>
       <p id="pruef-station-status" role="status"></p>
       <div id="pruef-station-list"></div>
+      <article class="tablet-global-ad-settings" aria-labelledby="tablet-ad-duration-heading">
+        <h3 id="tablet-ad-duration-heading">Werbedauer für alle Standorte</h3>
+        <p class="hint">Die Zeit pro Werbeeinspielung gilt einheitlich für alle Werbemonitore. Sicherheitsprüfcodes werden immer sofort eingeblendet, unabhängig von dieser Einstellung.</p>
+        <form id="tablet-ad-duration-form">
+          <label for="tablet-ad-duration-seconds">Anzeigedauer je Programm (Sekunden, 5–120)</label>
+          <input id="tablet-ad-duration-seconds" type="number" name="sekunden" min="5" max="120" step="1" value="11" required>
+          <button class="btn" type="submit">Werbedauer für alle Standorte speichern</button>
+        </form>
+        <p id="tablet-ad-duration-status" role="status" aria-live="polite">Einstellung wird nach Anmeldung geladen.</p>
+      </article>
       <h3>Werbetablet am Standort koppeln</h3>
       <p class="hint">Das Tablet öffnet <a href="/tablet.html">die separate Werbe- und Prüfcode-Anzeige</a>. Es erhält niemals eine Admin-Sitzung. Nach der Kopplung hier unter dem jeweiligen Gerät den Werbestandort auswählen und speichern. Auf dem Monitor erscheinen dann nur die aktiven, veröffentlichten und buchbaren Programme dieses Standorts. Ohne Standortzuordnung bleibt die Werbung neutral. Ein neuer Kopplungscode ist zehn Minuten gültig und nur einmal nutzbar. Das Tablet kann hier gesperrt werden.</p>
       <button id="tablet-pair-generate" type="button" class="btn secondary">Tablet-Kopplungscode erzeugen</button>
@@ -751,10 +761,10 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261108-admin-horizontal-tabs-whatsapp"></script>
+  <script src="/admin.js?v=20261108-program-delete-actions"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
   <script src="/website-effekte-admin.js?v=20261108"></script>
-  <script src="/pruefung-admin.js?v=20261108-delete-tablet"></script>
+  <script src="/pruefung-admin.js?v=20261108-global-ad-duration"></script>
   <script src="/feedback-admin.js"></script>
   <script src="/einsatzplanung-admin.js?v=20261108-employment-editor-fix"></script>
   <script src="/wissensportal-admin.js?v=20261106-hierarchical-categories"></script>

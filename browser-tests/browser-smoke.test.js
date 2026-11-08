@@ -123,6 +123,41 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.close();
   });
 
+  await t.test('Wunschtermin übernimmt die exakten Gruppenstaffeln, Dauer und Preise',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    await fakePublicApi(page);
+    await page.route('**/api/angebote',route=>route.fulfill({status:200,
+      contentType:'application/json',body:JSON.stringify([{
+        id:1,name:'Klettertest',beschreibung:'Gruppenangebot',
+        aktiv:true,buchbar:true,veroeffentlicht:true,dauer:90,dauer_modus:'staffel',
+        gruppenstufen:[{min:5,max:10,dauer:90,preis:150},{min:11,max:15,dauer:180,preis:250}],
+        preise:{'5-10':150,'11-15':250},buchungsmodus:'gruppe',
+        kapazitaet:15,kategorie:'Klettern',zielgruppe:'Schulklassen',
+        veranstaltungsort:'Brilon',verfuegbare_termine:[]
+      }])}));
+    await page.goto(root+'/');
+    await page.locator('#buchungs-standort').selectOption('Brilon');
+    await page.locator('#angebot-auswahl').selectOption('Klettertest');
+    const exact=page.locator('#buchungs-teilnehmer');
+    assert.equal(await exact.inputValue(),'','Es darf keine voreingestellte Teilnehmerzahl geben.');
+    assert.equal(await exact.getAttribute('required'),'');
+    const groups=page.locator('#buchungs-gruppenstufe');
+    assert.equal(await page.locator('#buchungs-gruppenstufen').isVisible(),true);
+    assert.equal(await groups.locator('option').count(),3);
+    assert.match(await groups.locator('option[value="11-15"]').textContent(),/180 Minuten/);
+    assert.match(await groups.locator('option[value="11-15"]').textContent(),/250,00/);
+    await groups.selectOption('11-15');
+    assert.equal(await exact.inputValue(),'11');
+    assert.match(await page.locator('#buchungs-dauer').textContent(),/3 Std/);
+    assert.match(await page.locator('#angebots-preis').textContent(),/250,00/);
+    await exact.fill('13');
+    assert.equal(await groups.inputValue(),'11-15');
+    await exact.fill('16');
+    assert.notEqual(await exact.evaluate(input=>input.validationMessage),'');
+    assert.match(await page.locator('#angebots-preis').textContent(),/kein buchbarer Gruppenpreis/);
+    await page.close();
+  });
+
   await t.test('WhatsApp-Schalter blendet sowohl Floating-Button als auch Kontaktlink aus',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
     await fakePublicApi(page);

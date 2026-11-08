@@ -9,7 +9,7 @@ const net = require('node:net');
 
 function fakeAdminApi(page) {
   const state = {
-    signedIn: false, csrf: 'a'.repeat(64), mutations: [],
+    signedIn: false, csrf: 'a'.repeat(64), mutations: [], tabletAdSeconds:11,
     tours: [], games: [], specials: [],
     inspectionEvents: [], inspectionStatusEvents: [], inspectionStaff: [], invitations: [],
     nextInvite: 0,
@@ -291,6 +291,14 @@ function fakeAdminApi(page) {
       special.programm_id=next||null;
       return json(200,{id:special.id,programm_id:special.programm_id});
     }
+    if(endpoint==='/api/admin/tablet-werbedauer'&&method==='GET')return json(200,{sekunden:state.tabletAdSeconds});
+    if(endpoint==='/api/admin/tablet-werbedauer'&&method==='PUT'){
+      const sekunden=Number(readBody().sekunden);
+      if(!Number.isSafeInteger(sekunden)||sekunden<5||sekunden>120)
+        return json(400,{error:'Ungültige Werbedauer.'});
+      state.tabletAdSeconds=sekunden;
+      return json(200,{success:true,sekunden});
+    }
     if(endpoint==='/api/admin/orte'&&method==='GET')return json(200,state.places);
     if(endpoint==='/api/admin/orte'&&method==='POST'){
       const name=readBody().name;
@@ -307,6 +315,16 @@ function fakeAdminApi(page) {
       return json(201,{id:program.id});
     }
     const programRoute=endpoint.match(/^\/api\/admin\/angebote\/(\d+)$/);
+    if(programRoute&&method==='DELETE'){
+      const index=state.programs.findIndex(p=>p.id===Number(programRoute[1]));
+      if(index<0)return json(404,{error:'Programm nicht gefunden'});
+      const name=state.programs[index].name;
+      if(state.bookings.some(b=>b.data?.angebot===name)||
+        state.tours.some(t=>Number(t.angebot_id)===Number(programRoute[1])))
+        return json(409,{error:'Programm mit Buchung verknüpft – bitte archivieren.'});
+      state.programs.splice(index,1);
+      return json(200,{success:true,geloescht:true});
+    }
     if(programRoute&&method==='PATCH'){
       const program=state.programs.find(p=>p.id===Number(programRoute[1]));
       if(!program)return json(404,{error:'Programm nicht gefunden'});
@@ -519,6 +537,35 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await page.waitForFunction(()=>document.getElementById('social-link-admin-status')?.textContent.includes('gespeichert'));
     assert.equal(links.find(item=>item.id==='youtube').aktiv,true);
     assert.match(links.find(item=>item.id==='youtube').url,/youtube.com/);
+    await page.close();
+  });
+
+  await t.test('Werbedauer zentral speichern und Programm-Aktionsleiste einheitlich mit Löschen',async()=>{
+    const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
+    const state=fakeAdminApi(page);
+    state.bookings=[];
+    const confirmation=[];
+    page.on('dialog',async dialog=>{confirmation.push(dialog.message());await dialog.accept();});
+    await login(page,root);
+    await openAdminView(page,'#stationspruefung');
+    const seconds=page.locator('#tablet-ad-duration-seconds');
+    await seconds.waitFor({state:'visible'});
+    await page.waitForFunction(()=>document.getElementById('tablet-ad-duration-seconds')?.value==='11');
+    await seconds.fill('30');
+    await page.getByRole('button',{name:'Werbedauer für alle Standorte speichern'}).click();
+    await page.waitForFunction(()=>document.getElementById('tablet-ad-duration-status')?.textContent.includes('Gespeichert: 30'));
+    assert.equal(state.tabletAdSeconds,30);
+    await openAdminView(page,'#angebote-verwaltung');
+    const card=page.locator('#angebote-admin-liste .card').filter({has:page.getByRole('heading',{name:'Klettertest'})});
+    const buttons=card.locator('.program-action-row button');
+    assert.deepEqual(await buttons.allTextContents(),[
+      'Bild hochladen','✕ Deaktiviert','Programm speichern','Angebot archivieren','Programm löschen'
+    ]);
+    await card.getByRole('button',{name:'Programm löschen'}).click();
+    await page.waitForFunction(()=>!document.querySelector('#angebote-admin-liste')?.textContent.includes('Klettertest'));
+    assert.equal(state.programs.length,0);
+    assert.equal(confirmation.length,1);
+    assert.match(confirmation[0],/nicht rückgängig/);
     await page.close();
   });
 

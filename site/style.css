@@ -1206,3 +1206,101 @@ header.site-header{overflow:visible}
 .whatsapp-share-list{display:grid;gap:10px;max-width:920px;}
 .whatsapp-share-list article{background:#fff;border:1px solid #d7e3d9;border-radius:10px;padding:12px;}
 .whatsapp-share-list article p{margin:4px 0;font-size:13px;}
+
+/* Tablet-Bühne: Markenlandschaft, laufende Uhr und großflächige Programmbilder. */
+.tablet-page .tablet-top{
+  position:relative;isolation:isolate;overflow:hidden;
+  min-height:clamp(146px,20vh,230px);
+  padding:18px clamp(18px,3vw,50px);align-items:center;gap:24px;
+  border-bottom:3px solid #7bac8b;
+  color:#133c2c;background:#ecf7ea url('/tablet-forest-header.svg') center bottom / cover no-repeat;
+  box-shadow:0 8px 21px #0d271e23;
+}
+.tablet-page .tablet-brand,.tablet-page .tablet-site-info{position:relative;z-index:2;}
+.tablet-page .tablet-brand{
+  display:flex;flex-direction:column;align-items:flex-start;gap:0;
+  padding:10px 15px;border-radius:14px;
+  background:linear-gradient(115deg,#fffffff0,#ffffffbb);
+  box-shadow:0 3px 13px #0c442616;
+}
+.tablet-page .tablet-brand-logo{display:block;width:clamp(165px,22vw,340px);height:auto;max-height:120px;object-fit:contain;}
+.tablet-page .tablet-clock{
+  padding:4px 8px;font-size:clamp(13px,1.55vw,19px);
+  color:#0e4835;font-weight:800;letter-spacing:.02em;
+  text-shadow:0 1px 2px #fff;line-height:1.4;
+}
+.tablet-page .tablet-site-info{
+  display:flex;flex-direction:column;gap:5px;align-items:flex-end;
+  padding:14px 20px;border-radius:14px;
+  background:#fffef6e8;box-shadow:0 3px 12px #0c442618;
+  color:#0c4833;max-width:min(46%,530px);
+  text-align:right;
+}
+.tablet-page .tablet-site-caption{font-size:clamp(11px,1.35vw,17px);letter-spacing:.11em;font-weight:900;text-transform:uppercase;color:#3c6c53;}
+.tablet-page .tablet-site-info strong{font-size:clamp(18px,3vw,38px);overflow-wrap:anywhere;line-height:1.1;}
+.tablet-page .tablet-celestial{
+  position:absolute;z-index:1;display:grid;place-items:center;
+  width:58px;height:58px;border-radius:50%;
+  color:#ffc641;font-size:68px;line-height:1;pointer-events:none;
+  filter:drop-shadow(0 0 14px #eaba5c77);
+  transform:translate(-50%,0);transition:left 15s linear,top 15s linear;
+}
+.tablet-page .tablet-celestial.tablet-moon{color:#ecf2fa;filter:drop-shadow(0 0 16px #44586b99);}
+.tablet-page #tablet-marketing{justify-content:center;background:linear-gradient(180deg,#112a24,#12382c);}
+.tablet-page .tablet-offer{
+  display:grid;align-items:center;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);
+  grid-template-rows:auto auto;column-gap:clamp(18px,4vw,55px);
+  padding:clamp(20px,3vw,50px);
+  width:100%;max-width:1600px;min-height:clamp(250px,45vh,710px);
+  margin:0 auto;text-align:left;
+}
+.tablet-page .tablet-offer-image{
+  display:block;grid-column:1;grid-row:1 / span 2;
+  width:100%;height:clamp(200px,40vh,650px);object-fit:cover;
+  border:4px solid #e4f4e3;border-radius:18px;
+  box-shadow:0 16px 34px #020b085e;
+}
+.tablet-page .tablet-offer-image[hidden]{display:none!important;}
+.tablet-page .tablet-offer:has(.tablet-offer-image[hidden]){
+  grid-template-columns:minmax(0,1fr);text-align:center;
+}
+.tablet-page .tablet-offer h1{
+  grid-column:2;grid-row:1;margin:0 0 10px;
+  font-size:clamp(34px,5.6vw,76px);color:#f7fff4;
+  text-shadow:0 4px 14px #06211575;
+}
+.tablet-page .tablet-offer p{
+  grid-column:2;grid-row:2;margin:0;
+  font-size:clamp(20px,2.6vw,38px);color:#e7f6eb;
+  line-height:1.35;
+}
+.tablet-page .tablet-offer:has(.tablet-offer-image[hidden]) h1,
+.tablet-page .tablet-offer:has(.tablet-offer-image[hidden]) p{grid-column:1;}
+.tablet-page #tablet-code{position:relative;z-index:4;}
+@media(max-width:780px){
+  .tablet-page .tablet-top{min-height:165px;padding:13px;flex-direction:row;gap:8px;}
+  .tablet-page .tablet-brand{padding:8px;max-width:52%;min-width:0;}
+  .tablet-page .tablet-brand-logo{width:100%;max-height:75px;}
+  .tablet-page .tablet-site-info{padding:9px 10px;max-width:45%;}
+  .tablet-page .tablet-celestial{width:35px;height:35px;font-size:45px;}
+  .tablet-page .tablet-offer{display:flex;flex-direction:column;align-items:stretch;gap:14px;text-align:center;padding:16px 12px;}
+  .tablet-page .tablet-offer-image{height:min(44vh,470px);}
+  .tablet-page .tablet-offer h1{font-size:clamp(30px,7vw,54px);}
+  .tablet-page .tablet-offer p{font-size:clamp(19px,4vw,30px);}
+}
+@media(max-width:440px){
+  .tablet-page .tablet-top{min-height:128px;}
+  .tablet-page .tablet-site-info strong{font-size:16px;}
+  .tablet-page .tablet-clock{font-size:11px;padding:3px;}
+}
+
+/* Wunschtermin: identische Gruppenstaffeln wie in der Programmverwaltung. */
+.booking-group-tiers{
+  margin:15px 0;padding:16px 18px;border-radius:13px;
+  border:1px solid #9fc6ab;background:linear-gradient(120deg,#ecf5ed,#fafef9);
+  color:#143f2d;
+}
+.booking-group-tiers[hidden]{display:none!important;}
+.booking-group-tiers label{display:flex;flex-direction:column;gap:7px;font-weight:850;}
+.booking-group-tiers select{width:100%;min-height:45px;background:#fff;color:#103f2d;}
+.booking-group-tiers small{display:block;margin-top:9px;color:#42644c;font-size:12px;line-height:1.45;}

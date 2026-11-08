@@ -3,6 +3,7 @@
 'use strict';
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
+const {werbedauerLesen,werbedauerPruefen}=require('./lib/tablet-werbedauer');
 const { heuteInBerlin } = require('./lib/kalendertag');
 const { datenbankKonfiguration } = require('./lib/datenbank-konfiguration');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
@@ -493,6 +494,36 @@ async function main(req,res){
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    // Ein Zeitintervall für sämtliche Werbetablets: zentrale Verwaltung,
+    // geräteübergreifend gespeichert, keine standortspezifische Abweichung.
+    if(route==='/api/admin/tablet-werbedauer'&&(req.method==='GET'||req.method==='PUT')){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht verfügbar.'});
+      if(req.method==='GET'){
+        try{
+          const q=await pool.query("SELECT data->>'tabletWerbedauerSekunden' AS sekunden FROM brilon_rechnungsdaten WHERE id=1");
+          if(!q.rowCount)return reply(res,503,{error:'Website-Einstellungen fehlen.'});
+          return reply(res,200,{sekunden:werbedauerLesen(q.rows[0].sekunden)});
+        }catch(error){
+          console.error('Tablet-Werbezeit konnte nicht geladen werden:',error.message);
+          return reply(res,503,{error:'Werbedauer momentan nicht verfügbar.'});
+        }
+      }
+      const d=await body(req,2000);
+      let sekunden;
+      try{sekunden=werbedauerPruefen(d);}catch(error){return reply(res,400,{error:error.message});}
+      try{
+        const q=await pool.query(`UPDATE brilon_rechnungsdaten
+          SET data=jsonb_set(COALESCE(data,'{}'::jsonb),
+            '{tabletWerbedauerSekunden}',to_jsonb($1::integer),true),
+            aktualisiert_am=NOW() WHERE id=1 RETURNING id`,[sekunden]);
+        if(!q.rowCount)return reply(res,503,{error:'Website-Einstellungen fehlen.'});
+        return reply(res,200,{success:true,sekunden});
+      }catch(error){
+        console.error('Tablet-Werbedauer konnte nicht gespeichert werden:',error.message);
+        return reply(res,503,{error:'Werbedauer konnte nicht gespeichert werden.'});
+      }
+    }
     // Kanalweise Sichtbarkeit: öffentlich sind nur freigeschaltete Links verfügbar.
     // Die Administration speichert Links und Status dauerhaft im vorhandenen Website-Konfigurationsdatensatz.
     if(route==='/api/social-links'&&req.method==='GET'){
@@ -3061,6 +3092,26 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
 
      
 const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
+
+// Echte Löschung nur bei unbenutzten Programmen: vorhandene Kundenbuchungen,
+// Sonderaktionen und GPS-Touren dürfen niemals stillschweigend verloren gehen.
+if(preisRoute&&req.method==='DELETE'){
+  const id=Number(preisRoute[1]);
+  const existing=await pool.query('SELECT id,name FROM brilon_angebote WHERE id=$1',[id]);
+  if(!existing.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+  const programmeName=existing.rows[0].name;
+  const used=await pool.query(`SELECT
+    EXISTS(SELECT 1 FROM brilon_buchungen WHERE data->>'angebot'=$1) AS gebucht,
+    EXISTS(SELECT 1 FROM brilon_gps_touren WHERE angebot_id=$2) AS gps,
+    EXISTS(SELECT 1 FROM brilon_aktionen WHERE data->>'programm_id'=$3) AS aktion`,
+    [programmeName,id,String(id)]);
+  const refs=used.rows[0]||{};
+  if(refs.gebucht||refs.gps||refs.aktion)
+    return reply(res,409,{error:'Das Programm ist mit Buchungen, GPS-Touren oder Sonderaktionen verbunden. Bitte stattdessen deaktivieren oder archivieren; bestehende Nachweise müssen erhalten bleiben.'});
+  const q=await pool.query('DELETE FROM brilon_angebote WHERE id=$1 RETURNING id',[id]);
+  if(!q.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+  return reply(res,200,{success:true,geloescht:true,id});
+}
 
 if (preisRoute && req.method === 'PATCH') {
   const d = await body(req);
