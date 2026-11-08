@@ -1,0 +1,4 @@
+/* Social-Media-Kontakte erscheinen nur bei Veröffentlichung im Admin-Bereich. */
+.social-contact-links{display:inline;line-height:1.7;}
+.social-contact-links a{display:inline;color:inherit;font-weight:760;text-decoration:underline;text-underline-offset:3px;}
+.social-contact-links a:hover,.social-contact-links a:focus-visible{color:#126c46;outline-offset:2px;}
