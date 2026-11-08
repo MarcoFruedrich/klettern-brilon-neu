@@ -320,3 +320,40 @@ body.admin-page{
   .admin-page .admin-navigation a,
   .admin-page .admin-subnav-row a{transition:none;}
 }
+
+/* Öffentliche Social-Media-Kanäle: dauerhaft gespeicherte Publikationsschalter. */
+.admin-page .social-channel-panel{
+  margin:14px 0 20px;padding:18px;background:linear-gradient(155deg,#fff,#edf7ec);
+  border:1px solid #bfd8c5;border-radius:14px;box-shadow:0 3px 15px #145c3612;
+}
+.admin-page .social-channel-panel>h3{margin:0 0 8px;color:#104932;}
+.admin-page .social-link-admin-list{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));
+  gap:12px;margin-top:14px;
+}
+.admin-page .social-link-admin-card{
+  min-width:0;padding:15px;border:1px solid #c4dbc9;border-radius:12px;background:#fff;
+}
+.admin-page .social-link-admin-card h4{margin:0 0 3px;color:#145039;font-size:17px;}
+.admin-page .social-link-admin-card p{margin:3px 0 10px;}
+.admin-page .social-channel-state{
+  display:inline-block;margin:5px 0 12px;padding:5px 10px;border-radius:20px;
+  background:#e8eee7;color:#445e4f;font-size:12px;
+}
+.admin-page .social-channel-state[data-visible="true"]{background:#d9f3de;color:#11552e;}
+.admin-page .social-link-admin-card label{display:block;font-weight:760;font-size:13px;}
+.admin-page .social-link-admin-card input{width:100%;margin-top:5px;max-width:100%;}
+.admin-page .social-channel-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:12px 0 0;}
+.admin-page .social-channel-actions .btn{min-height:41px;padding:9px 12px;font-size:12px;}
+.admin-page #whatsapp-visibility-control{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:12px;}
+.admin-page #whatsapp-visibility-control .btn{min-height:43px;}
+.admin-page #whatsapp-visibility-status{font-weight:750;margin:0;}
+/* Den aus der Mitarbeiterliste gewählten Vertrag erkennbar hervorheben. */
+.admin-page .arbeitsvertrag-karte.is-contract-target{
+  border:2px solid #148458;box-shadow:0 0 0 3px #a4d9b279,0 8px 24px #185b3828;
+}
+.admin-page .arbeitsvertrag-karte{scroll-margin-top:155px;}
+@media(max-width:500px){
+  .admin-page .social-channel-panel{padding:12px;}
+  .admin-page .social-channel-actions .btn{flex:1 1 120px;}
+}
