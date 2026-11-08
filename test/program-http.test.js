@@ -42,7 +42,8 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   const headers={Cookie:cookie,Origin:root,'X-CSRF-Token':loginData.csrfToken,'Content-Type':'application/json'};
   const program={name:'Klettern am Turm',beschreibung:'Ein sicheres Testprogramm',dauer:90,kategorie:'Klettern',
     zielgruppe:'Kinder und Familien',veranstaltungsort:'Brilon',kapazitaet:12,verfuegbare_termine:['2027-03-15'],
-    hinweise:'Festes Schuhwerk',buchbar:true,veroeffentlicht:true};
+    hinweise:'Festes Schuhwerk',buchbar:true,veroeffentlicht:true,
+    gruppenstufen:[{min:1,max:4,preis:100,dauer:90},{min:5,max:10,preis:150,dauer:90}]};
   const created=await fetch(root+'/api/admin/angebote',{method:'POST',headers,body:JSON.stringify(program)});
   const createdText=await created.text();
   assert.equal(created.status,201,createdText);
