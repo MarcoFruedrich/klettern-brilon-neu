@@ -1,0 +1,68 @@
+/* Zielgruppen-Landingpage: bestehende hellgrüne Gestaltung, responsiv. */
+#besuchergruppen{scroll-margin-top:92px}
+#besuchergruppen .besuchergruppen-intro{
+  text-align:center;color:#fff;border-radius:24px;padding:54px 24px 60px;
+  background:linear-gradient(90deg,rgba(10,43,35,.92),rgba(14,62,43,.73)),url('/fotos/abseilen.jpg') center 43%/cover no-repeat;
+  margin-bottom:-20px;
+}
+#besuchergruppen .besuchergruppen-intro .eyebrow{color:#d7f37e;letter-spacing:.15em}
+#besuchergruppen .besuchergruppen-intro h2{
+  color:#fff;margin:12px auto 18px;font-size:clamp(1.8rem,4vw,3.3rem);letter-spacing:-.03em
+}
+#besuchergruppen .besuchergruppen-intro p{color:#f0f8ee;max-width:790px;margin:0 auto;font-size:1.12rem}
+.besuchergruppen-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;position:relative}
+.besuchergruppe-karte{
+  min-width:0;background:#fff;border:1px solid #dfe7de;border-radius:22px;
+  overflow:hidden;box-shadow:0 10px 28px rgba(25,57,37,.11);
+  display:flex;flex-direction:column;transition:transform .18s ease,box-shadow .18s ease;
+}
+.besuchergruppe-karte:hover{transform:translateY(-3px);box-shadow:0 16px 35px rgba(25,57,37,.17)}
+.besuchergruppe-bild{display:block;width:100%;height:167px;object-fit:cover;background:#e4eee4}
+.besuchergruppe-inhalt{padding:0 22px 23px;display:flex;flex:1;flex-direction:column}
+.besuchergruppe-head{display:flex;align-items:center;gap:13px;margin-top:-25px;position:relative}
+.besuchergruppe-symbol{
+  display:grid;place-items:center;flex:none;width:56px;height:56px;
+  font-size:1.6rem;border-radius:18px;border:3px solid #fff;color:#fff;
+  background:var(--gruppe-farbe);box-shadow:0 4px 12px #0002
+}
+.besuchergruppe-head h3{margin:23px 0 3px;color:#162f27;font-size:1.3rem;line-height:1.25}
+.besuchergruppe-beschreibung{color:#39574c;line-height:1.45;margin:8px 0 12px;min-height:65px}
+.besuchergruppe-vorteile{list-style:none;padding:0;margin:0 0 19px;display:grid;gap:7px;color:#33443c;font-size:.91rem}
+.besuchergruppe-vorteile li{display:flex;gap:9px;line-height:1.3}
+.besuchergruppe-vorteile li::before{content:'✓';font-weight:900;color:var(--gruppe-farbe)}
+.besuchergruppe-button{
+  align-self:flex-start;margin-top:auto;display:inline-flex;align-items:center;
+  justify-content:center;text-decoration:none;font-size:.91rem;font-weight:800;
+  color:white!important;background:#185c2e;border-radius:11px;padding:11px 17px;
+  min-height:42px
+}
+.besuchergruppe-button:hover{background:#267a40}
+.besuchergruppen-filterhinweis{
+  margin:16px 0 24px;padding:13px 16px;background:#eaf4e8;border:1px solid #b3d2b4;
+  border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap
+}
+.besuchergruppen-filterhinweis[hidden]{display:none}
+.besuchergruppen-filterhinweis button{
+  border:1px solid #1a5d33;background:white;border-radius:9px;
+  padding:8px 12px;color:#174c2a;font-weight:700;cursor:pointer
+}
+.besuchergruppen-admin-karte{background:#fff;border:1px solid #d3dfd5;border-radius:15px;padding:20px;display:grid;gap:14px}
+.besuchergruppen-admin-karte label{min-width:0}
+.besuchergruppen-admin-head,.besuchergruppen-admin-reorder{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.besuchergruppen-admin-head h3{margin:0}
+.besuchergruppen-admin-reorder{justify-content:flex-end}
+.besuchergruppen-admin-reorder button{min-width:44px;padding:7px}
+.besuchergruppen-admin-vorschau{display:block;width:min(100%,330px);max-height:150px;object-fit:cover;border-radius:13px}
+.besuchergruppen-admin-zuordnung{min-width:0;border:1px solid #bfd0c4;border-radius:12px;padding:14px}
+.besuchergruppen-admin-checkboxen{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 15px;margin:10px 0}
+.besuchergruppen-admin-checkboxen label,.besuchergruppen-admin-sichtbar{display:flex;align-items:center;gap:10px}
+.besuchergruppen-admin-checkboxen input,.besuchergruppen-admin-sichtbar input{width:auto}
+@media(max-width:1000px){.besuchergruppen-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){
+  #besuchergruppen .besuchergruppen-intro{padding:35px 18px 52px;border-radius:17px}
+  .besuchergruppen-grid{grid-template-columns:1fr;gap:17px}
+  .besuchergruppe-bild{height:190px}
+  .besuchergruppe-beschreibung{min-height:0}
+  .besuchergruppen-admin-checkboxen{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){.besuchergruppe-karte{transition:none}.besuchergruppe-karte:hover{transform:none}}
