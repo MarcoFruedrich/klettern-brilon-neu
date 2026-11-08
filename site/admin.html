@@ -175,7 +175,14 @@
         </nav>
       </section>
 
-      <section id="social-media-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="social-media-heading"><h2 id="social-media-heading">Social Media</h2><p>Beiträge für Facebook und Instagram zentral vorbereiten. Eine direkte Veröffentlichung ist erst nach sicherer Verbindung der jeweiligen Konten möglich.</p><div class="admin-grid"><article><h3>Beitrag vorbereiten</h3><p>Entwürfe für Angebote, Sonderaktionen und freie Termine erstellen. Die technische Speicherung von Entwürfen ist noch nicht eingerichtet.</p><label>Beitragstext<textarea id="social-media-draft" rows="6" placeholder="Hier deinen Beitrag vorbereiten …"></textarea></label><button type="button" class="btn secondary" id="social-media-copy">Text kopieren</button><p id="social-media-copy-status" role="status" aria-live="polite"></p></article><article><h3>Kanäle verbinden</h3><p>Facebook und Instagram: Noch nicht verbunden. Automatisches Veröffentlichen, Terminplanung und Statistiken werden erst nach einer autorisierten Anbindung freigeschaltet.</p><p>Bitte keine Passwörter oder Zugangstoken in das Beitragsfeld eingeben.</p></article></div></section><script>document.getElementById('social-media-copy')?.addEventListener('click',async()=>{const field=document.getElementById('social-media-draft');const status=document.getElementById('social-media-copy-status');try{await navigator.clipboard.writeText(field.value);status.textContent='Beitragstext kopiert.'}catch{field.focus();field.select();status.textContent='Text markiert. Bitte manuell kopieren.'}});</script><section id="marketing-campaign-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="marketing-campaign-heading">
+      <section id="social-media-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="social-media-heading"><h2 id="social-media-heading">Social Media</h2><p>Beiträge für Facebook und Instagram zentral vorbereiten. Eine direkte Veröffentlichung ist erst nach sicherer Verbindung der jeweiligen Konten möglich.</p><div class="admin-grid"><article><h3>Beitrag vorbereiten</h3><p>Entwürfe für Angebote, Sonderaktionen und freie Termine erstellen. Die technische Speicherung von Entwürfen ist noch nicht eingerichtet.</p><label>Beitragstext<textarea id="social-media-draft" rows="6" placeholder="Hier deinen Beitrag vorbereiten …"></textarea></label><button type="button" class="btn secondary" id="social-media-copy">Text kopieren</button><p id="social-media-copy-status" role="status" aria-live="polite"></p></article><article><h3>Kanäle verbinden</h3><p>Facebook und Instagram: Noch nicht verbunden. Automatisches Veröffentlichen, Terminplanung und Statistiken werden erst nach einer autorisierten Anbindung freigeschaltet.</p><p>Bitte keine Passwörter oder Zugangstoken in das Beitragsfeld eingeben.</p></article></div>
+  <article class="social-channel-panel" aria-labelledby="social-links-heading">
+    <h3 id="social-links-heading">Social-Media-Buttons auf der Webseite verwalten</h3>
+    <p>Jeder Kanal hat seinen eigenen Schalter und Link. Deaktivierte Kanäle bleiben gespeichert, werden aber auf der öffentlichen Webseite nicht angezeigt. Das ersetzt keine Freigabe zum automatischen Veröffentlichen von Beiträgen.</p>
+    <p id="social-link-admin-status" role="status" aria-live="polite"></p>
+    <div id="social-link-admin-list" class="social-link-admin-list"></div>
+  </article>
+</section><script>document.getElementById('social-media-copy')?.addEventListener('click',async()=>{const field=document.getElementById('social-media-draft');const status=document.getElementById('social-media-copy-status');try{await navigator.clipboard.writeText(field.value);status.textContent='Beitragstext kopiert.'}catch{field.focus();field.select();status.textContent='Text markiert. Bitte manuell kopieren.'}});</script><section id="marketing-campaign-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="marketing-campaign-heading">
 <h2 id="marketing-campaign-heading">Marketing · Kampagnen</h2>
 <p>Gemeinsame Startkampagne für Familien, Schulen, Vereine und Firmen. Entwürfe werden nach Anmeldung zentral in der Datenbank gespeichert, sofern die Marketing-Datenbankmigration aktiviert wurde. Eine Veröffentlichung findet nicht statt.</p>
 <div class="admin-grid"><article>
@@ -195,6 +202,14 @@
   <p>WhatsApp dient zur Werbung und für allgemeine Fragen. Die Anmeldung und Buchung von Programmen erfolgt weiterhin ausschließlich über die bestehenden Formulare auf der Webseite. WhatsApp-Nachrichten werden nicht in dieser Verwaltungsoberfläche empfangen.</p>
   <p><strong>Benutzername:</strong> @Klettern_und_Abenteuer</p>
   <p><a class="btn" target="_blank" rel="noopener noreferrer" href="https://wa.me/message/JXO6HLT34O37B1">WhatsApp Business öffnen</a></p>
+  <article class="social-channel-panel" aria-labelledby="whatsapp-visibility-heading">
+    <h3 id="whatsapp-visibility-heading">WhatsApp-Button auf der Webseite</h3>
+    <p>Hier kannst du den WhatsApp-Kontakt vorübergehend ausblenden oder wieder veröffentlichen. Der hinterlegte WhatsApp-Link bleibt gespeichert.</p>
+    <div id="whatsapp-visibility-control">
+      <p id="whatsapp-visibility-status" role="status" aria-live="polite">Einstellung wird nach der Anmeldung geladen …</p>
+      <button id="whatsapp-visibility-toggle" class="btn secondary" type="button" disabled>Freigabe laden …</button>
+    </div>
+  </article>
   <h3>Programme und Sonderangebote über WhatsApp bewerben</h3>
   <p>Hier erscheinen die veröffentlichten Programme und Aktionen der Webseite. Beim Teilen wird immer ein direkter Link auf das bestehende Anmelde- und Buchungsformular erzeugt. Der Kunde stellt seine Anfrage ausschließlich auf der Webseite; Verfügbarkeit und Preise werden im bisherigen Buchungsweg geprüft.</p>
   <button type="button" class="btn secondary" id="whatsapp-angebote-aktualisieren">Aktuelle Angebote laden</button>
@@ -735,7 +750,7 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261108-admin-horizontal-tabs-whatsapp"></script>
-  <script src="/whatsapp-admin.js?v=20261108"></script>
+  <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
   <script src="/website-effekte-admin.js?v=20261108"></script>
   <script src="/pruefung-admin.js?v=20261107-single-location-employment-special-approval"></script>
   <script src="/feedback-admin.js"></script>
