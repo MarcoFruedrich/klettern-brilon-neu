@@ -3762,6 +3762,7 @@ async function start(){
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_ort_idx ON brilon_pruef_tablets(ort_id)');
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets((1)) WHERE pruefdisplay=true');
     await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
       console.log('Mitarbeiter- und Stationsschema geprüft (RUN_PRUEF_SCHEMA_MIGRATION=true)');
@@ -3772,6 +3773,12 @@ async function start(){
       await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_ort_idx ON brilon_pruef_tablets(ort_id)');
       console.log('Werbetablet-Standortbindung eingerichtet (RUN_TABLET_SITE_MIGRATION=true)');
+    }
+    // Additiver Einmal-Schritt für gelöschte Tablet-Verbindungen.
+    // Vergangene Prüfungen bleiben dokumentiert, nur der Gerätezugang wird entfernt.
+    if(process.env.RUN_TABLET_DELETE_MIGRATION==='true'){
+      await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
+      console.log('Tablet-Löschfunktion eingerichtet (RUN_TABLET_DELETE_MIGRATION=true)');
     }
     // Optional employee portal content; independent from staff and inspection tables.
     if(process.env.RUN_EMPLOYEE_AREAS_MIGRATION==='true'){
@@ -4072,6 +4079,7 @@ await pool.query(`
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_ort_idx ON brilon_pruef_tablets(ort_id)');
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets((1)) WHERE pruefdisplay=true');
     await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
     } else {

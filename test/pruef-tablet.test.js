@@ -58,3 +58,46 @@ test('Deaktivierter Werbestandort kann zurückgesetzt, aber nicht willkürlich z
   assert.equal(queries.some(q=>q.sql.includes('UPDATE brilon_pruef_tablets')),false);
   assert.deepEqual(await service.chooseSite('tablet-1',null),{id:'tablet-1',ort_id:null});
 });
+
+test('Verwaltung löscht Tablet atomar, entzieht Token und entwertet offene Codes',async()=>{
+  const sql=[];
+  const client={
+    query:async(query,params=[])=>{
+      sql.push({query,params});
+      if(query.includes('UPDATE brilon_pruef_tablets')){
+        return {rowCount:1,rows:[{id:'tablet-1',name:'Tablet Brilon'}]};
+      }
+      return {rowCount:1,rows:[]};
+    },
+    release:()=>{sql.push({query:'RELEASE'});}
+  };
+  const service=createTabletService({pool:{connect:async()=>client}});
+  const data=await service.deleteTablet('tablet-1');
+  assert.deepEqual(data,{id:'tablet-1',name:'Tablet Brilon',gelöscht:true,zugangGesperrt:true});
+  assert.equal(sql[0].query,'BEGIN');
+  const updated=sql.find(item=>item.query.includes('UPDATE brilon_pruef_tablets'));
+  assert.match(updated.query,/aktiv=false/);
+  assert.match(updated.query,/pruefdisplay=false/);
+  assert.match(updated.query,/ort_id=NULL/);
+  assert.match(updated.query,/geloescht_am=NOW/);
+  assert.match(updated.query,/token_hash=\$2/);
+  assert.match(updated.params[1],/^[a-f0-9]{64}$/);
+  assert.deepEqual(sql.find(item=>item.query.includes('UPDATE brilon_pruef_codes')).params,['tablet-1']);
+  assert.ok(sql.some(item=>item.query==='COMMIT'));
+  assert.equal(sql.at(-1).query,'RELEASE');
+});
+test('Bereits gelöschtes Tablet wird nicht versehentlich erneut gelöscht',async()=>{
+  const sql=[];
+  const client={
+    query:async(query)=>{
+      sql.push(query);
+      if(query.includes('UPDATE brilon_pruef_tablets'))return {rowCount:0,rows:[]};
+      return {rowCount:0,rows:[]};
+    },release:()=>{}
+  };
+  const service=createTabletService({pool:{connect:async()=>client}});
+  assert.equal(await service.deleteTablet('tablet-1'),null);
+  assert.deepEqual(sql.filter(query=>query==='COMMIT'),[]);
+  assert.ok(sql.includes('ROLLBACK'));
+  assert.equal(sql.some(query=>query.includes('UPDATE brilon_pruef_codes')),false);
+});

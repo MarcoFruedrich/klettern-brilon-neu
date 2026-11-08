@@ -736,6 +736,31 @@
         });
         block.append(button);
       }
+      // Löschen ist unabhängig vom Zustand und erfordert niemals Zugriff auf das Tablet.
+      const deleteButton=elt('button','Tablet löschen');
+      deleteButton.type='button';
+      deleteButton.className='btn danger tablet-delete-button';
+      deleteButton.title='Zugang sofort sperren und Gerät aus der Verwaltung entfernen';
+      deleteButton.addEventListener('click',async()=>{
+        if(!confirm('Tablet „'+device.name+'“ endgültig aus der Geräteverwaltung entfernen? Der Gerätezugang wird sofort gesperrt, laufende Prüfcodes werden ungültig. Eine spätere Nutzung erfordert einen neuen Kopplungscode.'))return;
+        deleteButton.disabled=true;
+        try{
+          await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id),
+            {method:'DELETE'});
+          // Entferne die Karte sofort; andere Teile der Prüfverwaltung bleiben nutzbar.
+          block.remove();
+          find('tablet-admin-status').textContent='Tablet „'+device.name+
+            '“ gelöscht. Der Zugang ist sofort gesperrt. Erneute Nutzung nur mit neuer Kopplung.';
+          await refresh();
+          // Refresh kann die Statusmeldung ersetzen; erfolgreiche Löschung bestätigen.
+          find('tablet-admin-status').textContent='Tablet „'+device.name+
+            '“ gelöscht und serverseitig gesperrt. Für die erneute Nutzung neu koppeln.';
+        }catch(error){
+          find('tablet-admin-status').textContent='Tablet konnte nicht gelöscht werden: '+error.message;
+          deleteButton.disabled=false;
+        }
+      });
+      block.append(deleteButton);
       target.append(block);
     }
   }

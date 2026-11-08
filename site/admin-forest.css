@@ -357,3 +357,18 @@ body.admin-page{
   .admin-page .social-channel-panel{padding:12px;}
   .admin-page .social-channel-actions .btn{flex:1 1 120px;}
 }
+
+/* Destruktive Geräteaktion: klar abgesetzt, nicht mit der bloßen Sperre verwechselbar. */
+.admin-page #tablet-admin-list .tablet-delete-button{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:linear-gradient(110deg,#b82935,#912431);
+  color:#fff;border:1px solid #8c1f2b;
+  border-radius:10px;min-height:41px;padding:9px 14px;
+  font-weight:850;box-shadow:0 2px 8px #9a1b3126;
+  margin:12px 5px 5px 0;
+}
+.admin-page #tablet-admin-list .tablet-delete-button:hover,
+.admin-page #tablet-admin-list .tablet-delete-button:focus-visible{
+  outline:2px solid #942633;outline-offset:2px;filter:brightness(1.08);
+}
+.admin-page #tablet-admin-list .tablet-delete-button:disabled{opacity:.6;cursor:wait;}
