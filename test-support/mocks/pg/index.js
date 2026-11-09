@@ -56,6 +56,8 @@ class Pool {
       }
       return {rows:[],rowCount:0};
     }
+    if(sql.includes("data->'besuchergruppen' AS gruppen")&&sql.includes('FROM brilon_rechnungsdaten'))
+      return {rows:[{gruppen:this.rechnungsdaten.besuchergruppen||null}],rowCount:1};
     if (sql.includes('FROM brilon_rechnungsdaten')) {
       if (sql.includes("data->>'agbText'")) return {rows:[{text:this.rechnungsdaten.agbText,
         aktiv:String(this.rechnungsdaten.agbAktiv),version:String(this.rechnungsdaten.agbVersion)}],rowCount:1};
@@ -70,7 +72,8 @@ class Pool {
     }
     if(sql.includes('UPDATE brilon_kundenbestaetigungen SET faellig_ab=$1'))return {rows:[],rowCount:0};
     if (sql.includes('UPDATE brilon_rechnungsdaten')&&sql.includes('jsonb_set')) {
-      this.rechnungsdaten.hintergrundEffekte=JSON.parse(params[0]);
+      const key=sql.includes("'{besuchergruppen}'")?'besuchergruppen':'hintergrundEffekte';
+      this.rechnungsdaten[key]=JSON.parse(params[0]);
       return {rows:[{id:1}],rowCount:1};
     }
     if (sql.includes('UPDATE brilon_rechnungsdaten')) {
