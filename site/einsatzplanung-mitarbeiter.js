@@ -78,7 +78,7 @@
           card.append(button);
         }
         if(t.mein_status==='eingeteilt'){
-          const option=anschlussAuswahl();card.append(option.closest('label'));
+          const option=t.manueller_termin?null:anschlussAuswahl();if(option)card.append(option.closest('label'));
           const yes=el('button','Einsatz verbindlich bestätigen');
           yes.type='button';yes.className='btn';yes.onclick=()=>{if(t.manueller_termin)action('/api/pruefung/einsatzplanung/kalender-antwort/'+encodeURIComponent(t.id),{status:'bestaetigt'});else if(option.reportValidity())action('/api/pruefung/einsatzplanung/antwort/'+encodeURIComponent(t.id),{status:'bestaetigt',anschlussOption:option.value});};
           const no=el('button','Einsatz ablehnen');
