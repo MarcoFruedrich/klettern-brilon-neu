@@ -41,7 +41,7 @@ const adminSubnavigation=document.getElementById('admin-subnavigation');
 const adminSubnavGroups=Array.from(document.querySelectorAll('[data-subnav-group]'));
 const adminSections={
   buchungen:['bookings-section','payment-overview-section','rechnungen-agb-section','admin-guestbook-section'],
-  programme:['angebote-verwaltung','gps-verwaltung','special-offers-view','anschlussrabatt-section'],
+  programme:['angebote-verwaltung','besuchergruppen-admin-section','gps-verwaltung','special-offers-view','anschlussrabatt-section'],
   kontakte:['mitarbeiter-einladen-section','mitarbeiter-section','netzwerkpartner-einladen-section',
     'netzwerkpartner-section','mitarbeiterbereiche-admin-section'],
   oeffentlichkeit:['whatsapp-admin-section','feedback-admin-section','social-media-section',
