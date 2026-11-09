@@ -22,7 +22,7 @@ const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 const angebotAuswahl = document.getElementById('angebot-auswahl');
 const standortAuswahl = document.getElementById('buchungs-standort');
 let angeboteCache=[];
-window.ausgewaehlterAngebotsStandort='';
+window.ausgewaehlterAngebotsStandort='alle';
 let verfuegbarkeitsAnfrage=0;
 let sonderaktionsPrefix='';
 let ausgewaehlteSonderaktion=null;
@@ -716,15 +716,15 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
   if(!ausgabe)return;
   const einleitung=document.getElementById('angebote-einleitung');
   const standortStatus=document.getElementById('standortwahl-status');
-  if(einleitung)einleitung.textContent=standortFilter
-    ?'Diese Programme können am Standort '+standortFilter+' angefragt werden.'
-    :'Wähle oben zuerst deinen Veranstaltungsort. Anschließend erscheinen ausschließlich die dort buchbaren Programme als Kacheln.';
-  const standortAngebote=standortFilter?angeboteCache.filter(angebot=>
+  const alleStandorte=!standortFilter||standortFilter==='alle';
+  if(einleitung)einleitung.textContent=alleStandorte
+    ?'Alle buchbaren Programme unserer Standorte. Wähle oben einen Standort, um die Auswahl einzugrenzen.'
+    :'Diese Programme können am Standort '+standortFilter+' angefragt werden.';
+  const standortAngebote=alleStandorte?angeboteCache:angeboteCache.filter(angebot=>
     (Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
-      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standortFilter)):[];
-  if(standortStatus)standortStatus.textContent=standortFilter
-    ?standortFilter+': '+standortAngebote.length+' buchbare Programm'+(standortAngebote.length===1?'':'e')+' verfügbar.'
-    :'Bitte zuerst einen Standort auswählen.';
+      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standortFilter));
+  if(standortStatus)standortStatus.textContent=(alleStandorte?'Alle Standorte':standortFilter)
+    +': '+standortAngebote.length+' buchbare Programm'+(standortAngebote.length===1?'':'e')+' verfügbar.';
   const passend=standortAngebote.filter(angebot=>
     !window.besuchergruppePasst||window.besuchergruppePasst(angebot));
   const filterhinweis=document.getElementById('besuchergruppen-filterhinweis');
@@ -742,21 +742,14 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     }
   }
   ausgabe.replaceChildren();
-  if(!standortFilter){
-    const hinweis=document.createElement('p');
-    hinweis.className='hint';
-    hinweis.textContent='Bitte wähle zuerst oben deinen Standort aus. Danach siehst du alle dort buchbaren Programme.';
-    ausgabe.append(hinweis);
-    return;
-  }
   if(!passend.length){
     const hinweis=document.createElement('p');
     hinweis.className='hint';
-    hinweis.textContent=standortFilter
-      ?'Für diesen Standort und diese Auswahl gibt es derzeit keine passenden veröffentlichten Programme.'
-      :window.aktiveBesuchergruppe
-        ?'Für diese Besuchergruppe sind noch keine passenden veröffentlichten Programme zugeordnet. Du kannst die gesamte Angebotsübersicht anzeigen.'
-        :'Derzeit sind keine veröffentlichten Angebote verfügbar.';
+    hinweis.textContent=window.aktiveBesuchergruppe
+      ?'Für diese Besuchergruppe gibt es in der aktuellen Standortauswahl keine passenden buchbaren Programme. Du kannst den Gruppenfilter zurücksetzen.'
+      :alleStandorte
+        ?'Derzeit sind keine veröffentlichten buchbaren Programme verfügbar.'
+        :'Für diesen Standort sind derzeit keine veröffentlichten buchbaren Programme verfügbar.';
     ausgabe.append(hinweis);
     return;
   }
@@ -786,7 +779,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     }
     const angebotOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
       ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
-    const meta=standortFilter?'Standort: '+standortFilter:
+    const meta=!alleStandorte?'Standort: '+standortFilter:
       angebotOrte.length?`Standorte: ${angebotOrte.join(', ')}`:'';
     if(meta){
       const details=document.createElement('p');
@@ -803,7 +796,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     const anfrage=document.createElement('a');
     anfrage.className='angebote-anfragen-link';
     anfrage.href='#buchung';
-    anfrage.dataset.location=standortFilter||angebotOrte[0]||'';
+    anfrage.dataset.location=(!alleStandorte?standortFilter:angebotOrte[0])||'';
     anfrage.dataset.program=angebot.name;
     anfrage.textContent='Dieses Angebot anfragen →';
     karte.append(anfrage);
@@ -851,8 +844,9 @@ async function angeboteLaden() {
   standortAuswahl.addEventListener('change',angeboteFuerStandortAnzeigen);
   standortAuswahl.addEventListener('change',()=>{
     const filter=document.getElementById('angebote-standort-filter');
-    if(filter&&filter.value!==standortAuswahl.value){
-      filter.value=standortAuswahl.value;
+    const filterWert=standortAuswahl.value||'alle';
+    if(filter&&filter.value!==filterWert){
+      filter.value=filterWert;
       filter.dispatchEvent(new Event('change',{bubbles:true}));
     }
   });
@@ -869,8 +863,8 @@ async function angeboteLaden() {
     if(standortFilter){
       standortFilter.replaceChildren();
       const alle=document.createElement('option');
-      alle.value='';
-      alle.textContent='Bitte zuerst Standort auswählen';
+      alle.value='alle';
+      alle.textContent='Alle Standorte';
       standortFilter.append(alle);
       for(const ort of orte){
         const option=document.createElement('option');
@@ -883,8 +877,9 @@ async function angeboteLaden() {
         if(window.aktiveBesuchergruppe)window.besuchergruppeZuruecksetzen?.();
         angeboteUebersichtAnzeigen(standortFilter.value);
         document.dispatchEvent(new CustomEvent('standortwechsel',{detail:{standort:standortFilter.value}}));
-        if(standortAuswahl.value!==standortFilter.value){
-          standortAuswahl.value=standortFilter.value;
+        const buchungsStandort=standortFilter.value==='alle'?'':standortFilter.value;
+        if(standortAuswahl.value!==buchungsStandort){
+          standortAuswahl.value=buchungsStandort;
           standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
         }
       });
