@@ -41,7 +41,7 @@ test('Browser: Besuchergruppen, Programmfilter und Buchungsübergang',async t=>{
   const browser=await chromium.launch({headless:true});
   t.after(()=>browser.close());
 
-  await t.test('Erst Standort wählen, danach buchbare Programmkacheln und Gruppenfilter',async()=>{
+  await t.test('Alle Standorte als Standard, dann Standortfilter und Buchungsübergang',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844}});
     try{
       const offers=[
@@ -64,11 +64,16 @@ test('Browser: Besuchergruppen, Programmfilter und Buchungsübergang',async t=>{
         .map(section=>section.id).filter(Boolean));
       assert.ok(sectionOrder.indexOf('standortwahl')<sectionOrder.indexOf('angebote'));
       assert.ok(sectionOrder.indexOf('angebote')<sectionOrder.indexOf('besuchergruppen'));
-      assert.equal(await page.locator('#angebote-standort-filter').inputValue(),'');
-      assert.equal(await page.locator('#angebote-uebersicht article').count(),0,
-        'Ohne ausgewählten Standort sind keine Programme sichtbar');
-      assert.equal(await page.locator('#besuchergruppen-kacheln article').count(),0,
-        'Besuchergruppen erscheinen erst nach der Standortwahl');
+      assert.equal(await page.locator('#angebote-standort-filter').inputValue(),'alle',
+        'Alle Standorte ist vorausgewählt');
+      await page.waitForFunction(()=>document.querySelectorAll('#angebote-uebersicht article').length===3);
+      assert.match(await page.locator('#angebote-uebersicht').innerText(),/Schul-Klettertag/);
+      assert.match(await page.locator('#angebote-uebersicht').innerText(),/GPS-Tour Hamm/);
+      assert.match(await page.locator('#angebote-uebersicht').innerText(),/Standorte: Brilon/);
+      assert.equal(await page.locator('#besuchergruppen-kacheln article').count(),6,
+        'Besuchergruppen sind bei Alle Standorte nutzbar');
+      assert.equal(await page.locator('#buchungs-standort').inputValue(),'',
+        'Alle Standorte darf nicht als ungültiger Buchungsstandort übernommen werden');
 
       await page.locator('#angebote-standort-filter').selectOption('Brilon');
       await page.waitForFunction(()=>document.querySelectorAll('#angebote-uebersicht article').length===2);
@@ -95,6 +100,11 @@ test('Browser: Besuchergruppen, Programmfilter und Buchungsübergang',async t=>{
         'Die Standortwahl ist mit dem Buchungsformular synchronisiert');
       assert.equal(await page.locator('#angebot-auswahl').inputValue(),'',
         'Programm wird beim Standortwechsel nicht fälschlich übernommen');
+      await page.locator('#angebote-standort-filter').selectOption('alle');
+      await page.waitForFunction(()=>document.querySelectorAll('#angebote-uebersicht article').length===3);
+      assert.equal(await page.locator('#angebote-standort-filter').inputValue(),'alle');
+      assert.equal(await page.locator('#buchungs-standort').inputValue(),'',
+        'Rückkehr zu Alle Standorte hebt die Buchungsstandortauswahl auf');
     }finally{await page.close();}
   });
 
