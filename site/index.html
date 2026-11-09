@@ -1,27 +1,52 @@
 <!DOCTYPE html>
-<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><meta content="#163e35" name="theme-color"/><title>Klettern &amp; Abenteuer | Erlebnisse für Gruppen und Familien</title><link href="/style.css?v=20261108-admin-horizontal-tabs-whatsapp" rel="stylesheet"/><link href="/besuchergruppen.css?v=20261108" rel="stylesheet"/><link rel="stylesheet" href="/social-links.css?v=20261108-social-visibility"/></head><body><a class="skip-link" href="#main-content">Zum Inhalt springen</a><header class="site-header"><div class="container header-inner">
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><meta content="#163e35" name="theme-color"/><title>Klettern &amp; Abenteuer | Erlebnisse für Gruppen und Familien</title><link href="/style.css?v=20261108-admin-horizontal-tabs-whatsapp" rel="stylesheet"/><link href="/besuchergruppen.css?v=20261109-standort-zuerst" rel="stylesheet"/><link rel="stylesheet" href="/social-links.css?v=20261108-social-visibility"/></head><body><a class="skip-link" href="#main-content">Zum Inhalt springen</a><header class="site-header"><div class="container header-inner">
 <a aria-label="Klettern und Abenteuer, zur Startseite" class="logo brand-logo" href="#start"><img src="/logo-klettern-abenteuer.svg" alt="Klettern &amp; Abenteuer" width="440" height="168"/></a>
 <button aria-controls="siteNav" aria-expanded="false" aria-label="Menü öffnen" class="menu-toggle" id="menuToggle" type="button">☰</button>
-<nav aria-label="Hauptnavigation" class="navlinks" id="siteNav"><a href="#besuchergruppen">Für wen?</a><a href="#angebote">Angebote</a><a href="#buchung">Termine anfragen</a><a href="#aktionen">Tages- &amp; Sonderaktionen</a><a href="#kontakt">Kontakt</a><a class="nav-widerruf" href="/widerruf.html">Buchung widerrufen / Umbuchungsanfrage</a></nav>
+<nav aria-label="Hauptnavigation" class="navlinks" id="siteNav"><a href="#standortwahl">Standort wählen</a><a href="#angebote">Angebote</a><a href="#besuchergruppen">Für wen?</a><a href="#buchung">Termine anfragen</a><a href="#aktionen">Tages- &amp; Sonderaktionen</a><a href="#kontakt">Kontakt</a><a class="nav-widerruf" href="/widerruf.html">Buchung widerrufen / Umbuchungsanfrage</a></nav>
 </div></header><main id="main-content" tabindex="-1"><section class="hero" id="start"><div class="container hero-inner"><div>
 <span class="eyebrow">Klettern · Natur · Gemeinschaft · Abenteuer</span>
 <h1>Hier geht’s <em>hoch.</em><br/>Gemeinsam noch höher.</h1>
 <p class="lead">Klettern, mutig sein, miteinander lachen und über sich hinauswachsen. Ob Kindergeburtstag, Familienausflug, Schulklasse, Team oder spontaner Kletterspaß: Bei uns findet ihr euer Abenteuer.</p>
-<div class="hero-actions"><a class="button button-primary" href="#buchung">Wunschtermin anfragen <span aria-hidden="true">↗</span></a><a class="button button-ghost" href="#angebote">Alle Angebote entdecken ↓</a></div>
-<div class="hero-caption">Toprope <span>·</span> Bouldern <span>·</span> Pusiken <span>·</span> Abseilen <span>·</span> Teamgeist</div>
+<div class="hero-actions"><a class="button button-primary" href="#buchung">Wunschtermin anfragen <span aria-hidden="true">↗</span></a><a class="button button-ghost" href="#standortwahl">Standort &amp; Angebote entdecken ↓</a></div>
+<div class="hero-caption">Toprope <span>·</span> Bouldern <span>·</span> Prusiken <span>·</span> Abseilen <span>·</span> Teamgeist</div>
 </div><div aria-label="Echte Eindrücke aus der Kletterhalle Brilon" class="hero-pictures">
 <img alt="Hohe Indoor-Kletterwand mit Strickleiter in Brilon" class="hero-photo" fetchpriority="high" src="fotos/halle.jpg"/><img alt="Kind mit Kletterhelm und Klettergurt in der Kletterhalle" class="hero-photo" fetchpriority="high" src="fotos/kletterheldin-helm.jpg"/><img alt="Gesichertes Abseilen an der Kletterwand" class="hero-photo" fetchpriority="high" src="fotos/abseilen.jpg"/>
 <div class="floating-tag">Hoch hinaus – <strong>auch für dich!</strong></div>
 </div></div></section>
+<section id="standortwahl" class="standortwahl-section" aria-labelledby="standortwahl-heading">
+  <div class="standortwahl-panel">
+    <div>
+      <span class="eyebrow">DEIN ABENTEUER BEGINNT HIER</span>
+      <h2 id="standortwahl-heading">Wähle zuerst deinen Standort</h2>
+      <p>Jeder Veranstaltungsort hat eigene Erlebnisse. Wähle deinen Wunschstandort und entdecke anschließend ausschließlich die dort angebotenen, buchbaren Programme.</p>
+    </div>
+    <div class="standortwahl-auswahl">
+      <label for="angebote-standort-filter">Veranstaltungsort auswählen</label>
+      <select id="angebote-standort-filter" aria-controls="angebote-uebersicht besuchergruppen-kacheln" required>
+        <option value="">Bitte zuerst Standort auswählen</option>
+      </select>
+      <p id="standortwahl-status" role="status" aria-live="polite">Die verfügbaren Standorte werden geladen …</p>
+    </div>
+  </div>
+</section>
+<section id="angebote" aria-labelledby="angebote-heading">
+  <div class="eyebrow">UNSERE ERLEBNISSE</div>
+  <h2 id="angebote-heading">Buchbare Programme an deinem Standort</h2>
+  <p id="angebote-einleitung">Wähle oben zuerst deinen Veranstaltungsort. Anschließend erscheinen die dort buchbaren Programme als Kacheln.</p>
+  <div id="besuchergruppen-filterhinweis" class="besuchergruppen-filterhinweis" hidden></div>
+  <div class="cards" id="angebote-uebersicht" aria-live="polite">
+    <p>Bitte wähle oben zuerst einen Standort aus.</p>
+  </div>
+</section>
 <section id="besuchergruppen" aria-labelledby="besuchergruppen-heading">
   <div class="besuchergruppen-intro">
     <span class="eyebrow">FÜR ALLE, DIE ETWAS ERLEBEN MÖCHTEN</span>
-    <h2 id="besuchergruppen-heading">Für wen ist unser Angebot?</h2>
-    <p>Ob als Familie, Schulklasse, Verein oder Team – findet das Abenteuer, das zu euch passt.</p>
+    <h2 id="besuchergruppen-heading">Noch gezielter auswählen: Für wen?</h2>
+    <p>Ob als Familie, Schulklasse, Verein oder Team – entdecke Erlebnisse für eure Gruppe am gewählten Standort.</p>
   </div>
-  <div id="besuchergruppen-kacheln" class="besuchergruppen-grid" aria-live="polite"></div>
+  <p id="besuchergruppen-standorthinweis" class="hint">Wähle zuerst oben deinen Standort aus, damit du die passenden Angebote nach Besuchergruppen filtern kannst.</p>
+  <div id="besuchergruppen-kacheln" class="besuchergruppen-grid" aria-live="polite" hidden></div>
 </section>
-<section id="angebote" aria-labelledby="angebote-heading"><div class="eyebrow">UNSERE ERLEBNISSE</div><h2 id="angebote-heading">Dein Abenteuer beginnt hier</h2><p>Wähle einen Standort, um die dort verfügbaren Programme zu sehen, oder behalte alle Angebote in der Übersicht.</p><div class="angebote-filter"><label for="angebote-standort-filter">Angebote nach Standort anzeigen</label><select id="angebote-standort-filter" aria-controls="angebote-uebersicht"><option value="">Alle Standorte – alle Angebote</option></select></div><div id="besuchergruppen-filterhinweis" class="besuchergruppen-filterhinweis" hidden></div><div class="cards" id="angebote-uebersicht" aria-live="polite"><p>Unsere Angebote werden geladen …</p></div></section>
 <section class="split" id="buchung"><div><div class="eyebrow">TERMINANFRAGE</div><h2>Wunschtermin anfragen</h2><p>Teile uns deinen Wunschtermin mit. Wir prüfen die Verfügbarkeit und melden uns persönlich zurück. Eine Anfrage ist noch keine verbindliche Buchung.</p><p class="hint">Bitte gib besondere Unterstützungsbedarfe nur an, soweit sie für die Planung erforderlich sind. Vertrauliche gesundheitliche Details besprechen wir lieber persönlich.</p><div class="angebots-bildanzeige" id="angebots-bildanzeige"></div>
 </div><form id="booking"><label>Vorname<input autocomplete="given-name" maxlength="80" name="vorname" required=""/></label><label>Nachname<input autocomplete="family-name" maxlength="80" name="nachname" required=""/></label><label>E-Mail-Adresse<input autocomplete="email" maxlength="180" name="email" required="" type="email"/></label><label>Telefon (optional)<input autocomplete="tel" maxlength="40" name="telefon" type="tel"/></label><label class="check invoice-address-choice"><input id="rechnung-adresse-erforderlich" type="checkbox" name="rechnungsadresseErforderlich"><span>Ich benötige eine Rechnung mit Rechnungsanschrift.</span></label><fieldset id="rechnungsanschrift-feld" hidden><legend>Rechnungsanschrift</legend><p class="hint">Bitte gib die Anschrift ein, an die die Rechnung ausgestellt werden soll. Ohne Auswahl verwenden wir deine bereits eingegebenen Buchungs- und Kontaktdaten.</p><label>Firma (optional)<input autocomplete="organization" maxlength="160" name="rechnungsFirma"></label><label>Straße und Hausnummer<input autocomplete="street-address" maxlength="180" name="rechnungsStrasse"></label><div class="two"><label>PLZ<input autocomplete="postal-code" maxlength="12" name="rechnungsPlz"></label><label>Ort<input autocomplete="address-level2" maxlength="120" name="rechnungsOrt"></label></div></fieldset><label>Veranstaltungsort<select id="buchungs-standort" name="veranstaltungsort" required="">
 <option value="">Bitte Veranstaltungsort auswählen</option>
@@ -44,4 +69,4 @@
 <small aria-live="polite" id="buchungs-modus-hinweis" role="status"></small>
 <p aria-live="polite" id="angebots-preis"></p>
 </label></div><label>Nachricht / Wünsche<textarea maxlength="2000" name="nachricht" placeholder="Alter der Gruppe, gewünschte Aktivitäten, Fragen ..." rows="4"></textarea></label><p id="selected-special" class="hint" role="status" aria-live="polite" hidden></p><details id="booking-agb-details"><summary>Aktuelle Geschäftsbedingungen anzeigen</summary><p id="booking-agb-text" style="white-space:pre-wrap"></p></details><label class="check"><input name="agbBestaetigt" id="booking-agb" required="" type="checkbox"/><span>Ich habe die <a href="/agb.html" target="_blank">Allgemeinen Geschäftsbedingungen</a> gelesen und akzeptiere sie in der angezeigten Fassung.</span></label><p id="booking-agb-status" class="hint" role="status" aria-live="polite">Geschäftsbedingungen werden geladen …</p><label class="check"><input name="datenschutz" required="" type="checkbox"/><span>Ich habe die <a href="/datenschutz.html" target="_blank">Datenschutzhinweise</a> gelesen und bin mit der Bearbeitung meiner Anfrage einverstanden.</span></label><div aria-hidden="true" class="hidden"><label>Website<input autocomplete="off" name="website" tabindex="-1"/></label></div><button class="btn" type="submit">Terminanfrage absenden →</button><p aria-live="polite" id="booking-status" role="status"></p></form></section><section id="aktionen"><div class="eyebrow">BESONDERE TERMINE</div><h2>Tages- &amp; Sonderangebote</h2><div class="cards" id="specials"><p>Aktuelle Termine werden geladen …</p></div></section>
-<section id="kontakt"><div class="eyebrow">KONTAKT</div><h2>Fragen? Wir helfen gerne.</h2><p>Veranstaltungsort: Jugendherberge Brilon. Die Kletterangebote werden eigenständig organisiert.</p><p><a href="mailto:info@klettern-abenteuer.de">info@klettern-abenteuer.de</a> · <a href="tel:+4915152979924">0151 52979924</a> <span id="social-contact-links" class="social-contact-links" aria-label="Social-Media-Kontaktmöglichkeiten"></span></p></section></main><footer><span>© <span id="year"></span> Klettern &amp; Abenteuer</span><span><a href="/impressum.html">Impressum</a> · <a href="/datenschutz.html">Datenschutz</a> · <a href="/agb.html">AGB</a> · <a href="/admin.html">Verwaltung</a> · <a href="/mitarbeiterbereich.html">Mitarbeiteranmeldung</a></span></footer><script src="/sperrzeit.js"></script><script src="/app.js?v=20261108-whatsapp-booking-links"></script><script src="/besuchergruppen.js?v=20261108"></script><script src="/social-links-public.js?v=20261108-social-visibility"></script><script src="/navigation.js"></script><script src="/logo-himmel.js?v=20261107-tageslauf"></script><script src="/logo-uhr.js?v=20261108"></script><script src="/hintergrund-effekte.js?v=20261108"></script></body></html>
+<section id="kontakt"><div class="eyebrow">KONTAKT</div><h2>Fragen? Wir helfen gerne.</h2><p>Veranstaltungsort: Jugendherberge Brilon. Die Kletterangebote werden eigenständig organisiert.</p><p><a href="mailto:info@klettern-abenteuer.de">info@klettern-abenteuer.de</a> · <a href="tel:+4915152979924">0151 52979924</a> <span id="social-contact-links" class="social-contact-links" aria-label="Social-Media-Kontaktmöglichkeiten"></span></p></section></main><footer><span>© <span id="year"></span> Klettern &amp; Abenteuer</span><span><a href="/impressum.html">Impressum</a> · <a href="/datenschutz.html">Datenschutz</a> · <a href="/agb.html">AGB</a> · <a href="/admin.html">Verwaltung</a> · <a href="/mitarbeiterbereich.html">Mitarbeiteranmeldung</a></span></footer><script src="/sperrzeit.js"></script><script src="/app.js?v=20261109-standort-zuerst"></script><script src="/besuchergruppen.js?v=20261109-standort-zuerst"></script><script src="/social-links-public.js?v=20261108-social-visibility"></script><script src="/navigation.js"></script><script src="/logo-himmel.js?v=20261107-tageslauf"></script><script src="/logo-uhr.js?v=20261108"></script><script src="/hintergrund-effekte.js?v=20261108"></script></body></html>
