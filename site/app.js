@@ -22,6 +22,7 @@ const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 const angebotAuswahl = document.getElementById('angebot-auswahl');
 const standortAuswahl = document.getElementById('buchungs-standort');
 let angeboteCache=[];
+window.ausgewaehlterAngebotsStandort='';
 let verfuegbarkeitsAnfrage=0;
 let sonderaktionsPrefix='';
 let ausgewaehlteSonderaktion=null;
@@ -713,10 +714,19 @@ specials();
 function angeboteUebersichtAnzeigen(standortFilter=''){
   const ausgabe=document.getElementById('angebote-uebersicht');
   if(!ausgabe)return;
-  const passend=angeboteCache.filter(angebot=>(!standortFilter||
+  const einleitung=document.getElementById('angebote-einleitung');
+  const standortStatus=document.getElementById('standortwahl-status');
+  if(einleitung)einleitung.textContent=standortFilter
+    ?'Diese Programme können am Standort '+standortFilter+' angefragt werden.'
+    :'Wähle oben zuerst deinen Veranstaltungsort. Anschließend erscheinen ausschließlich die dort buchbaren Programme als Kacheln.';
+  const standortAngebote=standortFilter?angeboteCache.filter(angebot=>
     (Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
-      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standortFilter))&&
-    (!window.besuchergruppePasst||window.besuchergruppePasst(angebot)));
+      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standortFilter)):[];
+  if(standortStatus)standortStatus.textContent=standortFilter
+    ?standortFilter+': '+standortAngebote.length+' buchbare Programm'+(standortAngebote.length===1?'':'e')+' verfügbar.'
+    :'Bitte zuerst einen Standort auswählen.';
+  const passend=standortAngebote.filter(angebot=>
+    !window.besuchergruppePasst||window.besuchergruppePasst(angebot));
   const filterhinweis=document.getElementById('besuchergruppen-filterhinweis');
   if(filterhinweis){
     filterhinweis.replaceChildren();
@@ -732,6 +742,13 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     }
   }
   ausgabe.replaceChildren();
+  if(!standortFilter){
+    const hinweis=document.createElement('p');
+    hinweis.className='hint';
+    hinweis.textContent='Bitte wähle zuerst oben deinen Standort aus. Danach siehst du alle dort buchbaren Programme.';
+    ausgabe.append(hinweis);
+    return;
+  }
   if(!passend.length){
     const hinweis=document.createElement('p');
     hinweis.className='hint';
@@ -769,7 +786,8 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     }
     const angebotOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
       ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
-    const meta=angebotOrte.length?`Standorte: ${angebotOrte.join(', ')}`:'';
+    const meta=standortFilter?'Standort: '+standortFilter:
+      angebotOrte.length?`Standorte: ${angebotOrte.join(', ')}`:'';
     if(meta){
       const details=document.createElement('p');
       details.className='angebote-karte-meta';
@@ -831,6 +849,13 @@ async function angeboteLaden() {
     belegteUhrzeitenLaden();
   });
   standortAuswahl.addEventListener('change',angeboteFuerStandortAnzeigen);
+  standortAuswahl.addEventListener('change',()=>{
+    const filter=document.getElementById('angebote-standort-filter');
+    if(filter&&filter.value!==standortAuswahl.value){
+      filter.value=standortAuswahl.value;
+      filter.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  });
 
   try {
     const [angeboteAntwort,orteAntwort]=await Promise.all([
@@ -845,7 +870,7 @@ async function angeboteLaden() {
       standortFilter.replaceChildren();
       const alle=document.createElement('option');
       alle.value='';
-      alle.textContent='Alle Standorte – alle Angebote';
+      alle.textContent='Bitte zuerst Standort auswählen';
       standortFilter.append(alle);
       for(const ort of orte){
         const option=document.createElement('option');
@@ -853,7 +878,16 @@ async function angeboteLaden() {
         option.textContent=ort.name;
         standortFilter.append(option);
       }
-      standortFilter.addEventListener('change',()=>angeboteUebersichtAnzeigen(standortFilter.value));
+      standortFilter.addEventListener('change',()=>{
+        window.ausgewaehlterAngebotsStandort=standortFilter.value;
+        if(window.aktiveBesuchergruppe)window.besuchergruppeZuruecksetzen?.();
+        angeboteUebersichtAnzeigen(standortFilter.value);
+        document.dispatchEvent(new CustomEvent('standortwechsel',{detail:{standort:standortFilter.value}}));
+        if(standortAuswahl.value!==standortFilter.value){
+          standortAuswahl.value=standortFilter.value;
+          standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+      });
       document.getElementById('angebote-uebersicht')?.addEventListener('click',ereignis=>{
         const link=ereignis.target.closest('.angebote-anfragen-link');
         if(!link)return;
