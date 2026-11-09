@@ -122,7 +122,7 @@
 .ck-staff-picker-row.is-applied .ck-staff-picker-marker {color:#10804c;}
 .ck-staff-picker-row.is-not-applied .ck-staff-picker-marker {color:#a33b3b;}
 .ck-staff-picker-person {display:grid;min-width:0;}
-.ck-staff-picker-person strong {overflow-wrap:anywhere;color:#173e32;}
+.ck-staff-picker-person strong {font-size:13px;line-height:1.2;overflow-wrap:normal;word-break:normal;hyphens:none;color:#173e32;}
 .ck-staff-picker-person small {font-size:11px;color:#52695b;}
 .ck-staff-picker-assign {min-height:34px;padding:6px 9px;border:1px solid #18804e;border-radius:7px;background:#11804d;color:#fff;font-size:11px;font-weight:800;}
 .ck-staff-picker-assign:disabled {opacity:.6;cursor:wait;}
