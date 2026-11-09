@@ -54,7 +54,26 @@ const brevoMail=createBrevoMailer();
 const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
-function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
+function demoRedact(value){
+  if(Array.isArray(value))return value.map(demoRedact);
+  if(!value||typeof value!=='object')return value;
+  const keys=Object.keys(value);
+  const hasPerson=keys.some(key=>/^(email|emailadresse|telefon|telefonnummer|phone|vorname|nachname|mitarbeiter_id|kunde_id|kontakt_id|ansprechpartner)$/i.test(key));
+  const result={};
+  for(const [key,item] of Object.entries(value)){
+    if(/^(email|emailadresse|mailadresse)$/i.test(key)||/^(recipient|empfaenger_email)$/i.test(key))result[key]='demo@example.invalid';
+    else if(/(telefon|telefonnummer|mobile|mobilnummer|phone|adresse|strasse|street|plz|postcode|geburtsdatum|bankverbindung|iban|buchungsnummer)/i.test(key))result[key]='[Im Demo-Zugang ausgeblendet]';
+    else if(/^(name|vorname|nachname|kunde|kontaktperson|ansprechpartner)$/i.test(key)&&hasPerson)result[key]='Beispielperson';
+    else if(/(nachricht|notiz|intern|kommentar|freitext|bemerkung)/i.test(key))result[key]='[Interne Angaben im Demo-Zugang ausgeblendet]';
+    else result[key]=demoRedact(item);
+  }
+  return result;
+}
+function reply(res,status,data,headers={}){
+  if(res.adminDemoReadOnly)data=demoRedact(data);
+  res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});
+  res.end(JSON.stringify(data));
+}
 // Free mode is intentionally limited to authenticated admin image uploads.
 // This performs strict decode/re-encode in bereinigeBild, but is NOT antivirus scanning.
 const imageUploadSecurityMode=process.env.IMAGE_UPLOAD_SECURITY_MODE==='sanitized_images'
@@ -300,11 +319,31 @@ async function anschlussRabattElternZuruecknehmen(client,zusatz,zusatzId){
     [JSON.stringify(data),parent.id]);
   return {zurueckgenommen:true,buchung:saved.rows[0],stand};
 }
+function demoSessionToken(expiresAt=Math.floor(Date.now()/1000)+8*3600){
+  const expiry=Number(expiresAt).toString(16).padStart(12,'0');
+  const signature=crypto.createHmac('sha256',process.env.ADMIN_DEMO_PASSWORD||'')
+    .update('brilon-admin-demo-v1:'+expiry).digest('hex').slice(0,52);
+  return expiry+signature;
+}
+function demoSessionValid(token){
+  if(!process.env.ADMIN_DEMO_PASSWORD||typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))return false;
+  const expiry=token.slice(0,12),signature=token.slice(12);
+  const expected=crypto.createHmac('sha256',process.env.ADMIN_DEMO_PASSWORD)
+    .update('brilon-admin-demo-v1:'+expiry).digest('hex').slice(0,52);
+  const a=Buffer.from(signature),b=Buffer.from(expected);
+  return a.length===b.length&&crypto.timingSafeEqual(a,b)&&parseInt(expiry,16)>Math.floor(Date.now()/1000);
+}
+function credentialMatches(input,configured){
+  if(typeof configured!=='string'||!configured)return false;
+  const a=Buffer.from(String(input||'')),b=Buffer.from(configured);
+  return a.length===b.length&&crypto.timingSafeEqual(a,b);
+}
 async function session(req){
   const jetzt=Date.now();
   const match=(req.headers.cookie||'').match(/(?:^|;\s*)brilon_session=([a-f0-9]{64})/);
   const token=match?.[1];
   if(!token)return {valid:false};
+  if(demoSessionValid(token))return {valid:true,readOnly:true};
   if(pool){
     try{
       if(++persistentSessionChecks%128===0)
@@ -340,8 +379,17 @@ async function admin(req,res){
   const auth=await session(req);
   if(auth.unavailable){reply(res,503,{error:'Admin-Sitzungsspeicher ist nicht verfügbar.'});return false;}
   if(!auth.valid){reply(res,401,{error:'Bitte anmelden.'});return false}
+  if(auth.readOnly)res.adminDemoReadOnly=true;
+  const method=String(req.method||'').toUpperCase();
+  const path=new URL(req.url,'http://localhost').pathname;
+  if(auth.readOnly&&!['GET','HEAD','OPTIONS'].includes(method)&&path!=='/api/admin/logout'){
+    reply(res,403,{error:'Der Demo-Zugang ist nur lesend. Änderungen sind hier gesperrt.'});return false;
+  }
+  if(auth.readOnly&&/\.(pdf|csv|xlsx|zip)$/i.test(path)){
+    reply(res,403,{error:'Dateidownloads sind im Demo-Zugang gesperrt.'});return false;
+  }
   if(!sameOriginMutation(req)){reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});return false}
-  if(!['GET','HEAD','OPTIONS'].includes(String(req.method||'').toUpperCase())&&!adminCsrfValid(req)){
+  if(!['GET','HEAD','OPTIONS'].includes(method)&&!adminCsrfValid(req)){
     reply(res,403,{error:'CSRF-Prüfung fehlgeschlagen. Bitte Verwaltung neu laden.'});return false;
   }
   return true;
@@ -1569,6 +1617,13 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const d=await body(req),
             username=process.env.ADMIN_USER,
             password=process.env.ADMIN_PASSWORD;
+      const demoUser=process.env.ADMIN_DEMO_USER,demoPassword=process.env.ADMIN_DEMO_PASSWORD;
+      if(credentialMatches(d.username,demoUser)&&credentialMatches(d.password,demoPassword)){
+        const token=demoSessionToken();
+        return reply(res,200,{success:true,readOnly:true,csrfToken:adminCsrfToken(token)},{
+          'Set-Cookie':`${cookieName}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`
+        });
+      }
       if(!username||!password)
         return reply(res,503,{error:'Admin-Zugang nicht eingerichtet.'});
       const a=Buffer.from(String(d.username||'')),
