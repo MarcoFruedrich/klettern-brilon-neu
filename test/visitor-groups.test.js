@@ -42,12 +42,18 @@ test('Manipulierte Bildadressen und falsche IDs werden abgewehrt',()=>{
 test('Öffentliche Webseite bindet Navigationspunkt, sechs Kacheln und Filter ein',()=>{
   const page=site('index.html');
   assert.match(page,/href="#besuchergruppen"/);
+  assert.match(page,/id="standortwahl"/);
+  assert.match(page,/id="angebote-standort-filter"/);
   assert.match(page,/id="besuchergruppen-kacheln"/);
   assert.match(page,/id="besuchergruppen-filterhinweis"/);
+  assert.ok(page.indexOf('id="standortwahl"')<page.indexOf('id="angebote"'));
+  assert.ok(page.indexOf('id="angebote"')<page.indexOf('id="besuchergruppen"'));
   assert.match(page,/besuchergruppen\.js/);
   const js=site('app.js');
   assert.match(js,/besuchergruppePasst/);
   assert.match(js,/besuchergruppenwechsel/);
+  assert.match(js,/window\.ausgewaehlterAngebotsStandort/);
+  assert.match(js,/Bitte wähle zuerst oben deinen Standort/);
 });
 test('Verwaltungsseite hat Steuerungen und geschützte API zum Speichern',()=>{
   const page=site('admin.html');
