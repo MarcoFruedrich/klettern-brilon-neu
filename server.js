@@ -1609,6 +1609,24 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       }
     }
 
+    if(route==='/api/demo-vorschlag'&&req.method==='POST'){
+      const auth=await session(req);
+      if(!auth.valid||!auth.readOnly)return reply(res,401,{error:'Bitte mit dem Demo-Zugang anmelden.'});
+      if(!sameOriginMutation(req)||!adminCsrfValid(req))return reply(res,403,{error:'Anfrage abgelehnt.'});
+      if(!limit('demo-vorschlag:'+ip,4,3600000))return reply(res,429,{error:'Zu viele Vorschläge. Bitte später erneut versuchen.'});
+      const d=await body(req),message=safeText(d?.message,2000).trim();
+      if(message.length<8)return reply(res,400,{error:'Bitte einen Vorschlag mit mindestens 8 Zeichen eingeben.'});
+      if(!process.env.BOOKING_NOTIFY_EMAIL)return reply(res,503,{error:'Die Verwaltungsadresse ist derzeit nicht eingerichtet.'});
+      try{
+        await brevoMail(process.env.BOOKING_NOTIFY_EMAIL,'Hinweis aus dem Verwaltungs-Demo-Zugang',
+          'Eine Person hat im Demo-Zugang einen Hinweis oder Verbesserungsvorschlag eingereicht.\\n\\n'+message+'\\n\\nDer Vorschlag wurde nicht automatisch in der Website umgesetzt.');
+        return reply(res,200,{success:true,message:'Vielen Dank. Der Vorschlag wurde an die Verwaltung weitergeleitet.'});
+      }catch(error){
+        console.error('Demo-Vorschlag konnte nicht versendet werden:',error.message);
+        return reply(res,502,{error:'Der Vorschlag konnte gerade nicht zugestellt werden.'});
+      }
+    }
+
     if(route==='/api/admin/login'&&req.method==='POST'){
       if(!sameOriginMutation(req))return reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});
       const kontoId=gpsTokenHash(process.env.ADMIN_USER||'unconfigured');
