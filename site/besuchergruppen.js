@@ -38,6 +38,11 @@
   }
   function render(){
     root.replaceChildren();
+    const standortGewaehlt=Boolean(window.ausgewaehlterAngebotsStandort);
+    root.hidden=!standortGewaehlt;
+    const hinweis=document.getElementById('besuchergruppen-standorthinweis');
+    if(hinweis)hinweis.hidden=standortGewaehlt;
+    if(!standortGewaehlt)return;
     gruppen.filter(g=>g.aktiv).forEach(g=>{
       const card=element('article','besuchergruppe-karte');
       card.style.setProperty('--gruppe-farbe',g.farbe||'#267c50');
@@ -62,6 +67,7 @@
       root.append(card);
     });
   }
+  document.addEventListener('standortwechsel',render);
   render();
   fetch('/api/besuchergruppen')
     .then(r=>{if(!r.ok)throw Error('Besuchergruppen nicht erreichbar');return r.json();})

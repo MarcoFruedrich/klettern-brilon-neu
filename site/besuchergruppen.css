@@ -66,3 +66,34 @@
   .besuchergruppen-admin-checkboxen{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.besuchergruppe-karte{transition:none}.besuchergruppe-karte:hover{transform:none}}
+
+/* Ablauf: erst Standort auswählen, dann nur dort buchbare Programme sehen. */
+.standortwahl-section{scroll-margin-top:116px;padding-bottom:20px}
+.standortwahl-panel{
+  display:grid;grid-template-columns:minmax(0,1.3fr) minmax(250px,.9fr);
+  align-items:center;gap:25px;border-radius:22px;padding:clamp(22px,3.5vw,42px);
+  background:linear-gradient(125deg,#e4f0e3,#f7faf3);
+  border:1px solid #c1d5c4;box-shadow:0 10px 30px #163e3510;
+}
+.standortwahl-panel h2{
+  color:#163e35;font-size:clamp(1.8rem,3vw,2.8rem);line-height:1.17;
+  margin:9px 0 13px;letter-spacing:-.025em
+}
+.standortwahl-panel p{color:#395749;line-height:1.55;margin:0}
+.standortwahl-auswahl{
+  background:white;border:1px solid #c6d8c7;border-radius:17px;
+  padding:19px;box-shadow:0 7px 22px #163e350e
+}
+.standortwahl-auswahl label{display:block;font-weight:800;color:#163e35;margin:0 0 10px}
+#angebote-standort-filter{
+  width:100%;min-height:53px;background:white;color:#163e35;
+  border:2px solid #79ad88;border-radius:12px;padding:10px 13px;font:inherit;font-weight:750
+}
+#angebote-standort-filter:focus-visible{outline:3px solid #99c5a3;outline-offset:2px}
+#standortwahl-status{font-size:.89rem;color:#40684d;margin-top:10px}
+#besuchergruppen-kacheln[hidden],#besuchergruppen-standorthinweis[hidden] {display:none!important}
+#besuchergruppen-standorthinweis{margin:20px 0;color:#496952}
+@media(max-width:720px){
+ .standortwahl-panel{grid-template-columns:1fr;gap:19px;padding:20px;border-radius:17px}
+ .standortwahl-auswahl{padding:15px}
+}
