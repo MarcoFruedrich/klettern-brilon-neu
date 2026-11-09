@@ -42,8 +42,21 @@
       <button class="btn">Anmelden</button>
     </form>
     <p id="login-status" role="status" aria-live="polite"></p>
+    <p class="demo-login-hint">Netzwerkpartner können sich mit einem separaten Demo-Zugang anmelden. Dieser ist ausschließlich lesend.</p>
 
     <div id="workspace" hidden>
+      <section id="demo-readonly-banner" class="demo-readonly-notice" hidden aria-label="Demo-Zugang">
+        <div>
+          <strong>Demo-Zugang · nur Lesezugriff</strong>
+          <p>Du siehst den aktuellen Verwaltungsstand. Änderungen, Buchungen und Nachrichten an Kunden sind gesperrt. Personenbezogene Angaben werden ausgeblendet.</p>
+        </div>
+        <form id="demo-feedback-form">
+          <label for="demo-feedback-message">Hinweis oder Verbesserungsvorschlag</label>
+          <textarea id="demo-feedback-message" maxlength="2000" rows="3" placeholder="Dein Vorschlag geht ausschließlich an die Verwaltung."></textarea>
+          <button class="btn secondary" type="submit">Vorschlag an Verwaltung senden</button>
+          <span id="demo-feedback-status" role="status" aria-live="polite"></span>
+        </form>
+      </section>
       <div class="admin-layout">
         <aside class="admin-sidebar" aria-label="Verwaltung">
           <div class="admin-sidebar-label" aria-hidden="true"><span class="admin-sidebar-tree">🌲</span><span><strong>Klettern &amp; Abenteuer</strong><small>VERWALTUNG</small></span></div>
