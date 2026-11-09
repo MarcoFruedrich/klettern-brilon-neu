@@ -37,6 +37,12 @@
 .ck-entry-field input,.ck-entry-field select,.ck-entry-field textarea {width:100%;min-width:0;min-height:38px;padding:7px 9px;border:1px solid #bfd3c7;border-radius:7px;background:#fff;color:#164333;font:inherit;font-size:13px;}
 .ck-entry-field textarea {min-height:80px;resize:vertical;}
 .ck-entry-field.ck-entry-wide {grid-column:1/-1;}
+.ck-entry-sites {display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px 12px;margin:0;padding:10px 12px;border:1px solid #cbd9d0;border-radius:9px;background:#f7faf8;}
+.ck-entry-sites legend {padding:0 5px;color:#244c3c;font-size:12px;font-weight:800;}
+.ck-entry-site-all {grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #b8d6c2;border-radius:7px;background:#e8f6eb;color:#174c34;font-weight:800;}
+.ck-entry-site-option {display:flex;align-items:center;gap:7px;min-width:0;color:#294a3b;font-size:12px;}
+.ck-entry-site-option input,.ck-entry-site-all input {accent-color:#087847;flex:0 0 auto;}
+.ck-entry-site-hint {grid-column:1/-1;color:#52695b;font-size:11px;line-height:1.4;}
 .ck-entry-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
 .ck-entry-actions button {min-height:42px;padding:8px 10px;border:1px solid #bfd3c7;border-radius:8px;background:#fff;color:#164333;font-weight:750;}
 .ck-entry-actions .ck-entry-save {background:#087847;border-color:#087847;color:#fff;}
