@@ -103,6 +103,8 @@
 .ck-repeat-box input,.ck-repeat-box select {width:100%;min-height:36px;padding:6px 8px;border:1px solid #bfd3c7;border-radius:7px;background:#fff;color:#164333;font:inherit;}
 .ck-repeat-box button {justify-self:start;background:#087847;color:#fff;border:1px solid #087847;padding:8px 11px;border-radius:7px;font-weight:750;}
 .ck-repeat-box button:disabled {opacity:.58;cursor:wait;}
+.ck-repeat-box button.ck-entry-delete {background:#b42332;border-color:#b42332;color:#fff;}
+.ck-repeat-box button.ck-entry-delete:hover {background:#941b28;border-color:#941b28;}
 .ck-agenda {display:grid;gap:10px;padding:14px;}
  .ck-agenda-day {border-bottom:1px solid #e1eae3;padding:0 0 8px;}
 .ck-agenda-day h4 {font-size:15px;margin:0 0 6px;}

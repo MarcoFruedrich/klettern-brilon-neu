@@ -257,7 +257,7 @@
       const till=minutes(e.endzeit);
       const end=start==null?null:(till!=null&&till>start?till:Math.min(1440,start+60));
       normalized.push({
-        id:'manual-'+e.id,type:e.typ==='sperrzeit'?'sperrzeit':'termin',
+        id:'manual-'+e.id,manualId:String(e.id),type:e.typ==='sperrzeit'?'sperrzeit':'termin',
         date:e.datum,last:e.enddatum&&e.enddatum>=e.datum?e.enddatum:e.datum,
         start,end,reliable:start!=null&&till!=null&&till>start,
         title:e.titel||'Eigener Termin',description:e.beschreibung||'',
@@ -650,6 +650,9 @@
         const dateLabel=mk('label','','Erster Kopietermin');
         const targetDate=mk('input');targetDate.type='date';targetDate.min=iso(new Date());
         targetDate.value=iso(addDays(fromIso(e.date),1));targetDate.required=true;dateLabel.append(targetDate);
+        const timeLabel=mk('label','','Startzeit der Kopien');
+        const targetTime=mk('input');targetTime.type='time';targetTime.step='900';
+        targetTime.value=e.start==null?'':clock(e.start);timeLabel.append(targetTime);
         const ruleLabel=mk('label','','Wiederholung');
         const rule=mk('select');rule.setAttribute('aria-label','Wiederholungsintervall');
         for(const [value,label] of [['einmalig','Einmalig duplizieren'],['woechentlich','Wöchentlich'],['14tage','Alle 14 Tage'],['3wochen','Alle 3 Wochen'],['monatlich','Monatlich'],['2monate','Alle 2 Monate']]){
@@ -681,9 +684,12 @@
               }
             }
             const start=iso(cursor);
+            const copyStart=minutes(targetTime.value);
+            const duration=e.start!=null&&e.end!=null&&e.end>e.start?e.end-e.start:60;
             copies.push({typ:e.type==='sperrzeit'?'sperrzeit':'termin',titel:e.title,datum:start,
               enddatum:daysBetween?iso(addDays(cursor,daysBetween)):'',
-              uhrzeit:e.start==null?'':prettyTime(e.start),endzeit:e.end==null?'':prettyTime(e.end),
+              uhrzeit:copyStart==null?'':clock(copyStart),
+              endzeit:copyStart==null?'':clock(Math.min(1440,copyStart+duration)),
               beschreibung:e.description||'',standorte:e.standorte||[]});
           }
           duplicate.disabled=true;status.textContent=`Erstelle ${copies.length} Kalendereintrag(e) …`;
@@ -696,7 +702,17 @@
           }catch(error){if(savedEntries.length)showManualEntries(savedEntries);status.textContent=`${created} von ${copies.length} Einträgen gespeichert. Weitere Kopien fehlgeschlagen: ${error.message}`;await load();}
           finally{duplicate.disabled=false;}
         });
-        repeatBox.append(dateLabel,ruleLabel,countLabel,duplicate,status);card.append(repeatBox);
+        const remove=btn('Eintrag dauerhaft löschen','ck-entry-delete',async()=>{
+          if(!e.manualId||!window.confirm('„'+e.title+'“ wirklich dauerhaft aus dem Kalender löschen?'))return;
+          remove.disabled=true;status.textContent='Eintrag wird gelöscht …';
+          try{
+            await api('/api/admin/kalender/'+encodeURIComponent(e.manualId),{method:'DELETE'});
+            chosen.events=chosen.events.filter(entry=>entry.id!==e.id);
+            chosen.entryId=null;status.textContent='Eintrag dauerhaft gelöscht.';
+            await load();
+          }catch(error){status.textContent='Eintrag konnte nicht gelöscht werden: '+(error.message||'Fehler');remove.disabled=false;}
+        });
+        repeatBox.append(dateLabel,timeLabel,ruleLabel,countLabel,duplicate,remove,status);card.append(repeatBox);
       }
       detail.append(card);
     }
