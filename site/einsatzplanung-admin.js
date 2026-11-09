@@ -136,12 +136,30 @@
     if(!plan.buchungen?.length){list.append(el('p','Keine aktiven Buchungen in diesem Monat.'));return;}
     for(const b of plan.buchungen){
       const card=el('article');card.className='booking';
+      card.dataset.buchungId=String(b.id);
       card.append(el('h3',b.datum+' · '+(b.uhrzeit||'Uhrzeit offen')+' Uhr – '+(b.angebot||'Programm')));
       card.append(el('p',(b.ort||'Standort offen')+' · '+(b.dauer||'Dauer nicht hinterlegt')+' Minuten · '+b.status));
       const matches=byBooking.get(b.id)||[];
       card.append(el('p','Bewerbungen: '+(matches.filter(x=>x.status==='beworben').map(x=>x.name).join(', ')||'keine')));
       card.append(el('p','Eingeteilt: '+(matches.filter(x=>['eingeteilt','bestaetigt','abgeschlossen'].includes(x.status))
         .map(x=>x.name+' ('+x.status+')').join(', ')||'noch niemand')));
+      const roster=document.createElement('details');roster.className='einsatz-personalstatus';
+      roster.append(el('summary','Mitarbeiterstatus für dieses Programm'));
+      const statusList=el('div');statusList.className='einsatz-personalstatus-liste';
+      for(const person of personen){
+        const entry=matches.find(x=>String(x.mitarbeiter_id)===String(person.id));
+        const activeStatus=entry&&['beworben','eingeteilt','bestaetigt','abgeschlossen'].includes(entry.status);
+        const row=el('div');row.className='einsatz-personalstatus-zeile '+(activeStatus?'is-available':'is-not-applied');
+        const marker=el('span',activeStatus?'+':'−');marker.className='einsatz-personalstatus-marker';marker.setAttribute('aria-hidden','true');
+        const details=el('span');details.className='einsatz-personalstatus-details';
+        details.append(el('strong',person.name));
+        details.append(el('small',entry
+          ?(entry.status==='beworben'?'Für dieses Programm beworben':entry.status==='abgelehnt'?'Bewerbung abgelehnt':'Status: '+entry.status)
+          :'Keine Bewerbung für dieses Programm'));
+        row.append(marker,details);statusList.append(row);
+      }
+      if(!personen.length)statusList.append(el('p','Noch keine Mitarbeitenden hinterlegt.'));
+      roster.append(statusList);card.append(roster);
       const pending=notificationMap.get(b.id);
       if(pending){
         card.append(el('p','Kundenbestätigung: '+pending.status+
@@ -160,7 +178,7 @@
       }
       const row=el('div');row.className='einsatz-zuweisung';
       const select=document.createElement('select');select.setAttribute('aria-label','Mitarbeiter auswählen');
-      const placeholder=document.createElement('option');placeholder.textContent='Mitarbeiter auswählen';placeholder.value='';select.append(placeholder);
+      const placeholder=document.createElement('option');placeholder.textContent='Mitarbeiter auswählen (auch ohne Bewerbung)';placeholder.value='';select.append(placeholder);
       const eligible=personen.filter(x=>x.aktiv&&x.art&&x.art!=='nicht_hinterlegt'&&
         Array.isArray(x.standorte)&&x.standorte.includes(b.ort));
       for(const person of eligible){
@@ -211,6 +229,26 @@
       list.append(card);
     }
   }
+  window.adminEinsatzplanungFokussieren=async(buchungId,date)=>{
+    const show=()=>{
+      const card=Array.from(root.querySelectorAll('[data-buchung-id]'))
+        .find(item=>item.dataset.buchungId===String(buchungId));
+      if(!card)return;
+      const roster=card.querySelector('.einsatz-personalstatus');
+      if(roster)roster.open=true;
+      card.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
+      card.classList.add('is-assignment-target');
+      window.setTimeout(()=>card.classList.remove('is-assignment-target'),4000);
+    };
+    const targetMonth=String(date||'').slice(0,7);
+    if(/^\\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)){
+      monat=targetMonth;
+      const filter=document.getElementById('einsatzplanung-monat');
+      if(filter)filter.value=monat;
+    }
+    await laden();
+    show();
+  };
   const filter=document.getElementById('einsatzplanung-monat');
   filter.value=monat;filter.onchange=()=>{if(/^\d{4}-\d\d$/.test(filter.value)){monat=filter.value;laden();}};
   document.getElementById('einsatzplanung-refresh').onclick=laden;
