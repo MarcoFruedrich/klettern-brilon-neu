@@ -159,3 +159,8 @@
 .ck-booking-edit-grid label span{font-size:12px}
 .ck-booking-edit-grid input{min-width:0;width:100%;padding:10px;border:1px solid #bfd4ca;border-radius:8px;background:white;color:#153a30}
 @media(max-width:700px){.ck-booking-edit-grid{grid-template-columns:1fr}}
+
+/* Namen der zuständigen Mitarbeitenden direkt in den Kalendereinträgen */
+.ck-event .ck-staff-name{font-size:9px;line-height:1.1;font-weight:700;color:#37624d;overflow-wrap:anywhere;}
+.ck-mini-event .ck-mini-staff{display:block;font-size:8px;line-height:1.1;font-weight:700;white-space:normal;}
+.ck-agenda-day button .ck-agenda-staff{flex:1 0 100%;font-size:11px;line-height:1.2;font-weight:700;color:#37624d;}
