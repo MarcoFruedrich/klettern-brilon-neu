@@ -52,7 +52,11 @@ test('Öffentliche Webseite bindet Navigationspunkt, sechs Kacheln und Filter ei
 test('Verwaltungsseite hat Steuerungen und geschützte API zum Speichern',()=>{
   const page=site('admin.html');
   assert.match(page,/id="besuchergruppen-admin-speichern"/);
+  assert.match(page,/<section id="besuchergruppen-admin-section"[^>]*data-admin-view/);
+  assert.match(page,/href="#besuchergruppen-admin-section" data-admin-view-link/);
   assert.match(page,/besuchergruppen-admin\.js/);
+  const adminJs=site('admin.js');
+  assert.match(adminJs,/programme:\[[^\]]*'besuchergruppen-admin-section'/);
   const source=readFileSync(path.join(__dirname,'..','server.js'),'utf8');
   assert.match(source,/route==='\/api\/besuchergruppen'/);
   assert.match(source,/route==='\/api\/admin\/besuchergruppen'/);
