@@ -751,7 +751,14 @@
     }
     if(note.textContent)detail.append(note);
     const controls=mk('div','ck-actions-bottom');
-    controls.append(btn('Mitarbeiter einteilen','',()=>document.getElementById('einsatzplanung-termine')?.scrollIntoView({behavior:'smooth',block:'start'})),
+    const selectedBooking=selected.length===1&&selected[0].type==='buchung'?selected[0]:null;
+    controls.append(btn('Mitarbeiter einteilen','',()=>{
+        if(selectedBooking&&window.adminEinsatzplanungFokussieren){
+          window.adminEinsatzplanungFokussieren(selectedBooking.id,selectedBooking.date);
+          return;
+        }
+        document.getElementById('einsatzplanung-termine')?.scrollIntoView({behavior:'smooth',block:'start'});
+      }),
       btn('Sperrzeit eintragen','',()=>openNewEntry(chosen.date,null,'sperrzeit')));
     detail.append(controls);
   }
