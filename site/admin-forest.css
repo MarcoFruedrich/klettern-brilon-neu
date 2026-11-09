@@ -372,3 +372,14 @@ body.admin-page{
   outline:2px solid #942633;outline-offset:2px;filter:brightness(1.08);
 }
 .admin-page #tablet-admin-list .tablet-delete-button:disabled{opacity:.6;cursor:wait;}
+
+.demo-login-hint{font-size:13px;color:#48665b;margin:8px 0 20px;}
+.demo-readonly-notice{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,420px);gap:18px;align-items:start;margin:0 0 16px;padding:16px;border:1px solid #9abfac;border-left:5px solid #11804d;border-radius:10px;background:#edf8f0;color:#153e32;}
+.demo-readonly-notice[hidden]{display:none!important;}
+.demo-readonly-notice strong{font-size:17px;}
+.demo-readonly-notice p{margin:5px 0 0;font-size:13px;line-height:1.45;}
+.demo-readonly-notice form{display:grid;gap:7px;}
+.demo-readonly-notice textarea{width:100%;resize:vertical;padding:9px;border:1px solid #b9d0c2;border-radius:7px;font:inherit;}
+.demo-readonly-notice button{justify-self:start;}
+.demo-readonly-notice [role=status]{font-size:12px;}
+@media(max-width:760px){.demo-readonly-notice{grid-template-columns:1fr;}}
