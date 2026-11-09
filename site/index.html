@@ -17,13 +17,13 @@
   <div class="standortwahl-panel">
     <div>
       <span class="eyebrow">DEIN ABENTEUER BEGINNT HIER</span>
-      <h2 id="standortwahl-heading">Wähle zuerst deinen Standort</h2>
-      <p>Jeder Veranstaltungsort hat eigene Erlebnisse. Wähle deinen Wunschstandort und entdecke anschließend ausschließlich die dort angebotenen, buchbaren Programme.</p>
+      <h2 id="standortwahl-heading">Wähle deinen Standort</h2>
+      <p>Standardmäßig siehst du die buchbaren Programme aller Standorte. Wähle einen bestimmten Veranstaltungsort, um nur dessen Angebote zu entdecken.</p>
     </div>
     <div class="standortwahl-auswahl">
       <label for="angebote-standort-filter">Veranstaltungsort auswählen</label>
       <select id="angebote-standort-filter" aria-controls="angebote-uebersicht besuchergruppen-kacheln" required>
-        <option value="">Bitte zuerst Standort auswählen</option>
+        <option value="alle" selected>Alle Standorte</option>
       </select>
       <p id="standortwahl-status" role="status" aria-live="polite">Die verfügbaren Standorte werden geladen …</p>
     </div>
@@ -31,20 +31,20 @@
 </section>
 <section id="angebote" aria-labelledby="angebote-heading">
   <div class="eyebrow">UNSERE ERLEBNISSE</div>
-  <h2 id="angebote-heading">Buchbare Programme an deinem Standort</h2>
-  <p id="angebote-einleitung">Wähle oben zuerst deinen Veranstaltungsort. Anschließend erscheinen die dort buchbaren Programme als Kacheln.</p>
+  <h2 id="angebote-heading">Buchbare Programme</h2>
+  <p id="angebote-einleitung">Alle buchbaren Programme unserer Standorte. Wähle oben einen Standort, um die Auswahl einzugrenzen.</p>
   <div id="besuchergruppen-filterhinweis" class="besuchergruppen-filterhinweis" hidden></div>
   <div class="cards" id="angebote-uebersicht" aria-live="polite">
-    <p>Bitte wähle oben zuerst einen Standort aus.</p>
+    <p>Unsere buchbaren Programme werden geladen …</p>
   </div>
 </section>
 <section id="besuchergruppen" aria-labelledby="besuchergruppen-heading">
   <div class="besuchergruppen-intro">
     <span class="eyebrow">FÜR ALLE, DIE ETWAS ERLEBEN MÖCHTEN</span>
     <h2 id="besuchergruppen-heading">Noch gezielter auswählen: Für wen?</h2>
-    <p>Ob als Familie, Schulklasse, Verein oder Team – entdecke Erlebnisse für eure Gruppe am gewählten Standort.</p>
+    <p>Ob als Familie, Schulklasse, Verein oder Team – entdecke passende Erlebnisse an allen oder an deinem gewählten Standort.</p>
   </div>
-  <p id="besuchergruppen-standorthinweis" class="hint">Wähle zuerst oben deinen Standort aus, damit du die passenden Angebote nach Besuchergruppen filtern kannst.</p>
+  <p id="besuchergruppen-standorthinweis" class="hint">Die Besuchergruppen werden geladen …</p>
   <div id="besuchergruppen-kacheln" class="besuchergruppen-grid" aria-live="polite" hidden></div>
 </section>
 <section class="split" id="buchung"><div><div class="eyebrow">TERMINANFRAGE</div><h2>Wunschtermin anfragen</h2><p>Teile uns deinen Wunschtermin mit. Wir prüfen die Verfügbarkeit und melden uns persönlich zurück. Eine Anfrage ist noch keine verbindliche Buchung.</p><p class="hint">Bitte gib besondere Unterstützungsbedarfe nur an, soweit sie für die Planung erforderlich sind. Vertrauliche gesundheitliche Details besprechen wir lieber persönlich.</p><div class="angebots-bildanzeige" id="angebots-bildanzeige"></div>
