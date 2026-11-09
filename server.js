@@ -62,7 +62,7 @@ function demoRedact(value){
   const result={};
   for(const [key,item] of Object.entries(value)){
     if(/^(email|emailadresse|mailadresse)$/i.test(key)||/^(recipient|empfaenger_email)$/i.test(key))result[key]='demo@example.invalid';
-    else if(/(telefon|telefonnummer|mobile|mobilnummer|phone|adresse|strasse|street|plz|postcode|geburtsdatum|bankverbindung|iban|buchungsnummer)/i.test(key))result[key]='[Im Demo-Zugang ausgeblendet]';
+    else if(/(telefon|telefonnummer|mobile|mobilnummer|phone|adresse|strasse|street|plz|postcode|geburtsdatum|bankverbindung|iban|buchungsnummer)/i.test(key)||(hasPerson&&/(bild|foto|avatar|dokument|datei|profilbild)/i.test(key)))result[key]='[Im Demo-Zugang ausgeblendet]';
     else if(/^(name|vorname|nachname|kunde|kontaktperson|ansprechpartner)$/i.test(key)&&hasPerson)result[key]='Beispielperson';
     else if(/(nachricht|notiz|intern|kommentar|freitext|bemerkung)/i.test(key)||(hasPerson&&/(beschreibung|hinweis)/i.test(key)))result[key]='[Interne Angaben im Demo-Zugang ausgeblendet]';
     else result[key]=demoRedact(item);
