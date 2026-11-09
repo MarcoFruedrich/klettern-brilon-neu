@@ -3713,6 +3713,7 @@ async function ensureKundenbestaetigungEinstellungen(){
     PRIMARY KEY(kalender_id,mitarbeiter_id)
   )`);
   await pool.query('CREATE INDEX IF NOT EXISTS brilon_kalender_einsaetze_mitarbeiter_idx ON brilon_kalender_einsaetze(mitarbeiter_id,status)');
+  await pool.query('ALTER TABLE brilon_kalender ADD COLUMN IF NOT EXISTS bewerbung_oeffentlich_ab TIMESTAMPTZ');
   const assignments=await pool.query("SELECT to_regclass('public.brilon_einsaetze') AS table_name");
   if(assignments.rows[0]?.table_name)
     await pool.query("ALTER TABLE brilon_einsaetze ADD COLUMN IF NOT EXISTS anschluss_option TEXT CHECK(anschluss_option IN ('keine','davor','danach','beides'))");
