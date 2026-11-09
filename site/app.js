@@ -15,7 +15,10 @@ const verfuegbarkeit = document.getElementById('datum-verfuegbarkeit');
 let sperrzeiten = [];
 let sperrzeitenGeladen = false;
 function datumIstGesperrt(datum){
-  return sperrzeitenGeladen&&window.sperrzeitEnthaelt(datum,sperrzeiten);
+  const standort=standortAuswahl?.value||'';
+  const passend=sperrzeiten.filter(e=>!Array.isArray(e.standorte)||!e.standorte.length||
+    (standort&&e.standorte.includes(standort)));
+  return sperrzeitenGeladen&&window.sperrzeitEnthaelt(datum,passend);
 }
 const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
@@ -717,7 +720,11 @@ async function angeboteLaden() {
     buchungsdauerBerechnen();
     belegteUhrzeitenLaden();
   });
-  standortAuswahl.addEventListener('change',angeboteFuerStandortAnzeigen);
+  standortAuswahl.addEventListener('change',()=>{
+    angeboteFuerStandortAnzeigen();
+    datumPruefen();
+    kalenderAnzeigen();
+  });
 
   try {
     const [angeboteAntwort,orteAntwort]=await Promise.all([

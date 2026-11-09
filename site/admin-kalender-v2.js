@@ -149,14 +149,41 @@
     const description=addField('Beschreibung / Interne Hinweise','beschreibung','textarea','',{maxlength:1000,rows:3});
     description.placeholder='Weitere Informationen zum Termin';
     description.closest('label').classList.add('ck-entry-wide');
+    const locations=mk('fieldset','ck-entry-sites ck-entry-wide');
+    const locationsLegend=mk('legend','','Geltungsbereich / Standorte');
+    const allLabel=mk('label','ck-entry-site-all');
+    const allInput=mk('input');allInput.type='checkbox';allInput.checked=true;
+    allLabel.append(allInput,mk('span','','Alle Standorte'));
+    locations.append(locationsLegend,allLabel);
+    const siteInputs=[];
+    for(const site of knownSites){
+      const label=mk('label','ck-entry-site-option');
+      const input=mk('input');input.type='checkbox';input.name='standort';input.value=site;input.checked=true;
+      label.append(input,mk('span','',site));locations.append(label);siteInputs.push(input);
+    }
+    const siteHint=mk('small','ck-entry-site-hint','Alle Standorte ist vorausgewählt. Für einen einzelnen Standort einfach die übrigen Häkchen entfernen.');
+    locations.append(siteHint);
+    const syncAll=()=>{
+      const selected=siteInputs.filter(input=>input.checked).length;
+      allInput.checked=selected===siteInputs.length;
+      allInput.indeterminate=selected>0&&selected<siteInputs.length;
+    };
+    allInput.addEventListener('change',()=>{
+      for(const input of siteInputs)input.checked=allInput.checked;
+      allInput.indeterminate=false;
+    });
+    for(const input of siteInputs)input.addEventListener('change',syncAll);
     const actions=mk('div','ck-entry-actions');
     const cancel=btn('Abbrechen','ck-entry-cancel',()=>{chosen.newEntrySlot=null;renderDetail();});
     const save=btn('Eintrag speichern','ck-entry-save');save.type='submit';
     actions.append(cancel,save);
-    form.append(fields,actions,status);
+    form.append(fields,locations,actions,status);
     form.addEventListener('submit',async event=>{
       event.preventDefault();
       const data=Object.fromEntries(new FormData(form).entries());
+      const selectedSites=siteInputs.filter(input=>input.checked).map(input=>input.value);
+      if(siteInputs.length&&!selectedSites.length){status.textContent='Bitte mindestens einen Standort auswählen.';locations.focus();return;}
+      data.standorte=siteInputs.length&&selectedSites.length===siteInputs.length?[]:selectedSites;
       if(data.enddatum&&data.enddatum<data.datum){status.textContent='Das Enddatum darf nicht vor dem Beginn liegen.';endDate.focus();return;}
       if((!data.enddatum||data.enddatum===data.datum)&&data.uhrzeit&&data.endzeit&&data.endzeit<=data.uhrzeit){
         status.textContent='Die Endzeit muss nach der Beginnzeit liegen.';form.elements.endzeit.focus();return;
@@ -191,7 +218,9 @@
   }
   function visibleEntries(day) {
     return chosen.events.filter(e => e.date <= day && day <= e.last &&
-      (e.type !== 'buchung' || !e.site || chosen.sites.includes(e.site)));
+      (e.type === 'buchung'
+        ? (!e.site || chosen.sites.includes(e.site))
+        : (!e.standorte.length || e.standorte.some(site=>chosen.sites.includes(site)))));
   }
   function bookingStaff(plan) {
     const map=new Map();
@@ -230,7 +259,9 @@
         date:e.datum,last:e.enddatum&&e.enddatum>=e.datum?e.enddatum:e.datum,
         start,end,reliable:start!=null&&till!=null&&till>start,
         title:e.titel||'Eigener Termin',description:e.beschreibung||'',
-        site:'',status:'',staff:[],name:''
+        standorte:Array.isArray(e.standorte)?e.standorte.filter(Boolean):[],
+        site:Array.isArray(e.standorte)&&e.standorte.length?e.standorte.join(', '):'Alle Standorte',
+        status:'',staff:[],name:''
       });
     }
     return normalized;
@@ -625,7 +656,7 @@
             copies.push({typ:e.type==='sperrzeit'?'sperrzeit':'termin',titel:e.title,datum:start,
               enddatum:daysBetween?iso(addDays(cursor,daysBetween)):'',
               uhrzeit:e.start==null?'':prettyTime(e.start),endzeit:e.end==null?'':prettyTime(e.end),
-              beschreibung:e.description||''});
+              beschreibung:e.description||'',standorte:e.standorte||[]});
           }
           duplicate.disabled=true;status.textContent=`Erstelle ${copies.length} Kalendereintrag(e) …`;
           let created=0;const savedEntries=[];
