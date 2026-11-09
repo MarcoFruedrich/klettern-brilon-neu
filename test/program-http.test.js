@@ -49,6 +49,34 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   assert.equal(created.status,201,createdText);
   const id=JSON.parse(createdText).id;
 
+  // End-to-end-Test mit isoliertem Server: Verwaltung speichert Besuchergruppen,
+  // öffentliche Seite sieht die Änderungen, ohne echte Produktionsdaten anzufassen.
+  const publicVisitorGroups=await fetch(root+'/api/besuchergruppen');
+  assert.equal(publicVisitorGroups.status,200);
+  const visitorGroups=await publicVisitorGroups.json();
+  assert.equal(visitorGroups.length,6,'Sechs Besuchergruppen werden öffentlich angeboten');
+  const privateVisitorGroups=await fetch(root+'/api/admin/besuchergruppen');
+  assert.equal(privateVisitorGroups.status,401,'Die Besuchergruppen-Verwaltung ist geschützt');
+  visitorGroups.find(group=>group.id==='familien').programmIds=[id];
+  visitorGroups.find(group=>group.id==='familien').beschreibung='Gemeinsam Klettern und Abenteuer erleben';
+  const savedGroups=await fetch(root+'/api/admin/besuchergruppen',{
+    method:'PUT',headers,body:JSON.stringify({gruppen:visitorGroups})
+  });
+  assert.equal(savedGroups.status,200,await savedGroups.clone().text());
+  const savedGroupData=await savedGroups.json();
+  assert.equal(savedGroupData.success,true);
+  const publicUpdatedGroups=await (await fetch(root+'/api/besuchergruppen')).json();
+  assert.deepEqual(publicUpdatedGroups.find(group=>group.id==='familien').programmIds,[id],
+    'Veröffentlichte Zuordnungen werden aus der vorhandenen JSONB-Tabelle geladen');
+  assert.equal(publicUpdatedGroups.find(group=>group.id==='familien').beschreibung,
+    'Gemeinsam Klettern und Abenteuer erleben');
+  const invalidVisitorGroups=visitorGroups.map(g=>({...g}));
+  invalidVisitorGroups[0].bild='javascript:alert(1)';
+  const invalidGroupSave=await fetch(root+'/api/admin/besuchergruppen',{
+    method:'PUT',headers,body:JSON.stringify({gruppen:invalidVisitorGroups})
+  });
+  assert.equal(invalidGroupSave.status,400,'Gefährliche Bildadressen werden abgelehnt');
+
   const bildUrl=root+`/api/admin/angebote/${id}/bild`;
   const jpegHeaders={Cookie:cookie,Origin:root,'X-CSRF-Token':loginData.csrfToken,'Content-Type':'image/jpeg'};
   const fakeJpeg=await fetch(bildUrl,{method:'POST',headers:jpegHeaders,body:Buffer.from([0xff,0xd8,0xff])});
