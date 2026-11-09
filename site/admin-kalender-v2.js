@@ -154,16 +154,16 @@
     const locations=mk('fieldset','ck-entry-sites ck-entry-wide');
     const locationsLegend=mk('legend','','Geltungsbereich / Standorte');
     const allLabel=mk('label','ck-entry-site-all');
-    const allInput=mk('input');allInput.type='checkbox';allInput.checked=true;
+    const allInput=mk('input');allInput.type='checkbox';allInput.checked=false;
     allLabel.append(allInput,mk('span','','Alle Standorte'));
     locations.append(locationsLegend,allLabel);
     const siteInputs=[];
     for(const site of knownSites){
       const label=mk('label','ck-entry-site-option');
-      const input=mk('input');input.type='checkbox';input.name='standort';input.value=site;input.checked=true;
+      const input=mk('input');input.type='checkbox';input.name='standort';input.value=site;input.checked=false;
       label.append(input,mk('span','',site));locations.append(label);siteInputs.push(input);
     }
-    const siteHint=mk('small','ck-entry-site-hint','Alle Standorte ist vorausgewählt. Für einen einzelnen Standort einfach die übrigen Häkchen entfernen.');
+    const siteHint=mk('small','ck-entry-site-hint','Wähle „Alle Standorte“ oder markiere die gewünschten Standorte einzeln.');
     locations.append(siteHint);
     const syncAll=()=>{
       const selected=siteInputs.filter(input=>input.checked).length;
@@ -265,7 +265,7 @@
         title:e.titel||'Eigener Termin',description:e.beschreibung||'',
         standorte:Array.isArray(e.standorte)?e.standorte.filter(Boolean):[],
         site:Array.isArray(e.standorte)&&e.standorte.length?e.standorte.join(', '):'Alle Standorte',
-        status:'',staff:[],name:''
+        status:'',staff:Array.isArray(e.staff)?e.staff:[],name:''
       });
     }
     return normalized;
@@ -473,7 +473,9 @@
           b.append(mk('span','ck-time',prettyTime(e.start)+' – '+prettyTime(e.end)));
           b.append(mk('span','ck-title',e.title));
           if(e.site)b.append(mk('span','ck-site','⌖ '+e.site));
-          b.title=e.title+' · '+(e.site||'Standort offen')+' · '+prettyTime(e.start);
+          const assignedNames=staffNames(e,['eingeteilt','bestaetigt','abgeschlossen']);
+          if(assignedNames.length)b.append(mk('span','ck-staff-name','👤 '+assignedNames.join(', ')));
+          b.title=e.title+' · '+(e.site||'Standort offen')+' · '+prettyTime(e.start)+(assignedNames.length?' · '+assignedNames.join(', '):'');
           lane.append(b);
         }
       }
@@ -498,7 +500,10 @@
         const badge=btn((e.start==null?'':prettyTime(e.start)+' ')+e.title,'ck-mini-event',event=>{
           event.stopPropagation();chosen.date=key;selectEntry(e);
         });
-        paint(badge,e);cell.append(badge);
+        paint(badge,e);
+        const assignedNames=staffNames(e,['eingeteilt','bestaetigt','abgeschlossen']);
+        if(assignedNames.length)badge.append(mk('small','ck-mini-staff','👤 '+assignedNames.join(', ')));
+        cell.append(badge);
       }
       if(entries.length>3)cell.append(mk('span','', '+'+(entries.length-3)+' weitere'));
       grid.append(cell);
@@ -518,6 +523,8 @@
         paint(item,e);
         item.append(mk('span','',(e.start==null?'Ganztägig':prettyTime(e.start)+'–'+prettyTime(e.end))+' · '+e.title),
           mk('strong','',e.site|| (e.type==='sperrzeit'?'Sperrzeit':'') ));
+        const assignedNames=staffNames(e,['eingeteilt','bestaetigt','abgeschlossen']);
+        if(assignedNames.length)item.append(mk('small','ck-agenda-staff','Mitarbeiter: '+assignedNames.join(', ')));
         wrapper.append(item);
       }
       container.append(wrapper);
