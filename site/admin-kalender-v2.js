@@ -569,7 +569,7 @@
         if(assigned){
           row.append(mk('span','ck-staff-picker-done','Eingeteilt'));
         }else{
-          const assign=btn(current?.status==='beworben'?'Bewerber einteilen':'Manuell einteilen','ck-staff-picker-assign',async()=>{
+          const assign=btn('Einteilen','ck-staff-picker-assign',async()=>{
             assign.disabled=true;status.textContent='Zuweisung wird gespeichert und der Mitarbeiter informiert …';
             try{
               const assignUrl=booking.type==='termin'?'/api/admin/einsatzplanung/kalender/'+encodeURIComponent(booking.manualId)+'/zuweisen/'+encodeURIComponent(person.id):'/api/admin/einsatzplanung/zuweisen/'+encodeURIComponent(booking.id)+'/'+encodeURIComponent(person.id);
