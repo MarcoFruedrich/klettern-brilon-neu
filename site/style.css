@@ -1146,6 +1146,17 @@ header.site-header{overflow:visible}
 .angebot-standort-auswahl small{color:#49645b}
 .check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
 .check-grid label.check{display:flex;align-items:center;gap:8px;margin:0}
+.admin-page .einsatz-personalstatus{margin:12px 0;padding:12px;border:1px solid #c8dccd;border-radius:10px;background:#f5faf5}
+.admin-page .einsatz-personalstatus>summary{cursor:pointer;font-weight:850;color:#124d36}
+.admin-page .einsatz-personalstatus-liste{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:7px;margin-top:10px}
+.admin-page .einsatz-personalstatus-zeile{display:flex;align-items:center;gap:10px;min-width:0;padding:8px 10px;border:1px solid #d5e4d8;border-radius:8px;background:#fff}
+.admin-page .einsatz-personalstatus-marker{font-size:30px;line-height:1;font-weight:950;flex:0 0 26px;text-align:center}
+.admin-page .einsatz-personalstatus-zeile.is-available .einsatz-personalstatus-marker{color:#13794c}
+.admin-page .einsatz-personalstatus-zeile.is-not-applied .einsatz-personalstatus-marker{color:#a33b3b}
+.admin-page .einsatz-personalstatus-details{display:grid;min-width:0}
+.admin-page .einsatz-personalstatus-details strong{overflow-wrap:anywhere}
+.admin-page .einsatz-personalstatus-details small{color:#52695a}
+.admin-page #einsatzplanung-termine .booking.is-assignment-target{outline:3px solid #1a8c5b;outline-offset:2px}
 .angebot-stufen-editor{display:grid;gap:10px}
 .angebot-stufen-zeile{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr)) auto;align-items:end;gap:10px;padding:12px;border:1px solid #bfd3c9;border-radius:9px;background:#f8faf8}
 .angebot-stufen-zeile label{font-size:13px}
