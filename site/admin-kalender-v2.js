@@ -73,6 +73,8 @@
   const legend = mk('div', 'ck-legend');
   const chosen = {mode:'week',cursor:midday(new Date()),date:iso(new Date()),entryId:null,sites:[],siteOptions:[],siteFilterInitialized:false,events:[],staffComplete:false,newEntrySlot:null};
   let loadSequence = 0;
+  let staffPickerOpenFor = null;
+  let staffRosterCache = null;
   let knownSites = [];
   const tabs = {};
   for (const [key,label] of [['week','Woche'],['month','Monat'],['agenda','Agenda']]) {
@@ -530,6 +532,47 @@
   function staffNames(e,statusList) {
     return e.staff.filter(s=>statusList.includes(s.status)).map(s=>s.name).filter(Boolean);
   }
+  async function staffPickerFill(panel,booking){
+    panel.replaceChildren(mk('strong','','Mitarbeiter für diesen Termin'));
+    panel.append(mk('p','ck-staff-picker-hint','Bewerber sind mit + markiert. Andere Mitarbeitende können ebenfalls manuell eingeteilt werden.'));
+    const status=mk('p','ck-staff-picker-status','Mitarbeiterliste wird geladen …');
+    status.setAttribute('role','status');panel.append(status);
+    try{
+      if(!staffRosterCache)staffRosterCache=await api('/api/admin/einsatzplanung/personen');
+      const people=Array.isArray(staffRosterCache)?staffRosterCache:[];
+      const list=mk('div','ck-staff-picker-list');
+      const assignments=new Map((booking.staff||[]).map(person=>[String(person.mitarbeiter_id),person]));
+      if(!people.length)list.append(mk('p','','Noch keine Mitarbeitenden hinterlegt.'));
+      for(const person of people){
+        const current=assignments.get(String(person.id));
+        const active=['beworben','eingeteilt','bestaetigt','abgeschlossen'].includes(current?.status);
+        const assigned=['eingeteilt','bestaetigt','abgeschlossen'].includes(current?.status);
+        const row=mk('div','ck-staff-picker-row '+(active?'is-applied':'is-not-applied'));
+        const marker=mk('span','ck-staff-picker-marker',active?'+':'−');marker.setAttribute('aria-hidden','true');
+        const info=mk('div','ck-staff-picker-person');
+        info.append(mk('strong','',person.name||'Unbekannt'));
+        info.append(mk('small','',current?.status==='beworben'?'Für diesen Termin beworben':
+          assigned?'Bereits eingeteilt':current?.status==='abgelehnt'?'Bewerbung abgelehnt':'Keine Bewerbung'));
+        row.append(marker,info);
+        if(assigned){
+          row.append(mk('span','ck-staff-picker-done','Eingeteilt'));
+        }else{
+          const assign=btn(current?.status==='beworben'?'Bewerber einteilen':'Manuell einteilen','ck-staff-picker-assign',async()=>{
+            assign.disabled=true;status.textContent='Zuweisung wird gespeichert und der Mitarbeiter informiert …';
+            try{
+              const result=await api('/api/admin/einsatzplanung/zuweisen/'+encodeURIComponent(booking.id)+'/'+encodeURIComponent(person.id),
+                {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+              status.textContent='Zuweisung gespeichert. Informationskette gestartet ('+(result.emailVersand||'E-Mail-Status unbekannt')+').';
+              staffRosterCache=null;staffPickerOpenFor=String(booking.id);await load();
+            }catch(error){status.textContent='Zuweisung nicht möglich: '+(error.message||'Fehler');assign.disabled=false;}
+          });
+          row.append(assign);
+        }
+        list.append(row);
+      }
+      panel.append(list);status.textContent='';
+    }catch(error){status.textContent='Mitarbeiterliste konnte nicht geladen werden: '+(error.message||'Fehler');}
+  }
   function renderDetail() {
     detail.replaceChildren();
     const picked=/^\d{4}-\d{2}-\d{2}$/.test(chosen.date)?chosen.date:iso(chosen.cursor);
@@ -752,15 +795,26 @@
     if(note.textContent)detail.append(note);
     const controls=mk('div','ck-actions-bottom');
     const selectedBooking=selected.length===1&&selected[0].type==='buchung'?selected[0]:null;
-    controls.append(btn('Mitarbeiter einteilen','',()=>{
-        if(selectedBooking&&window.adminEinsatzplanungFokussieren){
-          window.adminEinsatzplanungFokussieren(selectedBooking.id,selectedBooking.date);
-          return;
-        }
-        document.getElementById('einsatzplanung-termine')?.scrollIntoView({behavior:'smooth',block:'start'});
-      }),
+    const staffPanel=mk('div','ck-staff-picker');staffPanel.hidden=true;
+    const staffButton=btn('Mitarbeiter einteilen','',async()=>{
+      if(!selectedBooking){
+        staffPanel.hidden=false;staffPanel.replaceChildren(
+          mk('strong','','Mitarbeiter einteilen'),
+          mk('p','ck-staff-picker-hint','Bitte wähle zuerst eine einzelne Kundenbuchung aus. Bewerbungen und Mitarbeiterzuweisungen sind mit der jeweiligen Buchung verknüpft.')
+        );
+        return;
+      }
+      const isOpen=!staffPanel.hidden;
+      staffPanel.hidden=isOpen;
+      if(!isOpen){staffPickerOpenFor=String(selectedBooking.id);await staffPickerFill(staffPanel,selectedBooking);}
+      else staffPickerOpenFor=null;
+    });
+    controls.append(staffButton,
       btn('Sperrzeit eintragen','',()=>openNewEntry(chosen.date,null,'sperrzeit')));
-    detail.append(controls);
+    detail.append(controls,staffPanel);
+    if(selectedBooking&&staffPickerOpenFor===String(selectedBooking.id)){
+      staffPanel.hidden=false;staffPickerFill(staffPanel,selectedBooking);
+    }
   }
   // Neu gespeicherte Sperrzeiten zeitnah aktualisieren.
   const ownStatus=document.getElementById('calendar-form-status');
