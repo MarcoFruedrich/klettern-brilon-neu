@@ -1647,6 +1647,33 @@ if (!workspace.hidden) {
 const kalenderFormular = document.getElementById('calendar-form');
 const kalenderFormStatus = document.getElementById('calendar-form-status');
 const kalenderEintraege = document.getElementById('calendar-entries');
+const kalenderAlleStandorte = document.getElementById('calendar-all-sites');
+const kalenderStandortListe = document.getElementById('calendar-site-list');
+
+function kalenderStandortAuswahlAnzeigen(orte, selectedNames=null) {
+  if (!kalenderStandortListe || !kalenderAlleStandorte) return;
+  const selected = selectedNames===null
+    ? new Set([...kalenderStandortListe.querySelectorAll('input:checked')].map(input=>input.value))
+    : new Set(selectedNames);
+  kalenderStandortListe.replaceChildren();
+  for (const ort of orte.filter(item=>item.aktiv)) {
+    const label=document.createElement('label');label.className='check';
+    const input=document.createElement('input');input.type='checkbox';input.name='kalender-standort';input.value=ort.name;input.checked=selected.has(ort.name);
+    input.addEventListener('change',()=>{
+      if(input.checked)kalenderAlleStandorte.checked=false;
+      kalenderStandortListe.hidden=kalenderAlleStandorte.checked;
+    });
+    label.append(input,el('span',ort.name));kalenderStandortListe.append(label);
+  }
+  kalenderStandortListe.hidden=kalenderAlleStandorte.checked;
+}
+
+kalenderAlleStandorte?.addEventListener('change',()=>{
+  if(kalenderAlleStandorte.checked){
+    kalenderStandortListe?.querySelectorAll('input[type="checkbox"]').forEach(input=>input.checked=false);
+  }
+  if(kalenderStandortListe)kalenderStandortListe.hidden=kalenderAlleStandorte.checked;
+});
 
 async function eigeneKalenderEintraegeLaden() {
   try {
@@ -1692,6 +1719,7 @@ kalenderAnzeigen();
       if (eintrag.beschreibung) {
         karte.append(el('p', eintrag.beschreibung));
       }
+      karte.append(el('p', 'Standort(e): ' + (eintrag.standorte?.length ? eintrag.standorte.join(', ') : 'Alle Standorte')));
 
       const bearbeitenButton = document.createElement('button');
 bearbeitenButton.type = 'button';
@@ -1700,6 +1728,13 @@ bearbeitenButton.textContent = 'Termin bearbeiten';
 
 bearbeitenButton.onclick = () => {
   kalenderBearbeitenId = eintrag.id;
+
+  const eintragStandorte=Array.isArray(eintrag.standorte)?eintrag.standorte:[];
+  kalenderAlleStandorte.checked=eintragStandorte.length===0;
+  kalenderStandortListe?.querySelectorAll('input[type="checkbox"]').forEach(input=>{
+    input.checked=eintragStandorte.includes(input.value);
+  });
+  if(kalenderStandortListe)kalenderStandortListe.hidden=kalenderAlleStandorte.checked;
 
   for (const name of [
     'typ', 'titel', 'datum', 'enddatum',
@@ -1768,6 +1803,13 @@ kalenderFormular.onsubmit = async event => {
     const daten = Object.fromEntries(
       new FormData(kalenderFormular).entries()
     );
+    const einzelneStandorte=[...kalenderStandortListe.querySelectorAll('input[type="checkbox"]:checked')].map(input=>input.value);
+    if(!kalenderAlleStandorte.checked&&!einzelneStandorte.length){
+      kalenderFormStatus.textContent='Bitte wähle „Alle Standorte“ oder mindestens einen einzelnen Standort aus.';
+      kalenderStandortListe.hidden=false;
+      return;
+    }
+    daten.standorte=kalenderAlleStandorte.checked?[]:einzelneStandorte;
 
     await api(
   kalenderBearbeitenId
@@ -1782,6 +1824,9 @@ kalenderFormular.onsubmit = async event => {
     });
 
     kalenderFormular.reset();
+    kalenderAlleStandorte.checked=true;
+    kalenderStandortListe.querySelectorAll('input[type="checkbox"]').forEach(input=>input.checked=false);
+    kalenderStandortListe.hidden=true;
     kalenderBearbeitenId = null;
 knopf.textContent = 'Termin oder Sperrzeit speichern';
     kalenderFormStatus.textContent = 'Termin erfolgreich gespeichert.';
@@ -1942,9 +1987,10 @@ if (neuesAngebotForm) {
 async function orteLaden(){
   const sitePicker=document.getElementById('angebot-orte-auswahl');
   const liste=document.getElementById('admin-place-list');
-  if(!sitePicker&&!liste)return;
+  if(!sitePicker&&!liste&&!kalenderStandortListe)return;
   try{
     const orte=await api('/api/admin/orte');
+    kalenderStandortAuswahlAnzeigen(orte);
     if(sitePicker){
       const selected=new Set([...sitePicker.querySelectorAll('input:checked')].map(input=>input.value));
       sitePicker.replaceChildren();
