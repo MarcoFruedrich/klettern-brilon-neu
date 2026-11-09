@@ -367,7 +367,7 @@ function ueberschneidung(a,b){
 async function pruefeBuchungskonflikt(client,datum,fenster,ausnahmeId=null,gleicheSitzung=null,standort=null){
   const sperrung=await client.query(
     `SELECT id FROM brilon_kalender
-     WHERE typ='sperrzeit'
+     WHERE typ IN ('sperrzeit','termin')
      AND datum <= $1::date
      AND COALESCE(enddatum,datum) >= $1::date
      AND (COALESCE(cardinality(standorte),0)=0 OR ($2::text IS NOT NULL AND $2=ANY(standorte)))
@@ -429,7 +429,7 @@ async function anschlussApi(req,res,url,route,ip){
     const [programs,bookings,blocked]=await Promise.all([
       pool.query(`SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,kapazitaet,verfuegbare_termine,veranstaltungsort FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
       pool.query(`SELECT id,data FROM brilon_buchungen WHERE data->>'datum'=$1 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum]),
-      pool.query(`SELECT COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender WHERE typ='sperrzeit' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date`,[base.datum])
+      pool.query(`SELECT COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender WHERE typ IN ('sperrzeit','termin') AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date`,[base.datum])
     ]);
     const participants=Number(base.teilnehmer);
     if(!Number.isInteger(participants)||participants<1||participants>1000)
@@ -1081,7 +1081,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
                 COALESCE(enddatum,datum)::text AS enddatum,
                 COALESCE(standorte,'{}'::text[]) AS standorte
          FROM brilon_kalender
-         WHERE typ='sperrzeit'
+         WHERE typ IN ('sperrzeit','termin')
          ORDER BY datum ASC`
       );
       return reply(res,200,q.rows);
