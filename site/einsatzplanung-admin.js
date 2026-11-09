@@ -241,7 +241,7 @@
       window.setTimeout(()=>card.classList.remove('is-assignment-target'),4000);
     };
     const targetMonth=String(date||'').slice(0,7);
-    if(/^\\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)){
+    if(/^\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)){
       monat=targetMonth;
       const filter=document.getElementById('einsatzplanung-monat');
       if(filter)filter.value=monat;
