@@ -538,10 +538,21 @@
     const status=mk('p','ck-staff-picker-status','Mitarbeiterliste wird geladen …');
     status.setAttribute('role','status');panel.append(status);
     try{
-      if(!staffRosterCache)staffRosterCache=await api('/api/admin/einsatzplanung/personen');
-      const people=Array.isArray(staffRosterCache)?staffRosterCache:[];
+      if(booking.type==='termin')staffRosterCache=await api('/api/admin/einsatzplanung/kalender/'+encodeURIComponent(booking.manualId)+'/personen');
+      else if(!staffRosterCache)staffRosterCache=await api('/api/admin/einsatzplanung/personen');
+      const sites=Array.isArray(booking.standorte)?booking.standorte:[];
+      const allPeople=Array.isArray(staffRosterCache)?staffRosterCache:[];
+      const people=booking.type==='termin'?allPeople.filter(person=>person.aktiv&&person.registriert&&person.freigegeben&&Array.isArray(person.standorte)&&person.standorte.some(site=>!sites.length||sites.includes(site))):allPeople;
       const list=mk('div','ck-staff-picker-list');
-      const assignments=new Map((booking.staff||[]).map(person=>[String(person.mitarbeiter_id),person]));
+      const assignments=booking.type==='termin'?new Map(allPeople.map(person=>[String(person.id),person])):new Map((booking.staff||[]).map(person=>[String(person.mitarbeiter_id),person]));
+      if(booking.type==='termin'){
+        const invite=btn('Bewerbungsaufruf an Standortteam senden','ck-staff-picker-assign',async()=>{
+          if(!window.confirm('Bewerbungsaufruf per E-Mail an die für diesen Termin freigegebenen Mitarbeitenden senden?'))return;
+          invite.disabled=true;status.textContent='Rundmail wird versendet …';
+          try{const result=await api('/api/admin/einsatzplanung/kalender/'+encodeURIComponent(booking.manualId)+'/einladung',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});status.textContent=result.message+' ('+result.versandt+' E-Mail(s) versandt'+(result.fehlgeschlagen?', '+result.fehlgeschlagen+' fehlgeschlagen':'')+').';}
+          catch(error){status.textContent='Bewerbungsaufruf nicht möglich: '+(error.message||'Fehler');invite.disabled=false;}
+        });panel.insertBefore(invite,status);
+      }
       if(!people.length)list.append(mk('p','','Noch keine Mitarbeitenden hinterlegt.'));
       for(const person of people){
         const current=assignments.get(String(person.id));
@@ -560,10 +571,11 @@
           const assign=btn(current?.status==='beworben'?'Bewerber einteilen':'Manuell einteilen','ck-staff-picker-assign',async()=>{
             assign.disabled=true;status.textContent='Zuweisung wird gespeichert und der Mitarbeiter informiert …';
             try{
-              const result=await api('/api/admin/einsatzplanung/zuweisen/'+encodeURIComponent(booking.id)+'/'+encodeURIComponent(person.id),
+              const assignUrl=booking.type==='termin'?'/api/admin/einsatzplanung/kalender/'+encodeURIComponent(booking.manualId)+'/zuweisen/'+encodeURIComponent(person.id):'/api/admin/einsatzplanung/zuweisen/'+encodeURIComponent(booking.id)+'/'+encodeURIComponent(person.id);
+              const result=await api(assignUrl,
                 {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
               status.textContent='Zuweisung gespeichert. Informationskette gestartet ('+(result.emailVersand||'E-Mail-Status unbekannt')+').';
-              staffRosterCache=null;staffPickerOpenFor=String(booking.id);await load();
+              staffRosterCache=null;staffPickerOpenFor=booking.type==='termin'?'manual-'+booking.manualId:String(booking.id);await load();
             }catch(error){status.textContent='Zuweisung nicht möglich: '+(error.message||'Fehler');assign.disabled=false;}
           });
           row.append(assign);
@@ -795,25 +807,28 @@
     if(note.textContent)detail.append(note);
     const controls=mk('div','ck-actions-bottom');
     const selectedBooking=selected.length===1&&selected[0].type==='buchung'?selected[0]:null;
+    const selectedManual=selected.length===1&&selected[0].type==='termin'?selected[0]:null;
+    const staffEntry=selectedBooking||selectedManual;
+    const staffKey=staffEntry?(selectedManual?'manual-'+selectedManual.manualId:String(selectedBooking.id)):null;
     const staffPanel=mk('div','ck-staff-picker');staffPanel.hidden=true;
     const staffButton=btn('Mitarbeiter einteilen','',async()=>{
-      if(!selectedBooking){
+      if(!staffEntry){
         staffPanel.hidden=false;staffPanel.replaceChildren(
           mk('strong','','Mitarbeiter einteilen'),
-          mk('p','ck-staff-picker-hint','Bitte wähle zuerst eine einzelne Kundenbuchung aus. Bewerbungen und Mitarbeiterzuweisungen sind mit der jeweiligen Buchung verknüpft.')
+          mk('p','ck-staff-picker-hint',selected.length===1&&selected[0].type==='sperrzeit'?'Für eine Sperrzeit werden keine Mitarbeitenden eingeteilt. Wähle einen eigenen Termin oder eine Buchung aus.':'Bitte wähle zuerst genau eine Buchung oder einen eigenen Termin aus.')
         );
         return;
       }
       const isOpen=!staffPanel.hidden;
       staffPanel.hidden=isOpen;
-      if(!isOpen){staffPickerOpenFor=String(selectedBooking.id);await staffPickerFill(staffPanel,selectedBooking);}
+      if(!isOpen){staffPickerOpenFor=staffKey;await staffPickerFill(staffPanel,staffEntry);}
       else staffPickerOpenFor=null;
     });
     controls.append(staffButton,
       btn('Sperrzeit eintragen','',()=>openNewEntry(chosen.date,null,'sperrzeit')));
     detail.append(controls,staffPanel);
-    if(selectedBooking&&staffPickerOpenFor===String(selectedBooking.id)){
-      staffPanel.hidden=false;staffPickerFill(staffPanel,selectedBooking);
+    if(staffEntry&&staffPickerOpenFor===staffKey){
+      staffPanel.hidden=false;staffPickerFill(staffPanel,staffEntry);
     }
   }
   // Neu gespeicherte Sperrzeiten zeitnah aktualisieren.
