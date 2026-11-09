@@ -2159,7 +2159,7 @@ if(!versandProtokoll.rowCount)
       if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       const q=await pool.query(
-        "SELECT id,titel,datum::text AS datum,enddatum::text AS enddatum,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,typ,beschreibung,COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender ORDER BY datum,uhrzeit NULLS LAST LIMIT 1000"
+        "SELECT k.id,k.titel,k.datum::text AS datum,k.enddatum::text AS enddatum,k.uhrzeit::text AS uhrzeit,k.endzeit::text AS endzeit,k.typ,k.beschreibung,COALESCE(k.standorte,'{}'::text[]) AS standorte,COALESCE((SELECT json_agg(json_build_object('mitarbeiter_id',e.mitarbeiter_id,'name',m.name,'status',e.status) ORDER BY m.name) FROM brilon_kalender_einsaetze e JOIN brilon_pruef_mitarbeitende m ON m.id=e.mitarbeiter_id WHERE e.kalender_id=k.id AND e.status IN ('eingeteilt','bestaetigt','abgeschlossen')),'[]'::json) AS staff FROM brilon_kalender k ORDER BY k.datum,k.uhrzeit NULLS LAST LIMIT 1000"
       );
       return reply(res,200,q.rows);
     }
