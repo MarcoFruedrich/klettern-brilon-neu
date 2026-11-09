@@ -113,7 +113,22 @@
 .ck-agenda-day .ck-empty {color:#7a8980;font-size:12px;margin:2px 0;}
 .ck-actions-bottom {display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
 .ck-actions-bottom button {min-height:38px;background:#f0f8f3;border:1px solid #bed7c7;color:#19543e;border-radius:8px;padding:7px 10px;font-weight:750;}
+.ck-staff-picker {display:grid;gap:8px;margin:10px 0 0;padding:12px;border:1px solid #cbd9d0;border-radius:10px;background:#f7faf8;color:#173e32;}
+.ck-staff-picker[hidden] {display:none!important;}
+.ck-staff-picker-hint,.ck-staff-picker-status {margin:0!important;color:#52695b!important;font-size:12px;line-height:1.4;}
+.ck-staff-picker-list {display:grid;gap:7px;max-height:360px;overflow:auto;}
+.ck-staff-picker-row {display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px;border:1px solid #d6e3da;border-radius:8px;background:#fff;}
+.ck-staff-picker-marker {font-size:29px;line-height:1;font-weight:950;text-align:center;}
+.ck-staff-picker-row.is-applied .ck-staff-picker-marker {color:#10804c;}
+.ck-staff-picker-row.is-not-applied .ck-staff-picker-marker {color:#a33b3b;}
+.ck-staff-picker-person {display:grid;min-width:0;}
+.ck-staff-picker-person strong {overflow-wrap:anywhere;color:#173e32;}
+.ck-staff-picker-person small {font-size:11px;color:#52695b;}
+.ck-staff-picker-assign {min-height:34px;padding:6px 9px;border:1px solid #18804e;border-radius:7px;background:#11804d;color:#fff;font-size:11px;font-weight:800;}
+.ck-staff-picker-assign:disabled {opacity:.6;cursor:wait;}
+.ck-staff-picker-done {font-size:11px;font-weight:800;color:#137047;}
 .admin-page.ck-enabled #calendar-section {display:none!important;}
+@media(max-width:420px){.ck-staff-picker-row{grid-template-columns:28px minmax(0,1fr);}.ck-staff-picker-assign,.ck-staff-picker-done{grid-column:2;justify-self:start;}}
 @media(max-width:900px){.ck-body,.ck-body.ck-has-entry-editor{grid-template-columns:minmax(0,1fr)}.ck-detail{min-height:auto}.ck-toolbar{justify-content:flex-start}}
 @media(max-width:700px){.ck-period{min-width:0;font-size:12px;flex:1}.ck-nav{width:100%;justify-content:space-between}.ck-actions{width:100%}.ck-filter{max-width:none;flex:1}.ck-month-grid{min-width:620px}.ck-detail{padding:12px}.ck-toolbar{gap:9px}.ck-legend{font-size:11px}}
 @media(max-width:620px){.ck-entry-grid{grid-template-columns:minmax(0,1fr)}.ck-entry-field.ck-entry-wide{grid-column:auto}.ck-entry-actions{grid-template-columns:minmax(0,1fr)}}
