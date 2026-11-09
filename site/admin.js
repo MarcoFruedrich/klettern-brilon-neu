@@ -7,6 +7,7 @@ let refreshSequenz=0;
 let bookingPage=1;
 let zahlungsPage=1,zahlungsLadeSequenz=0;
 let csrfToken=null;
+let demoReadOnly=false;
 let adminBuchbareProgramme=[];
 let ausgewaehltesAdminProgramm=null;
 let zuletztAngelegtesAdminProgramm=null;
@@ -153,7 +154,7 @@ async function api(path, options = {}) {
     fehler.data=j;
     throw fehler;
   }
-  if(path==='/api/admin/login')csrfToken=j.csrfToken||null;
+  if(path==='/api/admin/login'){csrfToken=j.csrfToken||null;demoReadOnly=j.readOnly===true;}
   if(path==='/api/admin/logout')csrfToken=null;
   return j;
 }
@@ -292,6 +293,9 @@ async function refresh() {
 
     login.hidden = true;
     workspace.hidden = false;
+    const demoBanner=document.getElementById('demo-readonly-banner');
+    if(demoBanner)demoBanner.hidden=!demoReadOnly;
+    document.body.classList.toggle('admin-demo-readonly',demoReadOnly);
     adminAnsichtAusHash();
 
     await rechnungsdatenLaden();
@@ -1361,6 +1365,20 @@ login.onsubmit = async e => {
     else status.textContent=err.message;
   }
 };
+
+document.getElementById('demo-feedback-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget,field=document.getElementById('demo-feedback-message');
+  const output=document.getElementById('demo-feedback-status'),button=form.querySelector('button[type="submit"]');
+  if(!field.value.trim()){output.textContent='Bitte zuerst einen Vorschlag eingeben.';return;}
+  button.disabled=true;output.textContent='Wird an die Verwaltung weitergeleitet …';
+  try{
+    const result=await api('/api/demo-vorschlag',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:field.value})});
+    output.textContent=result.message||'Vielen Dank. Der Vorschlag wurde weitergeleitet.';
+    field.value='';
+  }catch(error){output.textContent='Versand nicht möglich: '+error.message;}
+  finally{button.disabled=false;}
+});
 
 document.getElementById('logout').onclick = async () => {
   await api('/api/admin/logout', {
