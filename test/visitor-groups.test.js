@@ -53,7 +53,9 @@ test('Öffentliche Webseite bindet Navigationspunkt, sechs Kacheln und Filter ei
   assert.match(js,/besuchergruppePasst/);
   assert.match(js,/besuchergruppenwechsel/);
   assert.match(js,/window\.ausgewaehlterAngebotsStandort/);
-  assert.match(js,/Bitte wähle zuerst oben deinen Standort/);
+  assert.match(page,/<option value="alle" selected>Alle Standorte<\/option>/);
+  assert.match(js,/alle\.value='alle'/);
+  assert.match(js,/alleStandorte/);
 });
 test('Verwaltungsseite hat Steuerungen und geschützte API zum Speichern',()=>{
   const page=site('admin.html');
