@@ -538,10 +538,11 @@
     const status=mk('p','ck-staff-picker-status','Mitarbeiterliste wird geladen …');
     status.setAttribute('role','status');panel.append(status);
     try{
-      if(booking.type==='termin')staffRosterCache=await api('/api/admin/einsatzplanung/kalender/'+encodeURIComponent(booking.manualId)+'/personen');
+      let manualRoster=null;
+      if(booking.type==='termin')manualRoster=await api('/api/admin/einsatzplanung/kalender/'+encodeURIComponent(booking.manualId)+'/personen');
       else if(!staffRosterCache)staffRosterCache=await api('/api/admin/einsatzplanung/personen');
       const sites=Array.isArray(booking.standorte)?booking.standorte:[];
-      const allPeople=Array.isArray(staffRosterCache)?staffRosterCache:[];
+      const allPeople=booking.type==='termin'?(Array.isArray(manualRoster)?manualRoster:[]):(Array.isArray(staffRosterCache)?staffRosterCache:[]);
       const people=booking.type==='termin'?allPeople.filter(person=>person.aktiv&&person.registriert&&person.freigegeben&&Array.isArray(person.standorte)&&person.standorte.some(site=>!sites.length||sites.includes(site))):allPeople;
       const list=mk('div','ck-staff-picker-list');
       const assignments=booking.type==='termin'?new Map(allPeople.map(person=>[String(person.id),person])):new Map((booking.staff||[]).map(person=>[String(person.mitarbeiter_id),person]));
