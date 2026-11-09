@@ -64,7 +64,7 @@ function demoRedact(value){
     if(/^(email|emailadresse|mailadresse)$/i.test(key)||/^(recipient|empfaenger_email)$/i.test(key))result[key]='demo@example.invalid';
     else if(/(telefon|telefonnummer|mobile|mobilnummer|phone|adresse|strasse|street|plz|postcode|geburtsdatum|bankverbindung|iban|buchungsnummer)/i.test(key))result[key]='[Im Demo-Zugang ausgeblendet]';
     else if(/^(name|vorname|nachname|kunde|kontaktperson|ansprechpartner)$/i.test(key)&&hasPerson)result[key]='Beispielperson';
-    else if(/(nachricht|notiz|intern|kommentar|freitext|bemerkung)/i.test(key))result[key]='[Interne Angaben im Demo-Zugang ausgeblendet]';
+    else if(/(nachricht|notiz|intern|kommentar|freitext|bemerkung)/i.test(key)||(hasPerson&&/(beschreibung|hinweis)/i.test(key)))result[key]='[Interne Angaben im Demo-Zugang ausgeblendet]';
     else result[key]=demoRedact(item);
   }
   return result;
@@ -385,7 +385,7 @@ async function admin(req,res){
   if(auth.readOnly&&!['GET','HEAD','OPTIONS'].includes(method)&&path!=='/api/admin/logout'){
     reply(res,403,{error:'Der Demo-Zugang ist nur lesend. Änderungen sind hier gesperrt.'});return false;
   }
-  if(auth.readOnly&&/\.(pdf|csv|xlsx|zip)$/i.test(path)){
+  if(auth.readOnly&&(/\.(pdf|csv|xlsx|zip)$/i.test(path)||/(export|download)/i.test(path))){
     reply(res,403,{error:'Dateidownloads sind im Demo-Zugang gesperrt.'});return false;
   }
   if(!sameOriginMutation(req)){reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});return false}
