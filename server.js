@@ -3702,6 +3702,17 @@ async function ensureKundenbestaetigungEinstellungen(){
   // Keep this small settings table available even when the broad staffing migration
   // has already been switched off after its first run.
   await pool.query('SELECT 1 FROM brilon_kundenbestaetigungen LIMIT 0');
+  await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kalender_einsaetze (
+    kalender_id UUID NOT NULL REFERENCES brilon_kalender(id) ON DELETE CASCADE,
+    mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK(status IN ('beworben','eingeteilt','bestaetigt','abgelehnt','abgeschlossen')),
+    bewerbung_am TIMESTAMPTZ,
+    zugewiesen_am TIMESTAMPTZ,
+    bestaetigt_am TIMESTAMPTZ,
+    aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY(kalender_id,mitarbeiter_id)
+  )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS brilon_kalender_einsaetze_mitarbeiter_idx ON brilon_kalender_einsaetze(mitarbeiter_id,status)');
   const assignments=await pool.query("SELECT to_regclass('public.brilon_einsaetze') AS table_name");
   if(assignments.rows[0]?.table_name)
     await pool.query("ALTER TABLE brilon_einsaetze ADD COLUMN IF NOT EXISTS anschluss_option TEXT CHECK(anschluss_option IN ('keine','davor','danach','beides'))");
