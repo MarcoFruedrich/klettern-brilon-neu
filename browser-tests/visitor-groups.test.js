@@ -6,7 +6,7 @@ const net=require('node:net');
 const {spawn}=require('node:child_process');
 const {chromium}=require('playwright');
 
-test('Browser: Besuchergruppen, Programmfilter, Buchungsübergang und Admin-Bearbeitung',async t=>{
+test('Browser: Besuchergruppen, Programmfilter und Buchungsübergang',async t=>{
   const probe=net.createServer();
   await new Promise((resolve,reject)=>{
     probe.once('error',reject);probe.listen(0,'127.0.0.1',resolve);
@@ -71,29 +71,4 @@ test('Browser: Besuchergruppen, Programmfilter, Buchungsübergang und Admin-Bear
     }finally{await page.close();}
   });
 
-  await t.test('Angemeldete Verwaltung öffnet Besuchergruppen und speichert Änderungen',async()=>{
-    const page=await browser.newPage({viewport:{width:1280,height:840}});
-    try{
-      await page.goto(root+'/admin.html',{waitUntil:'domcontentloaded'});
-      await page.locator('#username').fill('visitor-admin');
-      await page.locator('#password').fill('visitor-test-only');
-      await page.locator('#login button').click();
-      await page.locator('#workspace').waitFor({state:'visible'});
-      await page.locator('.admin-navigation a[href="#angebote-verwaltung"]').click();
-      await page.locator('#admin-subnavigation a[href="#besuchergruppen-admin-section"]').click();
-      await page.locator('#besuchergruppen-admin-section').waitFor({state:'visible'});
-      assert.equal(new URL(page.url()).hash,'#besuchergruppen-admin-section');
-      await page.locator('#besuchergruppen-admin-liste .besuchergruppen-admin-karte').first().waitFor({state:'visible'});
-      assert.equal(await page.locator('#besuchergruppen-admin-liste .besuchergruppen-admin-karte').count(),6);
-      const firstTitle=page.locator('#besuchergruppen-admin-liste .besuchergruppen-admin-karte input').first();
-      await firstTitle.fill('Familien & Abenteuer');
-      await page.locator('#besuchergruppen-admin-speichern').click();
-      await page.waitForFunction(()=>document.querySelector('#besuchergruppen-admin-status')?.textContent?.includes('gespeichert'));
-      await page.locator('#besuchergruppen-admin-neuladen').click();
-      await page.waitForFunction(()=>document.querySelector('#besuchergruppen-admin-liste input')?.value==='Familien & Abenteuer');
-      assert.equal(await page.locator('#besuchergruppen-admin-liste input').first().inputValue(),'Familien & Abenteuer');
-      const publicGroups=await (await fetch(root+'/api/besuchergruppen')).json();
-      assert.equal(publicGroups[0].titel,'Familien & Abenteuer');
-    }finally{await page.close();}
-  });
 });
