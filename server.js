@@ -65,6 +65,11 @@ async function pruefeBereinigtenBildUpload(bild){
   if(verdict?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
   return verdict;
 }
+function gueltigeMedienBildUrl(value){
+  if(typeof value!=='string'||!value)return false;
+  const base=safeText(process.env.SUPABASE_URL,500).replace(/\/+$/,'');
+  return Boolean(base&&value.startsWith(base+'/storage/v1/object/public/angebotsbilder/'));
+}
 function malwareScanReply(res,error){
   const code=error?.code||'MALWARE_SCAN_ERROR';
   const detected=code==='MALWARE_FOUND';
@@ -2250,6 +2255,63 @@ preis=safeText(d.preis,50);
       if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 
+      if(route==='/api/admin/medien'&&req.method==='GET'){
+        if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
+        try{
+          const [programme,aktionen,storage]=await Promise.all([
+            pool.query("SELECT name AS titel,bild_url FROM brilon_angebote WHERE bild_url IS NOT NULL AND bild_url<>''"),
+            pool.query("SELECT data->>'titel' AS titel,data->>'bild_url' AS bild_url FROM brilon_aktionen WHERE data->>'bild_url' IS NOT NULL AND data->>'bild_url'<>''"),
+            supabase.storage.from('angebotsbilder').list('medien',{limit:1000,sortBy:{column:'created_at',order:'desc'}})
+          ]);
+          if(storage.error)throw storage.error;
+          const images=new Map();
+          for(const row of [...programme.rows,...aktionen.rows]){
+            if(row.bild_url&&gueltigeMedienBildUrl(row.bild_url))
+              images.set(row.bild_url,{url:row.bild_url,name:safeText(row.titel,120)||'Gespeichertes Programmbild',date:null});
+          }
+          for(const file of storage.data||[]){
+            if(!/\.(jpe?g|png|webp)$/i.test(file.name)||!file.id)continue;
+            const {data}=supabase.storage.from('angebotsbilder').getPublicUrl('medien/'+file.name);
+            images.set(data.publicUrl,{url:data.publicUrl,name:safeText(file.metadata?.originalName,120)||file.name,
+              date:file.created_at||file.updated_at||null});
+          }
+          return reply(res,200,{bilder:[...images.values()]});
+        }catch(error){
+          console.error('Medienbibliothek konnte nicht geladen werden:',error?.message||'Speicherfehler');
+          return reply(res,503,{error:'Bilder konnten nicht geladen werden.'});
+        }
+      }
+      if(route==='/api/admin/medien'&&req.method==='POST'){
+        if(!limit('image-upload:'+ip,20,600000))return reply(res,429,{error:'Zu viele Bild-Uploads. Bitte später erneut versuchen.'});
+        if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
+        const types={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
+        const contentType=(req.headers['content-type']||'').split(';')[0].toLowerCase();
+        const extension=types[contentType];
+        if(!extension)return reply(res,400,{error:'Nur JPG/JPEG, PNG und WebP erlaubt.'});
+        const chunks=[];let size=0;
+        for await(const chunk of req){
+          size+=chunk.length;
+          if(size>5*1024*1024)return reply(res,413,{error:'Das Bild darf maximal 5 MB groß sein.'});
+          chunks.push(chunk);
+        }
+        if(!size)return reply(res,400,{error:'Keine Bilddatei empfangen.'});
+        let image=Buffer.concat(chunks);
+        try{image=await bereinigeBild(image,contentType);}
+        catch{return reply(res,400,{error:'Ungültiges oder zu großes Bild. JPG/JPEG, PNG und WebP bis 40 Megapixel sind erlaubt.'});}
+        try{await pruefeBereinigtenBildUpload(image);}catch(error){return malwareScanReply(res,error);}
+        const originalName=safeText(req.headers['x-original-filename'],120)||'Bild';
+        const filePath='medien/'+crypto.randomUUID()+'.'+extension;
+        const {error}=await supabase.storage.from('angebotsbilder').upload(filePath,image,{
+          contentType,upsert:false,metadata:{originalName}
+        });
+        if(error){
+          console.error('Medienbild konnte nicht gespeichert werden:',error?.message||'Speicherfehler');
+          return reply(res,502,{error:'Bild konnte nicht dauerhaft gespeichert werden.'});
+        }
+        const {data}=supabase.storage.from('angebotsbilder').getPublicUrl(filePath);
+        return reply(res,201,{success:true,bild_url:data.publicUrl,name:originalName});
+      }
+
       if(route==='/api/admin/feedback'&&req.method==='GET'){
         const q=await pool.query(`SELECT COALESCE(b.buchungsnummer,b.data->>'buchungsnummer') AS kundennummer,
             b.data->>'name' AS name,b.data->>'email' AS email,b.data->>'angebot' AS programm,
@@ -3195,6 +3257,8 @@ if (preisRoute && req.method === 'PATCH') {
   
 const aktiv = typeof d.aktiv === 'boolean' ? d.aktiv : null;
 const name=d.name===undefined?alt.name:safeText(d.name,120);
+const bildUrl=d.bild_url===undefined?alt.bild_url:(d.bild_url===null||d.bild_url===''?null:safeText(d.bild_url,1000));
+if(d.bild_url!==undefined&&bildUrl&&!gueltigeMedienBildUrl(bildUrl))return reply(res,400,{error:'Bitte ein Bild aus der Medienbibliothek auswählen.'});
 const beschreibung = d.beschreibung===undefined?alt.beschreibung:safeText(d.beschreibung,1000);
 const kategorie=d.kategorie===undefined?alt.kategorie:safeText(d.kategorie,60);
 const zielgruppe=d.zielgruppe===undefined?alt.zielgruppe:safeText(d.zielgruppe,120);
@@ -3228,9 +3292,9 @@ const q = await pool.query(
        name=$4,beschreibung = $5,
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,veranstaltungsorte=$9::jsonb,kapazitaet=$10,
        verfuegbare_termine=$11::jsonb,hinweise=$12,buchbar=$13,veroeffentlicht=$14,dauer=$15,
-       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18,dauer_modus=$19,gruppenstufen=$20::jsonb
+       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18,dauer_modus=$19,gruppenstufen=$20::jsonb,bild_url=$21
    WHERE id = $2
-   RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
+   RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,bild_url,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
              buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,sortierung,archiviert`,
   [
@@ -3240,7 +3304,7 @@ const q = await pool.query(
     name,beschreibung,kategorie,zielgruppe,requestedSites[0],JSON.stringify(requestedSites),kapazitaet,
     JSON.stringify(termine),hinweise,buchbar,veroeffentlicht,dauer,
     buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-    buchungsmodus==='einzelplatz'?preisProPerson:0,dauerModus,JSON.stringify(gruppenstufen)
+    buchungsmodus==='einzelplatz'?preisProPerson:0,dauerModus,JSON.stringify(gruppenstufen),bildUrl
   ]
 );
 
@@ -3325,14 +3389,15 @@ if (bildRoute && req.method === 'POST') {
   }
 
   const dateiname =
-    angebotId + '/' + crypto.randomUUID() + '.' + endung;
+    'medien/' + crypto.randomUUID() + '.' + endung;
 
       if (!supabase) return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
       const { error } = await supabase.storage
     .from('angebotsbilder')
     .upload(dateiname, bild, {
       contentType: dateityp,
-      upsert: false
+      upsert: false,
+      metadata:{originalName:safeText(req.headers['x-original-filename'],120)||'Bild'}
     });
 
   if (error) {
@@ -3433,15 +3498,15 @@ if (aktionsBildRoute && req.method === 'POST') {
   }
 
   const dateiname =
-    'sonderaktionen/' + aktionsId + '/' +
-    crypto.randomUUID() + '.' + endung;
+    'medien/' + crypto.randomUUID() + '.' + endung;
 
   if (!supabase) return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
   const { error } = await supabase.storage
     .from('angebotsbilder')
     .upload(dateiname, bild, {
       contentType: dateityp,
-      upsert: false
+      upsert: false,
+      metadata:{originalName:safeText(req.headers['x-original-filename'],120)||'Bild'}
     });
 
   if (error) {

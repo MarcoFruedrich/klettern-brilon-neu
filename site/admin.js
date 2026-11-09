@@ -874,6 +874,7 @@ bildButton.onclick = async () => {
         credentials: 'same-origin',
         headers: {
           'Content-Type': datei.type,
+          'X-Original-Filename': datei.name,
           'X-CSRF-Token': await adminCsrfTokenLaden()
         },
         body: datei
@@ -900,7 +901,9 @@ bildButton.onclick = async () => {
   }
 };
 
-bildBereich.append(bildAuswahl, bildButton);
+const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
+bildFormatHinweis.className='hint';
+bildBereich.append(bildAuswahl,bildButton,bildFormatHinweis);
 c.append(bildBereich);
       const btn = el('button', a.status==='vorschlag'?'Vorschlag verwerfen':'Löschen');
       btn.className = 'danger';
@@ -2410,6 +2413,7 @@ bildButton.addEventListener('click', async () => {
         credentials: 'same-origin',
         headers: {
           'Content-Type': datei.type,
+          'X-Original-Filename': datei.name,
           'X-CSRF-Token': await adminCsrfTokenLaden()
         },
         body: datei
@@ -2435,7 +2439,25 @@ bildButton.addEventListener('click', async () => {
   }
 });
 
-bildBereich.append(bildAuswahl, bildButton);
+const bildAusBibliothekButton=document.createElement('button');
+bildAusBibliothekButton.type='button';
+bildAusBibliothekButton.className='btn secondary';
+bildAusBibliothekButton.textContent='Bild aus Medienbibliothek wählen';
+bildAusBibliothekButton.addEventListener('click',async()=>{
+  if(typeof window.medienpoolBildAuswaehlen!=='function'){alert('Die Medienbibliothek ist noch nicht verfügbar.');return;}
+  try{
+    await window.medienpoolBildAuswaehlen(async url=>{
+      await api('/api/admin/angebote/'+angebot.id,{method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({bild_url:url})});
+      bildVorschau.src=url;
+      if(!bildVorschau.parentNode)bildBereich.insertBefore(bildVorschau,bildAuswahl);
+      alert('Programmbild aus der Medienbibliothek übernommen.');
+    });
+  }catch(error){alert('Bild konnte nicht übernommen werden: '+error.message);}
+});
+const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
+bildFormatHinweis.className='hint';
+bildBereich.append(bildAuswahl,bildButton,bildAusBibliothekButton,bildFormatHinweis);
 eintrag.appendChild(bildBereich);
 
 const preisButton = document.createElement('button');

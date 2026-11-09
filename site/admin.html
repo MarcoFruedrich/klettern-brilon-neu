@@ -369,6 +369,19 @@
   </form>
   <p class="hint">Zahl und Dauer bestimmen die Animation. Neue Effekte lassen sich mit eigenem Namen und Symbol speichern. Für komplexe Szenen (z. B. ein laufendes GPS-Team) sind eigene Grafikdateien erforderlich.</p>
   <p id="website-effekte-status" role="status" aria-live="polite"></p>
+  <section class="booking" aria-labelledby="medienpool-heading">
+    <h3 id="medienpool-heading">Medienbibliothek</h3>
+    <p>Hier dauerhaft gespeicherte Bilder und vorhandene Programmbilder stehen beim Bearbeiten von Programmen direkt zur Auswahl. Erlaubt sind JPG/JPEG, PNG und WebP bis 5 MB je Bild.</p>
+    <div class="actions">
+      <label>Bilddatei auswählen
+        <input id="medienpool-datei" type="file" accept="image/jpeg,image/png,image/webp">
+      </label>
+      <button type="button" class="btn" id="medienpool-hochladen">Bild dauerhaft speichern</button>
+      <button type="button" class="btn secondary" id="medienpool-neuladen">Bilder aktualisieren</button>
+    </div>
+    <p id="medienpool-status" role="status" aria-live="polite">Bilder werden nach der Anmeldung geladen.</p>
+    <div id="medienpool-bilder" class="admin-grid"></div>
+  </section>
 </section>
 
 <section id="anschlussrabatt-section" class="booking admin-view" data-admin-view aria-labelledby="anschlussrabatt-heading">
@@ -763,7 +776,8 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261108-admin-horizontal-tabs-whatsapp"></script>
+  <script src="/admin.js?v=20261109-medienpool"></script>
+  <script src="/medienpool-admin.js?v=20261109"></script>
   <script src="/besuchergruppen-admin.js?v=20261108"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
   <script src="/website-effekte-admin.js?v=20261108"></script>
