@@ -10,6 +10,7 @@ const net = require('node:net');
 function fakeAdminApi(page) {
   const state = {
     signedIn: false, csrf: 'a'.repeat(64), mutations: [],
+    visitorGroups:require('../visitor-groups').DEFAULT_VISITOR_GROUPS.map(g=>({...g})),
     tours: [], games: [], specials: [],
     inspectionEvents: [], inspectionStatusEvents: [], inspectionStaff: [], invitations: [],
     nextInvite: 0,
@@ -54,6 +55,14 @@ function fakeAdminApi(page) {
       state.mutations.push({endpoint,method,body:method==='DELETE'?null:readBody()});
     }
     if(endpoint==='/api/admin/csrf')return json(200,{csrfToken:state.csrf});
+    if(endpoint==='/api/admin/besuchergruppen'&&method==='GET')
+      return json(200,state.visitorGroups);
+    if(endpoint==='/api/admin/besuchergruppen'&&method==='PUT'){
+      const groups=readBody().gruppen;
+      if(!Array.isArray(groups)||groups.length!==6)return json(400,{error:'Sechs Besuchergruppen erforderlich'});
+      state.visitorGroups=groups;
+      return json(200,{success:true,gruppen:state.visitorGroups});
+    }
     if(endpoint==='/api/admin/pruefung/uebersicht'&&method==='GET')
       return json(200,state.inspectionOverview);
     if(endpoint==='/api/admin/pruefung/tablets'&&method==='GET')
@@ -344,6 +353,7 @@ async function openAdminView(page,href){
       '#gps-verwaltung':'#angebote-verwaltung',
       '#special-offers-view':'#angebote-verwaltung',
       '#anschlussrabatt-section':'#angebote-verwaltung',
+      '#besuchergruppen-admin-section':'#angebote-verwaltung',
       '#mitarbeiter-section':'#mitarbeiter-einladen-section',
       '#netzwerkpartner-section':'#mitarbeiter-einladen-section',
       '#netzwerkpartner-einladen-section':'#mitarbeiter-einladen-section',
@@ -577,6 +587,27 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
       'Der Termin 09:00–10:10 muss direkt an der 09:00-Zeile liegen: '+JSON.stringify(placement));
     assert.match(placement.label,/09:00\s*–\s*10:10/);
     await page.close();
+  });
+
+  await t.test('Besuchergruppen: Verwaltung öffnen, bearbeiten, speichern und neu laden',async()=>{
+    const page=await browser.newPage({viewport:{width:1280,height:900},locale:'de-DE'});
+    try{
+      const state=fakeAdminApi(page);
+      await login(page,root);
+      await openAdminView(page,'#besuchergruppen-admin-section');
+      assert.equal(new URL(page.url()).hash,'#besuchergruppen-admin-section');
+      const cards=page.locator('#besuchergruppen-admin-liste .besuchergruppen-admin-karte');
+      await cards.first().waitFor({state:'visible'});
+      assert.equal(await cards.count(),6);
+      const title=cards.first().locator('input').first();
+      await title.fill('Familien & Abenteuer');
+      await page.locator('#besuchergruppen-admin-speichern').click();
+      await page.waitForFunction(()=>document.querySelector('#besuchergruppen-admin-status')?.textContent?.includes('gespeichert'));
+      assert.equal(state.visitorGroups[0].titel,'Familien & Abenteuer');
+      await page.locator('#besuchergruppen-admin-neuladen').click();
+      await page.waitForFunction(()=>document.querySelector('#besuchergruppen-admin-liste input')?.value==='Familien & Abenteuer');
+      assert.equal(await cards.first().locator('input').first().inputValue(),'Familien & Abenteuer');
+    }finally{await page.close();}
   });
 
   await t.test('Programm erstellen, editieren und aktivieren mit CSRF-Token',async()=>{
