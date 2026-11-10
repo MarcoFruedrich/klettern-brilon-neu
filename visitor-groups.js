@@ -44,7 +44,6 @@ function visitorGroupId(value){
 }
 function prepareVisitorGroups(input) {
   const configured=Array.isArray(input)?input:[];
-  const validCustom=configured.filter(g=>g&&visitorGroupId(g.id)&&!DEFAULT_VISITOR_GROUPS.some(d=>d.id===g.id));
   const ordered=Array.isArray(input)
     ?configured.filter(g=>g&&visitorGroupId(g.id))
     :[...DEFAULT_VISITOR_GROUPS];
