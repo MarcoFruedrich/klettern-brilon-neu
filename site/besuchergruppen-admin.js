@@ -20,7 +20,7 @@
       const result=await api('/api/admin/besuchergruppen',{method:'PUT',
         headers:{'Content-Type':'application/json'},body:JSON.stringify({gruppen})});
       gruppen=result.gruppen;status.textContent='Besuchergruppen gespeichert und sofort für die Webseite übernommen.';
-      render();
+      render();document.dispatchEvent(new CustomEvent('besuchergruppenaktualisiert'));
     }catch(e){status.textContent='Speichern fehlgeschlagen: '+e.message;}
   };
   function render(){
