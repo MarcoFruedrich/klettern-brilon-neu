@@ -33,9 +33,9 @@ function sichereBesucherBildUrl(value) {
   if(typeof value!=='string')return '';
   const url=value.trim();
   if(url.length>900)return '';
-  if(/^\\/(?:fotos\\/|images\\/|bilder\\/|assets\\/)[a-zA-Z0-9_./-]+\\.(?:jpe?g|png|webp|gif|svg)$/i.test(url)
+  if(new RegExp('^/(?:fotos/|images/|bilder/|assets/)[a-zA-Z0-9_./-]+\\.(?:jpe?g|png|webp|gif|svg)$','i').test(url)
     && !url.includes('..'))return url;
-  if(/^https:\\/\\/fssjruvxkdqeltjdrlfo\\.supabase\\.co\\/storage\\/v1\\/object\\/public\\/angebotsbilder\\/[a-zA-Z0-9_./-]+\\.(?:jpe?g|png|webp|gif)$/i.test(url)
+  if(new RegExp('^https://fssjruvxkdqeltjdrlfo\\.supabase\\.co/storage/v1/object/public/angebotsbilder/[a-zA-Z0-9_./-]+\\.(?:jpe?g|png|webp|gif)$','i').test(url)
     && !url.includes('..'))return url;
   return '';
 }
