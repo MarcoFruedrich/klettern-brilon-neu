@@ -1635,9 +1635,11 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
             username=process.env.ADMIN_USER,
             password=process.env.ADMIN_PASSWORD;
       const demoUser=process.env.ADMIN_DEMO_USER,demoPassword=process.env.ADMIN_DEMO_PASSWORD;
-      if(credentialMatches(d.username,demoUser)&&credentialMatches(d.password,demoPassword)){
+      if(demoUser&&credentialMatches(d.username,demoUser)){
         if(!rateLimiter.erlauben('admin-demo-ip:'+ip,12,600000))
           return reply(res,429,{error:'Zu viele Demo-Anmeldeversuche. Bitte später erneut versuchen.'});
+        if(!credentialMatches(d.password,demoPassword))
+          return reply(res,401,{error:'Demo-Zugangsdaten nicht korrekt.'});
         const token=demoSessionToken();
         return reply(res,200,{success:true,readOnly:true,csrfToken:adminCsrfToken(token)},{
           'Set-Cookie':cookieName+'='+token+'; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800'
