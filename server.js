@@ -3837,6 +3837,15 @@ async function ensureKundenbestaetigungEinstellungen(){
 async function start(){
   if(pool){
     await pool.query('SELECT 1');
+    if(process.env.RUN_PROGRAM_GROUPS_MIGRATION==='true'){
+      const offerTable=await pool.query("SELECT to_regclass('public.brilon_angebote') AS relation");
+      if(offerTable.rows[0]?.relation){
+        await pool.query("ALTER TABLE brilon_angebote ADD COLUMN IF NOT EXISTS besuchergruppen JSONB NOT NULL DEFAULT '[]'::jsonb");
+        console.log('Programm-Gruppenzuordnungsspalte geprüft (RUN_PROGRAM_GROUPS_MIGRATION=true)');
+      }else{
+        console.log('Programm-Gruppenzuordnungsmigration übersprungen: brilon_angebote wird separat initialisiert.');
+      }
+    }
     if(process.env.RUN_INVOICE_MIGRATION==='true'){
       const sql=fs.readFileSync(path.join(__dirname,'db/migrations/2026-11-06-rechnungen-agb.sql'),'utf8');
       await pool.query(sql);
