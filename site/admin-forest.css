@@ -383,3 +383,13 @@ body.admin-page{
 .demo-readonly-notice button{justify-self:start;}
 .demo-readonly-notice [role=status]{font-size:12px;}
 @media(max-width:760px){.demo-readonly-notice{grid-template-columns:1fr;}}
+
+.demo-owner-card{display:grid;grid-template-columns:190px minmax(0,1fr);gap:22px;align-items:center;margin:16px 0 22px;padding:18px;border:1px solid #c9d9ce;border-radius:14px;background:linear-gradient(135deg,#f4faf5,#fff);box-shadow:0 5px 16px #123e2810;}
+.demo-owner-card[hidden]{display:none!important;}
+.demo-owner-card img{display:block;width:100%;height:230px;object-fit:cover;object-position:center 20%;border-radius:10px;background:#e8eee9;}
+.demo-owner-card h3{margin:2px 0 8px;color:#0e4a37;font-size:22px;}
+.demo-owner-card p{line-height:1.5;}
+.demo-owner-card .demo-owner-eyebrow{margin:0;color:#527467;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;}
+.demo-owner-card address{margin-top:12px;font-style:normal;line-height:1.7;}
+.demo-owner-card a{color:#08754b;font-weight:700;}
+@media(max-width:600px){.demo-owner-card{grid-template-columns:1fr;}.demo-owner-card img{width:min(100%,220px);height:250px;}}
