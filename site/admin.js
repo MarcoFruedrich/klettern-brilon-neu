@@ -2215,6 +2215,8 @@ function programmDauerhaftLoeschenButton(angebot){
 
 /* Gespeicherte Erlebnisangebote anzeigen */
 
+document.addEventListener('besuchergruppenaktualisiert',()=>{erlebnisangeboteLaden();});
+
 async function erlebnisangeboteLaden() {
   const liste = document.getElementById('angebote-admin-liste');
   if (!liste) return;
