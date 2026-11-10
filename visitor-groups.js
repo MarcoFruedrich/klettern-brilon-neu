@@ -33,50 +33,60 @@ function sichereBesucherBildUrl(value) {
   if(typeof value!=='string')return '';
   const url=value.trim();
   if(url.length>900)return '';
-  if(/^\/(?:fotos\/|images\/|bilder\/|assets\/)[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp|svg)$/i.test(url)
+  if(/^\\/(?:fotos\\/|images\\/|bilder\\/|assets\\/)[a-zA-Z0-9_./-]+\\.(?:jpe?g|png|webp|gif|svg)$/i.test(url)
     && !url.includes('..'))return url;
-  if(/^https:\/\/fssjruvxkdqeltjdrlfo\.supabase\.co\/storage\/v1\/object\/public\/angebotsbilder\/[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp)$/i.test(url)
+  if(/^https:\\/\\/fssjruvxkdqeltjdrlfo\\.supabase\\.co\\/storage\\/v1\\/object\\/public\\/angebotsbilder\\/[a-zA-Z0-9_./-]+\\.(?:jpe?g|png|webp|gif)$/i.test(url)
     && !url.includes('..'))return url;
   return '';
 }
-
+function visitorGroupId(value){
+  return typeof value==='string'&&/^[a-z0-9][a-z0-9_-]{1,39}$/.test(value);
+}
 function prepareVisitorGroups(input) {
   const configured=Array.isArray(input)?input:[];
+  const validCustom=configured.filter(g=>g&&visitorGroupId(g.id)&&!DEFAULT_VISITOR_GROUPS.some(d=>d.id===g.id));
+  const defaults=[...DEFAULT_VISITOR_GROUPS];
   const orderedDefaults=Array.isArray(input)
-    ?[...DEFAULT_VISITOR_GROUPS].sort((a,b)=>{
-      const ai=input.findIndex(g=>g?.id===a.id),bi=input.findIndex(g=>g?.id===b.id);
-      return (ai<0?DEFAULT_VISITOR_GROUPS.indexOf(a):ai)-(bi<0?DEFAULT_VISITOR_GROUPS.indexOf(b):bi);
-    })
-    :DEFAULT_VISITOR_GROUPS;
-  return orderedDefaults.map(defaults=>{
-    const source=configured.find(g=>g&&g.id===defaults.id)||{};
-    const text=(key,max)=>typeof source[key]==='string'&&source[key].trim()
-      ?source[key].trim().slice(0,max):defaults[key];
-    const rawIds=Array.isArray(source.programmIds)?source.programmIds:[];
+    ?[...input.filter(g=>g&&DEFAULT_VISITOR_GROUPS.some(d=>d.id===g.id))
+      .map(g=>DEFAULT_VISITOR_GROUPS.find(d=>d.id===g.id)),
+      ...defaults.filter(d=>!input.some(g=>g?.id===d.id))]
+    :defaults;
+  const ordered=[...orderedDefaults,...validCustom];
+  return ordered.slice(0,30).map(g=>{
+    const fallback=DEFAULT_VISITOR_GROUPS.find(d=>d.id===g.id)||{
+      id:g.id,titel:'Neue Gruppe',icon:'✨',farbe:'#258451',beschreibung:'',
+      punkte:[],bild:'/fotos/halle.jpg',programmIds:[],aktiv:true
+    };
+    const text=(key,max)=>typeof g[key]==='string'&&g[key].trim()
+      ?g[key].trim().slice(0,max):fallback[key];
+    const rawIds=Array.isArray(g.programmIds)?g.programmIds:[];
     const programmIds=[...new Set(rawIds.map(Number).filter(n=>Number.isSafeInteger(n)&&n>0))].slice(0,250);
-    const punkte=Array.isArray(source.punkte)
-      ?source.punkte.filter(v=>typeof v==='string'&&v.trim()).slice(0,3).map(v=>v.trim().slice(0,100))
-      :defaults.punkte;
+    const punkte=Array.isArray(g.punkte)
+      ?g.punkte.filter(v=>typeof v==='string'&&v.trim()).slice(0,3).map(v=>v.trim().slice(0,100))
+      :fallback.punkte;
+    const farbe=/^#[0-9a-f]{6}$/i.test(g.farbe||'')?g.farbe:fallback.farbe;
     return {
-      id:defaults.id,titel:text('titel',55),beschreibung:text('beschreibung',350),
-      punkte,icon:defaults.icon,farbe:defaults.farbe,
-      bild:sichereBesucherBildUrl(source.bild)||defaults.bild,
-      programmIds,aktiv:source.aktiv!==false
+      id:fallback.id,titel:text('titel',55),beschreibung:typeof g.beschreibung==='string'?g.beschreibung.trim().slice(0,350):fallback.beschreibung,
+      punkte,icon:text('icon',16),iconBild:sichereBesucherBildUrl(g.iconBild),
+      farbe,bild:sichereBesucherBildUrl(g.bild)||fallback.bild,
+      programmIds,aktiv:g.aktiv!==false
     };
   });
 }
-
 function validateVisitorGroups(input) {
-  if(!Array.isArray(input)||input.length!==DEFAULT_VISITOR_GROUPS.length||
-     new Set(input.map(g=>g?.id)).size!==DEFAULT_VISITOR_GROUPS.length||
-     !DEFAULT_VISITOR_GROUPS.every(d=>input.some(g=>g?.id===d.id)))
-    return {error:'Bitte alle sechs Besuchergruppen unverändert in der Auswahl übermitteln.'};
+  if(!Array.isArray(input)||input.length>30||
+     new Set(input.map(g=>g?.id)).size!==input.length||
+     input.some(g=>!visitorGroupId(g?.id)))
+    return {error:'Bitte gültige Gruppen-IDs wählen. Es sind höchstens 30 Gruppen möglich.'};
   for(const g of input){
     if(typeof g.titel!=='string'||!g.titel.trim()||g.titel.length>55||
-       typeof g.beschreibung!=='string'||!g.beschreibung.trim()||g.beschreibung.length>350||
+       typeof g.beschreibung!=='string'||g.beschreibung.length>350||
        !Array.isArray(g.punkte)||g.punkte.length>3||
        g.punkte.some(s=>typeof s!=='string'||s.length>100)||
+       (g.icon!==undefined&&(typeof g.icon!=='string'||g.icon.length>16))||
+       (g.farbe!==undefined&&!/^#[0-9a-f]{6}$/i.test(g.farbe))||
        (g.bild&&!sichereBesucherBildUrl(g.bild))||
+       (g.iconBild&&!sichereBesucherBildUrl(g.iconBild))||
        !Array.isArray(g.programmIds)||g.programmIds.length>250||
        g.programmIds.some(id=>!Number.isSafeInteger(Number(id))||Number(id)<1)||
        typeof g.aktiv!=='boolean')
