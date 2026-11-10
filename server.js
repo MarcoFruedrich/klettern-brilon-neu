@@ -2356,7 +2356,7 @@ preis=safeText(d.preis,50);
               images.set(row.bild_url,{url:row.bild_url,name:safeText(row.titel,120)||'Gespeichertes Programmbild',date:null});
           }
           for(const file of storage.data||[]){
-            if(!/\.(jpe?g|png|webp)$/i.test(file.name)||!file.id)continue;
+            if(!/\.(jpe?g|png|webp|gif)$/i.test(file.name)||!file.id)continue;
             const {data}=supabase.storage.from('angebotsbilder').getPublicUrl('medien/'+file.name);
             images.set(data.publicUrl,{url:data.publicUrl,name:safeText(file.metadata?.originalName,120)||file.name,
               date:file.created_at||file.updated_at||null});
@@ -2370,20 +2370,29 @@ preis=safeText(d.preis,50);
       if(route==='/api/admin/medien'&&req.method==='POST'){
         if(!limit('image-upload:'+ip,20,600000))return reply(res,429,{error:'Zu viele Bild-Uploads. Bitte später erneut versuchen.'});
         if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
-        const types={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
+        const types={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif'};
         const contentType=(req.headers['content-type']||'').split(';')[0].toLowerCase();
         const extension=types[contentType];
-        if(!extension)return reply(res,400,{error:'Nur JPG/JPEG, PNG und WebP erlaubt.'});
-        const chunks=[];let size=0;
+        if(!extension)return reply(res,400,{error:'Erlaubt sind JPG/JPEG, PNG, WebP und GIF.'});
+        const chunks=[];let size=0;const maxSize=extension==='gif'?3*1024*1024:5*1024*1024;
         for await(const chunk of req){
           size+=chunk.length;
-          if(size>5*1024*1024)return reply(res,413,{error:'Das Bild darf maximal 5 MB groß sein.'});
+          if(size>maxSize)return reply(res,413,{error:extension==='gif'?'GIF-Animationen dürfen maximal 3 MB groß sein.':'Das Bild darf maximal 5 MB groß sein.'});
           chunks.push(chunk);
         }
         if(!size)return reply(res,400,{error:'Keine Bilddatei empfangen.'});
         let image=Buffer.concat(chunks);
-        try{image=await bereinigeBild(image,contentType);}
-        catch{return reply(res,400,{error:'Ungültiges oder zu großes Bild. JPG/JPEG, PNG und WebP bis 40 Megapixel sind erlaubt.'});}
+        if(contentType==='image/gif'){
+          const signature=image.subarray(0,6).toString('ascii');
+          if(!['GIF87a','GIF89a'].includes(signature)||image.length<13)
+            return reply(res,400,{error:'Die Datei ist kein gültiges GIF.'});
+          const width=image.readUInt16LE(6),height=image.readUInt16LE(8);
+          if(!width||!height||width>1200||height>1200)
+            return reply(res,400,{error:'GIF-Icons dürfen höchstens 1200 × 1200 Pixel groß sein.'});
+        }else{
+          try{image=await bereinigeBild(image,contentType);}
+          catch{return reply(res,400,{error:'Ungültiges oder zu großes Bild. JPG/JPEG, PNG und WebP bis 40 Megapixel sind erlaubt.'});}
+        }
         try{await pruefeBereinigtenBildUpload(image);}catch(error){return malwareScanReply(res,error);}
         const originalName=safeText(req.headers['x-original-filename'],120)||'Bild';
         const filePath='medien/'+crypto.randomUUID()+'.'+extension;
