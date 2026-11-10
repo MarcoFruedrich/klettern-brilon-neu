@@ -1971,6 +1971,7 @@ if (neuesAngebotForm) {
       new FormData(neuesAngebotForm).entries()
     );
     daten.veranstaltungsorte=[...document.querySelectorAll('#angebot-orte-auswahl input[name="veranstaltungsorte"]:checked')].map(input=>input.value);
+    daten.besuchergruppen=[...document.querySelectorAll('#neues-angebot-gruppen input:checked')].map(input=>input.value);
     daten.veranstaltungsort=daten.veranstaltungsorte[0]||'';
     daten.verfuegbare_termine=(daten.verfuegbare_termine||'').split('\n').map(x=>x.trim()).filter(Boolean);
     daten.buchbar=neuesAngebotForm.elements.buchbar.checked;
@@ -2219,7 +2220,36 @@ async function erlebnisangeboteLaden() {
   if (!liste) return;
 
   try {
-    const [angebote,verwaltungsOrte] = await Promise.all([api('/api/admin/angebote'),api('/api/admin/orte')]);
+    const [angebote,verwaltungsOrte,besuchergruppen] = await Promise.all([
+      api('/api/admin/angebote'),api('/api/admin/orte'),api('/api/admin/besuchergruppen')
+    ]);
+    const gruppenAuswahlErstellen=(selected=[])=>{
+      const fieldset=document.createElement('fieldset');
+      fieldset.className='angebot-standort-auswahl programm-besuchergruppen-auswahl';
+      const legend=document.createElement('legend');legend.textContent='Besuchergruppen (Mehrfachauswahl)';
+      const list=document.createElement('div');list.className='check-grid';
+      const selectedIds=new Set(selected);
+      const available=besuchergruppen.filter(group=>group.aktiv||selectedIds.has(group.id));
+      for(const group of available){
+        const label=document.createElement('label');label.className='check';
+        const input=document.createElement('input');input.type='checkbox';input.value=group.id;
+        input.checked=selectedIds.has(group.id);
+        const text=document.createElement('span');
+        if(group.iconBild){const image=document.createElement('img');image.src=group.iconBild;image.alt='';image.className='programm-gruppen-icon';text.append(image);}
+        else text.append(document.createTextNode((group.icon||'✨')+' '));
+        text.append(document.createTextNode(group.titel));
+        label.append(input,text);list.append(label);
+      }
+      if(!available.length)list.append(el('p','Noch keine aktiven Besuchergruppen angelegt.'));
+      fieldset.append(legend,list);
+      return fieldset;
+    };
+    const createGroups=document.getElementById('neues-angebot-gruppen');
+    if(createGroups){
+      const picker=gruppenAuswahlErstellen();
+      createGroups.replaceWith(picker);
+      picker.id='neues-angebot-gruppen';
+    }
     adminBuchbareProgramme=angebote.filter(a=>!a.archiviert&&a.aktiv&&a.buchbar&&a.veroeffentlicht);
     const specialSelect=document.getElementById('special-program-select');
     if(specialSelect){
@@ -2342,6 +2372,8 @@ beschreibung.style.width = '100%';
       const programmName=feld('Programmname',angebot.name,'name');
       const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
       const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
+      const besuchergruppenFeld=gruppenAuswahlErstellen(Array.isArray(angebot.besuchergruppen)?angebot.besuchergruppen:[]);
+      metadaten.append(besuchergruppenFeld);
       const standortFeld=document.createElement('fieldset');
       const standortLegende=document.createElement('legend');standortLegende.textContent='Veröffentlichte Standorte';standortFeld.append(standortLegende);
       const standortAuswahl=document.createElement('div');standortAuswahl.className='check-grid';
@@ -2553,6 +2585,7 @@ preisButton.addEventListener('click', async () => {
   aktiv: aktivSchalter.checked,
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
+        besuchergruppen:[...besuchergruppenFeld.querySelectorAll('input:checked')].map(input=>input.value),
         veranstaltungsorte:[...standortAuswahl.querySelectorAll('input:checked')].map(input=>input.value),
         veranstaltungsort:standortAuswahl.querySelector('input:checked')?.value||'',dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
         verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),
