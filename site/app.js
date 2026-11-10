@@ -818,6 +818,24 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       hinweis.textContent=angebot.hinweise;
       inhalt.append(hinweis);
     }
+    const zugeordneteGruppen=(window.besuchergruppenListe?.()||[])
+      .filter(group=>Array.isArray(angebot.besuchergruppen)&&angebot.besuchergruppen.includes(group.id));
+    if(zugeordneteGruppen.length){
+      const groupTags=document.createElement('div');
+      groupTags.className='angebote-programm-gruppen';
+      groupTags.setAttribute('aria-label','Zugeordnete Gruppen');
+      for(const group of zugeordneteGruppen){
+        const tag=document.createElement('span');
+        tag.className='angebote-programm-gruppe';
+        if(group.iconBild){
+          const icon=document.createElement('img');icon.src=group.iconBild;icon.alt='';icon.loading='lazy';
+          tag.append(icon);
+        }else if(group.icon)tag.append(document.createTextNode(group.icon+' '));
+        tag.append(document.createTextNode(group.titel));
+        groupTags.append(tag);
+      }
+      inhalt.append(groupTags);
+    }
     const aktionen=document.createElement('div');
     aktionen.className='angebote-karte-aktionen';
     const anfrage=document.createElement('a');
