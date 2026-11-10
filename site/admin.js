@@ -295,6 +295,8 @@ async function refresh() {
     workspace.hidden = false;
     const demoBanner=document.getElementById('demo-readonly-banner');
     if(demoBanner)demoBanner.hidden=!demoReadOnly;
+    const ownerCard=document.getElementById('demo-owner-card');
+    if(ownerCard)ownerCard.hidden=!demoReadOnly;
     document.body.classList.toggle('admin-demo-readonly',demoReadOnly);
     adminAnsichtAusHash();
 
