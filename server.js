@@ -2,7 +2,7 @@
 // Klettern & Abenteuer Brilon – Node.js / PostgreSQL
 'use strict';
 const {DEFAULT_VISITOR_GROUPS,prepareVisitorGroups,validateVisitorGroups}=require('./visitor-groups');
-const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const {Pool}=require('pg');
+const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const net=require('node:net');const {Pool}=require('pg');
 const { buchungsreferenz } = require('./lib/buchungsreferenz');
 const { heuteInBerlin } = require('./lib/kalendertag');
 const { datenbankKonfiguration } = require('./lib/datenbank-konfiguration');
@@ -565,7 +565,9 @@ const wissensportalApi=createWissensportalApi({pool,admin,staffSession:pruefungA
 async function main(req,res){
   const u=new URL(req.url,'http://localhost'),
         route=decodeURIComponent(u.pathname),
-        ip=req.socket.remoteAddress||'unknown';
+        forwardedFor=req.headers['x-forwarded-for'],
+        forwardedClient=typeof forwardedFor==='string'?forwardedFor.split(',')[0].trim():'',
+        ip=net.isIP(forwardedClient)?forwardedClient:(req.socket.remoteAddress||'unknown');
   try{
     // Kanalweise Sichtbarkeit: öffentlich sind nur freigeschaltete Links verfügbar.
     // Die Administration speichert Links und Status dauerhaft im vorhandenen Website-Konfigurationsdatensatz.
@@ -1629,17 +1631,16 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
     if(route==='/api/admin/login'&&req.method==='POST'){
       if(!sameOriginMutation(req))return reply(res,403,{error:'Admin-Anfragen müssen von derselben Website stammen.'});
-      const kontoId=gpsTokenHash(process.env.ADMIN_USER||'unconfigured');
-      if(!adminLoginErlauben(rateLimiter,ip,kontoId))
-        return reply(res,429,{error:'Zu viele Versuche.'});
       const d=await body(req),
             username=process.env.ADMIN_USER,
             password=process.env.ADMIN_PASSWORD;
       const demoUser=process.env.ADMIN_DEMO_USER,demoPassword=process.env.ADMIN_DEMO_PASSWORD;
       if(credentialMatches(d.username,demoUser)&&credentialMatches(d.password,demoPassword)){
+        if(!rateLimiter.erlauben('admin-demo-ip:'+ip,12,600000))
+          return reply(res,429,{error:'Zu viele Demo-Anmeldeversuche. Bitte später erneut versuchen.'});
         const token=demoSessionToken();
         return reply(res,200,{success:true,readOnly:true,csrfToken:adminCsrfToken(token)},{
-          'Set-Cookie':`${cookieName}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`
+          'Set-Cookie':cookieName+'='+token+'; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800'
         });
       }
       if(!username||!password)
@@ -1649,9 +1650,12 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
             c=Buffer.from(String(d.password||'')),
             e=Buffer.from(password);
       if(a.length!==b.length||c.length!==e.length||
-         !crypto.timingSafeEqual(a,b)||!crypto.timingSafeEqual(c,e))
+         !crypto.timingSafeEqual(a,b)||!crypto.timingSafeEqual(c,e)){
+        const kontoId=gpsTokenHash(process.env.ADMIN_USER||'unconfigured');
+        if(!adminLoginErlauben(rateLimiter,ip,kontoId))
+          return reply(res,429,{error:'Zu viele Versuche. Bitte zehn Minuten warten.'});
         return reply(res,401,{error:'Zugangsdaten nicht korrekt.'});
-
+      }
       const token=crypto.randomBytes(32).toString('hex');
       const ablauf=new Date(Date.now()+8*3600000);
       if(pool){
