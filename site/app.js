@@ -819,7 +819,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       inhalt.append(hinweis);
     }
     const zugeordneteGruppen=(window.besuchergruppenListe?.()||[])
-      .filter(group=>Array.isArray(angebot.besuchergruppen)&&angebot.besuchergruppen.includes(group.id));
+      .filter(group=>Array.isArray(angebot.besuchergruppen)&&angebot.besuchergruppen.includes(group.id)||group.programmIds?.some(id=>String(id)===String(angebot.id)));
     if(zugeordneteGruppen.length){
       const groupTags=document.createElement('div');
       groupTags.className='angebote-programm-gruppen';
