@@ -66,12 +66,15 @@
   upload.addEventListener('click',async()=>{
     const file=input.files?.[0];
     if(!file){status.textContent='Bitte zuerst eine Bilddatei auswählen.';return;}
-    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
-      status.textContent='Erlaubt sind JPG/JPEG, PNG und WebP.';
+    if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)){
+      status.textContent='Erlaubt sind JPG/JPEG, PNG, WebP und GIF.';
       return;
     }
-    if(file.size>5*1024*1024){
-      status.textContent='Das Bild darf maximal 5 MB groß sein.';
+    const maxBytes=file.type==='image/gif'?3*1024*1024:5*1024*1024;
+    if(file.size>maxBytes){
+      status.textContent=file.type==='image/gif'
+        ?'GIF-Animationen dürfen maximal 3 MB groß sein.'
+        :'Das Bild darf maximal 5 MB groß sein.';
       return;
     }
     upload.disabled=true;
@@ -133,7 +136,7 @@
       preview.style.objectFit='cover';
       preview.style.borderRadius='8px';
       const title=el('strong',image.name||'Gespeichertes Bild');
-      const choose=el('button','Für dieses Programm verwenden');
+      const choose=el('button','Dieses Bild verwenden');
       choose.type='button';
       choose.className='btn';
       choose.addEventListener('click',async()=>{
