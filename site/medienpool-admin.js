@@ -109,7 +109,7 @@
     dialog.style.color='#173f34';
     const heading=el('h2','Bild aus der Medienbibliothek wählen');
     heading.id='medienpool-picker-heading';
-    const help=el('p','Wähle ein bereits gespeichertes Bild aus. Es wird direkt dem Programm zugeordnet.');
+    const help=el('p','Wähle ein bereits gespeichertes Bild oder GIF aus. Es wird dem aktuell bearbeiteten Bereich zugeordnet.');
     const pickerStatus=el('p');
     pickerStatus.setAttribute('role','status');
     pickerStatus.setAttribute('aria-live','polite');
