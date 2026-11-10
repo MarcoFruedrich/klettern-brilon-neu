@@ -63,10 +63,29 @@
           });
         }catch(error){status.textContent='Icon-Auswahl fehlgeschlagen: '+error.message;}
       });
+      const iconUploadInput=document.createElement('input');
+      iconUploadInput.type='file';iconUploadInput.accept='image/jpeg,image/png,image/webp,image/gif';
+      iconUploadInput.hidden=true;
+      iconUploadInput.addEventListener('change',async()=>{
+        const file=iconUploadInput.files?.[0];if(!file)return;
+        const allowed=['image/jpeg','image/png','image/webp','image/gif'];
+        const maxBytes=file.type==='image/gif'?3*1024*1024:5*1024*1024;
+        if(!allowed.includes(file.type)){status.textContent='Erlaubt sind JPG/JPEG, PNG, WebP und GIF.';iconUploadInput.value='';return;}
+        if(file.size>maxBytes){status.textContent=file.type==='image/gif'?'GIF-Animationen dürfen maximal 3 MB groß sein.':'Das Bild darf maximal 5 MB groß sein.';iconUploadInput.value='';return;}
+        try{
+          status.textContent='Icon wird in der Medienbibliothek gespeichert …';
+          const saved=await api('/api/admin/medien',{method:'POST',headers:{'Content-Type':file.type,'X-Original-Filename':file.name},body:file});
+          g.iconBild=saved.bild_url;iconPreview.src=g.iconBild;iconPreview.hidden=false;
+          status.textContent='Icon zentral gespeichert. Nach „Besuchergruppen speichern“ ist die Zuordnung dauerhaft.';
+        }catch(error){status.textContent='Icon-Upload fehlgeschlagen: '+error.message;}
+        finally{iconUploadInput.value='';}
+      });
+      const iconUpload=node('button','GIF/Bild neu hochladen','btn secondary');iconUpload.type='button';
+      iconUpload.addEventListener('click',()=>iconUploadInput.click());
       const iconClear=node('button','GIF-Icon entfernen','btn secondary');iconClear.type='button';
       iconClear.addEventListener('click',()=>{g.iconBild='';iconPreview.removeAttribute('src');iconPreview.hidden=true;});
-      const iconTools=node('div','','besuchergruppen-admin-icon-tools');iconTools.append(iconChoose,iconClear);
-      card.append(field('Zentrales GIF-/Bild-Icon',iconTools),iconPreview);
+      const iconTools=node('div','','besuchergruppen-admin-icon-tools');iconTools.append(iconChoose,iconUpload,iconClear);
+      card.append(field('Zentrales GIF-/Bild-Icon',iconTools),iconUploadInput,iconPreview);
       const description=node('textarea');description.value=g.beschreibung;description.rows=3;description.maxLength=350;
       description.addEventListener('input',()=>g.beschreibung=description.value);
       card.append(field('Kurzbeschreibung',description));
