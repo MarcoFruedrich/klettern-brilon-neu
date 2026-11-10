@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/wissensportal.css?v=20261106-custom-categories">
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261109-assigned-employee-names">
   <link rel="stylesheet" href="/admin-forest.css?v=20261110-demo-owner-profile">
-  <link rel="stylesheet" href="/besuchergruppen.css?v=20261108">
+  <link rel="stylesheet" href="/besuchergruppen.css?v=20261110-program-groups">
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -500,11 +500,8 @@
   <fieldset class="angebot-standort-auswahl"><legend>Teilnehmerstufen (Gruppenpreis und Dauer je Gruppe)</legend><div id="neues-angebot-stufen" class="angebot-stufen-editor"></div><button type="button" class="btn secondary" id="neues-angebot-stufe-hinzufuegen">Teilnehmerstufe hinzufügen</button><small>Die Grenzen und die Dauer sind frei einstellbar. Der Preis gilt für die gesamte Gruppe.</small></fieldset>
   <label>Kategorie<input name="kategorie" maxlength="60" placeholder="Klettern"></label>
   <label>Zielgruppe<input name="zielgruppe" maxlength="120" placeholder="Familien, Schulklassen"></label>
-  <fieldset class="angebot-standort-auswahl">
-    <legend>Besuchergruppen (Mehrfachauswahl)</legend>
-    <div id="neues-angebot-gruppen" class="check-grid"></div>
-    <small>Wähle eine oder mehrere Gruppen. Das Programm wird diesen Gruppen zugeordnet und auf der Website passend gefiltert.</small>
-  </fieldset>
+  <div id="neues-angebot-gruppen"></div>
+  <p class="hint">Wähle eine oder mehrere Gruppen. Das Programm wird ihnen zugeordnet und auf der Website passend gefiltert.</p>
   <fieldset class="angebot-standort-auswahl"><legend>Veranstaltungsorte (Mehrfachauswahl)</legend><div id="angebot-orte-auswahl" class="check-grid"></div><small>Das Programm wird an allen angehakten Standorten auf der Website angezeigt.</small></fieldset>
   <label>Kapazität (Teilnehmende)<input name="kapazitaet" type="number" min="1" max="1000" value="20" required></label>
   <label>Buchungsart<select name="buchungsmodus"><option value="gruppe">Gruppenanfrage</option><option value="einzelplatz">Einzelplätze reservieren</option></select></label>
@@ -818,7 +815,7 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261110-demo-owner-profile"></script>
+  <script src="/admin.js?v=20261110-program-groups"></script>
   <script src="/medienpool-admin.js?v=20261110-gif-media"></script>
   <script src="/besuchergruppen-admin.js?v=20261110-custom-groups-gif-icons"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
