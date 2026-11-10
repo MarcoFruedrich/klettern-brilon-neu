@@ -169,3 +169,5 @@
   color:#28593c;font-size:.8rem;font-weight:750
 }
 .angebote-programm-gruppe img{width:18px;height:18px;object-fit:contain}
+
+.besuchergruppen-admin-icon-vorschau[hidden]{display:none!important}
