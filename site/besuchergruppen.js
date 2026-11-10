@@ -21,6 +21,7 @@
   };
   window.aktiveBesuchergruppe=null;
   window.besuchergruppeName=()=>gruppen.find(g=>g.id===window.aktiveBesuchergruppe)?.titel||'';
+  window.besuchergruppenListe=()=>gruppen;
   window.besuchergruppePasst=(angebot)=>{
     if(!window.aktiveBesuchergruppe)return true;
     const group=gruppen.find(g=>g.id===window.aktiveBesuchergruppe);
@@ -79,6 +80,6 @@
   render();
   fetch('/api/besuchergruppen')
     .then(r=>{if(!r.ok)throw Error('Besuchergruppen nicht erreichbar');return r.json();})
-    .then(data=>{if(Array.isArray(data)){gruppen=data;render();}})
+    .then(data=>{if(Array.isArray(data)){gruppen=data;render();document.dispatchEvent(new CustomEvent('besuchergruppenwechsel'));}})
     .catch(()=>{}); // Die sechs sichtbaren Standardkacheln bleiben verfügbar.
 })();
