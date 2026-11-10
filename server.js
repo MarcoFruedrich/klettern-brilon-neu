@@ -4206,6 +4206,7 @@ await pool.query(`
       ADD COLUMN IF NOT EXISTS bild_url TEXT,
       ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
       ADD COLUMN IF NOT EXISTS zielgruppe TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS besuchergruppen JSONB NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS veranstaltungsort TEXT NOT NULL DEFAULT 'Brilon',
       ADD COLUMN IF NOT EXISTS kapazitaet INTEGER NOT NULL DEFAULT 20,
       ADD COLUMN IF NOT EXISTS verfuegbare_termine JSONB NOT NULL DEFAULT '[]'::jsonb,
