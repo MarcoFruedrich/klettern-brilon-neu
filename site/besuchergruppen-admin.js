@@ -45,7 +45,7 @@
       controls.append(remove);
       head.append(controls);card.append(head);
       const textName=input(g.titel,55);
-      textName.addEventListener('input',()=>g.titel=textName.value);
+      textName.addEventListener('input',()=>{g.titel=textName.value;head.querySelector('h3').textContent=(g.icon||'✨')+' '+g.titel;});
       card.append(field('Titel',textName));
       const iconInput=input(g.icon,16);
       iconInput.addEventListener('input',()=>{g.icon=iconInput.value;head.querySelector('h3').textContent=(g.icon||'✨')+' '+g.titel;});
@@ -85,7 +85,7 @@
       const iconClear=node('button','GIF-Icon entfernen','btn secondary');iconClear.type='button';
       iconClear.addEventListener('click',()=>{g.iconBild='';iconPreview.removeAttribute('src');iconPreview.hidden=true;});
       const iconTools=node('div','','besuchergruppen-admin-icon-tools');iconTools.append(iconChoose,iconUpload,iconClear);
-      card.append(field('Zentrales GIF-/Bild-Icon',iconTools),iconUploadInput,iconPreview);
+      card.append(field('Zentrales GIF-/Bild-Icon',iconTools),iconUploadInput,iconPreview,node('small','GIF-Animationen: maximal 3 MB und 1200 × 1200 Pixel. Uploads werden zentral gespeichert und bleiben wiederverwendbar.'));
       const description=node('textarea');description.value=g.beschreibung;description.rows=3;description.maxLength=350;
       description.addEventListener('input',()=>g.beschreibung=description.value);
       card.append(field('Kurzbeschreibung',description));
