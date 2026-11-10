@@ -2374,7 +2374,11 @@ beschreibung.style.width = '100%';
       const programmName=feld('Programmname',angebot.name,'name');
       const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
       const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
-      const besuchergruppenFeld=gruppenAuswahlErstellen(Array.isArray(angebot.besuchergruppen)?angebot.besuchergruppen:[]);
+      const zugeordneteGruppenIds=[...new Set([
+        ...(Array.isArray(angebot.besuchergruppen)?angebot.besuchergruppen:[]),
+        ...besuchergruppen.filter(group=>group.programmIds?.some(id=>String(id)===String(angebot.id))).map(group=>group.id)
+      ])];
+      const besuchergruppenFeld=gruppenAuswahlErstellen(zugeordneteGruppenIds);
       metadaten.append(besuchergruppenFeld);
       const standortFeld=document.createElement('fieldset');
       const standortLegende=document.createElement('legend');standortLegende.textContent='Veröffentlichte Standorte';standortFeld.append(standortLegende);
