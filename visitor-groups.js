@@ -45,13 +45,9 @@ function visitorGroupId(value){
 function prepareVisitorGroups(input) {
   const configured=Array.isArray(input)?input:[];
   const validCustom=configured.filter(g=>g&&visitorGroupId(g.id)&&!DEFAULT_VISITOR_GROUPS.some(d=>d.id===g.id));
-  const defaults=[...DEFAULT_VISITOR_GROUPS];
-  const orderedDefaults=Array.isArray(input)
-    ?[...input.filter(g=>g&&DEFAULT_VISITOR_GROUPS.some(d=>d.id===g.id))
-      .map(g=>DEFAULT_VISITOR_GROUPS.find(d=>d.id===g.id)),
-      ...defaults.filter(d=>!input.some(g=>g?.id===d.id))]
-    :defaults;
-  const ordered=[...orderedDefaults,...validCustom];
+  const ordered=Array.isArray(input)
+    ?configured.filter(g=>g&&visitorGroupId(g.id))
+    :[...DEFAULT_VISITOR_GROUPS];
   return ordered.slice(0,30).map(g=>{
     const fallback=DEFAULT_VISITOR_GROUPS.find(d=>d.id===g.id)||{
       id:g.id,titel:'Neue Gruppe',icon:'✨',farbe:'#258451',beschreibung:'',
