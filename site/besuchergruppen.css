@@ -99,49 +99,36 @@
 }
 
 
-/* Buchbare Programme: Kacheln im Stil der Erlebnis-Auswahl darunter. */
+/* Der Programmbereich nutzt dieselbe Banner-, Kachel- und Hovergestaltung wie die Zielgruppenkarten. */
 #angebote{scroll-margin-top:92px;overflow-anchor:none}
+#angebote .angebote-intro{
+  text-align:center;color:#fff;border-radius:24px;padding:54px 24px 60px;
+  background:linear-gradient(90deg,rgba(10,43,35,.92),rgba(14,62,43,.73)),url('/fotos/abseilen.jpg') center 43%/cover no-repeat;
+  margin-bottom:-20px;animation:angebote-einblenden .45s ease-out both
+}
+#angebote .angebote-intro .eyebrow{color:#d7f37e;letter-spacing:.15em}
+#angebote .angebote-intro h2{
+  color:#fff;margin:12px auto 18px;font-size:clamp(1.8rem,4vw,3.3rem);letter-spacing:-.03em
+}
+#angebote .angebote-intro p{color:#f0f8ee;max-width:790px;margin:0 auto;font-size:1.12rem}
 #angebote-uebersicht{
   display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;
-  align-items:stretch;overflow-anchor:none
+  align-items:stretch;position:relative;overflow-anchor:none
 }
-#angebote-uebersicht>.angebote-karte{
-  min-width:0;margin:0;padding:0;background:#fff;color:#16352c;
-  border:1px solid #dfe7de;border-radius:18px;overflow:hidden;
-  box-shadow:0 8px 24px rgba(25,57,37,.09);
-  display:flex;flex-direction:column;
-  transition:transform .18s ease,box-shadow .18s ease
+#angebote-uebersicht .angebote-karte{
+  animation:angebote-einblenden .42s ease-out both;
+  animation-delay:calc(var(--karten-index,0) * 65ms)
 }
-#angebote-uebersicht>.angebote-karte:hover{
-  transform:translateY(-3px);box-shadow:0 15px 32px rgba(25,57,37,.15)
+.angebote-programm-bild-fallback{
+  display:grid;place-items:center;background:linear-gradient(135deg,#dcebdd,#b9d7c0);
+  color:#17653c;font-size:3rem
 }
-.angebote-karte-bildbereich{
-  height:167px;flex:none;display:grid;place-items:center;overflow:hidden;
-  background:linear-gradient(135deg,#dcebdd,#b9d7c0);color:#17653c
-}
-.angebote-karte-bild{display:block;width:100%;height:100%;object-fit:cover}
-.angebote-karte-symbol{font-size:3rem;line-height:1}
-.angebote-karte-inhalt{
-  display:flex;flex:1;flex-direction:column;align-items:flex-start;
-  padding:18px 20px 20px
-}
-.angebote-karte-inhalt h3{
-  margin:0 0 9px;color:#16352c;font-size:1.2rem;line-height:1.25
-}
-.angebote-karte-beschreibung{color:#39574c;line-height:1.5;margin:0 0 12px}
-.angebote-karte-meta{
-  margin:0 0 8px;color:#50705b;font-size:.9rem;line-height:1.4
-}
+.angebote-karte-meta{margin:0 0 8px;color:#50705b;font-size:.9rem;line-height:1.4}
 .angebote-karte-aktionen{
   display:flex;flex-direction:column;align-items:flex-start;gap:9px;
-  width:100%;margin-top:auto;padding-top:12px
+  width:100%;margin-top:auto;padding-top:8px
 }
-.angebote-anfragen-link{
-  display:inline-flex;align-items:center;justify-content:center;min-height:42px;
-  padding:10px 16px;border-radius:10px;background:#185c2e;color:#fff!important;
-  font-weight:800;text-decoration:none
-}
-.angebote-anfragen-link:hover{background:#267a40}
+.angebote-programm-anfrage{margin-top:auto}
 #angebote-uebersicht .whatsapp-share-link{
   display:inline-flex;align-items:center;justify-content:center;min-height:36px;
   padding:7px 12px;border:1px solid #8cc49b;border-radius:9px;
@@ -149,15 +136,19 @@
   text-decoration:none
 }
 #angebote-uebersicht .whatsapp-share-link:hover{background:#e5f3e7}
+@keyframes angebote-einblenden{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
 @media(max-width:900px){
   #angebote-uebersicht{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:600px){
+  #angebote .angebote-intro{padding:42px 20px 48px;border-radius:18px}
   #angebote-uebersicht{grid-template-columns:1fr;gap:15px}
-  .angebote-karte-bildbereich{height:190px}
-  .angebote-karte-inhalt{padding:16px}
+  #angebote-uebersicht .besuchergruppe-bild{height:190px}
+  #angebote-uebersicht .besuchergruppe-inhalt{padding:0 17px 20px}
 }
 @media(prefers-reduced-motion:reduce){
-  #angebote-uebersicht>.angebote-karte{transition:none}
-  #angebote-uebersicht>.angebote-karte:hover{transform:none}
+  #angebote .angebote-intro,#angebote-uebersicht .angebote-karte{animation:none}
 }
