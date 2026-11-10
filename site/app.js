@@ -758,27 +758,44 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
   }
   for(const angebot of passend){
     const karte=document.createElement('article');
+    karte.className='angebote-karte';
+    const bildbereich=document.createElement('div');
+    bildbereich.className='angebote-karte-bildbereich';
     if(angebot.bild_url){
       const bild=document.createElement('img');
       bild.src=angebot.bild_url;
       bild.alt=angebot.name;
       bild.loading='lazy';
+      bild.width=640;
+      bild.height=360;
       bild.className='angebote-karte-bild';
-      karte.append(bild);
+      bild.addEventListener('error',()=>{
+        bild.remove();
+        const fallback=document.createElement('span');
+        fallback.className='angebote-karte-symbol';
+        fallback.setAttribute('aria-hidden','true');
+        fallback.textContent='🧗';
+        bildbereich.append(fallback);
+      },{once:true});
+      bildbereich.append(bild);
     }else{
-      const symbol=document.createElement('div');
-      symbol.className='symbol';
-      symbol.setAttribute('aria-hidden','true');
-      symbol.textContent='🧗';
-      karte.append(symbol);
+      const fallback=document.createElement('span');
+      fallback.className='angebote-karte-symbol';
+      fallback.setAttribute('aria-hidden','true');
+      fallback.textContent='🧗';
+      bildbereich.append(fallback);
     }
+    karte.append(bildbereich);
+    const inhalt=document.createElement('div');
+    inhalt.className='angebote-karte-inhalt';
     const titel=document.createElement('h3');
     titel.textContent=angebot.name;
-    karte.append(titel);
+    inhalt.append(titel);
     if(angebot.beschreibung){
       const beschreibung=document.createElement('p');
+      beschreibung.className='angebote-karte-beschreibung';
       beschreibung.textContent=angebot.beschreibung;
-      karte.append(beschreibung);
+      inhalt.append(beschreibung);
     }
     const angebotOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
       ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
@@ -788,22 +805,26 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       const details=document.createElement('p');
       details.className='angebote-karte-meta';
       details.textContent=meta;
-      karte.append(details);
+      inhalt.append(details);
     }
     if(angebot.hinweise){
       const hinweis=document.createElement('p');
       hinweis.className='angebote-karte-meta';
       hinweis.textContent=angebot.hinweise;
-      karte.append(hinweis);
+      inhalt.append(hinweis);
     }
+    const aktionen=document.createElement('div');
+    aktionen.className='angebote-karte-aktionen';
     const anfrage=document.createElement('a');
     anfrage.className='angebote-anfragen-link';
     anfrage.href='#buchung';
     anfrage.dataset.location=(!alleStandorte?standortFilter:angebotOrte[0])||'';
     anfrage.dataset.program=angebot.name;
-    anfrage.textContent='Dieses Angebot anfragen →';
-    karte.append(anfrage);
-    karte.append(whatsappTeilButton(angebot.name,meta,angebot.id!=null?angebotBuchungslink('programm',angebot.id):'/#buchung'));
+    anfrage.textContent='Angebot anfragen →';
+    aktionen.append(anfrage);
+    aktionen.append(whatsappTeilButton(angebot.name,meta,angebot.id!=null?angebotBuchungslink('programm',angebot.id):'/#buchung'));
+    inhalt.append(aktionen);
+    karte.append(inhalt);
     ausgabe.append(karte);
   }
 }
