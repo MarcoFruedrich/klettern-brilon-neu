@@ -25,7 +25,10 @@
     if(!window.aktiveBesuchergruppe)return true;
     const group=gruppen.find(g=>g.id===window.aktiveBesuchergruppe);
     if(!group)return true;
+    const offerGroups=Array.isArray(angebot.besuchergruppen)?angebot.besuchergruppen:[];
+    if(offerGroups.includes(group.id))return true;
     if(group.programmIds?.length)return group.programmIds.some(id=>String(id)===String(angebot.id));
+    if(offerGroups.length)return false;
     const text=[angebot.zielgruppe,angebot.name,angebot.kategorie].filter(Boolean).join(' ');
     return Boolean(synonyms[group.id]?.test(text));
   };
@@ -50,8 +53,13 @@
       image.src=g.bild;image.alt='Erlebnisbild: '+g.titel;image.loading='lazy';
       const content=element('div','besuchergruppe-inhalt');
       const heading=element('h3','besuchergruppe-titel',g.titel);
-      const badge=element('span','besuchergruppe-symbol',g.icon);
+      const badge=element('span','besuchergruppe-symbol');
       badge.setAttribute('aria-hidden','true');
+      if(g.iconBild){
+        const iconImage=element('img','besuchergruppe-iconbild');
+        iconImage.src=g.iconBild;iconImage.alt='';iconImage.loading='lazy';
+        badge.append(iconImage);
+      }else badge.textContent=g.icon||'✨';
       const head=element('div','besuchergruppe-head');head.append(badge,heading);
       const description=element('p','besuchergruppe-beschreibung',g.beschreibung);
       const benefits=element('ul','besuchergruppe-vorteile');
@@ -71,6 +79,6 @@
   render();
   fetch('/api/besuchergruppen')
     .then(r=>{if(!r.ok)throw Error('Besuchergruppen nicht erreichbar');return r.json();})
-    .then(data=>{if(Array.isArray(data)&&data.length===6){gruppen=data;render();}})
+    .then(data=>{if(Array.isArray(data)){gruppen=data;render();}})
     .catch(()=>{}); // Die sechs sichtbaren Standardkacheln bleiben verfügbar.
 })();
