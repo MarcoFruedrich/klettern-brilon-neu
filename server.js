@@ -3167,7 +3167,7 @@ if(staffArea&&req.method==='DELETE'){
 
 if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
-    `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
+    `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,besuchergruppen,
             veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
             buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,sortierung,archiviert
      FROM brilon_angebote
@@ -3261,6 +3261,10 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const dauerModus=d.dauer_modus==='fest'?'fest':'gruppenstufe';
   const kategorie=safeText(d.kategorie,60)||'Klettern';
   const zielgruppe=safeText(d.zielgruppe,120);
+  const rawBesuchergruppen=Array.isArray(d.besuchergruppen)?d.besuchergruppen:[];
+  if(rawBesuchergruppen.length>30||rawBesuchergruppen.some(id=>typeof id!=='string'||!/^[a-z0-9][a-z0-9_-]{1,39}$/.test(id)))
+    return reply(res,400,{error:'Ungültige Besuchergruppenzuordnung.'});
+  const besuchergruppen=[...new Set(rawBesuchergruppen)];
   const veranstaltungsort=safeText(d.veranstaltungsort,80)||'Brilon';
   const requestedSites=Array.isArray(d.veranstaltungsorte)?[...new Set(d.veranstaltungsorte.map(name=>safeText(name,80)).filter(Boolean))]:[veranstaltungsort];
   const kapazitaet=Number(d.kapazitaet||20);
@@ -3294,14 +3298,14 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const q = await pool.query(
     `INSERT INTO brilon_angebote
       (name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,veranstaltungsorte,kapazitaet,
-       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,false,$7,$8,$9,$10::jsonb,$11,$12::jsonb,$13,$14,$15,$16,$17,$18,
+       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,besuchergruppen,sortierung,archiviert)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,false,$7,$8,$9,$10::jsonb,$11,$12::jsonb,$13,$14,$15,$16,$17,$18,$19::jsonb,
        (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false)
      RETURNING id`,
     [name,beschreibung,dauer,dauerModus,JSON.stringify(gruppenstufen),JSON.stringify(gruppenPreise),kategorie,zielgruppe,
       requestedSites[0],JSON.stringify(requestedSites),kapazitaet,JSON.stringify(termine),hinweise,
       d.buchbar===true,d.veroeffentlicht===true,buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-      buchungsmodus==='einzelplatz'?preisProPerson:0]
+      buchungsmodus==='einzelplatz'?preisProPerson:0,JSON.stringify(besuchergruppen)]
   );
 
   return reply(res, 201, {
@@ -3348,6 +3352,9 @@ if(d.bild_url!==undefined&&bildUrl&&!gueltigeMedienBildUrl(bildUrl))return reply
 const beschreibung = d.beschreibung===undefined?alt.beschreibung:safeText(d.beschreibung,1000);
 const kategorie=d.kategorie===undefined?alt.kategorie:safeText(d.kategorie,60);
 const zielgruppe=d.zielgruppe===undefined?alt.zielgruppe:safeText(d.zielgruppe,120);
+const rawBesuchergruppen=d.besuchergruppen===undefined?(Array.isArray(alt.besuchergruppen)?alt.besuchergruppen:[]):d.besuchergruppen;
+if(!Array.isArray(rawBesuchergruppen)||rawBesuchergruppen.length>30||rawBesuchergruppen.some(id=>typeof id!=='string'||!/^[a-z0-9][a-z0-9_-]{1,39}$/.test(id)))return reply(res,400,{error:'Ungültige Besuchergruppenzuordnung.'});
+const besuchergruppen=[...new Set(rawBesuchergruppen)];
 const veranstaltungsort=d.veranstaltungsort===undefined?alt.veranstaltungsort:safeText(d.veranstaltungsort,80);
 const requestedSites=Array.isArray(d.veranstaltungsorte)?[...new Set(d.veranstaltungsorte.map(name=>safeText(name,80)).filter(Boolean))]:
   (alt.veranstaltungsorte?.length?alt.veranstaltungsorte:[veranstaltungsort]);
@@ -3378,7 +3385,7 @@ const q = await pool.query(
        name=$4,beschreibung = $5,
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,veranstaltungsorte=$9::jsonb,kapazitaet=$10,
        verfuegbare_termine=$11::jsonb,hinweise=$12,buchbar=$13,veroeffentlicht=$14,dauer=$15,
-       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18,dauer_modus=$19,gruppenstufen=$20::jsonb,bild_url=$21
+       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18,dauer_modus=$19,gruppenstufen=$20::jsonb,bild_url=$21,besuchergruppen=$22::jsonb
    WHERE id = $2
    RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,bild_url,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
@@ -3390,7 +3397,8 @@ const q = await pool.query(
     name,beschreibung,kategorie,zielgruppe,requestedSites[0],JSON.stringify(requestedSites),kapazitaet,
     JSON.stringify(termine),hinweise,buchbar,veroeffentlicht,dauer,
     buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-    buchungsmodus==='einzelplatz'?preisProPerson:0,dauerModus,JSON.stringify(gruppenstufen),bildUrl
+    buchungsmodus==='einzelplatz'?preisProPerson:0,dauerModus,JSON.stringify(gruppenstufen),bildUrl,
+    JSON.stringify(besuchergruppen)
   ]
 );
 
@@ -3646,7 +3654,7 @@ if (route === '/api/angebote' && req.method === 'GET') {
   }
 
   const q = await pool.query(
- `SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,bild_url,kategorie,zielgruppe,
+ `SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,bild_url,kategorie,zielgruppe,besuchergruppen,
         veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,
         buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert
      FROM brilon_angebote
@@ -3882,6 +3890,7 @@ async function start(){
         ADD COLUMN IF NOT EXISTS bild_url TEXT,
         ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
         ADD COLUMN IF NOT EXISTS zielgruppe TEXT NOT NULL DEFAULT '',
+        ADD COLUMN IF NOT EXISTS besuchergruppen JSONB NOT NULL DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS veranstaltungsort TEXT NOT NULL DEFAULT 'Brilon',
         ADD COLUMN IF NOT EXISTS kapazitaet INTEGER NOT NULL DEFAULT 20,
         ADD COLUMN IF NOT EXISTS verfuegbare_termine JSONB NOT NULL DEFAULT '[]'::jsonb,
