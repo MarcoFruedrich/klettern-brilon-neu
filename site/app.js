@@ -756,51 +756,56 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     ausgabe.append(hinweis);
     return;
   }
-  for(const angebot of passend){
+  passend.forEach((angebot,index)=>{
     const karte=document.createElement('article');
-    karte.className='angebote-karte';
-    const bildbereich=document.createElement('div');
-    bildbereich.className='angebote-karte-bildbereich';
-    if(angebot.bild_url){
-      const bild=document.createElement('img');
-      bild.src=angebot.bild_url;
-      bild.alt=angebot.name;
-      bild.loading='lazy';
-      bild.width=640;
-      bild.height=360;
-      bild.className='angebote-karte-bild';
-      bild.addEventListener('error',()=>{
-        bild.remove();
-        const fallback=document.createElement('span');
-        fallback.className='angebote-karte-symbol';
-        fallback.setAttribute('aria-hidden','true');
-        fallback.textContent='🧗';
-        bildbereich.append(fallback);
-      },{once:true});
-      bildbereich.append(bild);
-    }else{
-      const fallback=document.createElement('span');
-      fallback.className='angebote-karte-symbol';
-      fallback.setAttribute('aria-hidden','true');
-      fallback.textContent='🧗';
-      bildbereich.append(fallback);
-    }
-    karte.append(bildbereich);
-    const inhalt=document.createElement('div');
-    inhalt.className='angebote-karte-inhalt';
-    const titel=document.createElement('h3');
-    titel.textContent=angebot.name;
-    inhalt.append(titel);
-    if(angebot.beschreibung){
-      const beschreibung=document.createElement('p');
-      beschreibung.className='angebote-karte-beschreibung';
-      beschreibung.textContent=angebot.beschreibung;
-      inhalt.append(beschreibung);
-    }
+    karte.className='besuchergruppe-karte angebote-karte';
+    karte.style.setProperty('--karten-index',String(index));
+    karte.style.setProperty('--gruppe-farbe','#258451');
     const angebotOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
       ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
     const meta=!alleStandorte?'Standort: '+standortFilter:
       angebotOrte.length?`Standorte: ${angebotOrte.join(', ')}`:'';
+    if(angebot.bild_url){
+      const bild=document.createElement('img');
+      bild.src=angebot.bild_url;
+      bild.alt='Erlebnisbild: '+angebot.name;
+      bild.loading='lazy';
+      bild.width=640;bild.height=360;
+      bild.className='besuchergruppe-bild';
+      bild.addEventListener('error',()=>{
+        const fallback=document.createElement('div');
+        fallback.className='besuchergruppe-bild angebote-programm-bild-fallback';
+        fallback.setAttribute('aria-hidden','true');
+        fallback.textContent='🧗';
+        bild.replaceWith(fallback);
+      },{once:true});
+      karte.append(bild);
+    }else{
+      const fallback=document.createElement('div');
+      fallback.className='besuchergruppe-bild angebote-programm-bild-fallback';
+      fallback.setAttribute('aria-hidden','true');
+      fallback.textContent='🧗';
+      karte.append(fallback);
+    }
+    const inhalt=document.createElement('div');
+    inhalt.className='besuchergruppe-inhalt';
+    const kopf=document.createElement('div');
+    kopf.className='besuchergruppe-head';
+    const symbol=document.createElement('span');
+    symbol.className='besuchergruppe-symbol';
+    symbol.setAttribute('aria-hidden','true');
+    symbol.textContent='🧗';
+    const titel=document.createElement('h3');
+    titel.className='besuchergruppe-titel';
+    titel.textContent=angebot.name;
+    kopf.append(symbol,titel);
+    inhalt.append(kopf);
+    if(angebot.beschreibung){
+      const beschreibung=document.createElement('p');
+      beschreibung.className='besuchergruppe-beschreibung';
+      beschreibung.textContent=angebot.beschreibung;
+      inhalt.append(beschreibung);
+    }
     if(meta){
       const details=document.createElement('p');
       details.className='angebote-karte-meta';
@@ -816,7 +821,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     const aktionen=document.createElement('div');
     aktionen.className='angebote-karte-aktionen';
     const anfrage=document.createElement('a');
-    anfrage.className='angebote-anfragen-link';
+    anfrage.className='besuchergruppe-button angebote-programm-anfrage';
     anfrage.href='#buchung';
     anfrage.dataset.location=(!alleStandorte?standortFilter:angebotOrte[0])||'';
     anfrage.dataset.program=angebot.name;
@@ -826,7 +831,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     inhalt.append(aktionen);
     karte.append(inhalt);
     ausgabe.append(karte);
-  }
+  });
 }
 
 document.addEventListener('besuchergruppenwechsel',()=>angeboteUebersichtAnzeigen(
