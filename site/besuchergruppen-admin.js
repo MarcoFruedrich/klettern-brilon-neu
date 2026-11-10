@@ -4,6 +4,7 @@
   const status=document.getElementById('besuchergruppen-admin-status');
   if(!container||!status)return;
   let gruppen=[],programme=[],geladen=false;
+  const newButton=document.getElementById('besuchergruppen-admin-neue-gruppe');
   const node=(tag,txt='',className='')=>{
     const el=document.createElement(tag);if(txt)el.textContent=txt;if(className)el.className=className;return el;
   };
@@ -36,10 +37,36 @@
         b.addEventListener('click',()=>{const [moved]=gruppen.splice(i,1);gruppen.splice(i+delta,0,moved);render();});
         controls.append(b);
       }
+      const remove=node('button','Gruppe entfernen','btn secondary');remove.type='button';
+      remove.addEventListener('click',()=>{
+        if(!confirm('Diese Gruppe aus der Verwaltung entfernen? Die Änderung wird erst nach dem Speichern übernommen.'))return;
+        gruppen=gruppen.filter(item=>item.id!==g.id);render();
+      });
+      controls.append(remove);
       head.append(controls);card.append(head);
       const textName=input(g.titel,55);
       textName.addEventListener('input',()=>g.titel=textName.value);
       card.append(field('Titel',textName));
+      const iconInput=input(g.icon,16);
+      iconInput.addEventListener('input',()=>{g.icon=iconInput.value;head.querySelector('h3').textContent=(g.icon||'✨')+' '+g.titel;});
+      card.append(field('Kleines Symbol (Emoji)',iconInput));
+      const iconPreview=node('img','','besuchergruppen-admin-icon-vorschau');
+      iconPreview.alt='GIF-Icon für '+g.titel;
+      iconPreview.src=g.iconBild||'';
+      iconPreview.hidden=!g.iconBild;
+      const iconChoose=node('button','GIF oder Bild aus Medienbibliothek wählen','btn secondary');iconChoose.type='button';
+      iconChoose.addEventListener('click',async()=>{
+        if(typeof window.medienpoolBildAuswaehlen!=='function'){status.textContent='Die Medienbibliothek wird noch geladen.';return;}
+        try{
+          await window.medienpoolBildAuswaehlen(async url=>{
+            g.iconBild=url;iconPreview.src=url;iconPreview.hidden=false;
+          });
+        }catch(error){status.textContent='Icon-Auswahl fehlgeschlagen: '+error.message;}
+      });
+      const iconClear=node('button','GIF-Icon entfernen','btn secondary');iconClear.type='button';
+      iconClear.addEventListener('click',()=>{g.iconBild='';iconPreview.removeAttribute('src');iconPreview.hidden=true;});
+      const iconTools=node('div','','besuchergruppen-admin-icon-tools');iconTools.append(iconChoose,iconClear);
+      card.append(field('Zentrales GIF-/Bild-Icon',iconTools),iconPreview);
       const description=node('textarea');description.value=g.beschreibung;description.rows=3;description.maxLength=350;
       description.addEventListener('input',()=>g.beschreibung=description.value);
       card.append(field('Kurzbeschreibung',description));
@@ -99,7 +126,15 @@
       render();
     }catch(e){status.textContent='Besuchergruppen konnten nicht geladen werden: '+e.message;}
   };
-  document.getElementById('besuchergruppen-admin-speichern')?.addEventListener('click',write);
+  newButton?.addEventListener('click',()=>{
+    if(gruppen.length>=30){status.textContent='Es können höchstens 30 Gruppen angelegt werden.';return;}
+    const id='gruppe-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
+    gruppen.push({id,titel:'Neue Gruppe',icon:'✨',iconBild:'',farbe:'#258451',beschreibung:'',
+      punkte:[],bild:'/fotos/halle.jpg',programmIds:[],aktiv:true});
+    render();
+    container.lastElementChild?.scrollIntoView({behavior:'smooth',block:'center'});
+  });
+    document.getElementById('besuchergruppen-admin-speichern')?.addEventListener('click',write);
   document.getElementById('besuchergruppen-admin-neuladen')?.addEventListener('click',()=>{
     geladen=false;window.besuchergruppenAdminLaden();
   });
