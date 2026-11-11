@@ -35,8 +35,12 @@
 </section>
 <form id="onsite-unlock">
 <h2>Freigabe vor Ort</h2>
-<p>Am Standort auf <strong>Code am Tablet anzeigen</strong> tippen. Der Code erscheint ausschließlich auf dem gekoppelten Werbetablet und gilt zwei Minuten. Sollte die Anzeige nicht erreichbar sein, die Verwaltung informieren.</p>
-<button class="btn secondary" id="request-tablet-code" type="button">Code am Tablet anzeigen</button>
+<p>Wähle zuerst den Standort aus. Danach kannst du den Prüfcode auf dem zugehörigen Tablet anfordern. Der Code gilt zwei Minuten.</p>
+<label>Standort auswählen
+<select id="pruefung-standort" required>
+<option value="">Standorte werden geladen …</option>
+</select></label>
+<button class="btn secondary" id="request-tablet-code" type="button" disabled>Prüfcode am Standorttablet anzeigen</button>
 <label>Sechsstelliger Sicherheitscode
 <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" required></label>
 <button class="btn secondary">Prüfformular freischalten</button>
@@ -53,6 +57,6 @@
 </section>
 <p id="pruefung-status" role="status" aria-live="polite"></p>
 </main>
-<script src="/pruefung.js"></script>
+<script src="/pruefung.js?v=20261111-standortcode"></script>
 </body>
 </html>

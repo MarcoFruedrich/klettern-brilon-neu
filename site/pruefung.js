@@ -155,8 +155,15 @@ async function fotoAlsJPEG(file){
 }
 
 async function loadStations(){
+  const selector=$('pruefung-standort');
+  const chosen=selector.value;
   const data=await request('/api/pruefung/stationen');
   $('pruefung-person').textContent=data.mitarbeiter;
+  selector.replaceChildren(new Option('Bitte Standort auswählen',''));
+  for(const place of data.standorte||[])selector.add(new Option(place.name,String(place.id)));
+  const selected=data.ortId?String(data.ortId):chosen;
+  if(selected&&Array.from(selector.options).some(option=>option.value===selected))selector.value=selected;
+  $('request-tablet-code').disabled=!selector.value;
   const target=$('pruefung-stationen');target.replaceChildren();
   data.stationen.forEach(s=>target.append(stationControl(s)));
   if(!data.stationen.length)notice('Für deinen Zugang sind noch keine passenden Standorte und Qualifikationen freigegeben. Bitte die Verwaltung informieren.');
@@ -169,6 +176,18 @@ async function signedIn(){
   await loadOwnReports();
   await loadStations();
 }
+$('pruefung-standort')?.addEventListener('change',async event=>{
+  const selector=event.currentTarget;
+  $('request-tablet-code').disabled=!selector.value;
+  $('station-inspection').hidden=true;
+  if(!selector.value){$('pruefung-stationen').replaceChildren();return;}
+  try{
+    const data=await request('/api/pruefung/stationen?ortId='+encodeURIComponent(selector.value));
+    const target=$('pruefung-stationen');target.replaceChildren();
+    data.stationen.forEach(s=>target.append(stationControl(s)));
+    if(!data.stationen.length)notice('Für diesen Standort ist keine passende Prüfstation freigegeben. Bitte die Verwaltung informieren.');
+  }catch(error){notice('Standort konnte nicht geladen werden: '+error.message);}
+});
 $('staff-login').addEventListener('submit',async event=>{
   event.preventDefault();const form=event.currentTarget;
   const submit=form.querySelector('button');submit.disabled=true;
@@ -177,7 +196,7 @@ $('staff-login').addEventListener('submit',async event=>{
     const login=await request('/api/pruefung/login',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(Object.fromEntries(new FormData(form)))});
     $('pruefung-admin-link').hidden=!login.verwaltungszugang;
-    form.reset();await signedIn();notice('Angemeldet. Bitte Vor-Ort-Code vom Tablet eingeben.');
+    form.reset();await signedIn();notice('Angemeldet. Bitte zuerst den Standort auswählen.');
   }catch(e){notice('Anmeldung fehlgeschlagen: '+e.message);if(e.passwortResetMoeglich)$('staff-reset-request').hidden=false;}
   finally{submit.disabled=false;}
 });
@@ -195,16 +214,19 @@ $('staff-reset-request')?.addEventListener('click',async event=>{
 $('request-tablet-code')?.addEventListener('click',async()=>{
   const button=$('request-tablet-code');button.disabled=true;
   try{
-    await request('/api/pruefung/code-anfordern',{method:'POST'});
-    notice('Der sechsstellige Code wird für zwei Minuten auf dem gekoppelten Tablet angezeigt.');
+    const ortId=$('pruefung-standort').value;
+    if(!ortId)throw Error('Bitte zuerst einen Standort auswählen.');
+    await request('/api/pruefung/code-anfordern',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ortId:Number(ortId)})});
+    notice('Der sechsstellige Code wird für zwei Minuten auf dem Prüfdisplay für '+$('pruefung-standort').selectedOptions[0].text+' angezeigt.');
   }catch(error){notice('Tablet-Code konnte nicht angezeigt werden: '+error.message);}
-  finally{button.disabled=false;}
+  finally{button.disabled=!$('pruefung-standort').value;}
 });
 $('onsite-unlock').addEventListener('submit',async event=>{
   event.preventDefault();const form=event.currentTarget;
   try{
     await request('/api/pruefung/freischalten',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(Object.fromEntries(new FormData(form)))});
+      body:JSON.stringify({...Object.fromEntries(new FormData(form)),ortId:Number($('pruefung-standort').value)})});
     form.reset();form.hidden=true;
     // Aktuelle Sperrungen nochmals abrufen, bevor die Fachkraft Stationen auswählt.
     await loadStations();

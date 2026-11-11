@@ -639,7 +639,7 @@
         elt('p',!device.aktiv?'Zugang gesperrt':
           device.online?'Erreichbar – letztes Lebenszeichen innerhalb von 45 Sekunden':
           'Keine aktuelle Verbindung – Codeanforderung nicht möglich'),
-        elt('p',device.pruefdisplay?'Ausgewähltes Prüfdisplay für sechsstellige Codes':
+        elt('p',device.pruefdisplay?'Prüfdisplay für '+(device.standort||'zugewiesenen Standort'):
           'Nur Werbeanzeige – keine Prüfcodes'),
         elt('p','Zuletzt gemeldet: '+lastSeen),
         elt('p','Gekoppelt: '+new Date(device.gekoppelt_am).toLocaleString('de-DE')),
@@ -682,14 +682,14 @@
         block.append(siteLabel,saveSite);
       }
       if(device.aktiv&&!device.pruefdisplay){
-        const select=elt('button','Als Prüfdisplay auswählen');select.type='button';
+        const select=elt('button','Als Prüfdisplay für diesen Standort auswählen');select.type='button';
         select.className='btn secondary';
         select.addEventListener('click',async()=>{
-          if(!confirm('Dieses Tablet als einziges Prüfdisplay festlegen? Noch gültige Prüfcodes werden dadurch ungültig.'))return;
+          if(!confirm('Dieses Tablet als Prüfdisplay für den zugewiesenen Standort festlegen? Ein bisheriges Prüfdisplay an diesem Standort wird ersetzt.'))return;
           select.disabled=true;
           try{
             await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id)+'/pruefdisplay',{method:'PATCH'});
-            find('tablet-admin-status').textContent='Prüfdisplay umgestellt. Bisherige Codes sind ungültig.';
+            find('tablet-admin-status').textContent='Prüfdisplay für diesen Standort gespeichert. Bisherige Codes dieses Standorts sind ungültig.';
             await refresh();
           }catch(error){
             find('tablet-admin-status').textContent='Prüfdisplay konnte nicht umgestellt werden: '+error.message;
