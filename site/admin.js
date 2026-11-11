@@ -304,6 +304,7 @@ async function refresh() {
     await rechnungenLaden();
 
     await erlebnisangeboteLaden();
+    await teamerbaseProgrammeLaden();
     await window.besuchergruppenAdminLaden?.();
     await orteLaden();
     await mitarbeiterbereicheLaden();
@@ -2973,5 +2974,56 @@ document.getElementById('invoice-backfill')?.addEventListener('click',async even
   status.textContent='Vollständig bezahlte Buchungen werden geprüft …';
   try{const result=await api('/api/admin/rechnungen/ausstehend',{method:'POST'});status.textContent=`Nachverarbeitung abgeschlossen: ${result.verarbeitet} Rechnung(en) bearbeitet.`;await rechnungenLaden();}
   catch(error){status.textContent='Nachverarbeitung fehlgeschlagen: '+error.message;}
+  finally{button.disabled=false;}
+});
+
+async function teamerbaseProgrammeLaden(){
+  const list=document.getElementById('teamerbase-program-list');
+  const status=document.getElementById('teamerbase-sync-status');
+  if(!list||!status)return;
+  try{
+    const result=await api('/api/admin/teamerbase/programme');
+    list.replaceChildren();
+    if(!result.konfiguriert){
+      status.textContent='Der eingeschränkte Teamerbase-Lesezugang ist noch nicht in Render eingerichtet. Die Programmregeln können hier bereits gepflegt werden.';
+    }else if(result.status?.letzter_fehler){
+      status.textContent='Letzter Abgleichfehler: '+result.status.letzter_fehler;
+    }else if(result.status?.zuletzt_geprueft_am){
+      status.textContent='Zuletzt abgeglichen: '+new Date(result.status.zuletzt_geprueft_am).toLocaleString('de-DE')+' · '+result.status.anzahl_termine+' Termine im Standortfilter.';
+    }else status.textContent='Noch kein erfolgreicher Abgleich erfolgt.';
+    if(!result.programme.length){list.append(el('p','Noch keine Teamerbase-Programmnamen gespeichert.'));return;}
+    for(const program of result.programme){
+      const form=el('form');form.className='booking';
+      const title=el('strong',program.source_name+' · '+program.standort);
+      const display=el('label','Anzeigename');const nameInput=el('input');nameInput.name='name';nameInput.maxLength=180;nameInput.required=true;nameInput.value=program.angezeigter_name;display.append(nameInput);
+      const ruleLabel=el('label','Turmregel');const rule=el('select');
+      for(const [value,label] of [['pruefen','Noch prüfen'],['turm','Benötigt Kletterturm'],['kein_turm','Kein Kletterturm']]){const option=el('option',label);option.value=value;rule.append(option);}
+      rule.value=program.turm_bedarf;ruleLabel.append(rule);
+      const save=el('button','Änderungen speichern');save.type='submit';save.className='btn secondary';
+      const remove=el('button','Programmregel löschen');remove.type='button';remove.className='btn danger';
+      form.append(title,display,ruleLabel,save,remove);
+      form.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;
+        try{await api('/api/admin/teamerbase/programme/'+program.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({angezeigterName:nameInput.value,turmBedarf:rule.value})});status.textContent='Programmregel gespeichert.';await teamerbaseProgrammeLaden();}
+        catch(error){status.textContent='Programmregel konnte nicht gespeichert werden: '+error.message;save.disabled=false;}
+      });
+      remove.addEventListener('click',async()=>{if(!confirm('Programmregel für „'+program.source_name+'“ aus der Verwaltung entfernen?'))return;remove.disabled=true;
+        try{await api('/api/admin/teamerbase/programme/'+program.id,{method:'DELETE'});await teamerbaseProgrammeLaden();}
+        catch(error){status.textContent='Programmregel konnte nicht entfernt werden: '+error.message;remove.disabled=false;}
+      });
+      list.append(form);
+    }
+  }catch(error){status.textContent='Teamerbase-Programmnamen konnten nicht geladen werden: '+error.message;}
+}
+
+document.getElementById('teamerbase-program-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]'),status=document.getElementById('teamerbase-sync-status');button.disabled=true;
+  try{await api('/api/admin/teamerbase/programme',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({angezeigterName:form.elements.angezeigterName.value,standort:form.elements.standort.value,turmBedarf:form.elements.turmBedarf.value})});form.reset();form.elements.standort.value='Brilon';await teamerbaseProgrammeLaden();}
+  catch(error){status.textContent='Programmregel konnte nicht angelegt werden: '+error.message;}
+  finally{button.disabled=false;}
+});
+document.getElementById('teamerbase-sync-now')?.addEventListener('click',async event=>{
+  const button=event.currentTarget,status=document.getElementById('teamerbase-sync-status');button.disabled=true;
+  try{const result=await api('/api/admin/teamerbase/sync',{method:'POST'});status.textContent=result.synced?`Abgleich abgeschlossen: ${result.anzahlTermine} Termine übernommen.`:result.reason||'Abgleich wurde übersprungen.';await teamerbaseProgrammeLaden();await kalenderLaden();}
+  catch(error){status.textContent=error.message;}
   finally{button.disabled=false;}
 });

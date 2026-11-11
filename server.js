@@ -27,6 +27,7 @@ const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
 const { createKundenfeedbackApi } = require('./lib/kundenfeedback-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { createWissensportalApi } = require('./lib/wissensportal-api');
+const { createTeamerbaseSync } = require('./lib/teamerbase-kalender');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild } = require('./lib/bilddatei');
 const { createClamScanner } = require('./lib/malware-scanner');
@@ -52,6 +53,7 @@ const securityHeaders={
 };
 const brevoMail=createBrevoMailer();
 const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
+const teamerbaseSync=createTeamerbaseSync({pool});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
 function demoRedact(value){
@@ -2510,6 +2512,9 @@ preis=safeText(d.preis,50);
         const start=monat+'-01';
         const endDate=new Date(Date.UTC(Number(match[1]),Number(match[2]),1));
         const ende=endDate.toISOString().slice(0,10);
+        // Refresh imported Teamerbase appointments when the 72-hour interval is due.
+        try{await teamerbaseSync.sync();}
+        catch(error){console.error('Teamerbase-Kalenderabgleich fehlgeschlagen:',error.message);}
         const q=await pool.query(
           `SELECT id,data,status,created_at
            FROM brilon_buchungen
@@ -2517,7 +2522,59 @@ preis=safeText(d.preis,50);
              AND COALESCE(status,'offen') IN ('offen','bestaetigt')
            ORDER BY data->>'datum',data->>'uhrzeit',created_at`,[start,ende]
         );
-        return reply(res,200,q.rows);
+        const externe=await pool.query(`SELECT t.source_uid,COALESCE(p.angezeigter_name,p.source_name,t.titel) AS titel,
+              t.standort,t.datum::text AS datum,t.uhrzeit,t.enddatum::text AS enddatum,t.endzeit,t.ganztags,
+              COALESCE(p.turm_bedarf,'pruefen') AS turm_bedarf
+            FROM brilon_teamerbase_termine t LEFT JOIN brilon_teamerbase_programme p
+              ON p.source_name=t.titel AND p.standort=t.standort AND p.ignoriert=false
+            WHERE t.datum < $2::date AND COALESCE(t.enddatum,t.datum) >= $1::date AND t.storniert=false
+            ORDER BY t.datum,t.uhrzeit,t.titel`,[start,ende]);
+        return reply(res,200,[...q.rows,...externe.rows.map(e=>({
+          id:e.source_uid,status:'teamerbase',source:'teamerbase',
+          data:{datum:e.datum,uhrzeit:e.uhrzeit,angebot:e.titel,veranstaltungsort:e.standort,
+            enddatum:e.enddatum,endzeit:e.endzeit,ganztags:e.ganztags,turmBedarf:e.turm_bedarf}
+        }))]);
+      }
+
+      if(route==='/api/admin/teamerbase/programme'&&req.method==='GET'){
+        const q=await pool.query(`SELECT id,source_name,standort,angezeigter_name,turm_bedarf,
+            zuletzt_gesehen_am,aktualisiert_am FROM brilon_teamerbase_programme WHERE ignoriert=false
+          ORDER BY standort,source_name`);
+        const status=await pool.query(`SELECT zuletzt_geprueft_am,letzter_fehler,anzahl_termine
+          FROM brilon_teamerbase_sync_status WHERE id=1`);
+        return reply(res,200,{programme:q.rows,status:status.rows[0]||null,
+          konfiguriert:Boolean(process.env.TEAMERBASE_CALDAV_URL&&process.env.TEAMERBASE_CALDAV_USER&&process.env.TEAMERBASE_CALDAV_PASSWORD)});
+      }
+      if(route==='/api/admin/teamerbase/programme'&&req.method==='POST'){
+        const d=await body(req),name=safeText(d.angezeigterName,180),location=safeText(d.standort,100);
+        const rule=safeText(d.turmBedarf,20)||'pruefen';
+        if(!name||!location||!['pruefen','turm','kein_turm'].includes(rule))
+          return reply(res,400,{error:'Bitte Programmtitel, Standort und gültige Turmregel angeben.'});
+        const q=await pool.query(`INSERT INTO brilon_teamerbase_programme(source_name,standort,angezeigter_name,turm_bedarf)
+          VALUES($1,$2,$1,$3) ON CONFLICT(source_name,standort) DO UPDATE SET ignoriert=false,
+            angezeigter_name=EXCLUDED.angezeigter_name,turm_bedarf=EXCLUDED.turm_bedarf,aktualisiert_am=NOW()
+          RETURNING id`,[name,location,rule]);
+        return reply(res,201,{id:q.rows[0].id});
+      }
+      const teamerbaseProgramme=route.match(/^\/api\/admin\/teamerbase\/programme\/(\d+)$/);
+      if(teamerbaseProgramme&&req.method==='PATCH'){
+        const d=await body(req),name=safeText(d.angezeigterName,180),rule=safeText(d.turmBedarf,20);
+        if(!name||!['pruefen','turm','kein_turm'].includes(rule))
+          return reply(res,400,{error:'Bitte Programmanzeige und gültige Turmregel angeben.'});
+        const q=await pool.query(`UPDATE brilon_teamerbase_programme SET angezeigter_name=$1,turm_bedarf=$2,aktualisiert_am=NOW()
+          WHERE id=$3 RETURNING id`,[name,rule,teamerbaseProgramme[1]]);
+        if(!q.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+        return reply(res,200,{success:true});
+      }
+      if(teamerbaseProgramme&&req.method==='DELETE'){
+        const q=await pool.query(`UPDATE brilon_teamerbase_programme SET ignoriert=true,aktualisiert_am=NOW()
+          WHERE id=$1 AND ignoriert=false RETURNING id`,[teamerbaseProgramme[1]]);
+        if(!q.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+        return reply(res,200,{success:true});
+      }
+      if(route==='/api/admin/teamerbase/sync'&&req.method==='POST'){
+        try{return reply(res,200,await teamerbaseSync.sync({force:true}));}
+        catch(error){return reply(res,502,{error:'Teamerbase-Abgleich fehlgeschlagen: '+safeText(error.message,240)});}
       }
 
       if(route==='/api/admin/zahlungsuebersicht'&&req.method==='GET'){
@@ -3866,6 +3923,11 @@ async function ensureKundenbestaetigungEinstellungen(){
 async function start(){
   if(pool){
     await pool.query('SELECT 1');
+    if(process.env.RUN_TEAMERBASE_CALENDAR_MIGRATION==='true'){
+      const sql=fs.readFileSync(path.join(__dirname,'db/migrations/2026-11-11-teamerbase-calendar.sql'),'utf8');
+      await pool.query(sql);
+      console.log('Teamerbase-Kalenderschema geprüft (RUN_TEAMERBASE_CALENDAR_MIGRATION=true)');
+    }
     if(process.env.RUN_PROGRAM_GROUPS_MIGRATION==='true'){
       const offerTable=await pool.query("SELECT to_regclass('public.brilon_angebote') AS relation");
       if(offerTable.rows[0]?.relation){
@@ -4421,6 +4483,19 @@ await pool.query(`
     await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
+    }
+    if(process.env.MOCK_PG!=='1'&&process.env.TEAMERBASE_CALDAV_URL&&
+       process.env.TEAMERBASE_CALDAV_USER&&process.env.TEAMERBASE_CALDAV_PASSWORD){
+      try{
+        await pool.query('SELECT id FROM brilon_teamerbase_sync_status LIMIT 0');
+        const teamerbaseTimer=setInterval(()=>{
+          teamerbaseSync.sync().catch(error=>console.error('Teamerbase-Kalenderabgleich fehlgeschlagen:',error.message));
+        },60*60*1000);
+        teamerbaseTimer.unref();
+        teamerbaseSync.sync().catch(error=>console.error('Teamerbase-Erstabgleich fehlgeschlagen:',error.message));
+      }catch(error){
+        console.warn('Teamerbase-Kalenderabgleich nicht gestartet; Schema fehlt möglicherweise:',error.message);
+      }
     }
     if(process.env.MOCK_PG!=='1'){
       await pool.query(`ALTER TABLE brilon_angebote

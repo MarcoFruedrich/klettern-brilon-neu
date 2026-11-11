@@ -526,6 +526,18 @@
     <nav id="admin-program-picker" class="admin-program-picker" aria-label="Erstellte Programme auswählen"></nav>
   </div>
   <div id="angebote-admin-liste"></div>
+  <hr>
+  <h3>Teamerbase-Kalenderprogramme</h3>
+  <p>Programmbezeichnungen der synchronisierten Termine separat pflegen. Neue Namen erscheinen nach dem Abgleich automatisch mit dem Status „Noch prüfen“. Es werden nur Kalenderkennung, Titel, Standort und Terminzeiten angefordert.</p>
+  <p id="teamerbase-sync-status" role="status" aria-live="polite"></p>
+  <button id="teamerbase-sync-now" type="button" class="btn secondary">Jetzt mit Teamerbase abgleichen</button>
+  <form id="teamerbase-program-form" class="booking">
+    <label>Programmname<input name="angezeigterName" maxlength="180" required></label>
+    <label>Standort<input name="standort" maxlength="100" value="Brilon" required></label>
+    <label>Turmregel<select name="turmBedarf"><option value="pruefen">Noch prüfen</option><option value="turm">Benötigt Kletterturm</option><option value="kein_turm">Kein Kletterturm</option></select></label>
+    <button type="submit" class="btn">Programmregel hinzufügen</button>
+  </form>
+  <div id="teamerbase-program-list" class="admin-grid"></div>
 </section>
 
 <section id="besuchergruppen-admin-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="besuchergruppen-admin-heading">
@@ -815,7 +827,7 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261110-program-groups-v2"></script>
+  <script src="/admin.js?v=20261111-teamerbase-calendar"></script>
   <script src="/medienpool-admin.js?v=20261110-gif-media-v2"></script>
   <script src="/besuchergruppen-admin.js?v=20261110-custom-groups-gif-icons-v3"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
