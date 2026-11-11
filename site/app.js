@@ -20,6 +20,24 @@ function datumIstGesperrt(datum){
     (standort&&e.standorte.includes(standort)));
   return sperrzeitenGeladen&&window.sperrzeitEnthaelt(datum,passend);
 }
+function datumTeilweiseBelegt(datum){
+  const standort=standortAuswahl?.value||'';
+  return sperrzeitenGeladen&&sperrzeiten.some(entry=>{
+    if(Array.isArray(entry.standorte)&&entry.standorte.length&&
+      (!standort||!entry.standorte.includes(standort)))return false;
+    const end=typeof entry.enddatum==='string'?entry.enddatum:entry.datum;
+    if(datum<entry.datum||datum>end)return false;
+    const timeMinutes=value=>{
+      if(typeof value!=='string')return null;
+      const match=value.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/);
+      return match?Number(match[1])*60+Number(match[2]):null;
+    };
+    const start=timeMinutes(entry.uhrzeit),finish=timeMinutes(entry.endzeit);
+    if(start===null||finish===null||finish<=start)return false;
+    if(entry.datum===end)return true;
+    return datum===entry.datum||datum===end;
+  });
+}
 const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 const angebotAuswahl = document.getElementById('angebot-auswahl');
@@ -289,8 +307,10 @@ function datumPruefen() {
   const gesperrt=datumIstGesperrt(gewaehltesDatum);
 
   verfuegbarkeit.textContent = gesperrt
-    ? '⛔ Dieser Tag ist gesperrt. Bitte wähle ein anderes Datum.'
-    : '✓ Für diesen Tag kannst du eine Terminanfrage stellen.';
+    ? '⛔ Für diesen Tag liegt eine ganztägige Sperrzeit vor.'
+    : datumTeilweiseBelegt(gewaehltesDatum)
+      ? '◷ Bereits gebuchte Zeitfenster sind belegt. Davor, dazwischen oder danach kannst du freie Zeiten anfragen.'
+      : '✓ Für diesen Tag kannst du eine Terminanfrage stellen.';
 }
 
 const kalenderBereich = document.getElementById('buchungskalender');
@@ -375,6 +395,7 @@ function kalenderAnzeigen() {
       String(tag).padStart(2, '0');
 
     const gesperrt=datumIstGesperrt(datumWert);
+    const teilweiseBelegt=!gesperrt&&datumTeilweiseBelegt(datumWert);
 
     const knopf = document.createElement('button');
     knopf.type = 'button';
@@ -382,7 +403,11 @@ function kalenderAnzeigen() {
     knopf.className = 'kalender-tag';
 
     if (gesperrt) knopf.classList.add('gesperrt');
-    else if (sperrzeitenGeladen) knopf.classList.add('frei');
+    else if (teilweiseBelegt) {
+      knopf.classList.add('teilweise-belegt');
+      knopf.title='Bereits gebuchte Zeitfenster – andere Uhrzeiten können noch frei sein';
+      knopf.setAttribute('aria-label',tag+' teilweise belegt; andere Zeiten können noch frei sein');
+    } else if (sperrzeitenGeladen) knopf.classList.add('frei');
 
     if (date.value === datumWert) {
       knopf.classList.add('ausgewaehlt');
@@ -403,6 +428,21 @@ function kalenderAnzeigen() {
   }
 
   kalenderBereich.append(tage);
+  const legend=document.createElement('div');
+  legend.className='kalender-legende';
+  legend.setAttribute('aria-label','Kalenderlegende');
+  const legende=[
+    ['frei','Freie Termine – Buchungsanfrage möglich'],
+    ['teilweise-belegt','Bereits gebuchte Zeitfenster – andere Uhrzeiten können frei sein'],
+    ['gesperrt','Sperrzeit – an diesem Tag keine Buchung möglich']
+  ];
+  for(const [klasse,beschreibung] of legende){
+    const item=document.createElement('span');item.className='kalender-legende-eintrag';
+    const farbe=document.createElement('i');farbe.className='kalender-legende-farbe '+klasse;farbe.setAttribute('aria-hidden','true');
+    const text=document.createElement('span');text.textContent=beschreibung;
+    item.append(farbe,text);legend.append(item);
+  }
+  kalenderBereich.append(legend);
 }
 
 kalenderAnzeigen();

@@ -412,17 +412,34 @@ function buchungsfenster(data){
 function ueberschneidung(a,b){
   return !a||!b||a[0]<b[1]&&b[0]<a[1];
 }
+function kalenderfensterFuerDatum(entry,datum){
+  if(!entry||typeof datum!=='string')return null;
+  const startTag=typeof entry.datum==='string'?entry.datum:'';
+  const endeTag=typeof entry.enddatum==='string'?entry.enddatum:startTag;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(startTag)||!/^\d{4}-\d{2}-\d{2}$/.test(endeTag)||datum<startTag||datum>endeTag)return null;
+  const timeMinutes=value=>{
+    if(typeof value!=='string'||!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?$/.test(value))return null;
+    return minuten(value.slice(0,5));
+  };
+  const startZeit=timeMinutes(entry.uhrzeit),endeZeit=timeMinutes(entry.endzeit);
+  if(startTag===endeTag&&(startZeit===null||endeZeit===null))return [0,1440];
+  const start=datum===startTag?(startZeit??0):0;
+  const ende=datum===endeTag?(endeZeit??1440):1440;
+  return ende>start?[start,ende]:[0,1440];
+}
 async function pruefeBuchungskonflikt(client,datum,fenster,ausnahmeId=null,gleicheSitzung=null,standort=null){
   const sperrung=await client.query(
-    `SELECT id FROM brilon_kalender
+    `SELECT datum::text AS datum,COALESCE(enddatum,datum)::text AS enddatum,
+       uhrzeit::text AS uhrzeit,endzeit::text AS endzeit
+     FROM brilon_kalender
      WHERE typ IN ('sperrzeit','termin')
      AND datum <= $1::date
      AND COALESCE(enddatum,datum) >= $1::date
      AND (COALESCE(cardinality(standorte),0)=0 OR ($2::text IS NOT NULL AND $2=ANY(standorte)))
-     LIMIT 1`,[datum,standort]
+     ORDER BY datum,uhrzeit`,[datum,standort]
   );
-  if(sperrung.rowCount)
-    return 'Dieser Tag ist leider gesperrt. Bitte wähle ein anderes Datum.';
+  if(sperrung.rows.some(entry=>ueberschneidung(fenster,kalenderfensterFuerDatum(entry,datum))))
+    return 'Dieser Zeitraum ist bereits durch einen Termin oder eine Sperrzeit belegt. Bitte wähle eine andere Uhrzeit.';
 
   const q=await client.query(
     `SELECT id,data FROM brilon_buchungen
@@ -477,7 +494,10 @@ async function anschlussApi(req,res,url,route,ip){
     const [programs,bookings,blocked]=await Promise.all([
       pool.query(`SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,kapazitaet,verfuegbare_termine,veranstaltungsort FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
       pool.query(`SELECT id,data FROM brilon_buchungen WHERE data->>'datum'=$1 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum]),
-      pool.query(`SELECT COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender WHERE typ IN ('sperrzeit','termin') AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date`,[base.datum])
+      pool.query(`SELECT datum::text AS datum,COALESCE(enddatum,datum)::text AS enddatum,
+        uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,COALESCE(standorte,'{}'::text[]) AS standorte
+        FROM brilon_kalender WHERE typ IN ('sperrzeit','termin')
+          AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date`,[base.datum])
     ]);
     const participants=Number(base.teilnehmer);
     if(!Number.isInteger(participants)||participants<1||participants>1000)
@@ -485,15 +505,17 @@ async function anschlussApi(req,res,url,route,ip){
     const occupied=bookings.rows.filter(b=>b.id!==parentId).map(b=>buchungsfenster(b.data));
     const suggestions=[];
     for(const p of programs.rows){
-      if(blocked.rows.some(entry=>!entry.standorte.length||entry.standorte.includes(p.veranstaltungsort)))continue;
       if(p.name===base.angebot)continue;
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
       const price=preisFuerTeilnehmer(p.preise,participants,p.gruppenstufen),duration=buchungsdauerFuerProgramm(participants,p);
       if((dates.length&&!dates.includes(base.datum))||participants>Number(p.kapazitaet)||price===null||!Number.isInteger(duration)||duration<1)continue;
       const cap=await pool.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum,p.name]);
       if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))continue;
+      const calendarWindows=blocked.rows.filter(entry=>!entry.standorte.length||entry.standorte.includes(p.veranstaltungsort))
+        .map(entry=>kalenderfensterFuerDatum(entry,base.datum)).filter(Boolean);
       const times=zugelasseneAnschlusszeiten(window[0],window[1],duration)
-        .filter(t=>!occupied.some(w=>ueberschneidung([t.beginnMinuten,t.endeMinuten],w)))
+        .filter(t=>!occupied.some(w=>ueberschneidung([t.beginnMinuten,t.endeMinuten],w))&&
+          !calendarWindows.some(w=>ueberschneidung([t.beginnMinuten,t.endeMinuten],w)))
         .map(t=>({...t,uhrzeit:String(Math.floor(t.beginnMinuten/60)).padStart(2,'0')+':00'}));
       if(times.length){const quote=anschlussPreis(price);suggestions.push({id:p.id,name:p.name,beschreibung:p.beschreibung,dauer:duration,
         originalCent:quote.originalCent,rabattCent:quote.rabattCent,endpreisCent:quote.endpreisCent,zeiten:times});}
@@ -912,7 +934,7 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         if(Number(kapazitaet.rows[0].gebucht)+teilnehmer>Number(programm.kapazitaet))
           return {konflikt:'Die Kapazität für dieses Programm ist am gewählten Tag ausgeschöpft.'};
         const konflikt=await pruefeBuchungskonflikt(client,datum,fenster,null,
-          einzelplatz?{angebot,uhrzeit:data.uhrzeit}:null,programm.veranstaltungsort);
+          einzelplatz?{angebot,uhrzeit:data.uhrzeit}:null,bookingSite);
         if(konflikt)return {konflikt};
 
         const id=crypto.randomUUID();
@@ -1063,6 +1085,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       }
 
       const angebot=safeText(u.searchParams.get('angebot'),120);
+      const standort=safeText(u.searchParams.get('standort'),80);
       const programm=await pool.query(
         `SELECT id,dauer,dauer_modus,gruppenstufen,preise,buchungsmodus,mindestteilnehmer,kapazitaet FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
       );
@@ -1073,6 +1096,13 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         return reply(res,409,{error:'Für diese Teilnehmerzahl ist keine Preisstufe hinterlegt.'});
       const dauer=buchungsdauerFuerProgramm(teilnehmer,programm.rows[0]);
       if(!dauer)return reply(res,409,{error:'Für diese Gruppengröße konnte die Programmdauer nicht berechnet werden.'});
+      const calendar=await pool.query(`SELECT datum::text AS datum,COALESCE(enddatum,datum)::text AS enddatum,
+          uhrzeit::text AS uhrzeit,endzeit::text AS endzeit
+        FROM brilon_kalender WHERE typ IN ('sperrzeit','termin')
+          AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date
+          AND (COALESCE(cardinality(standorte),0)=0 OR $2::text IS NULL OR $2=ANY(standorte))
+        ORDER BY datum,uhrzeit`,[datum,standort||null]);
+      const calendarWindows=calendar.rows.map(entry=>kalenderfensterFuerDatum(entry,datum)).filter(Boolean);
 
       const specialId=safeText(u.searchParams.get('sonderaktion_id'),36);
       let requestedTimes=null;
@@ -1084,7 +1114,6 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           if(!tagesangebotPasstZurQuellbuchung(special,source.rows[0]))
             return reply(res,409,{error:'Dieses Tagesangebot ist nicht mehr aktuell, weil sich die zugehörige Buchung geändert hat oder storniert wurde.'});
         }
-        const standort=safeText(u.searchParams.get('standort'),80);
         if(!action.rowCount||special.status!=='freigegeben'||special.datum!==datum||
            String(special.programm_id)!==String(programm.rows[0].id)||safeText(special.quellprogramm,120)!==angebot||
            (standort&&safeText(special.veranstaltungsort,80)!==standort)||
@@ -1105,7 +1134,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
         const sameSession=b=>b.data?.buchungsmodus==='einzelplatz'&&
           b.data?.angebot===angebot&&b.data?.uhrzeit===uhrzeit;
-        const belegt=buchungen.some(b=>
+        const belegt=calendarWindows.some(window=>ueberschneidung(neuesFenster,window))||buchungen.some(b=>
           !(einzelplatz&&sameSession(b))&&ueberschneidung(neuesFenster,b.fenster)
         );
         const angemeldet=einzelplatz?buchungen.filter(sameSession)
@@ -1129,9 +1158,9 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const q=await pool.query(
         `SELECT datum::text AS datum,
                 COALESCE(enddatum,datum)::text AS enddatum,
-                COALESCE(standorte,'{}'::text[]) AS standorte
-         FROM brilon_kalender
-         WHERE typ IN ('sperrzeit','termin')
+                COALESCE(standorte,'{}'::text[]) AS standorte,
+                typ,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit
+         FROM brilon_kalender WHERE typ IN ('sperrzeit','termin')
          ORDER BY datum ASC`
       );
       return reply(res,200,q.rows);

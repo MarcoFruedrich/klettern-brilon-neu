@@ -1217,3 +1217,13 @@ header.site-header{overflow:visible}
 .whatsapp-share-list{display:grid;gap:10px;max-width:920px;}
 .whatsapp-share-list article{background:#fff;border:1px solid #d7e3d9;border-radius:10px;padding:12px;}
 .whatsapp-share-list article p{margin:4px 0;font-size:13px;}
+
+/* Kalender: freie Tage, Teilbelegung und ganztägige Sperrzeiten unterscheiden. */
+.kalender-tag.teilweise-belegt{background:#fff0c2;border-color:#e5bb4a;color:#684b00;}
+.kalender-tag.teilweise-belegt:not(:disabled):hover{border-color:#bd8b10;}
+.kalender-legende{display:flex;flex-wrap:wrap;gap:9px 18px;margin-top:14px;padding-top:12px;border-top:1px solid #dfe7df;color:#315244;font-size:12px;line-height:1.4;}
+.kalender-legende-eintrag{display:inline-flex;align-items:center;gap:7px;min-width:0;}
+.kalender-legende-farbe{display:inline-block;flex:0 0 17px;width:17px;height:17px;border:1px solid transparent;border-radius:5px;}
+.kalender-legende-farbe.frei{background:#e2f1d5;border-color:#9cc69b;}
+.kalender-legende-farbe.teilweise-belegt{background:#fff0c2;border-color:#e5bb4a;}
+.kalender-legende-farbe.gesperrt{background:#f6d9da;border-color:#dca9ae;}
