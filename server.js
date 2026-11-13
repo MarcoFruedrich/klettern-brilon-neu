@@ -593,6 +593,28 @@ async function main(req,res){
         forwardedClient=typeof forwardedFor==='string'?forwardedFor.split(',')[0].trim():'',
         ip=net.isIP(forwardedClient)?forwardedClient:(req.socket.remoteAddress||'unknown');
   try{
+    if(route==='/api/jh-brilon-termine'&&req.method==='GET'){
+      if(!pool)return reply(res,503,{error:'Künftige Brilon-Termine sind derzeit nicht abrufbar.'});
+      const termine=await pool.query(`
+        SELECT k.id AS fenster_id,p.id AS programm_id,p.name AS programm,
+          to_char(d.tag,'YYYY-MM-DD') AS datum,
+          to_char(k.uhrzeit,'HH24:MI') AS uhrzeit,
+          to_char(k.endzeit,'HH24:MI') AS endzeit,
+          k.gruppen_kapazitaet
+        FROM brilon_kalender k
+        CROSS JOIN LATERAL generate_series(k.datum::timestamp,
+          COALESCE(k.enddatum,k.datum)::timestamp,interval '1 day') AS d(tag)
+        JOIN brilon_angebote p ON p.veranstaltungsort='Jugendherberge Brilon'
+          AND (k.programm_id IS NULL OR k.programm_id=p.id)
+        WHERE k.typ='buchungsfenster' AND k.uhrzeit IS NOT NULL AND k.endzeit IS NOT NULL
+          AND d.tag::date >= (NOW() AT TIME ZONE 'Europe/Berlin')::date
+          AND p.archiviert=false AND p.aktiv=true AND p.buchbar=true AND p.veroeffentlicht=true
+          AND (COALESCE(jsonb_array_length(p.verfuegbare_termine),0)=0
+            OR p.verfuegbare_termine ? to_char(d.tag,'YYYY-MM-DD'))
+        ORDER BY d.tag,k.uhrzeit,p.name,k.id
+        LIMIT 500`);
+      return reply(res,200,{termine:termine.rows});
+    }
     // Kanalweise Sichtbarkeit: öffentlich sind nur freigeschaltete Links verfügbar.
     // Die Administration speichert Links und Status dauerhaft im vorhandenen Website-Konfigurationsdatensatz.
     if(route==='/api/social-links'&&req.method==='GET'){

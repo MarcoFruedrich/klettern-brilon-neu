@@ -1266,17 +1266,17 @@ function gpsEtikettenDrucken(tour){
   doc.body.append(sheet);
 }
 
-function qrAnmeldungDrucken(angebot){
+function qrAnmeldungDrucken(){
   const printWindow=window.open('','_blank');
   if(!printWindow){alert('Druckansicht wurde blockiert. Bitte Pop-ups für diese Seite erlauben.');return;}
   printWindow.opener=null;
   const doc=printWindow.document;doc.open();doc.write('<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QR-Anmeldung Brilon</title></head><body></body></html>');doc.close();
   const style=doc.createElement('style');style.textContent='*{box-sizing:border-box}body{font:16px/1.45 system-ui,sans-serif;color:#173d34;margin:0;padding:20px}.toolbar{position:sticky;top:0;background:#fff;padding:8px 0 16px}.toolbar button{font:inherit;font-weight:700;padding:12px 18px}.label{max-width:760px;margin:8mm auto;border:2px solid #236148;border-radius:16px;padding:10mm;text-align:center}.label h1{margin:0 0 8px}.label img{display:block;width:min(70vw,300px);height:auto;margin:16px auto}.hint{font-size:14px;color:#40564d}@media print{body{padding:0}.toolbar{display:none}.label{margin:0 auto;border:0}}';doc.head.append(style);
   const toolbar=doc.createElement('div');toolbar.className='toolbar';const button=doc.createElement('button');button.type='button';button.textContent='QR-Code drucken';button.onclick=()=>printWindow.print();toolbar.append(button);doc.body.append(toolbar);
-  const card=doc.createElement('main');card.className='label';card.append(Object.assign(doc.createElement('h1'),{textContent:'Klettern & Abenteuer · Jugendherberge Brilon'}),Object.assign(doc.createElement('h2'),{textContent:angebot.name}));
-  try{const target=new URL('/',location.origin);target.searchParams.set('zugang','jh-brilon');target.searchParams.set('programm',String(angebot.id));const image=doc.createElement('img');image.alt='QR-Code zur Programmanmeldung';image.src=window.GPSQrEtiketten.dataUri(target.toString());card.append(image);}
+  const card=doc.createElement('main');card.className='label';card.append(Object.assign(doc.createElement('h1'),{textContent:'Klettern & Abenteuer · Jugendherberge Brilon'}),Object.assign(doc.createElement('h2'),{textContent:'Künftige Programme und Termine'}));
+  try{const target=new URL('/',location.origin);target.searchParams.set('zugang','jh-brilon');target.hash='buchung';const image=doc.createElement('img');image.alt='Dauerhafter QR-Code zur Brilon-Terminübersicht';image.src=window.GPSQrEtiketten.dataUri(target.toString());card.append(image);}
   catch(error){printWindow.close();alert('QR-Code konnte nicht erzeugt werden: '+error.message);return;}
-  const note=doc.createElement('p');note.className='hint';note.textContent='Scanne den QR-Code mit dem Handy, wähle Termin und Personenzahl und trage deine Zimmernummer ein.';card.append(note);doc.body.append(card);
+  const note=doc.createElement('p');note.className='hint';note.textContent='Dieser QR-Code bleibt gleich. Gäste sehen die künftig freigegebenen Programme und Termine und tragen anschließend Name und Zimmernummer ein.';card.append(note);doc.body.append(card);
 }
 
 async function adminGaestelisteLaden(){
@@ -1680,6 +1680,7 @@ if (!workspace.hidden) {
 
 const kalenderFormular = document.getElementById('calendar-form');
 const kalenderFormStatus = document.getElementById('calendar-form-status');
+document.getElementById('brilon-permanent-qr-print')?.addEventListener('click',()=>qrAnmeldungDrucken());
 const kalenderEintraege = document.getElementById('calendar-entries');
 const kalenderAlleStandorte = document.getElementById('calendar-all-sites');
 const kalenderStandortListe = document.getElementById('calendar-site-list');
@@ -2359,15 +2360,6 @@ async function erlebnisangeboteLaden() {
 
       const titel = document.createElement('h3');
       titel.textContent = angebot.name;
-      const angebotOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
-        ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
-      if(!angebot.archiviert&&angebot.aktiv!==false&&angebot.buchbar!==false&&angebot.veroeffentlicht!==false&&angebotOrte.includes('Jugendherberge Brilon')){
-        const qrButton=document.createElement('button');qrButton.type='button';qrButton.className='btn secondary';
-        qrButton.textContent='QR-Anmeldung für Brilon drucken';
-        qrButton.addEventListener('click',()=>qrAnmeldungDrucken(angebot));
-        eintrag.append(qrButton);
-      }
-
       if(angebot.archiviert){
         titel.textContent='Archiviert · '+angebot.name;
         const wiederherstellen=document.createElement('button');

@@ -481,6 +481,13 @@ const form = document.getElementById('booking');
 if(qrAnmeldung){
   const intake=document.getElementById('hostel-qr-intake'),room=document.getElementById('hostel-room-number');
   if(intake)intake.hidden=false;if(room)room.required=true;
+  const slots=document.getElementById('qr-future-slots');if(slots)slots.hidden=false;
+  const heading=document.querySelector('#buchung h2');if(heading)heading.textContent='Für ein Programm anmelden';
+  const intro=document.querySelector('#buchung > div p');
+  if(intro)intro.textContent='Wähle ein künftiges Programm und Zeitfenster aus der Liste. Trage anschließend deine Daten und Zimmernummer ein.';
+  const participants=document.getElementById('buchungs-teilnehmer');if(participants)participants.value='1';
+  const guest=document.getElementById('ist-gast');if(guest){guest.value='ja';guest.dispatchEvent(new Event('change',{bubbles:true}));}
+  const guestProperty=document.getElementById('gast-einrichtung');if(guestProperty)guestProperty.value='Jugendherberge Brilon';
   const site=document.getElementById('buchungs-standort');
   if(site){site.value='Jugendherberge Brilon';site.dispatchEvent(new Event('change',{bubbles:true}));}
 }
@@ -1006,6 +1013,44 @@ async function angeboteLaden() {
     angeboteFuerStandortAnzeigen();
     einzelplatzFormAktualisieren();
     angeboteFertig=true;
+    if(qrAnmeldung){
+      const slotList=document.getElementById('qr-future-slots-list');
+      try{
+        const response=await fetch('/api/jh-brilon-termine',{cache:'no-store'});
+        if(!response.ok)throw new Error('Termine nicht abrufbar');
+        const data=await response.json(),heute=buchungstagInBerlin();
+        const future=(Array.isArray(data.termine)?data.termine:[]).filter(item=>item.datum>=heute);
+        slotList.replaceChildren();
+        if(!future.length){
+          slotList.textContent='Zurzeit sind keine künftigen Termine freigegeben. Bitte frage an der Rezeption nach.';
+        }else for(const slot of future){
+          const card=document.createElement('article');card.className='qr-future-slot';
+          const title=document.createElement('h3');title.textContent=slot.programm;
+          const details=document.createElement('p');
+          const dateText=new Intl.DateTimeFormat('de-DE',{dateStyle:'full',timeZone:'UTC'}).format(new Date(slot.datum+'T12:00:00Z'));
+          details.textContent=dateText+' · '+slot.uhrzeit+'–'+slot.endzeit+' Uhr';
+          const button=document.createElement('button');button.type='button';button.className='btn secondary';button.textContent='Diesen Termin auswählen';
+          button.addEventListener('click',async()=>{
+            standortAuswahl.value='Jugendherberge Brilon';
+            angeboteFuerStandortAnzeigen();
+            auswahl.value=slot.programm;
+            auswahl.dispatchEvent(new Event('change',{bubbles:true}));
+            date.value=slot.datum;
+            date.dispatchEvent(new Event('change',{bubbles:true}));
+            uhrzeitAuswahl.disabled=true;
+            await belegteUhrzeitenLaden();
+            if(Array.from(uhrzeitAuswahl.options).some(option=>option.value===slot.uhrzeit))uhrzeitAuswahl.value=slot.uhrzeit;
+            slotList.querySelectorAll('.qr-future-slot').forEach(element=>element.classList.remove('selected'));
+            card.classList.add('selected');
+            document.getElementById('buchung')?.scrollIntoView({behavior:'smooth',block:'start'});
+            document.getElementById('buchungs-teilnehmer')?.focus({preventScroll:true});
+          });
+          card.append(title,details,button);slotList.append(card);
+        }
+      }catch(error){
+        slotList.textContent='Die künftigen Termine konnten gerade nicht geladen werden. Bitte lade die Seite erneut.';
+      }
+    }
     angebotslinkAnwenden();
   } catch (fehler) {
     console.error('Erlebnisangebote oder Veranstaltungsorte konnten nicht geladen werden:', fehler);

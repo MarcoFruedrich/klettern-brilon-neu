@@ -1011,6 +1011,13 @@ line-height:1.25;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .calendar-central-times-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .calendar-central-times-toggle { display:flex; align-items:center; gap:10px; }
 .calendar-central-times-toggle input { width:20px; height:20px; }
+.qr-future-slots { margin:16px 0; padding:16px; border:1px solid #b9d5c2; border-radius:14px; background:#f2f8f3; }
+.qr-future-slots-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:12px; }
+.qr-future-slot { padding:14px; border:1px solid #d1ded4; border-radius:12px; background:#fff; }
+.qr-future-slot h3 { margin:0 0 6px; }
+.qr-future-slot p { margin:0 0 12px; }
+.qr-future-slot.selected { border:2px solid #168447; box-shadow:0 0 0 2px #16844722; }
+.qr-future-slot .btn { width:100%; }
 @media(max-width:640px) {
   #buchung { scroll-margin-top:76px; }
   #buchung form { padding:18px; border-radius:16px; }
