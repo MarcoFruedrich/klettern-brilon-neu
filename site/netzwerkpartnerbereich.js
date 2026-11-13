@@ -17,6 +17,18 @@ async function loadProfile(){
   addProfile('Ansprechperson',profile.ansprechpartner);addProfile('E-Mail',profile.email);
   addProfile('Telefon',profile.telefon);addProfile('Anschrift',[profile.strasse,[profile.plz,profile.ort].filter(Boolean).join(' ')].filter(Boolean).join(', '));
   addProfile('Weitere Kontakthinweise',profile.weitere_angaben);
+  const events=document.getElementById('partner-calendar-events');events.replaceChildren();
+  try{
+    const brilon=await request('/api/netzwerkpartner/brilon-kalender');
+    if(!brilon.events.length)events.append(Object.assign(document.createElement('p'),{textContent:'Für diesen Zeitraum sind keine Kalendereinträge vorhanden.'}));
+    for(const event of brilon.events){
+      const card=document.createElement('article');card.className='card';
+      const title=document.createElement('h4');title.textContent=event.titel||event.art;card.append(title);
+      const when=document.createElement('p');when.textContent=`${new Date(`${event.datum}T12:00:00`).toLocaleDateString('de-DE')} · ${event.uhrzeit?String(event.uhrzeit).slice(0,5)+' Uhr':''}${event.endzeit?' bis '+String(event.endzeit).slice(0,5)+' Uhr':''}`;card.append(when);
+      const kind=document.createElement('p');kind.textContent=event.art;card.append(kind);events.append(card);
+    }
+    document.getElementById('partner-calendar-status').textContent=`Zeitraum ${new Date(`${brilon.von}T12:00:00`).toLocaleDateString('de-DE')} bis ${new Date(`${brilon.bis}T12:00:00`).toLocaleDateString('de-DE')}`;
+  }catch(error){document.getElementById('partner-calendar-status').textContent=error.message;}
 }
 form.addEventListener('submit',async event=>{
   event.preventDefault();const button=form.querySelector('button');button.disabled=true;status.textContent='Anmeldung läuft …';
@@ -29,4 +41,4 @@ document.getElementById('partner-logout').addEventListener('click',async()=>{
   try{await request('/api/netzwerkpartner/logout',{method:'POST'});}catch{}
   workspace.hidden=true;form.hidden=false;form.reset();status.textContent='Du wurdest abgemeldet.';
 });
-loadProfile().then(()=>{status.textContent='Du bist bereits angemeldet.';}).catch(()=>{});
+document.getElementById('partne

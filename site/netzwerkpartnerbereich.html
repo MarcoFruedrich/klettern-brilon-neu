@@ -24,9 +24,14 @@
     <p class="staff-access-status is-active">Zugang freigeschaltet</p>
     <h3>Deine Kontaktdaten</h3>
     <div id="partner-profile" class="staff-contact-list"></div>
-    <p class="hint">Der Bereich ist getrennt von der Verwaltung und dem Mitarbeiterportal. Weitere gemeinsame Funktionen können hier später ergänzt werden.</p>
-  </section>
-</main>
-<script src="/netzwerkpartnerbereich.js?v=20261105-1"></script>
-</body>
-</html>
+    <section class="partner-brilon-calendar">
+      <h3>Kalender Jugendherberge Brilon</h3>
+      <p>Du siehst Belegungen und freigegebene Zeitfenster. Namen und Zimmernummern anderer Gäste werden nicht angezeigt.</p>
+      <button id="partner-calendar-refresh" type="button" class="btn secondary">Kalender aktualisieren</button>
+      <p id="partner-calendar-status" role="status" aria-live="polite"></p>
+      <div id="partner-calendar-events" class="admin-grid"></div>
+    </section>
+    <section class="partner-brilon-request">
+      <h3>Gezielten Termin anfragen</h3>
+      <form id="partner-appointment-form">
+        <label>Wun

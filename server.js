@@ -768,6 +768,8 @@ async function main(req,res){
       if(!limit('booking:'+ip,6))return reply(res,429,{error:'Bitte später erneut versuchen.'});
       const d=await body(req);
       if(d.website)return reply(res,201,{success:true});
+      const qrJugendherberge=d.anmeldeweg==='jh-brilon-qr';
+      const zimmernummer=safeText(d.zimmernummer,12);
       let agbData;
       try{
         const q=await pool.query("SELECT data->>'agbText' AS text,data->>'agbAktiv' AS aktiv,data->>'agbVersion' AS version FROM brilon_rechnungsdaten WHERE id=1");
@@ -801,7 +803,7 @@ async function main(req,res){
       if(!vorname||!nachname||!/^\S+@\S+\.\S+$/.test(email)||
          (!gueltigesDatum(datum)||datum<heuteInBerlin())||
          !angebot||!Number.isInteger(teilnehmer)||
-         teilnehmer<1||teilnehmer>1000||d.datenschutz!=='on'||
+         teilnehmer<1||teilnehmer>(qrJugendherberge?150:1000)||d.datenschutz!=='on'||
          (rechnungsadresseErforderlich&&(!rechnungsadresse.strasse||!rechnungsadresse.plz||!rechnungsadresse.ort)))
         return reply(res,400,{error:'Bitte Pflichtfelder korrekt ausfüllen.'});
 
@@ -820,6 +822,8 @@ async function main(req,res){
       const bookingSite=angefragterStandort||offerSites[0];
       if(!offerSites.includes(bookingSite))
         return reply(res,409,{error:'Das ausgewählte Angebot gehört nicht zum gewählten Veranstaltungsort.'});
+      if(qrJugendherberge&&(!zimmernummer||!/^[\p{L}\d-]{1,12}$/u.test(zimmernummer)||bookingSite!=='Jugendherberge Brilon'))
+        return reply(res,400,{error:'Für die Anmeldung über den Jugendherbergs-QR-Code wird eine gültige Zimmernummer benötigt.'});
       const sonderaktionId=safeText(d.sonderaktion_id,36);
       if(sonderaktionId){
         const action=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[sonderaktionId]);
@@ -836,15 +840,16 @@ async function main(req,res){
            (Number.isInteger(Number(sonderaktionData.dauer))&&Number(sonderaktionData.dauer)!==buchungsdauerFuerProgramm(teilnehmer,programm)))
           return reply(res,409,{error:'Das ausgewählte Tagesangebot ist für diesen Termin nicht mehr freigegeben.'});
       }
-      const einzelplatz=programm.buchungsmodus==='einzelplatz';
-      if(einzelplatz&&teilnehmer!==1)return reply(res,400,{error:'Für dieses Angebot kannst du nur einen Einzelplatz pro Anmeldung reservieren.'});
+      const programmEinzelplatz=programm.buchungsmodus==='einzelplatz';
+      const einzelplatz=programmEinzelplatz||qrJugendherberge;
+      if(programmEinzelplatz&&!qrJugendherberge&&teilnehmer!==1)return reply(res,400,{error:'Für dieses Angebot kannst du nur einen Einzelplatz pro Anmeldung reservieren.'});
       const verfuegbareTermine=Array.isArray(programm.verfuegbare_termine)?programm.verfuegbare_termine:[];
       if(verfuegbareTermine.length&&!verfuegbareTermine.includes(datum))
         return reply(res,409,{error:'Für dieses Programm ist an dem Datum kein Termin freigegeben.'});
       if(teilnehmer>Number(programm.kapazitaet))return reply(res,409,{error:'Die Gruppengröße überschreitet die maximale Kapazität.'});
       const einzelpreisCent=Number.isFinite(Number(programm.preis_pro_person))
         ?Math.round(Number(programm.preis_pro_person)*100):null;
-      const gruppenPreisCent=einzelplatz
+      const gruppenPreisCent=programmEinzelplatz
         ?(einzelpreisCent>0?einzelpreisCent:null)
         :preisFuerTeilnehmer(programm.preise,teilnehmer,programm.gruppenstufen);
       if(gruppenPreisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
@@ -858,6 +863,7 @@ async function main(req,res){
       if(!['ja','nein'].includes(istGast)||(istGast==='ja'&&!gastEinrichtung))
         return reply(res,400,{error:'Bitte Gästeangabe und gegebenenfalls die Unterkunft angeben.'});
       const data={
+       ...(qrJugendherberge?{anmeldeweg:'jh-brilon-qr',zimmernummer}:{}),
        istGast,gastEinrichtung:istGast==='ja'?gastEinrichtung:null,
        gaesteRabattStatus:istGast==='ja'?'pruefung_offen':'nicht_beantragt',
        name,vorname,nachname,email,datum,angebot,veranstaltungsort:bookingSite,teilnehmer,rechnungsadresse,
@@ -865,7 +871,7 @@ gesamtpreis,
 anzahlung: einzelplatz ? 0 : Math.round(gesamtpreis * 25) / 100,
 restbetrag: einzelplatz ? gesamtpreis : Math.round(gesamtpreis * 75) / 100,
 buchungsmodus: einzelplatz?'einzelplatz':'gruppe',
-mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
+        mindestteilnehmer: programmEinzelplatz?Number(programm.mindestteilnehmer)||5:qrJugendherberge?1:null,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
        nachricht:safeText(d.nachricht,2000),dauer:buchungsdauerFuerProgramm(teilnehmer,programm),
@@ -926,6 +932,49 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         const wiederkehrenderKunde=vergangeneBuchung.rowCount>0;
         data.wiederkehrenderKundeHinweis=wiederkehrenderKunde;
         if(wiederkehrenderKunde)data.wiedererkanntAm=new Date().toISOString();
+        if(qrJugendherberge){
+          const legacy=await client.query(`SELECT 1 FROM brilon_buchungen
+            WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND data->>'uhrzeit'=$3
+              AND COALESCE(status,'offen') IN ('offen','bestaetigt')
+              AND COALESCE(data->>'anmeldeweg','')<>'jh-brilon-qr' LIMIT 1`,[datum,angebot,data.uhrzeit]);
+          if(legacy.rowCount)return {konflikt:'Für diesen Startzeitpunkt besteht bereits eine andere Buchung. Bitte wähle den Folgetermin.'};
+          const windows=await client.query(`SELECT id,titel,uhrzeit::text AS start,endzeit::text AS ende,gruppen_kapazitaet
+            FROM brilon_kalender WHERE typ='buchungsfenster' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date
+              AND uhrzeit=$2::time AND endzeit>=$3::time
+              AND (programm_id IS NULL OR programm_id=$4)
+              AND (COALESCE(cardinality(standorte),0)=0 OR 'Jugendherberge Brilon'=ANY(standorte))
+            ORDER BY automatisch_angelegt,titel,id FOR UPDATE`,[datum,data.uhrzeit,
+              String(Math.floor(fenster[1]/60)).padStart(2,'0')+':'+String(fenster[1]%60).padStart(2,'0'),programm.id]);
+          if(!windows.rowCount)return {konflikt:'Dieses Zeitfenster ist nicht für QR-Anmeldungen freigegeben. Bitte wähle einen späteren Termin.'};
+          const occupied=await client.query(`SELECT data->>'buchungsgruppeId' AS gruppe_id,
+              COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::int ELSE 0 END),0)::int AS angemeldet
+            FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2
+              AND data->>'anmeldeweg'='jh-brilon-qr' AND COALESCE(status,'offen') IN ('offen','bestaetigt')
+            GROUP BY data->>'buchungsgruppeId'`,[datum,angebot]);
+          const counts=new Map(occupied.rows.map(row=>[String(row.gruppe_id),Number(row.angemeldet)||0]));
+          const groups=windows.rows.map(window=>({...window,capacity:Number(window.gruppen_kapazitaet)||10,
+            booked:counts.get(String(window.id))||0}));
+          let group=groups.filter(window=>window.booked+teilnehmer<=window.capacity)
+            .sort((a,b)=>a.booked-b.booked||String(a.id).localeCompare(String(b.id)))[0];
+          if(!group){
+            const template=groups.filter(window=>teilnehmer<=window.capacity)
+              .sort((a,b)=>a.booked-b.booked||String(a.id).localeCompare(String(b.id)))[0];
+            if(!template)return {konflikt:'Für diese Gruppengröße ist zu dieser Zeit kein Platz mehr. Bitte wähle einen späteren Termin.'};
+            const count=await client.query(`SELECT COUNT(*)::int AS anzahl FROM brilon_kalender
+              WHERE typ='buchungsfenster' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date
+                AND uhrzeit=$2::time AND endzeit=$3::time AND (programm_id IS NULL OR programm_id=$4)
+                AND (COALESCE(cardinality(standorte),0)=0 OR 'Jugendherberge Brilon'=ANY(standorte))`,
+              [datum,data.uhrzeit,template.ende,programm.id]);
+            const number=Number(count.rows[0]?.anzahl||0)+1,title=`Gruppe ${number}`;
+            const created=await client.query(`INSERT INTO brilon_kalender
+              (titel,datum,uhrzeit,endzeit,typ,beschreibung,standorte,programm_id,gruppen_kapazitaet,automatisch_angelegt)
+              VALUES($1,$2,$3,$4,'buchungsfenster',$5,$6,$7,$8,true)
+              RETURNING id,titel,gruppen_kapazitaet`,[title,datum,data.uhrzeit,template.ende,
+                'Automatisch angelegte Folgegruppe für QR-Anmeldungen.',['Jugendherberge Brilon'],programm.id,template.capacity]);
+            group={...created.rows[0],capacity:Number(created.rows[0].gruppen_kapazitaet)||template.capacity};
+          }
+          data.buchungsgruppeId=group.id;data.buchungsgruppe=group.titel;
+        }
         const kapazitaet=await client.query(
           `SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS gebucht
            FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2
@@ -933,10 +982,10 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
              AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,
           [datum,angebot,einzelplatz?data.uhrzeit:null]
         );
-        if(Number(kapazitaet.rows[0].gebucht)+teilnehmer>Number(programm.kapazitaet))
+        if(!qrJugendherberge&&Number(kapazitaet.rows[0].gebucht)+teilnehmer>Number(programm.kapazitaet))
           return {konflikt:'Die Kapazität für dieses Programm ist am gewählten Tag ausgeschöpft.'};
         const konflikt=await pruefeBuchungskonflikt(client,datum,fenster,null,
-          einzelplatz?{angebot,uhrzeit:data.uhrzeit}:null,bookingSite);
+          (einzelplatz||qrJugendherberge)?{angebot,uhrzeit:data.uhrzeit}:null,bookingSite);
         if(konflikt)return {konflikt};
 
         const id=crypto.randomUUID();
@@ -1107,6 +1156,9 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const calendarWindows=calendar.rows.map(entry=>kalenderfensterFuerDatum(entry,datum)).filter(Boolean);
 
       const specialId=safeText(u.searchParams.get('sonderaktion_id'),36);
+      const qrJugendherberge=u.searchParams.get('zugang')==='jh-brilon';
+      if(qrJugendherberge&&standort!=='Jugendherberge Brilon')
+        return reply(res,400,{error:'Dieser QR-Zugang ist ausschließlich für die Jugendherberge Brilon vorgesehen.'});
       let requestedTimes=null;
       if(specialId){
         const action=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[specialId]);
@@ -1125,7 +1177,33 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         requestedTimes=[safeText(special.uhrzeit,5)];
       }
       const zeiten=[];
-      const timeSlots=requestedTimes||Array.from({length:11},(_,hour)=>String(hour+9).padStart(2,'0')+':00');
+      let qrGroupsByTime=new Map();
+      let timeSlots=requestedTimes||Array.from({length:11},(_,hour)=>String(hour+9).padStart(2,'0')+':00');
+      if(qrJugendherberge&&!specialId){
+        const [windows,counts]=await Promise.all([
+          pool.query(`SELECT id,titel,uhrzeit::text AS start,endzeit::text AS ende,gruppen_kapazitaet
+            FROM brilon_kalender WHERE typ='buchungsfenster' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date
+              AND (programm_id IS NULL OR programm_id=$2)
+              AND (COALESCE(cardinality(standorte),0)=0 OR 'Jugendherberge Brilon'=ANY(standorte))
+            ORDER BY uhrzeit,titel,id`,[datum,programm.rows[0].id]),
+          pool.query(`SELECT data->>'buchungsgruppeId' AS gruppe_id,
+              COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::int ELSE 0 END),0)::int AS angemeldet
+            FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2
+              AND data->>'anmeldeweg'='jh-brilon-qr' AND COALESCE(status,'offen') IN ('offen','bestaetigt')
+            GROUP BY data->>'buchungsgruppeId'`,[datum,angebot])
+        ]);
+        const bookedByGroup=new Map(counts.rows.map(row=>[String(row.gruppe_id),Number(row.angemeldet)||0]));
+        qrGroupsByTime=new Map();
+        for(const window of windows.rows){
+          const start=String(window.start).slice(0,5),end=String(window.ende).slice(0,5);
+          if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end))continue;
+          const startMinutes=Number(start.slice(0,2))*60+Number(start.slice(3,5)),endMinutes=Number(end.slice(0,2))*60+Number(end.slice(3,5));
+          if(endMinutes<startMinutes+dauer)continue;
+          const group={id:window.id,capacity:Number(window.gruppen_kapazitaet)||10,booked:bookedByGroup.get(String(window.id))||0};
+          const list=qrGroupsByTime.get(start)||[];list.push(group);qrGroupsByTime.set(start,list);
+        }
+        timeSlots=[...qrGroupsByTime.keys()].sort();
+      }
 
       for(const uhrzeit of timeSlots){
         if(!/^(?:09:(?:00|15|30|45)|1[0-8]:(?:00|15|30|45)|19:00)$/.test(uhrzeit))continue;
@@ -1133,6 +1211,19 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
         const neuesFenster=
           dauer===null ? null : [start,start+dauer];
+
+        if(qrJugendherberge&&!specialId){
+          const groups=qrGroupsByTime.get(uhrzeit)||[];
+          const free=groups.some(group=>group.booked+teilnehmer<=group.capacity);
+          const followUpPossible=!free&&groups.some(group=>teilnehmer<=group.capacity);
+          const available=followUpPossible
+            ?groups.reduce((max,group)=>Math.max(max,group.capacity),0)
+            :groups.reduce((max,group)=>Math.max(max,group.capacity-group.booked),0);
+          const booked=groups.length?Math.min(...groups.map(group=>group.booked)):0;
+          zeiten.push({uhrzeit,belegt:!free&&!followUpPossible,freie_plaetze:Math.max(0,available),folgegruppe:followUpPossible,angemeldet:booked,
+            mindestteilnehmer:Math.max(1,teilnehmer)});
+          continue;
+        }
 
         const sameSession=b=>b.data?.buchungsmodus==='einzelplatz'&&
           b.data?.angebot===angebot&&b.data?.uhrzeit===uhrzeit;
@@ -2269,7 +2360,7 @@ if(!versandProtokoll.rowCount)
       if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       const q=await pool.query(
-        "SELECT k.id,k.titel,k.datum::text AS datum,k.enddatum::text AS enddatum,k.uhrzeit::text AS uhrzeit,k.endzeit::text AS endzeit,k.typ,k.beschreibung,COALESCE(k.standorte,'{}'::text[]) AS standorte,COALESCE((SELECT json_agg(json_build_object('mitarbeiter_id',e.mitarbeiter_id,'name',m.name,'status',e.status) ORDER BY m.name) FROM brilon_kalender_einsaetze e JOIN brilon_pruef_mitarbeitende m ON m.id=e.mitarbeiter_id WHERE e.kalender_id=k.id AND e.status IN ('eingeteilt','bestaetigt','abgeschlossen')),'[]'::json) AS staff FROM brilon_kalender k ORDER BY k.datum,k.uhrzeit NULLS LAST LIMIT 1000"
+        "SELECT k.id,k.titel,k.datum::text AS datum,k.enddatum::text AS enddatum,k.uhrzeit::text AS uhrzeit,k.endzeit::text AS endzeit,k.typ,k.beschreibung,COALESCE(k.standorte,'{}'::text[]) AS standorte,k.programm_id,k.gruppen_kapazitaet,k.automatisch_angelegt,COALESCE((SELECT json_agg(json_build_object('mitarbeiter_id',e.mitarbeiter_id,'name',m.name,'status',e.status) ORDER BY m.name) FROM brilon_kalender_einsaetze e JOIN brilon_pruef_mitarbeitende m ON m.id=e.mitarbeiter_id WHERE e.kalender_id=k.id AND e.status IN ('eingeteilt','bestaetigt','abgeschlossen')),'[]'::json) AS staff FROM brilon_kalender k ORDER BY k.datum,k.uhrzeit NULLS LAST LIMIT 1000"
       );
       return reply(res,200,q.rows);
     }
@@ -2291,6 +2382,7 @@ if(!versandProtokoll.rowCount)
       const beschreibung=safeText(d.beschreibung,1000),
 preis=safeText(d.preis,50);
       const standorte=Array.isArray(d.standorte)?[...new Set(d.standorte.map(value=>safeText(value,80)).filter(Boolean))]:[];
+      const programmId=d.programm_id?Number(d.programm_id):null,gruppenKapazitaet=Number(d.gruppen_kapazitaet||10);
 
       const gueltigesDatum=v=>{
         if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
@@ -2303,16 +2395,25 @@ preis=safeText(d.preis,50);
          (enddatum&&(!gueltigesDatum(enddatum)||enddatum<datum))||
          (uhrzeit&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(uhrzeit))||
          (endzeit&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(endzeit))||
-         !['termin','sperrzeit'].includes(typ)||standorte.length>50)
+         !['termin','sperrzeit','buchungsfenster'].includes(typ)||standorte.length>50||
+         (programmId!==null&&(!Number.isSafeInteger(programmId)||programmId<1))||
+         !Number.isInteger(gruppenKapazitaet)||gruppenKapazitaet<1||gruppenKapazitaet>150||
+         (typ==='buchungsfenster'&&(!uhrzeit||!endzeit||uhrzeit>=endzeit||!standorte.includes('Jugendherberge Brilon'))))
         return reply(res,400,{error:'Ungültige Kalenderdaten.'});
+
+      if(typ==='buchungsfenster'&&programmId){
+        const program=await pool.query(`SELECT id FROM brilon_angebote WHERE id=$1 AND aktiv=true
+          AND (veranstaltungsort=$2 OR COALESCE(veranstaltungsorte,'[]'::jsonb) ? $2)`,[programmId,'Jugendherberge Brilon']);
+        if(!program.rowCount)return reply(res,400,{error:'Das Programm ist nicht am Standort Jugendherberge Brilon aktiv.'});
+      }
 
       if(standorte.length){
         const places=await pool.query('SELECT name FROM brilon_orte WHERE aktiv=true AND name=ANY($1::text[])',[standorte]);
         if(places.rowCount!==standorte.length)return reply(res,400,{error:'Mindestens ein gewählter Standort ist inaktiv oder nicht vorhanden.'});
       }
       const q=await pool.query(
-        'INSERT INTO brilon_kalender(titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung,standorte) VALUES($1,$2,$3,$4,$5,$6,$7,$8::text[]) RETURNING id',
-        [titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung,standorte]
+        'INSERT INTO brilon_kalender(titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung,standorte,programm_id,gruppen_kapazitaet,automatisch_angelegt) VALUES($1,$2,$3,$4,$5,$6,$7,$8::text[],$9,$10,false) RETURNING id',
+        [titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung,standorte,programmId,gruppenKapazitaet]
       );
       return reply(res,201,{id:q.rows[0].id});
     }
@@ -2347,6 +2448,7 @@ preis=safeText(d.preis,50);
       const typ=safeText(d.typ,20);
       const beschreibung=safeText(d.beschreibung,1000);
       const standorte=Array.isArray(d.standorte)?[...new Set(d.standorte.map(value=>safeText(value,80)).filter(Boolean))]:[];
+      const programmId=d.programm_id?Number(d.programm_id):null,gruppenKapazitaet=Number(d.gruppen_kapazitaet||10);
 
       const gueltigesDatum=v=>{
         if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
@@ -2358,16 +2460,25 @@ preis=safeText(d.preis,50);
          (enddatum&&(!gueltigesDatum(enddatum)||enddatum<datum))||
          (uhrzeit&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(uhrzeit))||
          (endzeit&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(endzeit))||
-         !['termin','sperrzeit'].includes(typ)||standorte.length>50)
+         !['termin','sperrzeit','buchungsfenster'].includes(typ)||standorte.length>50||
+         (programmId!==null&&(!Number.isSafeInteger(programmId)||programmId<1))||
+         !Number.isInteger(gruppenKapazitaet)||gruppenKapazitaet<1||gruppenKapazitaet>150||
+         (typ==='buchungsfenster'&&(!uhrzeit||!endzeit||uhrzeit>=endzeit||!standorte.includes('Jugendherberge Brilon'))))
         return reply(res,400,{error:'Ungültige Kalenderdaten.'});
+
+      if(typ==='buchungsfenster'&&programmId){
+        const program=await pool.query(`SELECT id FROM brilon_angebote WHERE id=$1 AND aktiv=true
+          AND (veranstaltungsort=$2 OR COALESCE(veranstaltungsorte,'[]'::jsonb) ? $2)`,[programmId,'Jugendherberge Brilon']);
+        if(!program.rowCount)return reply(res,400,{error:'Das Programm ist nicht am Standort Jugendherberge Brilon aktiv.'});
+      }
 
       if(standorte.length){
         const places=await pool.query('SELECT name FROM brilon_orte WHERE aktiv=true AND name=ANY($1::text[])',[standorte]);
         if(places.rowCount!==standorte.length)return reply(res,400,{error:'Mindestens ein gewählter Standort ist inaktiv oder nicht vorhanden.'});
       }
       const q=await pool.query(
-        'UPDATE brilon_kalender SET titel=$1,datum=$2,enddatum=$3,uhrzeit=$4,endzeit=$5,typ=$6,beschreibung=$7,standorte=$8::text[] WHERE id=$9 RETURNING id',
-        [titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung,standorte,id]
+        'UPDATE brilon_kalender SET titel=$1,datum=$2,enddatum=$3,uhrzeit=$4,endzeit=$5,typ=$6,beschreibung=$7,standorte=$8::text[],programm_id=$9,gruppen_kapazitaet=$10 WHERE id=$11 RETURNING id',
+        [titel,datum,enddatum,uhrzeit,endzeit,typ,beschreibung,standorte,programmId,gruppenKapazitaet,id]
       );
       if(!q.rowCount)
         return reply(res,404,{error:'Kalendereintrag nicht gefunden.'});
@@ -3344,1231 +3455,4 @@ if(archivRoute&&req.method==='PATCH'){
     // The GPS tour table can be absent before the optional migration is run.
     const gpsTabelle=await pool.query("SELECT to_regclass('brilon_gps_touren') AS tabellenname");
     if(gpsTabelle.rows[0]?.tabellenname){
-      const aktiveTour=await pool.query('SELECT id FROM brilon_gps_touren WHERE angebot_id=$1 AND aktiv=true LIMIT 1',[archivRoute[1]]);
-      if(aktiveTour.rowCount)return reply(res,409,{error:'Bitte die verknüpfte GPS-Tour zuerst deaktivieren.'});
-    }
-  }
-  const q=await pool.query('UPDATE brilon_angebote SET archiviert=$1 WHERE id=$2 RETURNING id,archiviert',[d.archiviert,archivRoute[1]]);
-  if(!q.rowCount)return reply(res,404,{error:'Angebot nicht gefunden.'});
-  return reply(res,200,q.rows[0]);
-}
-  
-if (route === '/api/admin/angebote' && req.method === 'POST') {
-  const d = await body(req);
-
-  const name = safeText(d.name, 120);
-  const beschreibung = safeText(d.beschreibung, 1000);
-  const dauer = Number(d.dauer);
-  const dauerModus=d.dauer_modus==='fest'?'fest':'gruppenstufe';
-  const kategorie=safeText(d.kategorie,60)||'Klettern';
-  const zielgruppe=safeText(d.zielgruppe,120);
-  const rawBesuchergruppen=Array.isArray(d.besuchergruppen)?d.besuchergruppen:[];
-  if(rawBesuchergruppen.length>30||rawBesuchergruppen.some(id=>typeof id!=='string'||!/^[a-z0-9][a-z0-9_-]{1,39}$/.test(id)))
-    return reply(res,400,{error:'Ungültige Besuchergruppenzuordnung.'});
-  const besuchergruppen=[...new Set(rawBesuchergruppen)];
-  const veranstaltungsort=safeText(d.veranstaltungsort,80)||'Brilon';
-  const requestedSites=Array.isArray(d.veranstaltungsorte)?[...new Set(d.veranstaltungsorte.map(name=>safeText(name,80)).filter(Boolean))]:[veranstaltungsort];
-  const kapazitaet=Number(d.kapazitaet||20);
-  const hinweise=safeText(d.hinweise,1000);
-  const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:[];
-  const buchungsmodus=d.buchungsmodus==='einzelplatz'?'einzelplatz':'gruppe';
-  const mindestteilnehmer=Number(d.mindestteilnehmer??5);
-  const preisProPerson=Number(d.preis_pro_person??0);
-  const stufenErgebnis=programmStufenPruefen(d.gruppenstufen||[]);
-
-  if(!name)return reply(res,400,{error:'Bitte einen Namen für das Angebot eingeben.'});
-  if(!Number.isInteger(dauer)||dauer<15||dauer>1440)
-    return reply(res,400,{error:'Bitte eine Dauer zwischen 15 und 1440 Minuten eingeben.'});
-  if(buchungsmodus!=='einzelplatz'&&(!stufenErgebnis.ok||!stufenErgebnis.stufen.length))
-    return reply(res,400,{error:stufenErgebnis.fehler||'Bitte mindestens eine Teilnehmerstufe mit Gruppenpreis und Dauer hinterlegen.'});
-  if(!Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>1000)
-    return reply(res,400,{error:'Bitte eine Kapazität zwischen 1 und 1000 Teilnehmenden eingeben.'});
-  if(!requestedSites.length)return reply(res,400,{error:'Bitte mindestens einen Veranstaltungsort auswählen.'});
-  if(termine.some(t=>!gueltigesDatum(t)))
-    return reply(res,400,{error:'Bitte nur gültige Termine im Format JJJJ-MM-TT eingeben.'});
-  if(buchungsmodus==='einzelplatz'&&(kapazitaet<5||kapazitaet>12||
-     !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<5||mindestteilnehmer>kapazitaet||
-     !Number.isFinite(preisProPerson)||preisProPerson<=0))
-    return reply(res,400,{error:'Bei Einzelplätzen müssen Kapazität und Mindestanmeldungen zwischen 5 und 12 liegen. Der Preis pro Person muss größer als 0 € sein.'});
-
-  const place=await pool.query('SELECT name FROM brilon_orte WHERE name=ANY($1::text[]) AND aktiv=true',[requestedSites]);
-  if(place.rowCount!==requestedSites.length)return reply(res,400,{error:'Mindestens ein gewählter Veranstaltungsort ist nicht aktiv oder nicht angelegt.'});
-  const gruppenstufen=buchungsmodus==='einzelplatz'?[]:stufenErgebnis.stufen;
-  const gruppenPreise=Object.fromEntries(gruppenstufen.map(item=>[`${item.min}-${item.max}`,item.preis]));
-
-  const q = await pool.query(
-    `INSERT INTO brilon_angebote
-      (name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,veranstaltungsorte,kapazitaet,
-       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,besuchergruppen,sortierung,archiviert)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,false,$7,$8,$9,$10::jsonb,$11,$12::jsonb,$13,$14,$15,$16,$17,$18,$19::jsonb,
-       (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false)
-     RETURNING id`,
-    [name,beschreibung,dauer,dauerModus,JSON.stringify(gruppenstufen),JSON.stringify(gruppenPreise),kategorie,zielgruppe,
-      requestedSites[0],JSON.stringify(requestedSites),kapazitaet,JSON.stringify(termine),hinweise,
-      d.buchbar===true,d.veroeffentlicht===true,buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-      buchungsmodus==='einzelplatz'?preisProPerson:0,JSON.stringify(besuchergruppen)]
-  );
-
-  return reply(res, 201, {
-    success: true,
-    id: q.rows[0].id
-  });
-}
-
-     
-const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
-
-if (preisRoute && req.method === 'PATCH') {
-  const d = await body(req);
-  const bisher=await pool.query(
-    `SELECT * FROM brilon_angebote WHERE id=$1`,[preisRoute[1]]
-  );
-  if(!bisher.rowCount)return reply(res,404,{error:'Angebot nicht gefunden.'});
-  const alt=bisher.rows[0];
-  const preise = d.preise;
-  if(preise!==undefined&&(!preise||typeof preise!=='object'||Array.isArray(preise))) {
-    return reply(res, 400, {
-      error: 'Ungültige Preisangaben.'
-    });
-  }
-  const neueStufen=Array.isArray(d.gruppenstufen)?programmStufenPruefen(d.gruppenstufen):
-    programmStufenPruefen(alt.gruppenstufen||[]);
-  if(Array.isArray(d.gruppenstufen)&&(!neueStufen.ok||(!d.gruppenstufen.length&&d.buchungsmodus!=='einzelplatz')))
-    return reply(res,400,{error:neueStufen.fehler||'Gruppenangebote benötigen mindestens eine Teilnehmerstufe.'});
-  const gruppenstufen=neueStufen.ok?neueStufen.stufen:(alt.gruppenstufen||[]);
-  const neuePreise=Array.isArray(d.gruppenstufen)
-    ?Object.fromEntries(gruppenstufen.map(item=>[`${item.min}-${item.max}`,item.preis]))
-    :preise===undefined?(alt.preise||{}):Object.fromEntries(Object.entries(preise).filter(([key,value])=>{
-      if(!/^[1-9]\d{0,3}-[1-9]\d{0,3}$/.test(key))return false;
-      if(value===''||value==null)return false;
-      const match=key.split('-').map(Number),amount=Number(value);
-      return match[0]>=1&&match[1]>=match[0]&&match[1]<=1000&&Number.isFinite(amount)&&amount>=0;
-    }).map(([key,value])=>[key,Number(value)]));
-
-  
-const aktiv = typeof d.aktiv === 'boolean' ? d.aktiv : null;
-const name=d.name===undefined?alt.name:safeText(d.name,120);
-const bildUrl=d.bild_url===undefined?alt.bild_url:(d.bild_url===null||d.bild_url===''?null:safeText(d.bild_url,1000));
-if(d.bild_url!==undefined&&bildUrl&&!gueltigeMedienBildUrl(bildUrl))return reply(res,400,{error:'Bitte ein Bild aus der Medienbibliothek auswählen.'});
-const beschreibung = d.beschreibung===undefined?alt.beschreibung:safeText(d.beschreibung,1000);
-const kategorie=d.kategorie===undefined?alt.kategorie:safeText(d.kategorie,60);
-const zielgruppe=d.zielgruppe===undefined?alt.zielgruppe:safeText(d.zielgruppe,120);
-const rawBesuchergruppen=d.besuchergruppen===undefined?(Array.isArray(alt.besuchergruppen)?alt.besuchergruppen:[]):d.besuchergruppen;
-if(!Array.isArray(rawBesuchergruppen)||rawBesuchergruppen.length>30||rawBesuchergruppen.some(id=>typeof id!=='string'||!/^[a-z0-9][a-z0-9_-]{1,39}$/.test(id)))return reply(res,400,{error:'Ungültige Besuchergruppenzuordnung.'});
-const besuchergruppen=[...new Set(rawBesuchergruppen)];
-const veranstaltungsort=d.veranstaltungsort===undefined?alt.veranstaltungsort:safeText(d.veranstaltungsort,80);
-const requestedSites=Array.isArray(d.veranstaltungsorte)?[...new Set(d.veranstaltungsorte.map(name=>safeText(name,80)).filter(Boolean))]:
-  (alt.veranstaltungsorte?.length?alt.veranstaltungsorte:[veranstaltungsort]);
-const dauer=Number(d.dauer??alt.dauer);
-const dauerModus=d.dauer_modus===undefined?(alt.dauer_modus||'gruppenstufe'):d.dauer_modus==='fest'?'fest':'gruppenstufe';
-const kapazitaet=Number(d.kapazitaet??alt.kapazitaet);
-const hinweise=d.hinweise===undefined?alt.hinweise:safeText(d.hinweise,1000);
-const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:alt.verfuegbare_termine;
-const buchbar=typeof d.buchbar==='boolean'?d.buchbar:alt.buchbar;
-const veroeffentlicht=typeof d.veroeffentlicht==='boolean'?d.veroeffentlicht:alt.veroeffentlicht;
-const buchungsmodus=d.buchungsmodus===undefined?(alt.buchungsmodus||'gruppe'):
-  d.buchungsmodus==='einzelplatz'?'einzelplatz':'gruppe';
-const mindestteilnehmer=Number(d.mindestteilnehmer??alt.mindestteilnehmer??5);
-const preisProPerson=Number(d.preis_pro_person??alt.preis_pro_person??0);
-if(!name||!kategorie||!requestedSites.length||!Number.isInteger(dauer)||dauer<15||dauer>1440||
-   !Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>1000||termine.some(t=>!gueltigesDatum(t))||
-   (buchungsmodus==='einzelplatz'&&(!Number.isInteger(kapazitaet)||kapazitaet<5||kapazitaet>12||
-     !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<5||mindestteilnehmer>kapazitaet||
-     !Number.isFinite(preisProPerson)||preisProPerson<=0)))
-  return reply(res,400,{error:'Dauer, Kapazität oder verfügbare Termine sind ungültig.'});
-const place=await pool.query('SELECT name FROM brilon_orte WHERE name=ANY($1::text[]) AND aktiv=true',[requestedSites]);
-if(place.rowCount!==requestedSites.length)return reply(res,400,{error:'Mindestens ein gewählter Veranstaltungsort ist nicht aktiv oder nicht angelegt.'});
-
-const q = await pool.query(
-  `UPDATE brilon_angebote
-   SET preise = $1::jsonb,
-       aktiv = COALESCE($3, aktiv),
-       name=$4,beschreibung = $5,
-       kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,veranstaltungsorte=$9::jsonb,kapazitaet=$10,
-       verfuegbare_termine=$11::jsonb,hinweise=$12,buchbar=$13,veroeffentlicht=$14,dauer=$15,
-       buchungsmodus=$16,mindestteilnehmer=$17,preis_pro_person=$18,dauer_modus=$19,gruppenstufen=$20::jsonb,bild_url=$21,besuchergruppen=$22::jsonb
-   WHERE id = $2
-   RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,bild_url,
-             kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
-             buchungsmodus,mindestteilnehmer,preis_pro_person,dauer_modus,gruppenstufen,sortierung,archiviert`,
-  [
-    JSON.stringify(neuePreise),
-    preisRoute[1],
-    aktiv,
-    name,beschreibung,kategorie,zielgruppe,requestedSites[0],JSON.stringify(requestedSites),kapazitaet,
-    JSON.stringify(termine),hinweise,buchbar,veroeffentlicht,dauer,
-    buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-    buchungsmodus==='einzelplatz'?preisProPerson:0,dauerModus,JSON.stringify(gruppenstufen),bildUrl,
-    JSON.stringify(besuchergruppen)
-  ]
-);
-
-
-  if (!q.rowCount) {
-    return reply(res, 404, {
-      error: 'Angebot nicht gefunden.'
-    });
-  }
-
-  return reply(res, 200, q.rows[0]);
-}
-     const bildRoute = route.match(
-  /^\/api\/admin\/angebote\/([0-9]+)\/bild$/
-);
-
-if (bildRoute && req.method === 'POST') {
-  if(!limit('image-upload:'+ip,20,600000))
-    return reply(res,429,{error:'Zu viele Bild-Uploads. Bitte später erneut versuchen.'});
-  const angebotId = Number(bildRoute[1]);
-
-  const erlaubteTypen = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp'
-  };
-
-  const dateityp = (req.headers['content-type'] || '')
-    .split(';')[0]
-    .toLowerCase();
-
-  const endung = erlaubteTypen[dateityp];
-
-  if (!endung) {
-    return reply(res, 400, {
-      error: 'Nur JPG, PNG und WebP erlaubt.'
-    });
-  }
-
-  const teile = [];
-  let groesse = 0;
-
-  for await (const teil of req) {
-    groesse += teil.length;
-
-    if (groesse > 5 * 1024 * 1024) {
-      return reply(res, 413, {
-        error: 'Das Bild darf maximal 5 MB groß sein.'
-      });
-    }
-
-    teile.push(teil);
-  }
-
-  if (!groesse) {
-    return reply(res, 400, {
-      error: 'Keine Bilddatei empfangen.'
-    });
-  }
-
-  let bild = Buffer.concat(teile);
-
-  try{bild=await bereinigeBild(bild,dateityp);}catch{
-    return reply(res, 400, {
-      error: 'Ungültige oder zu große Bilddatei. Erlaubt sind vollständige JPG-, PNG- und WebP-Bilder bis 40 Megapixel.'
-    });
-  }
-
-  try{
-    await pruefeBereinigtenBildUpload(bild);
-  }catch(error){return malwareScanReply(res,error);}
-
-  const vorhanden = await pool.query(
-    'SELECT id FROM brilon_angebote WHERE id = $1',
-    [angebotId]
-  );
-
-  if (!vorhanden.rowCount) {
-    return reply(res, 404, {
-      error: 'Angebot nicht gefunden.'
-    });
-  }
-
-  const dateiname =
-    'medien/' + crypto.randomUUID() + '.' + endung;
-
-      if (!supabase) return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
-      const { error } = await supabase.storage
-    .from('angebotsbilder')
-    .upload(dateiname, bild, {
-      contentType: dateityp,
-      upsert: false,
-      metadata:{originalName:safeText(req.headers['x-original-filename'],120)||'Bild'}
-    });
-
-  if (error) {
-    console.error('Bildupload fehlgeschlagen:', error);
-    return reply(res, 502, {
-      error: 'Bild konnte nicht gespeichert werden.'
-    });
-  }
-
-  const { data } = supabase.storage
-    .from('angebotsbilder')
-    .getPublicUrl(dateiname);
-
-  const speicherung = await pool.query(
-  'UPDATE brilon_angebote SET bild_url = $1 WHERE id = $2 RETURNING id, bild_url',
-  [data.publicUrl, angebotId]
-);
-
-if (speicherung.rowCount !== 1) {
-  console.error('Bildadresse nicht gespeichert. Angebots-ID:', angebotId);
-  return reply(res, 500, {
-    error: 'Bild hochgeladen, aber Bildadresse nicht gespeichert.'
-  });
-}
-
-  return reply(res, 200, {
-    success: true,
-    bild_url: data.publicUrl
-  });
-}
- const aktionsBildRoute = route.match(
-  /^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/bild$/
-);
-
-if (aktionsBildRoute && req.method === 'POST') {
-  if(!limit('image-upload:'+ip,20,600000))
-    return reply(res,429,{error:'Zu viele Bild-Uploads. Bitte später erneut versuchen.'});
-  const aktionsId = aktionsBildRoute[1];
-
-  const erlaubteTypen = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp'
-  };
-
-  const dateityp = (req.headers['content-type'] || '')
-    .split(';')[0].toLowerCase();
-  const endung = erlaubteTypen[dateityp];
-
-  if (!endung) {
-    return reply(res, 400, {
-      error: 'Nur JPG, PNG und WebP erlaubt.'
-    });
-  }
-
-  const teile = [];
-  let groesse = 0;
-
-  for await (const teil of req) {
-    groesse += teil.length;
-
-    if (groesse > 5 * 1024 * 1024) {
-      return reply(res, 413, {
-        error: 'Das Bild darf maximal 5 MB groß sein.'
-      });
-    }
-
-    teile.push(teil);
-  }
-
-  if (!groesse) {
-    return reply(res, 400, {
-      error: 'Keine Bilddatei empfangen.'
-    });
-  }
-
-  let bild = Buffer.concat(teile);
-
-  try{bild=await bereinigeBild(bild,dateityp);}catch{
-    return reply(res, 400, {
-      error: 'Ungültige oder zu große Bilddatei. Erlaubt sind vollständige JPG-, PNG- und WebP-Bilder bis 40 Megapixel.'
-    });
-  }
-
-  try{
-    await pruefeBereinigtenBildUpload(bild);
-  }catch(error){return malwareScanReply(res,error);}
-
-  const vorhanden = await pool.query(
-    'SELECT id FROM brilon_aktionen WHERE id = $1',
-    [aktionsId]
-  );
-
-  if (!vorhanden.rowCount) {
-    return reply(res, 404, {
-      error: 'Sonderangebot nicht gefunden.'
-    });
-  }
-
-  const dateiname =
-    'medien/' + crypto.randomUUID() + '.' + endung;
-
-  if (!supabase) return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
-  const { error } = await supabase.storage
-    .from('angebotsbilder')
-    .upload(dateiname, bild, {
-      contentType: dateityp,
-      upsert: false,
-      metadata:{originalName:safeText(req.headers['x-original-filename'],120)||'Bild'}
-    });
-
-  if (error) {
-    console.error('Aktionsbild-Upload fehlgeschlagen:', error);
-    return reply(res, 502, {
-      error: 'Bild konnte nicht gespeichert werden.'
-    });
-  }
-
-  const { data } = supabase.storage
-    .from('angebotsbilder')
-    .getPublicUrl(dateiname);
-
- const speicherung = await pool.query(
-  `UPDATE brilon_aktionen
-   SET data = jsonb_set(data, '{bild_url}', to_jsonb($1::text))
-   WHERE id = $2
-   RETURNING id`,
-  [data.publicUrl, aktionsId]
-);
-
-if (speicherung.rowCount !== 1) {
-  return reply(res, 500, {
-    error: 'Bildadresse konnte nicht gespeichert werden.'
-  });
-}
-
-  return reply(res, 200, {
-    success: true,
-    bild_url: data.publicUrl
-  });
-}
-      return reply(res,404,{error:'Nicht gefunden.'});
-    }
-
-    
-
-
-   
-if (route === '/api/orte' && req.method === 'GET') {
-  if (!pool) return reply(res,503,{error:'Veranstaltungsorte derzeit nicht verfügbar.'});
-  const q=await pool.query('SELECT id,name FROM brilon_orte WHERE aktiv=true ORDER BY name');
-  return reply(res,200,q.rows);
-}
-
-if (route === '/api/angebote' && req.method === 'GET') {
-  if (!pool) {
-    return reply(res, 503, {
-      error: 'Angebote derzeit nicht verfügbar.'
-    });
-  }
-
-  const q = await pool.query(
- `SELECT id,name,beschreibung,dauer,dauer_modus,gruppenstufen,preise,bild_url,kategorie,zielgruppe,besuchergruppen,
-        veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,
-        buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert
-     FROM brilon_angebote
-     WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
-     ORDER BY sortierung ASC,name ASC`
-  );
-
-  return reply(res, 200, q.rows);
-}
-
-    if(route.startsWith('/api/'))
-      
-      return reply(res,404,{error:'Nicht gefunden.'});
-
-    if(req.method!=='GET'&&req.method!=='HEAD')
-      return reply(res,405,{error:'Methode nicht erlaubt.'});
-
-    const file=route==='/'?'/index.html':route;
-    const target=path.resolve(ROOT,'.'+file);
-    if(!target.startsWith(ROOT+path.sep))
-      return reply(res,403,{error:'Nicht erlaubt.'});
-
-    fs.readFile(target,(err,data)=>{
-      if(err){
-        res.writeHead(404,securityHeaders);
-        return res.end('Nicht gefunden');
-      }
-      res.writeHead(200,{
-        'Content-Type':mime[path.extname(target)]||'application/octet-stream',
-        ...securityHeaders,
-        'Content-Security-Policy':"default-src 'self'; img-src 'self' blob: https://fssjruvxkdqeltjdrlfo.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'self'; frame-ancestors 'none'"
-      });
-      res.end(req.method==='HEAD'?undefined:data);
-    });
-  }catch(e){
-    console.error('Anfragefehler:',e.message);
-    const placesSchemaMissing=route==='/api/admin/orte'&&e.code==='42P01';
-    const partnerFeedbackSchemaMissing=(route.startsWith('/api/netzwerkpartner/')||
-      route.startsWith('/api/admin/netzwerkpartner/')||route==='/api/kundenfeedback'||
-      route==='/api/admin/kundenfeedback')&&e.code==='42P01';
-    const statusCode=e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?400:
-      placesSchemaMissing||partnerFeedbackSchemaMissing?503:500;
-    reply(res,statusCode,{
-      error:e.message==='Ungültiges JSON'||e.message==='Anfrage zu groß'?
-        e.message:placesSchemaMissing?
-          'Die Veranstaltungsort-Tabelle fehlt. Einmalig RUN_PLACES_MIGRATION=true setzen und den Server neu starten.':
-          partnerFeedbackSchemaMissing?
-            'Dieser Bereich wird gerade eingerichtet. Bitte später erneut versuchen.':
-          'Interner Serverfehler.'
-    });
-  }
-}
-
-async function migrateEinsatzplanung(){
-    const einsatzSchema=await pool.query(`SELECT to_regclass('public.brilon_buchungen') AS buchungen,
-      to_regclass('public.brilon_pruef_mitarbeitende') AS mitarbeitende`);
-    if(einsatzSchema.rows[0]?.buchungen&&einsatzSchema.rows[0]?.mitarbeitende){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_beschaeftigung (
-  mitarbeiter_id UUID PRIMARY KEY REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-  art TEXT NOT NULL DEFAULT 'nicht_hinterlegt' CHECK (art IN ('nicht_hinterlegt','minijob','teilzeit','vollzeit','honorar')),
-  stundenlohn_cent INTEGER CHECK(stundenlohn_cent IS NULL OR stundenlohn_cent BETWEEN 0 AND 100000),
-  wochenstunden NUMERIC(6,2) CHECK(wochenstunden IS NULL OR wochenstunden BETWEEN 0 AND 80),
-  monatsstunden NUMERIC(7,2) CHECK(monatsstunden IS NULL OR monatsstunden BETWEEN 0 AND 350),
-  minijob_grenze_cent INTEGER CHECK(minijob_grenze_cent IS NULL OR minijob_grenze_cent BETWEEN 0 AND 1000000),
-  gueltig_ab DATE,
-  gueltig_bis DATE,
-  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK(gueltig_bis IS NULL OR gueltig_ab IS NULL OR gueltig_bis>=gueltig_ab)
-)`);
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_einsaetze (
-  buchung_id UUID NOT NULL REFERENCES brilon_buchungen(id) ON DELETE CASCADE,
-  mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-  status TEXT NOT NULL CHECK(status IN ('beworben','eingeteilt','bestaetigt','abgelehnt','abgeschlossen')),
-  arbeitsminuten INTEGER CHECK(arbeitsminuten IS NULL OR arbeitsminuten BETWEEN 1 AND 1440),
-  ist_minuten INTEGER CHECK(ist_minuten IS NULL OR ist_minuten BETWEEN 0 AND 1440),
-  bewerbung_am TIMESTAMPTZ,
-  zugewiesen_am TIMESTAMPTZ,
-  bestaetigt_am TIMESTAMPTZ,
-  abgeschlossen_am TIMESTAMPTZ,
-  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY(buchung_id,mitarbeiter_id)
-)`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS brilon_einsaetze_mitarbeiter_idx ON brilon_einsaetze(mitarbeiter_id,status)`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS brilon_einsaetze_buchung_idx ON brilon_einsaetze(buchung_id)`);
-      await pool.query('ALTER TABLE brilon_beschaeftigung ADD COLUMN IF NOT EXISTS vertrauensperson BOOLEAN NOT NULL DEFAULT false');
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigungen (
-  buchung_id UUID PRIMARY KEY REFERENCES brilon_buchungen(id) ON DELETE CASCADE,
-  anlass_mitarbeiter_id UUID REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE SET NULL,
-  faellig_ab TIMESTAMPTZ NOT NULL,
-  status TEXT NOT NULL DEFAULT 'geplant'
-    CHECK(status IN ('geplant','versand_laeuft','gesendet','abgebrochen','fehler')),
-  erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  versendet_am TIMESTAMPTZ,
-  fehler TEXT
-)`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS brilon_kundenbestaetigungen_faellig_idx
-  ON brilon_kundenbestaetigungen(faellig_ab) WHERE status='geplant'`);
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigung_einstellungen (
-  id SMALLINT PRIMARY KEY CHECK(id=1),
-  verzoegerung_minuten INTEGER NOT NULL DEFAULT 120 CHECK(verzoegerung_minuten BETWEEN 1 AND 1440),
-  ruhebeginn TEXT NOT NULL DEFAULT '18:00' CHECK(ruhebeginn ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
-  ruheende TEXT NOT NULL DEFAULT '09:00' CHECK(ruheende ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
-  aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`);
-      await pool.query(`INSERT INTO brilon_kundenbestaetigung_einstellungen
-  (id,verzoegerung_minuten,ruhebeginn,ruheende)
-  SELECT 1,
-    CASE WHEN data->>'kundenbestaetigungVerzoegerungMinuten' ~ '^[0-9]{1,4}$'
-      AND (data->>'kundenbestaetigungVerzoegerungMinuten')::integer BETWEEN 1 AND 1440
-      THEN (data->>'kundenbestaetigungVerzoegerungMinuten')::integer ELSE 120 END,
-    CASE WHEN data->>'kundenbestaetigungRuhebeginn' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
-      THEN data->>'kundenbestaetigungRuhebeginn' ELSE '18:00' END,
-    CASE WHEN data->>'kundenbestaetigungRuheende' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
-      THEN data->>'kundenbestaetigungRuheende' ELSE '09:00' END
-  FROM brilon_rechnungsdaten WHERE id=1
-  ON CONFLICT(id) DO NOTHING`);
-      console.log('Einsatzplanungsschema geprüft');
-    }else{
-      console.warn('Einsatzplanungsschema zurückgestellt: Grundtabellen noch nicht vorhanden.');
-    }
-
-}
-
-async function ensureKundenbestaetigungEinstellungen(){
-  // Keep this small settings table available even when the broad staffing migration
-  // has already been switched off after its first run.
-  await pool.query('SELECT 1 FROM brilon_kundenbestaetigungen LIMIT 0');
-  await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kalender_einsaetze (
-    kalender_id UUID NOT NULL REFERENCES brilon_kalender(id) ON DELETE CASCADE,
-    mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-    status TEXT NOT NULL CHECK(status IN ('beworben','eingeteilt','bestaetigt','abgelehnt','abgeschlossen')),
-    bewerbung_am TIMESTAMPTZ,
-    zugewiesen_am TIMESTAMPTZ,
-    bestaetigt_am TIMESTAMPTZ,
-    aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY(kalender_id,mitarbeiter_id)
-  )`);
-  await pool.query('CREATE INDEX IF NOT EXISTS brilon_kalender_einsaetze_mitarbeiter_idx ON brilon_kalender_einsaetze(mitarbeiter_id,status)');
-  await pool.query('ALTER TABLE brilon_kalender ADD COLUMN IF NOT EXISTS bewerbung_oeffentlich_ab TIMESTAMPTZ');
-  const assignments=await pool.query("SELECT to_regclass('public.brilon_einsaetze') AS table_name");
-  if(assignments.rows[0]?.table_name)
-    await pool.query("ALTER TABLE brilon_einsaetze ADD COLUMN IF NOT EXISTS anschluss_option TEXT CHECK(anschluss_option IN ('keine','davor','danach','beides'))");
-  await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenbestaetigung_einstellungen (
-    id SMALLINT PRIMARY KEY CHECK(id=1),
-    verzoegerung_minuten INTEGER NOT NULL DEFAULT 120 CHECK(verzoegerung_minuten BETWEEN 1 AND 1440),
-    ruhebeginn TEXT NOT NULL DEFAULT '18:00' CHECK(ruhebeginn ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
-    ruheende TEXT NOT NULL DEFAULT '09:00' CHECK(ruheende ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
-    aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )`);
-  await pool.query(`INSERT INTO brilon_kundenbestaetigung_einstellungen
-    (id,verzoegerung_minuten,ruhebeginn,ruheende)
-    SELECT 1,
-      CASE WHEN data->>'kundenbestaetigungVerzoegerungMinuten' ~ '^[0-9]{1,4}$'
-        AND (data->>'kundenbestaetigungVerzoegerungMinuten')::integer BETWEEN 1 AND 1440
-        THEN (data->>'kundenbestaetigungVerzoegerungMinuten')::integer ELSE 120 END,
-      CASE WHEN data->>'kundenbestaetigungRuhebeginn' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
-        THEN data->>'kundenbestaetigungRuhebeginn' ELSE '18:00' END,
-      CASE WHEN data->>'kundenbestaetigungRuheende' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
-        THEN data->>'kundenbestaetigungRuheende' ELSE '09:00' END
-    FROM brilon_rechnungsdaten WHERE id=1
-    ON CONFLICT(id) DO NOTHING`);
-}
-
-async function start(){
-  if(pool){
-    await pool.query('SELECT 1');
-    if(process.env.RUN_TEAMERBASE_CALENDAR_MIGRATION==='true'){
-      const sql=fs.readFileSync(path.join(__dirname,'db/migrations/2026-11-11-teamerbase-calendar.sql'),'utf8');
-      await pool.query(sql);
-      console.log('Teamerbase-Kalenderschema geprüft (RUN_TEAMERBASE_CALENDAR_MIGRATION=true)');
-    }
-    if(process.env.RUN_PROGRAM_GROUPS_MIGRATION==='true'){
-      const offerTable=await pool.query("SELECT to_regclass('public.brilon_angebote') AS relation");
-      if(offerTable.rows[0]?.relation){
-        await pool.query("ALTER TABLE brilon_angebote ADD COLUMN IF NOT EXISTS besuchergruppen JSONB NOT NULL DEFAULT '[]'::jsonb");
-        console.log('Programm-Gruppenzuordnungsspalte geprüft (RUN_PROGRAM_GROUPS_MIGRATION=true)');
-      }else{
-        console.log('Programm-Gruppenzuordnungsmigration übersprungen: brilon_angebote wird separat initialisiert.');
-      }
-    }
-    if(process.env.RUN_INVOICE_MIGRATION==='true'){
-      const sql=fs.readFileSync(path.join(__dirname,'db/migrations/2026-11-06-rechnungen-agb.sql'),'utf8');
-      await pool.query(sql);
-      console.log('Rechnungs- und AGB-Schema geprüft (RUN_INVOICE_MIGRATION=true)');
-    }
-    try{
-      const cleaned=await pool.query(`UPDATE brilon_rechnungsdaten
-        SET data=jsonb_set(data,'{agbText}',to_jsonb(regexp_replace(data->>'agbText',E'^MUSTER[^\\n]*\\n[[:space:]]*\\n','')),true),
-            aktualisiert_am=NOW()
-        WHERE id=1 AND data->>'agbText' LIKE 'MUSTER – bitte vor der Veröffentlichung%'`);
-      if(cleaned.rowCount)console.log('Musterhinweis aus der AGB-Fassung entfernt.');
-    }catch(error){if(error.code!=='42P01')console.warn('AGB-Musterhinweis konnte nicht bereinigt werden:',error.message);}
-    try{
-      const published=await pool.query(`UPDATE brilon_rechnungsdaten
-        SET data=data||jsonb_build_object('agbAktiv',true,'agbInitialfassungAktiviert',true),aktualisiert_am=NOW()
-        WHERE id=1 AND data->>'agbAktiv'='false'
-          AND COALESCE(data->>'agbInitialfassungAktiviert','false')<>'true'
-          AND data->>'agbText' LIKE '1. Buchung und Zahlung%'
-          AND data->>'agbText' LIKE '%25 % Anzahlung%'
-          AND data->>'agbText' LIKE '%zehn Kalendertage%'
-          AND data->>'agbText' LIKE '%geringerer Schaden%'`);
-      if(published.rowCount)console.log('Bereinigte AGB-Erstfassung veröffentlicht.');
-    }catch(error){if(error.code!=='42P01')console.warn('AGB-Fassung konnte nicht aktiviert werden:',error.message);}
-    // Idempotente, eng begrenzte Einsatzplanungs-Migration nach Freigabe.
-    // Nur ausführen, wenn die bestehenden Buchungs- und Mitarbeitertabellen vorhanden sind.
-    if(process.env.RUN_MARKETING_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_marketing_kampagnen (
-        id TEXT PRIMARY KEY,
-        data JSONB NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )`);
-      console.log('Marketing-Kampagnentabelle geprüft');
-    }
-    // Explicit, narrow opt-in used only to initialize the admin session store.
-    if(process.env.RUN_ADMIN_SESSION_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (
-        token_hash CHAR(64) PRIMARY KEY,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        expires_at TIMESTAMPTZ NOT NULL
-      )`);
-      await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
-      console.log('Admin-Sitzungstabelle geprüft (RUN_ADMIN_SESSION_MIGRATION=true)');
-    }
-    // Separate, explicit one-time opt-in for the venue settings table.
-    // This stays independent of both session initialization and broad schema migrations.
-    if(process.env.RUN_PLACES_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_orte(
-        id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
-        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-      await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon') ON CONFLICT(name) DO NOTHING`);
-      console.log('Veranstaltungsort-Tabelle geprüft (RUN_PLACES_MIGRATION=true)');
-    }
-    // Targeted opt-in: only columns needed by the admin dashboard's first queries.
-    if(process.env.RUN_ADMIN_DASHBOARD_MIGRATION==='true'){
-      await pool.query('ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS buchungsnummer TEXT');
-      await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_buchungen_buchungsnummer_unique ON brilon_buchungen (buchungsnummer)');
-      await pool.query(`ALTER TABLE brilon_angebote
-        ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
-        ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false`);
-      console.log('Admin-Dashboard-Spalten geprüft (RUN_ADMIN_DASHBOARD_MIGRATION=true)');
-    }
-    // Narrow, one-time opt-in for columns used by offer administration and booking.
-    // It is separate from the broad schema migration to avoid changing unrelated tables.
-    if(process.env.RUN_PROGRAM_FIELDS_MIGRATION==='true'){
-      await pool.query(`ALTER TABLE brilon_angebote
-        ADD COLUMN IF NOT EXISTS bild_url TEXT,
-        ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
-        ADD COLUMN IF NOT EXISTS zielgruppe TEXT NOT NULL DEFAULT '',
-        ADD COLUMN IF NOT EXISTS besuchergruppen JSONB NOT NULL DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS veranstaltungsort TEXT NOT NULL DEFAULT 'Brilon',
-        ADD COLUMN IF NOT EXISTS kapazitaet INTEGER NOT NULL DEFAULT 20,
-        ADD COLUMN IF NOT EXISTS verfuegbare_termine JSONB NOT NULL DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS hinweise TEXT NOT NULL DEFAULT '',
-        ADD COLUMN IF NOT EXISTS buchbar BOOLEAN NOT NULL DEFAULT true,
-        ADD COLUMN IF NOT EXISTS veroeffentlicht BOOLEAN NOT NULL DEFAULT true,
-        ADD COLUMN IF NOT EXISTS buchungsmodus TEXT NOT NULL DEFAULT 'gruppe',
-        ADD COLUMN IF NOT EXISTS mindestteilnehmer INTEGER NOT NULL DEFAULT 1,
-        ADD COLUMN IF NOT EXISTS preis_pro_person NUMERIC(10,2) NOT NULL DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS sortierung INTEGER NOT NULL DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false`);
-      console.log('Angebotsfelder geprüft (RUN_PROGRAM_FIELDS_MIGRATION=true)');
-    }
-    // One-time, narrowly scoped migration for the employee and station-inspection area.
-    // This does not run the booking, offers, or GPS schema migrations.
-    if(process.env.RUN_PRUEF_SCHEMA_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_orte(
-        id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
-        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-      await pool.query('ALTER TABLE brilon_orte ADD COLUMN IF NOT EXISTS aktiv BOOLEAN NOT NULL DEFAULT true');
-      await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon') ON CONFLICT(name) DO NOTHING`);
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (
-        token_hash CHAR(64) PRIMARY KEY,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        expires_at TIMESTAMPTZ NOT NULL
-      )`);
-      await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
-    // Stations-Prüfprotokoll: gezielte Migration für den Mitarbeiter- und Prüfbereich.
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_mitarbeitende (
-      id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,
-      passwort_hash TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS telefon TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS strasse TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS plz TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS wohnort TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS qualifikationen TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS registriert_am TIMESTAMPTZ');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS freigabe_am TIMESTAMPTZ');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS verwaltungszugang BOOLEAN NOT NULL DEFAULT false');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_personaldokumente (
-      id UUID PRIMARY KEY,
-      mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-      bezeichnung TEXT NOT NULL,dateiname TEXT NOT NULL,mime_type TEXT NOT NULL CHECK(mime_type='image/jpeg'),
-      daten BYTEA NOT NULL,bytegroesse INTEGER NOT NULL CHECK(bytegroesse>0 AND bytegroesse<=512000),
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_personaldokumente_mitarbeiter_idx ON brilon_pruef_personaldokumente(mitarbeiter_id,erstellt_am)');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_freigaben (
-      id UUID PRIMARY KEY,
-      mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-      ort_id BIGINT NOT NULL REFERENCES brilon_orte(id),
-      qualifikation TEXT NOT NULL,erstellt_von TEXT NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(mitarbeiter_id,ort_id,qualifikation))`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_einladungen (
-      id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,
-      token_hash CHAR(64) NOT NULL UNIQUE,ablauf TIMESTAMPTZ NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),verwendet_am TIMESTAMPTZ,
-      widerrufen_am TIMESTAMPTZ)`);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_einladungen_offen_email_idx
-      ON brilon_pruef_einladungen(email) WHERE verwendet_am IS NULL AND widerrufen_am IS NULL`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationen (
-      id UUID PRIMARY KEY,name TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
-    await pool.query("ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS qualifikation TEXT NOT NULL DEFAULT ''");
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_sessions (
-      token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
-      ablauf TIMESTAMPTZ NOT NULL,entsperrt_bis TIMESTAMPTZ)`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_sessions_ablauf_idx ON brilon_pruef_sessions(ablauf)');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_admin_sessions (
-      token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-      ablauf TIMESTAMPTZ NOT NULL)`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_admin_sessions_ablauf_idx ON brilon_pruef_admin_sessions(ablauf)');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_login_fehler (
-      email_hash CHAR(64) PRIMARY KEY,versuche INTEGER NOT NULL DEFAULT 0,fenster_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_passwort_resets (
-      token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-      ablauf TIMESTAMPTZ NOT NULL,verwendet_am TIMESTAMPTZ,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_passwort_resets_expiry_idx ON brilon_pruef_passwort_resets(ablauf)');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_codes (
-      id UUID PRIMARY KEY,code_hash CHAR(64) NOT NULL,ablauf TIMESTAMPTZ NOT NULL,
-      verbraucht_am TIMESTAMPTZ,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_berichte (
-      id UUID PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
-      programm TEXT NOT NULL,beginn TEXT NOT NULL,pruefungen JSONB NOT NULL,
-      hat_mangel BOOLEAN NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    // Sperren bleiben bis zu einer gesondert protokollierten fachlichen Freigabe bestehen.
-    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
-    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS sperrgrund TEXT');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationsereignisse (
-      id UUID PRIMARY KEY,
-      station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
-      bericht_id UUID REFERENCES brilon_pruef_berichte(id),
-      art TEXT NOT NULL CHECK(art IN ('mangel','freigabe')),
-      notiz TEXT NOT NULL,
-      verantwortlich TEXT NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsereignisse_station_idx ON brilon_pruef_stationsereignisse(station_id,erstellt_am DESC)');
-    // Administrative station changes do not alter the historic defect/release log.
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationsstatus (
-      id UUID PRIMARY KEY,
-      station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
-      art TEXT NOT NULL CHECK(art IN ('deaktiviert','reaktiviert')),
-      begruendung TEXT NOT NULL,
-      verantwortlich TEXT NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsstatus_station_idx ON brilon_pruef_stationsstatus(station_id,erstellt_am DESC)');
-    await pool.query('ALTER TABLE brilon_pruef_berichte ADD COLUMN IF NOT EXISTS hat_hinweis BOOLEAN NOT NULL DEFAULT false');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_hinweise(
-      id UUID PRIMARY KEY,station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
-      bericht_id UUID NOT NULL REFERENCES brilon_pruef_berichte(id),
-      beschreibung TEXT NOT NULL,erstellt_von TEXT NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      erledigt_am TIMESTAMPTZ,erledigt_von TEXT,erledigt_notiz TEXT,
-      UNIQUE(bericht_id,station_id))`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_hinweise_offen_idx ON brilon_pruef_hinweise(erstellt_am DESC) WHERE erledigt_am IS NULL');
-
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_meldungen (
-      bericht_id UUID PRIMARY KEY REFERENCES brilon_pruef_berichte(id),
-      status TEXT NOT NULL DEFAULT 'ausstehend'
-        CHECK(status IN ('ausstehend','sendet','angenommen','fehlgeschlagen','nicht_konfiguriert')),
-      versuche INTEGER NOT NULL DEFAULT 0 CHECK(versuche>=0),
-      letzter_versuch TIMESTAMPTZ,angenommen_am TIMESTAMPTZ,
-      letzter_fehler TEXT,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_meldungen_status_idx ON brilon_pruef_meldungen(status,erstellt_am DESC)');
-    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS code_verschluesselt TEXT');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_tablet_kopplungen(
-      id UUID PRIMARY KEY,code_hash CHAR(64) NOT NULL,
-      ablauf TIMESTAMPTZ NOT NULL,verwendet_am TIMESTAMPTZ,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_tablets(
-      id UUID PRIMARY KEY,name TEXT NOT NULL,token_hash CHAR(64) NOT NULL UNIQUE,
-      aktiv BOOLEAN NOT NULL DEFAULT true,gekoppelt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_aktiv_idx ON brilon_pruef_tablets(aktiv)');
-    // Letztes Lebenszeichen dient ausschließlich der aktuellen Verbindungserkennung.
-    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS zuletzt_gesehen_am TIMESTAMPTZ');
-    // Pro Prüfstandort ist genau ein Administrations-Tablet als Codeanzeige ausgewählt.
-    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
-    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_ort_idx ON brilon_pruef_tablets(ort_id)');
-    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
-    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
-      console.log('Mitarbeiter- und Stationsschema geprüft (RUN_PRUEF_SCHEMA_MIGRATION=true)');
-    }
-    // Eigenständige, additive Einmal-Migration für die Standortbindung der Werbetablets.
-    // Vor produktiver Aktivierung in einer isolierten Umgebung prüfen; nach Erfolg abschalten.
-    if(process.env.RUN_TABLET_SITE_MIGRATION==='true'){
-      await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
-      await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_ort_idx ON brilon_pruef_tablets(ort_id)');
-      console.log('Werbetablet-Standortbindung eingerichtet (RUN_TABLET_SITE_MIGRATION=true)');
-    }
-    if(process.env.RUN_PRUEF_SITE_CODE_MIGRATION==='true'){
-      await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
-      await pool.query('ALTER TABLE brilon_pruef_sessions ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
-      await pool.query('DROP INDEX IF EXISTS brilon_pruef_tablets_ein_display_idx');
-      console.log('Standortgebundene Prüfcodeausgabe eingerichtet (RUN_PRUEF_SITE_CODE_MIGRATION=true)');
-    }
-    // Additiver Einmal-Schritt für gelöschte Tablet-Verbindungen.
-    // Vergangene Prüfungen bleiben dokumentiert, nur der Gerätezugang wird entfernt.
-    if(process.env.RUN_TABLET_DELETE_MIGRATION==='true'){
-      await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
-      console.log('Tablet-Löschfunktion eingerichtet (RUN_TABLET_DELETE_MIGRATION=true)');
-    }
-    // Optional employee portal content; independent from staff and inspection tables.
-    if(process.env.RUN_EMPLOYEE_AREAS_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_mitarbeiterbereiche(
-        id UUID PRIMARY KEY,titel TEXT NOT NULL CHECK(length(titel) BETWEEN 1 AND 100),
-        inhalt TEXT NOT NULL CHECK(length(inhalt) BETWEEN 1 AND 20000),
-        aktiv BOOLEAN NOT NULL DEFAULT false,sortierung INTEGER NOT NULL DEFAULT 0,
-        art TEXT NOT NULL DEFAULT 'allgemein' CHECK(art IN ('allgemein','standort','partner','programm')),
-        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-      await pool.query(`ALTER TABLE brilon_mitarbeiterbereiche ADD COLUMN IF NOT EXISTS art TEXT NOT NULL DEFAULT 'allgemein'`);
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_mitarbeiterbereich_orte(
-        bereich_id UUID NOT NULL REFERENCES brilon_mitarbeiterbereiche(id) ON DELETE CASCADE,
-        ort_id BIGINT NOT NULL REFERENCES brilon_orte(id) ON DELETE RESTRICT,
-        PRIMARY KEY(bereich_id,ort_id))`);
-      await pool.query('CREATE INDEX IF NOT EXISTS brilon_mitarbeiterbereich_orte_ort_idx ON brilon_mitarbeiterbereich_orte(ort_id,bereich_id)');
-      console.log('Mitarbeiterbereiche-Tabelle geprüft (RUN_EMPLOYEE_AREAS_MIGRATION=true)');
-    }
-    // Eigenständiges internes Wissensportal – erst nach ausdrücklicher Freigabe opt-in migrieren.
-    if(process.env.RUN_WISSENSPORTAL_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_wissensportal_artikel(
-        id UUID PRIMARY KEY,
-        titel TEXT NOT NULL CHECK(length(titel) BETWEEN 1 AND 120),
-        kurztext TEXT NOT NULL DEFAULT '' CHECK(length(kurztext)<=500),
-        inhalt TEXT NOT NULL CHECK(length(inhalt) BETWEEN 1 AND 20000),
-        kategorie TEXT NOT NULL CHECK(kategorie IN ('allgemein','programm','standort','sicherheit','ablauf','notfall')),
-        standorte BIGINT[] NOT NULL DEFAULT '{}',
-        dokument_url TEXT CHECK(dokument_url IS NULL OR length(dokument_url)<=1000),
-        veroeffentlicht BOOLEAN NOT NULL DEFAULT false,
-        version INTEGER NOT NULL DEFAULT 1 CHECK(version>=1),
-        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )`);
-      await pool.query("ALTER TABLE brilon_wissensportal_artikel ADD COLUMN IF NOT EXISTS bild_url TEXT");
-      await pool.query("ALTER TABLE brilon_wissensportal_artikel ADD COLUMN IF NOT EXISTS anhaenge JSONB NOT NULL DEFAULT '[]'::jsonb");
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_wissensportal_versionen (
-        artikel_id UUID NOT NULL REFERENCES brilon_wissensportal_artikel(id) ON DELETE CASCADE,
-        version INTEGER NOT NULL CHECK(version>=1),
-        inhalt JSONB NOT NULL,
-        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        PRIMARY KEY(artikel_id,version)
-      )`);
-      await pool.query('CREATE INDEX IF NOT EXISTS brilon_wissensportal_veroeffentlicht_idx ON brilon_wissensportal_artikel(veroeffentlicht,kategorie,titel)');
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_wissensportal_bestaetigungen(
-        artikel_id UUID NOT NULL REFERENCES brilon_wissensportal_artikel(id) ON DELETE CASCADE,
-        mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-        version INTEGER NOT NULL CHECK(version>=1),
-        bestaetigt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        PRIMARY KEY(artikel_id,mitarbeiter_id)
-      )`);
-      console.log('Wissensportal-Schema geprüft (RUN_WISSENSPORTAL_MIGRATION=true)');
-    }
-    // Separate opt-in schema for network partners; never changes employee or admin accounts.
-    if(process.env.RUN_NETWORK_PARTNER_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_netzwerkpartner(
-        id UUID PRIMARY KEY,unternehmen TEXT NOT NULL CHECK(length(unternehmen) BETWEEN 2 AND 180),
-        ansprechpartner TEXT NOT NULL CHECK(length(ansprechpartner) BETWEEN 2 AND 120),
-        email TEXT NOT NULL UNIQUE,telefon TEXT,strasse TEXT,plz TEXT,ort TEXT,weitere_angaben TEXT,
-        passwort_hash TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT false,
-        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),freigabe_am TIMESTAMPTZ)`);
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_netzwerkpartner_einladungen(
-        id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,token_hash CHAR(64) NOT NULL UNIQUE,
-        ablauf TIMESTAMPTZ NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        verwendet_am TIMESTAMPTZ,widerrufen_am TIMESTAMPTZ)`);
-      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS brilon_netzwerkpartner_einladungen_offen_email_idx
-        ON brilon_netzwerkpartner_einladungen(email) WHERE verwendet_am IS NULL AND widerrufen_am IS NULL`);
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_netzwerkpartner_sessions(
-        token_hash CHAR(64) PRIMARY KEY,
-        netzwerkpartner_id UUID NOT NULL REFERENCES brilon_netzwerkpartner(id) ON DELETE CASCADE,
-        ablauf TIMESTAMPTZ NOT NULL)`);
-      await pool.query('CREATE INDEX IF NOT EXISTS brilon_netzwerkpartner_sessions_ablauf_idx ON brilon_netzwerkpartner_sessions(ablauf)');
-      console.log('Getrenntes Netzwerkpartnerschema geprüft (RUN_NETWORK_PARTNER_MIGRATION=true)');
-    }
-    // Customer feedback is private to the admin API and linked to one existing booking.
-    if(process.env.RUN_CUSTOMER_FEEDBACK_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenfeedback(
-        id UUID PRIMARY KEY,buchung_id UUID NOT NULL REFERENCES brilon_buchungen(id) ON DELETE CASCADE,
-        buchungsnummer TEXT NOT NULL,programm_bewertung SMALLINT NOT NULL CHECK(programm_bewertung BETWEEN 1 AND 5),
-        mitarbeiter_bewertung SMALLINT NOT NULL CHECK(mitarbeiter_bewertung BETWEEN 1 AND 5),
-        sicherheits_bewertung SMALLINT NOT NULL CHECK(sicherheits_bewertung BETWEEN 1 AND 5),
-        veraenderungen TEXT,ideen TEXT,einwilligung_am TIMESTAMPTZ NOT NULL,
-        einwilligung_version TEXT NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(buchung_id))`);
-      await pool.query('CREATE INDEX IF NOT EXISTS brilon_kundenfeedback_erstellt_idx ON brilon_kundenfeedback(erstellt_am DESC)');
-      console.log('Kundenfeedbackschema geprüft (RUN_CUSTOMER_FEEDBACK_MIGRATION=true)');
-    }
-    // Narrow, one-time migration: calendar entries can be scoped to active locations.
-    if(process.env.RUN_CALENDAR_LOCATION_MIGRATION==='true'){
-      await pool.query("ALTER TABLE brilon_kalender ADD COLUMN IF NOT EXISTS standorte TEXT[] NOT NULL DEFAULT '{}'");
-      console.log('Standortzuordnung für Kalendereinträge geprüft (RUN_CALENDAR_LOCATION_MIGRATION=true)');
-    }
-
-    // Schema changes are opt-in. A normal server start must not alter a live database.
-    if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){
-    await pool.query(
-      'CREATE TABLE IF NOT EXISTS brilon_buchungen (id UUID PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())'
-    );
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (
-      token_hash CHAR(64) PRIMARY KEY,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      expires_at TIMESTAMPTZ NOT NULL
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
-    await pool.query(
-      "ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'offen'"
-    );
-    await pool.query(
-      'ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS bearbeitungsnotiz TEXT'
-    );
-    await pool.query(
-      'ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ'
-    );
-    
-await pool.query(
-  'ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS zahlungsinfo_gesendet_am TIMESTAMPTZ'
-);
-await pool.query('ALTER TABLE brilon_buchungen ADD COLUMN IF NOT EXISTS buchungsnummer TEXT');
-await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_buchungen_buchungsnummer_unique ON brilon_buchungen (buchungsnummer)');
-
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_aktionen(
-      id UUID PRIMARY KEY,data JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kalender(
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),titel TEXT NOT NULL,datum DATE NOT NULL,
-      enddatum DATE,uhrzeit TIME,endzeit TIME,typ TEXT NOT NULL CHECK(typ IN ('termin','sperrzeit')),
-      beschreibung TEXT NOT NULL DEFAULT '',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    
-await pool.query(`
-  CREATE TABLE IF NOT EXISTS brilon_angebote (
-    id BIGSERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    beschreibung TEXT DEFAULT '',
-    dauer INTEGER,
-    preise JSONB NOT NULL DEFAULT '{}'::jsonb,
-    aktiv BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-  )
-`);
-    await pool.query(`ALTER TABLE brilon_angebote
-      ADD COLUMN IF NOT EXISTS bild_url TEXT,
-      ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
-      ADD COLUMN IF NOT EXISTS zielgruppe TEXT NOT NULL DEFAULT '',
-      ADD COLUMN IF NOT EXISTS besuchergruppen JSONB NOT NULL DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS veranstaltungsort TEXT NOT NULL DEFAULT 'Brilon',
-      ADD COLUMN IF NOT EXISTS kapazitaet INTEGER NOT NULL DEFAULT 20,
-      ADD COLUMN IF NOT EXISTS verfuegbare_termine JSONB NOT NULL DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS hinweise TEXT NOT NULL DEFAULT '',
-      ADD COLUMN IF NOT EXISTS buchbar BOOLEAN NOT NULL DEFAULT true,
-      ADD COLUMN IF NOT EXISTS veroeffentlicht BOOLEAN NOT NULL DEFAULT true`);
-    await pool.query(`ALTER TABLE brilon_angebote
-      ADD COLUMN IF NOT EXISTS buchungsmodus TEXT NOT NULL DEFAULT 'gruppe',
-      ADD COLUMN IF NOT EXISTS mindestteilnehmer INTEGER NOT NULL DEFAULT 1,
-      ADD COLUMN IF NOT EXISTS preis_pro_person NUMERIC(10,2) NOT NULL DEFAULT 0`);
-    await pool.query(`ALTER TABLE brilon_angebote
-      ADD COLUMN IF NOT EXISTS sortierung INTEGER NOT NULL DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false,
-      ADD COLUMN IF NOT EXISTS veranstaltungsorte JSONB NOT NULL DEFAULT '[]'::jsonb`);
-    await pool.query(`UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array(veranstaltungsort)
-      WHERE jsonb_array_length(CASE WHEN jsonb_typeof(veranstaltungsorte)='array' THEN veranstaltungsorte ELSE '[]'::jsonb END)=0`);
-    await pool.query(`WITH sortiert AS (
-      SELECT id,row_number() OVER(ORDER BY name ASC,id ASC)::integer AS position
-      FROM brilon_angebote
-    ) UPDATE brilon_angebote AS angebot SET sortierung=sortiert.position
-      FROM sortiert WHERE angebot.id=sortiert.id AND angebot.sortierung=0`);
-    await pool.query(`DO $$ BEGIN
-      ALTER TABLE brilon_angebote ADD CONSTRAINT brilon_angebote_buchungsmodus_check
-        CHECK (buchungsmodus IN ('gruppe','einzelplatz'));
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_orte(
-      id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon'),('Rüthen'),('Soest'),('Sundern') ON CONFLICT(name) DO NOTHING`);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS brilon_gps_touren (
-        id UUID PRIMARY KEY,
-        angebot_id BIGINT REFERENCES brilon_angebote(id),
-        data JSONB NOT NULL,
-        aktiv BOOLEAN NOT NULL DEFAULT false,
-        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await pool.query('ALTER TABLE brilon_gps_touren ADD COLUMN IF NOT EXISTS angebot_id BIGINT REFERENCES brilon_angebote(id)');
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS brilon_gps_spiele (
-        id UUID PRIMARY KEY,
-        token_hash TEXT NOT NULL UNIQUE,
-        tour_id UUID NOT NULL REFERENCES brilon_gps_touren(id),
-        buchung_id UUID NOT NULL REFERENCES brilon_buchungen(id),
-        station_index INTEGER NOT NULL DEFAULT 0,
-        gestartet_am TIMESTAMPTZ,
-        abgeschlossen_am TIMESTAMPTZ,
-        spielzeit_sekunden INTEGER,
-        gast_name TEXT,
-        gast_einwilligung BOOLEAN NOT NULL DEFAULT false,
-        gast_einwilligung_am TIMESTAMPTZ,
-        gast_einwilligung_version TEXT,
-        gesperrt_am TIMESTAMPTZ,
-        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_am TIMESTAMPTZ');
-    await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_version TEXT');
-    await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
-    // Stations-Prüfprotokoll: nur bei expliziter Freigabe der Testmigrationen.
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_mitarbeitende (
-      id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,
-      passwort_hash TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS telefon TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS strasse TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS plz TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS wohnort TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS qualifikationen TEXT');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS registriert_am TIMESTAMPTZ');
-    await pool.query('ALTER TABLE brilon_pruef_mitarbeitende ADD COLUMN IF NOT EXISTS freigabe_am TIMESTAMPTZ');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_personaldokumente (
-      id UUID PRIMARY KEY,
-      mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-      bezeichnung TEXT NOT NULL,dateiname TEXT NOT NULL,mime_type TEXT NOT NULL CHECK(mime_type='image/jpeg'),
-      daten BYTEA NOT NULL,bytegroesse INTEGER NOT NULL CHECK(bytegroesse>0 AND bytegroesse<=512000),
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_personaldokumente_mitarbeiter_idx ON brilon_pruef_personaldokumente(mitarbeiter_id,erstellt_am)');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_freigaben (
-      id UUID PRIMARY KEY,
-      mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
-      ort_id BIGINT NOT NULL REFERENCES brilon_orte(id),
-      qualifikation TEXT NOT NULL,erstellt_von TEXT NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(mitarbeiter_id,ort_id,qualifikation))`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_einladungen (
-      id UUID PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,
-      token_hash CHAR(64) NOT NULL UNIQUE,ablauf TIMESTAMPTZ NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),verwendet_am TIMESTAMPTZ,
-      widerrufen_am TIMESTAMPTZ)`);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_einladungen_offen_email_idx
-      ON brilon_pruef_einladungen(email) WHERE verwendet_am IS NULL AND widerrufen_am IS NULL`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationen (
-      id UUID PRIMARY KEY,name TEXT NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
-    await pool.query("ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS qualifikation TEXT NOT NULL DEFAULT ''");
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_sessions (
-      token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
-      ablauf TIMESTAMPTZ NOT NULL,entsperrt_bis TIMESTAMPTZ)`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_sessions_ablauf_idx ON brilon_pruef_sessions(ablauf)');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_codes (
-      id UUID PRIMARY KEY,code_hash CHAR(64) NOT NULL,ablauf TIMESTAMPTZ NOT NULL,
-      verbraucht_am TIMESTAMPTZ,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_berichte (
-      id UUID PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
-      programm TEXT NOT NULL,beginn TEXT NOT NULL,pruefungen JSONB NOT NULL,
-      hat_mangel BOOLEAN NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    // Sperren bleiben bis zu einer gesondert protokollierten fachlichen Freigabe bestehen.
-    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
-    await pool.query('ALTER TABLE brilon_pruef_stationen ADD COLUMN IF NOT EXISTS sperrgrund TEXT');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationsereignisse (
-      id UUID PRIMARY KEY,
-      station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
-      bericht_id UUID REFERENCES brilon_pruef_berichte(id),
-      art TEXT NOT NULL CHECK(art IN ('mangel','freigabe')),
-      notiz TEXT NOT NULL,
-      verantwortlich TEXT NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsereignisse_station_idx ON brilon_pruef_stationsereignisse(station_id,erstellt_am DESC)');
-    // Administrative station changes do not alter the historic defect/release log.
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_stationsstatus (
-      id UUID PRIMARY KEY,
-      station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
-      art TEXT NOT NULL CHECK(art IN ('deaktiviert','reaktiviert')),
-      begruendung TEXT NOT NULL,
-      verantwortlich TEXT NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_stationsstatus_station_idx ON brilon_pruef_stationsstatus(station_id,erstellt_am DESC)');
-    await pool.query('ALTER TABLE brilon_pruef_berichte ADD COLUMN IF NOT EXISTS hat_hinweis BOOLEAN NOT NULL DEFAULT false');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_hinweise(
-      id UUID PRIMARY KEY,station_id UUID NOT NULL REFERENCES brilon_pruef_stationen(id),
-      bericht_id UUID NOT NULL REFERENCES brilon_pruef_berichte(id),
-      beschreibung TEXT NOT NULL,erstellt_von TEXT NOT NULL,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      erledigt_am TIMESTAMPTZ,erledigt_von TEXT,erledigt_notiz TEXT,
-      UNIQUE(bericht_id,station_id))`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_hinweise_offen_idx ON brilon_pruef_hinweise(erstellt_am DESC) WHERE erledigt_am IS NULL');
-
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_meldungen (
-      bericht_id UUID PRIMARY KEY REFERENCES brilon_pruef_berichte(id),
-      status TEXT NOT NULL DEFAULT 'ausstehend'
-        CHECK(status IN ('ausstehend','sendet','angenommen','fehlgeschlagen','nicht_konfiguriert')),
-      versuche INTEGER NOT NULL DEFAULT 0 CHECK(versuche>=0),
-      letzter_versuch TIMESTAMPTZ,angenommen_am TIMESTAMPTZ,
-      letzter_fehler TEXT,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_meldungen_status_idx ON brilon_pruef_meldungen(status,erstellt_am DESC)');
-    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS code_verschluesselt TEXT');
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_tablet_kopplungen(
-      id UUID PRIMARY KEY,code_hash CHAR(64) NOT NULL,
-      ablauf TIMESTAMPTZ NOT NULL,verwendet_am TIMESTAMPTZ,
-      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_tablets(
-      id UUID PRIMARY KEY,name TEXT NOT NULL,token_hash CHAR(64) NOT NULL UNIQUE,
-      aktiv BOOLEAN NOT NULL DEFAULT true,gekoppelt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_aktiv_idx ON brilon_pruef_tablets(aktiv)');
-    // Letztes Lebenszeichen dient ausschließlich der aktuellen Verbindungserkennung.
-    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS zuletzt_gesehen_am TIMESTAMPTZ');
-    // Pro Prüfstandort ist genau ein Administrations-Tablet als Codeanzeige ausgewählt.
-    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
-    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
-    await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_ort_idx ON brilon_pruef_tablets(ort_id)');
-    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
-    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
-    } else {
-      console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
-    }
-    if(process.env.MOCK_PG!=='1'&&process.env.TEAMERBASE_CALDAV_URL&&
-       process.env.TEAMERBASE_CALDAV_USER&&process.env.TEAMERBASE_CALDAV_PASSWORD){
-      try{
-        await pool.query('SELECT id FROM brilon_teamerbase_sync_status LIMIT 0');
-        const teamerbaseTimer=setInterval(()=>{
-          teamerbaseSync.sync().catch(error=>console.error('Teamerbase-Kalenderabgleich fehlgeschlagen:',error.message));
-        },60*60*1000);
-        teamerbaseTimer.unref();
-        teamerbaseSync.sync().catch(error=>console.error('Teamerbase-Erstabgleich fehlgeschlagen:',error.message));
-      }catch(error){
-        console.warn('Teamerbase-Kalenderabgleich nicht gestartet; Schema fehlt möglicherweise:',error.message);
-      }
-    }
-    if(process.env.MOCK_PG!=='1'){
-      await pool.query(`ALTER TABLE brilon_angebote
-        ADD COLUMN IF NOT EXISTS veranstaltungsorte JSONB NOT NULL DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS dauer_modus TEXT NOT NULL DEFAULT 'gruppenstufe',
-        ADD COLUMN IF NOT EXISTS gruppenstufen JSONB NOT NULL DEFAULT '[]'::jsonb`);
-      await pool.query(`UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array(veranstaltungsort)
-        WHERE jsonb_array_length(CASE WHEN jsonb_typeof(veranstaltungsorte)='array' THEN veranstaltungsorte ELSE '[]'::jsonb END)=0`);
-      console.log('Programmstandorte geprüft und vorhandene Standorte übernommen');
-    }
-    if(process.env.RUN_SCHEMA_MIGRATIONS==='true'||process.env.RUN_STAFFING_MIGRATION==='true')
-      await migrateEinsatzplanung();
-    if(process.env.MOCK_PG!=='1'){
-      try{
-        await ensureKundenbestaetigungEinstellungen();
-        await pool.query('SELECT buchung_id FROM brilon_kundenbestaetigungen LIMIT 0');
-        const confirmationTimer=setInterval(()=>{
-          kundenService.processQueue().catch(error=>console.error('Kundenbestätigungen prüfen:',error.message));
-        },60_000);
-        confirmationTimer.unref();
-        kundenService.processQueue().catch(error=>console.error('Kundenbestätigungen bei Start:',error.message));
-      }catch(error){console.warn('Automatische Kundenbestätigung oder Zeiteinstellungen nicht gestartet:',error.message);}
-    }
-    if(process.env.MOCK_PG!=='1'){
-      try{
-        await pool.query('SELECT bericht_id FROM brilon_pruef_meldungen LIMIT 0');
-        const rateLimitRetryTimer=setInterval(()=>{
-          pruefungApi.retryRateLimited().catch(error=>
-            console.error('Zeitgesteuerter Mängelmail-Wiederholungsversuch fehlgeschlagen:',error.message));
-        },60_000);
-        rateLimitRetryTimer.unref();
-      }catch(error){
-        console.warn('Zeitgesteuerter Mängelmail-Wiederholungsversuch nicht gestartet:',error.message);
-      }
-      try{
-        await pool.query('SELECT ablauf FROM brilon_pruef_sessions LIMIT 0');
-        await pool.query('SELECT id FROM brilon_pruef_codes LIMIT 0');
-        await pool.query('SELECT verwendet_am FROM brilon_pruef_tablet_kopplungen LIMIT 0');
-        const credentialCleanupTimer=setInterval(()=>{
-          pruefungApi.bereinigeAbgelaufeneZugaenge().catch(error=>
-            console.error('Bereinigung abgelaufener Prüfsitzungen und Codes fehlgeschlagen:',error.message));
-        },60_000);
-        credentialCleanupTimer.unref();
-      }catch(error){
-        console.warn('Bereinigung abgelaufener Prüfsitzungen und Codes nicht gestartet:',error.message);
-      }
-    }
-    // Diagnose beim Start: niemals Geheimnisse oder Codes ausgeben.
-    if(process.env.MOCK_PG!=='1'){
-      try{
-        const required=['brilon_pruef_tablet_kopplungen','brilon_pruef_tablets','brilon_pruef_codes'];
-        const names=await pool.query('SELECT relname FROM pg_class WHERE relkind IN (\'r\',\'p\') AND relname = ANY($1::text[])',[required]);
-        const missing=required.filter(name=>!names.rows.some(row=>row.relname===name));
-        const configured=typeof process.env.STATION_CHECK_SECRET==='string'&&
-          process.env.STATION_CHECK_SECRET.length>=32;
-        console.log('Tablet-Kopplung Status:',missing.length?'Tabellen fehlen: '+missing.join(', '):'Tabellen bereit',
-          configured?'Sicherheitsgeheimnis bereit':'Sicherheitsgeheimnis fehlt');
-      }catch(error){
-        console.warn('Tablet-Kopplung Vorprüfung nicht verfügbar:',error?.code||'DB_FEHLER');
-      }
-    }
-    console.log('PostgreSQL verbunden');
-  }else{
-    console.warn('DATABASE_URL fehlt: Datenbankfunktionen nicht verfügbar');
-  }
-  http.createServer(main).listen(PORT,'0.0.0.0',()=>{
-    console.log('Server auf Port '+PORT);
-  });
-}
-start().catch(e=>{
-  console.error('Datenbank-Start fehlgeschlagen:',e.message);
-  process.exit(1);
-});
-
-
-
+      const aktiveTour=await pool.query('SELECT id FROM brilon_gps_touren WHERE angebot_id=$1 AND aktiv=true LIMIT 1',[ar

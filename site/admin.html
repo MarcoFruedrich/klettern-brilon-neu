@@ -330,8 +330,30 @@
     <select name="typ" required>
       <option value="termin">Eigener Klettertermin</option>
       <option value="sperrzeit">Sperrzeit / Nicht verfügbar</option>
+      <option value="buchungsfenster">Freies QR-Buchungszeitfenster (Jugendherberge Brilon)</option>
     </select>
   </label>
+
+  <label id="calendar-qr-program-field" hidden>Programm für QR-Anmeldungen
+    <select name="programm_id" id="calendar-qr-program"><option value="">Alle aktiven Brilon-Programme</option></select>
+  </label>
+  <label id="calendar-qr-capacity-field" hidden>Maximale Gruppengröße
+    <input name="gruppen_kapazitaet" type="number" min="1" max="150" value="10">
+  </label>
+  <label id="calendar-central-times-toggle-label" class="calendar-central-times-toggle" hidden>
+    <input name="zwei_startzeiten" type="checkbox" value="ja">
+    Zwei zentrale Startzeiten anlegen
+  </label>
+  <fieldset id="calendar-central-times" class="calendar-central-times" hidden>
+    <legend>Zentrale Startzeiten</legend>
+    <p>Für jeden Termin wird ein eigenes QR-Zeitfenster angelegt. Die Zeitfenster gelten für dasselbe Programm und dieselbe Gruppenkapazität.</p>
+    <div class="calendar-central-times-grid">
+      <label>Start 1<input name="startzeit_1" type="time" value="09:00"></label>
+      <label>Ende 1<input name="endzeit_1" type="time" value="12:00"></label>
+      <label>Start 2<input name="startzeit_2" type="time" value="14:00"></label>
+      <label>Ende 2<input name="endzeit_2" type="time" value="17:00"></label>
+    </div>
+  </fieldset>
 
   <fieldset id="calendar-location-picker" class="angebot-standort-auswahl">
     <legend>Standorte</legend>
@@ -621,221 +643,4 @@
   <h2 id="mitarbeiterbereiche-heading">Bereiche im Mitarbeiterportal</h2>
   <p>Aktivierte Textbereiche erscheinen für alle angemeldeten Mitarbeiter. Vertrauliche Einzelinformationen hier nicht veröffentlichen.</p>
   <form id="mitarbeiterbereich-form">
-    <label>Bereichstyp<select name="art">
-      <option value="allgemein">Allgemeine Information</option>
-      <option value="standort">Standortinformation</option>
-      <option value="partner">Netzwerk-/Kooperationspartner</option>
-      <option value="programm">Programm</option>
-    </select></label>
-    <label>Bezeichnung des Bereichs<input name="titel" maxlength="100" required placeholder="z. B. Ansprechpartner und Netzwerkpartner"></label>
-    <label>Inhalt<textarea name="inhalt" maxlength="20000" rows="8" required placeholder="Informationen und Kontaktdaten"></textarea></label>
-    <label>Standorte zuordnen (Mehrfachauswahl möglich)
-      <select name="standorte" class="staff-area-locations" multiple size="5" aria-describedby="staff-area-location-help"></select>
-    </label>
-    <small id="staff-area-location-help">Für Standortinformationen und Programme ist mindestens ein aktiver Standort erforderlich. Partner können optional einem oder mehreren Standorten zugeordnet werden.</small>
-    <label class="check"><input name="aktiv" type="checkbox"><span>Im Mitarbeiterbereich anzeigen</span></label>
-    <button type="submit" class="btn">Bereich hinzufügen</button>
-  </form>
-  <p id="mitarbeiterbereich-status" role="status" aria-live="polite"></p>
-  <h3>Vorhandene Bereiche</h3>
-  <div id="mitarbeiterbereiche-list" class="admin-grid"></div>
-</section>
-
-<section id="wissensportal-admin-section" class="admin-view" data-admin-view aria-labelledby="wissensportal-admin-heading">
-  <h2 id="wissensportal-admin-heading">Wissensportal – interne Wikipedia</h2>
-  <p>Hier legst du interne Artikel an, bearbeitest sie und veröffentlichst sie für angemeldete Mitarbeiter. Entwürfe bleiben unsichtbar. Standortzuweisungen können mehrfach erfolgen.</p>
-  <p><strong>Wichtig:</strong> Sicherheitseinweisungen und Notfallanweisungen erhalten Versionsnummern. Mitarbeiter können das Lesen der aktuellen Version bestätigen; praktische Sicherheitsunterweisungen bleiben zusätzlich erforderlich.</p>
-  <details id="wiki-categories-panel" class="booking wiki-categories-panel">
-    <summary><strong>Wissenskategorien verwalten</strong></summary>
-    <p>Oberpunkte lassen sich aufklappen. Unterpunkte werden innerhalb des Oberpunkts ergänzt und in der Reihenfolge gespeichert.</p>
-    <div id="wiki-category-tree" class="wiki-category-tree"></div>
-    <div class="wiki-category-new-root">
-      <label>Neue Hauptkategorie<input id="wiki-category-root-title" maxlength="80" placeholder="z. B. Programmsammlung"></label>
-      <button type="button" id="wiki-category-add-root" class="btn secondary">Hauptkategorie hinzufügen</button>
-    </div>
-    <button type="button" id="wiki-category-save" class="btn">Kategorien speichern</button>
-    <p id="wiki-category-status" role="status" aria-live="polite"></p>
-  </details>
-  <div class="wiki-admin-layout">
-    <form id="wiki-article-form" class="booking">
-      <h3 id="wiki-form-heading">Neuer Wissensartikel</h3>
-      <label>Titel<input name="titel" maxlength="120" required placeholder="z. B. Kletterwand Brilon – Sicherungsablauf"></label>
-      <label>Kategorie<select name="kategorie" required></select></label>
-      <label>Kurzbeschreibung<textarea name="kurztext" rows="2" maxlength="500" placeholder="Kurzer Überblick für die Suche"></textarea></label>
-      <label>Artikeltext<textarea name="inhalt" rows="12" maxlength="20000" required placeholder="Abläufe, Regeln, Material, Besonderheiten, Sicherheitshinweise ..."></textarea></label>
-      <label>Artikelbild (optional, HTTPS)<input type="url" name="bildUrl" placeholder="https://.../klettern.jpg"></label>
-      <label>Dokumente und PDF-Anhänge (ein Dokument je Zeile: Titel | HTTPS-Link)
-        <textarea name="anhaengeText" rows="4" placeholder="Sicherheitscheck | https://.../checkliste.pdf"></textarea>
-      </label>
-      <label>Externer Dokumentenlink (optional, HTTPS)<input type="url" name="dokumentUrl" placeholder="https://..."></label>
-      <label>Für diese Standorte freigeben (Mehrfachauswahl)<select name="standorte" id="wiki-standorte" multiple size="5"></select></label>
-      <small>Ohne Standortauswahl ist der Artikel für alle angemeldeten Mitarbeiter freigegeben. Mit Standortauswahl nur für Mitarbeiter, die für mindestens einen dieser Standorte freigegeben sind.</small>
-      <label class="check"><input type="checkbox" name="veroeffentlicht"><span>Jetzt im Mitarbeiter-Wissensportal veröffentlichen</span></label>
-      <div class="wiki-admin-actions"><button class="btn" id="wiki-save" type="submit">Artikel speichern</button><button class="btn secondary" id="wiki-new" type="button">Neuen Artikel beginnen</button></div>
-      <p id="wiki-admin-status" role="status" aria-live="polite"></p>
-    </form>
-    <div class="booking">
-      <h3>Vorhandene Wissensartikel</h3>
-      <label>Artikel suchen<input id="wiki-admin-search" type="search" placeholder="Titel, Stichwort oder Inhalt"></label>
-      <button type="button" id="wiki-admin-refresh" class="btn secondary">Aktualisieren</button>
-      <div id="wiki-admin-list" class="wiki-admin-list"></div>
-    </div>
-  </div>
-</section>
-
-<section id="kundenfeedback-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="kundenfeedback-heading">
-  <h2 id="kundenfeedback-heading">Kundenfeedback</h2>
-  <p>Vertrauliche Rückmeldungen sind nur in dieser Verwaltung sichtbar.</p>
-  <div id="kundenfeedback-summary" class="admin-grid payment-summary-grid" aria-live="polite"></div>
-  <p id="kundenfeedback-status" role="status" aria-live="polite"></p>
-  <div id="kundenfeedback-list" class="admin-grid"></div>
-</section>
-
-<section id="admin-guestbook-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="guestbook-heading">
-  <h2 id="guestbook-heading">Teilnahme-Gästeliste</h2>
-  <p>Angezeigt werden nur abgeschlossene Touren, für die eine ausdrückliche Veröffentlichungseinwilligung vorliegt.</p>
-  <div class="admin-booking-filters">
-    <label>GPS-Tour
-      <select id="admin-guestbook-tour"><option value="">Alle Touren</option></select>
-    </label>
-    <button type="button" id="admin-guestbook-load" class="btn secondary">Einträge laden</button>
-  </div>
-  <p id="admin-guestbook-status" role="status" aria-live="polite"></p>
-  <div id="admin-guestbook-list" class="admin-grid"></div>
-</section>
-
-<section id="gps-verwaltung" class="admin-view" data-admin-view aria-labelledby="gps-heading">
-  <h2 id="gps-heading">GPS-Schatzsuchen</h2>
-  <p>Touren verwalten, Kontrollcodes ändern und Zugänge für bestätigte Buchungen ausstellen.</p>
-  <form id="gps-tour-form">
-    <input name="id" type="hidden">
-    <label>Titel<input name="titel" maxlength="120" required></label>
-    <label>Beschreibung<textarea name="beschreibung" maxlength="2000" rows="3"></textarea></label>
-    <div class="two">
-      <label>Schwierigkeitsgrad<input name="schwierigkeitsgrad" maxlength="30" placeholder="leicht" required></label>
-      <label>Altersgruppe<input name="altersgruppe" maxlength="80" placeholder="3. und 4. Klasse" required></label>
-    </div>
-    <div class="two">
-      <label>Startpunkt<input name="startpunkt" maxlength="160" required></label>
-      <label>Ziel<input name="ziel" maxlength="160" required></label>
-    </div>
-    <div class="two">
-      <label>Dauer bei 5–10 Personen (Minuten)<input name="dauer" type="number" min="15" max="1440" required></label>
-      <label>Preis pro Gruppe (€)<input name="preis" type="number" min="0" step="0.01" required></label>
-    </div>
-    <div class="gps-station-heading">
-      <h3>Stationen und Aufgaben</h3>
-      <button class="btn secondary" id="gps-station-add" type="button">Station hinzufügen</button>
-    </div>
-    <div id="gps-stations" class="gps-stations" aria-live="polite"></div>
-    <p class="hint">Kontrollcodes werden als HMAC gespeichert. Koordinaten werden vom Spielbrowser nicht ausgeliefert.</p>
-    <label class="check"><input name="buchbar" type="checkbox"><span>Buchbar</span></label>
-    <label class="check"><input name="aktiv" type="checkbox"><span>Aktivieren</span></label>
-    <button class="btn" type="submit">GPS-Tour anlegen</button>
-  </form>
-  <p id="gps-tour-status" role="status"></p>
-  <div id="gps-tour-list" class="admin-grid"></div>
-  <h3>Spielzugang erstellen</h3>
-  <form id="gps-game-form">
-    <label>Aktive GPS-Tour<select name="tourId" required></select></label>
-    <label>Bestätigte Buchung suchen
-      <input id="gps-booking-search" type="search" maxlength="120" autocomplete="off"
-        placeholder="Name oder Buchungsnummer">
-    </label>
-    <p class="hint">Die Suche berücksichtigt alle bestätigten Buchungen zur ausgewählten GPS-Tour, auch ältere Termine.</p>
-    <label>Bestätigte Buchung<select name="buchungId" required></select></label>
-    <p id="gps-booking-results" role="status" aria-live="polite"></p>
-    <nav id="gps-booking-pagination" class="calendar-navigation" aria-label="GPS-Buchungsseiten" hidden>
-      <button id="gps-booking-prev" type="button" class="btn secondary">← Vorherige</button>
-      <span id="gps-booking-page-info" aria-live="polite"></span>
-      <button id="gps-booking-next" type="button" class="btn secondary">Weitere →</button>
-    </nav>
-    <button class="btn secondary" type="submit">Einmaligen Spielzugang erstellen</button>
-  </form>
-  <p id="gps-game-status" role="status"></p>
-
-  <h3>Ausgestellte Spielzugänge verwalten</h3>
-  <p class="hint">Hier sind ausgestellte Spielzugänge mit Bearbeitungsstand sichtbar. Geheime Zugangscodes und Links können nicht erneut angezeigt werden. Eine Sperrung ist dauerhaft und unterbricht auch gestartete Spiele.</p>
-  <label>GPS-Tour filtern
-    <select id="gps-access-tour"><option value="">Alle GPS-Touren</option></select>
-  </label>
-  <button type="button" id="gps-access-refresh" class="btn secondary">Zugänge aktualisieren</button>
-  <p id="gps-access-status" role="status" aria-live="polite"></p>
-  <div id="gps-access-list" class="admin-grid"></div>
-  <nav id="gps-access-pagination" class="calendar-navigation" aria-label="Seiten der GPS-Zugänge" hidden>
-    <button id="gps-access-prev" class="btn secondary" type="button">← Vorherige</button>
-    <span id="gps-access-page-info"></span>
-    <button id="gps-access-next" class="btn secondary" type="button">Weitere →</button>
-  </nav>
-</section>
-
-    
-    <section id="stationspruefung" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="inspection-heading">
-      <h2 id="inspection-heading">Stationsprüfungen – Verwaltung</h2>
-      <p>Für die dokumentierte Kontrolle vor jedem Programm. <a href="/pruefung.html">Prüfformular für Mitarbeitende öffnen</a>.</p>
-      <section id="pruef-uebersicht" aria-label="Sicherheitsübersicht der Kletterstationen">
-        <h3>Aktuelle Sicherheitsübersicht</h3>
-        <p class="hint">Sicherheitsmängel und stillgelegte Stationen haben Vorrang. Kleinere Hinweise werden separat zur Nachprüfung angezeigt. Die Übersicht ersetzt keine vorgeschriebene Kontrolle vor jeder Nutzung.</p>
-        <button id="pruef-uebersicht-refresh" type="button" class="btn secondary">Sicherheitsübersicht aktualisieren</button>
-        <p id="pruef-uebersicht-status" role="status" aria-live="polite">Noch keine Sicherheitsdaten geladen.</p>
-        <div id="pruef-uebersicht-zaehler"></div>
-        <div id="pruef-uebersicht-inhalt"></div>
-      </section>
-      <form id="pruef-station-form">
-        <h3>Station anlegen</h3>
-        <label>Stationsbezeichnung<input name="name" maxlength="100" required placeholder="Kletterwand links"></label>
-        <label>Standort<select id="pruef-station-ort" name="ortId" required></select></label>
-        <label>Erforderliche Qualifikation<input name="qualifikation" maxlength="100" required placeholder="z. B. Kletterprüfung"></label>
-        <button class="btn secondary" type="submit">Station speichern</button>
-      </form>
-      <p id="pruef-station-status" role="status"></p>
-      <div id="pruef-station-list"></div>
-      <h3>Werbetablet am Standort koppeln</h3>
-      <p class="hint">Das Tablet öffnet <a href="/tablet.html">die separate Werbe- und Prüfcode-Anzeige</a>. Es erhält niemals eine Admin-Sitzung. Nach der Kopplung hier unter dem jeweiligen Gerät den Werbestandort auswählen und speichern. Auf dem Monitor erscheinen dann nur die aktiven, veröffentlichten und buchbaren Programme dieses Standorts. Ohne Standortzuordnung bleibt die Werbung neutral. Ein neuer Kopplungscode ist zehn Minuten gültig und nur einmal nutzbar. Das Tablet kann hier gesperrt werden.</p>
-      <button id="tablet-pair-generate" type="button" class="btn secondary">Tablet-Kopplungscode erzeugen</button>
-      <p id="tablet-pair-code" role="status" aria-live="polite"></p>
-      <button id="tablet-admin-refresh" type="button" class="btn secondary">Tablet-Verbindung prüfen</button>
-      <p class="hint">Geräte können hier auch vollständig aus der Liste gelöscht werden. Der rote Button „Tablet löschen“ sperrt den Gerätezugang sofort; dafür ist keine Bedienung des Tablets nötig. Zur erneuten Nutzung muss es neu gekoppelt werden.</p>
-      <div id="tablet-admin-list"></div>
-      <p id="tablet-admin-status" role="status" aria-live="polite"></p>
-      <h3>Einmaligen Vor-Ort-Code anzeigen (Administrator-Notfalloption)</h3>
-      <p class="hint">Normalerweise fordert die angemeldete Fachkraft den Code über ihr Smartphone an und er erscheint auf dem gekoppelten Tablet. Diese Administrator-Notfalloption zeigt ihn zusätzlich hier an; daher nur in einem geschützten Umfeld verwenden.</p>
-      <button class="btn secondary" id="pruef-code-generate" type="button">Neuen Prüfcode anzeigen</button>
-      <p id="pruef-code-display" role="status" style="font-size:2rem;letter-spacing:.2rem"></p>
-      <h3>Offene Hinweise zur Nachprüfung</h3>
-      <p class="hint">Kleinere Auffälligkeiten ohne unmittelbare Sicherheitsbeeinträchtigung sperren die Station nicht automatisch. Sie bleiben sichtbar, bis eine verantwortliche Person die Prüfung und das Ergebnis dokumentiert.</p>
-      <button class="btn secondary" id="pruef-hinweis-refresh" type="button">Hinweise aktualisieren</button>
-      <p id="pruef-hinweis-status" role="status" aria-live="polite"></p>
-      <div id="pruef-hinweis-list"></div>
-      <h3>Mängelmeldungen – E-Mail-Versand</h3>
-      <p class="hint">Fehlgeschlagene und nicht konfigurierte Benachrichtigungen bleiben nachvollziehbar gespeichert. Eine erneute Sendung ist nur nach manueller Prüfung möglich. „Vom Anbieter angenommen“ bedeutet nicht, dass die E-Mail bereits zugestellt wurde.</p>
-      <button id="pruef-mail-refresh" class="btn secondary" type="button">Versandübersicht aktualisieren</button>
-      <p id="pruef-mail-status" role="status" aria-live="polite"></p>
-      <div id="pruef-mail-list"></div>
-      <h3>Zuletzt gespeicherte Prüfberichte</h3>
-      <button class="btn secondary" id="pruef-report-refresh" type="button">Berichte aktualisieren</button>
-      <p id="pruef-report-status" role="status"></p>
-      <div id="pruef-report-list"></div>
-    </section>
-
-    <p id="status" role="status"></p>
-        </div>
-      </div>
-      </div>
-  </main>
-
-  <script src="/zahlungsuebersicht.js"></script>
-  <script src="/vendor/qrcode-generator.js"></script>
-  <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261111-teamerbase-calendar"></script>
-  <script src="/medienpool-admin.js?v=20261110-gif-media-v2"></script>
-  <script src="/besuchergruppen-admin.js?v=20261110-custom-groups-gif-icons-v3"></script>
-  <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
-  <script src="/website-effekte-admin.js?v=20261108"></script>
-  <script src="/pruefung-admin.js?v=20261108-delete-tablet"></script>
-  <script src="/feedback-admin.js"></script>
-  <script src="/einsatzplanung-admin.js?v=20261109-staff-application-roster"></script>
-  <script src="/wissensportal-admin.js?v=20261106-hierarchical-categories"></script>
-  <script src="/admin-kalender-v2.js?v=20261109-assigned-employee-names"></script>
-</body>
-</html>
+    <la

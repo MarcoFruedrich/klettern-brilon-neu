@@ -925,6 +925,103 @@ line-height:1.25;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
   color: #173e35;
 }
 
+/* Standortneutraler Mitarbeiterkalender */
+.staff-portal-page .staff-calendar { display:grid; gap:14px; }
+.staff-portal-page .staff-calendar-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.staff-portal-page .staff-calendar-heading h2 { margin:0; }
+.staff-portal-page .staff-calendar-heading p { margin:4px 0 0; color:#536a60; }
+.staff-portal-page .staff-calendar-controls { display:grid; gap:10px; }
+.staff-portal-page .staff-calendar-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.staff-portal-page .staff-calendar-toolbar strong { min-width:170px; text-align:center; text-transform:capitalize; color:#173e35; font-size:20px; }
+.staff-portal-page .staff-calendar-nav { width:42px; height:42px; border:1px solid #c8d5cc; border-radius:10px; background:#fff; color:#173e35; font-size:24px; cursor:pointer; }
+.staff-portal-page .staff-calendar-filters { display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); gap:10px; }
+.staff-portal-page .staff-calendar-filters label { min-width:0; color:#173e35; }
+.staff-portal-page .staff-calendar-filters label span { font-size:13px; }
+.staff-portal-page .staff-calendar-filters select { min-width:0; background:#fff; color:#173e35; border-color:#c8d5cc; }
+.staff-portal-page .staff-calendar-legend { display:flex; flex-wrap:wrap; gap:8px 16px; }
+.staff-portal-page .staff-calendar-legend-item { display:inline-flex; align-items:center; gap:6px; color:#41594f; font-size:12px; }
+.staff-portal-page .staff-calendar-legend-item i { width:11px; height:11px; border-radius:3px; border:1px solid #bdc8c1; background:#fff; }
+.staff-portal-page .staff-calendar-legend-item.is-approved i { background:#e4f5bf; border:2px solid #1b6047; }
+.staff-portal-page .staff-calendar-legend-item.is-open i { background:#fff1bd; border-color:#d4a51c; }
+.staff-portal-page .staff-calendar-legend-item.is-confirmed i { background:#d7f0dc; border-color:#438e59; }
+.staff-portal-page .staff-calendar-legend-item.is-cancelled i { background:#f7dddd; border-color:#bd5c5c; }
+.staff-portal-page .staff-calendar-workspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(245px,300px); gap:14px; align-items:start; }
+.staff-portal-page .staff-calendar-grid { min-width:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); border:1px solid #d4ded7; border-radius:12px; overflow:hidden; background:#fff; }
+.staff-portal-page .staff-calendar-weekday { padding:8px 4px; text-align:center; background:#edf1ed; color:#173e35; font-size:12px; font-weight:800; border-right:1px solid #dfe5e0; }
+.staff-portal-page .staff-calendar-day { min-width:0; min-height:112px; padding:6px; border-top:1px solid #e2e8e3; border-right:1px solid #e2e8e3; }
+.staff-portal-page .staff-calendar-day.is-outside { background:#f8f9f7; color:#a0aaa4; }
+.staff-portal-page .staff-calendar-day-number { display:block; margin-bottom:4px; color:#52665c; font-size:12px; font-weight:750; }
+.staff-portal-page .staff-calendar-event { display:grid; gap:2px; margin:3px 0; padding:5px 6px; border:1px solid #d2d9d4; border-radius:7px; background:#f3f5f3; color:#48574f; font-size:10px; line-height:1.35; overflow:hidden; }
+.staff-portal-page .staff-calendar-event strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.staff-portal-page .staff-calendar-event.is-approved { background:#e8f5d0; border:2px solid #236148; color:#173e35; font-weight:750; }
+.staff-portal-page .staff-calendar-event.is-open { background:#fff4cf; border-color:#d8b24e; }
+.staff-portal-page .staff-calendar-event.is-confirmed { background:#ddf2e1; border-color:#65a777; }
+.staff-portal-page .staff-calendar-event.is-cancelled { background:#f8e5e5; border-color:#d58b8b; color:#734343; }
+.staff-portal-page .staff-calendar-event.is-pending { background:#e6edfc; border-color:#708ecb; }
+.staff-portal-page .staff-calendar-badge { color:#53665c; font-size:9px; font-weight:800; }
+.staff-portal-page .staff-calendar-detail { display:grid; gap:8px; padding:16px; border:1px solid #d5dfd8; border-radius:12px; background:#f0f2ef; color:#173e35; }
+.staff-portal-page .staff-calendar-detail h3 { font-size:20px; }
+.staff-portal-page .staff-calendar-detail p { margin:0; color:#40594f; }
+.staff-portal-page .staff-calendar-trust { display:inline-block; padding:7px 10px; border-radius:8px; background:#e2f4bd; color:#174b37; font-weight:800; font-size:13px; }
+.staff-portal-page .staff-calendar-primary { width:100%; margin-top:6px; }
+.staff-portal-page .staff-attendance-form { display:grid; gap:12px; margin-top:10px; padding:14px; border:1px solid #cad9ce; border-radius:12px; background:#fff; color:#173e35; }
+.staff-portal-page .staff-attendance-form h4 { margin:0; font-size:18px; }
+.staff-portal-page .staff-attendance-agenda { display:grid; gap:14px; }
+.staff-portal-page .staff-attendance-event { padding:14px; border:1px solid #cad9ce; border-radius:12px; background:#f7faf7; }
+.staff-portal-page .staff-attendance-event h3 { margin:0 0 8px; }
+.staff-portal-page .staff-attendance-event p { margin:4px 0; overflow-wrap:anywhere; }
+.staff-portal-page .staff-attendance-form p { margin:0; overflow-wrap:anywhere; }
+.staff-portal-page .staff-attendance-summary { display:grid; gap:7px; margin-top:8px; padding:13px; border:1px solid #b8d3bf; border-radius:10px; background:#e8f5eb; }
+.staff-portal-page .staff-attendance-summary p { margin:0; }
+.staff-portal-page .staff-attendance-confirm { width:100%; min-height:48px; border:0; border-radius:9px; background:#178044; color:#fff; font-weight:800; cursor:pointer; }
+.staff-portal-page .staff-attendance-confirm:hover { background:#116b37; }
+.staff-portal-page .staff-attendance-confirm:disabled { opacity:.65; cursor:wait; }
+.staff-portal-page .staff-calendar-grid.is-list { display:grid; grid-template-columns:1fr; padding:8px; }
+.staff-portal-page .staff-calendar-list-row { display:flex; align-items:center; gap:10px; padding:8px; text-align:left; background:#fff; border:0; border-bottom:1px solid #e2e8e3; cursor:pointer; }
+.staff-portal-page .staff-calendar-list-row .staff-calendar-event { flex:1; }
+@media(max-width:900px) {
+  .staff-portal-page .staff-calendar-workspace { grid-template-columns:minmax(0,1fr); }
+  .staff-portal-page .staff-calendar-detail { order:-1; }
+}
+@media(max-width:640px) {
+  .staff-portal-page .staff-calendar-filters { grid-template-columns:minmax(0,1fr); }
+  .staff-portal-page .staff-calendar-day { min-height:82px; padding:3px; }
+  .staff-portal-page .staff-calendar-event { padding:4px; font-size:9px; }
+  .staff-portal-page .staff-calendar-event>span:not(.staff-calendar-badge) { display:none; }
+  .staff-portal-page .staff-calendar-toolbar strong { flex:1; min-width:110px; font-size:17px; }
+  .staff-portal-page .staff-calendar-detail { padding:13px; }
+  .staff-portal-page .staff-attendance-form { padding:12px; }
+  .staff-portal-page .staff-attendance-form input,
+  .staff-portal-page .staff-attendance-form textarea { min-height:48px; font-size:16px; }
+  .staff-portal-page .staff-attendance-form textarea { min-height:92px; }
+  .staff-portal-page .staff-calendar-detail button { min-height:46px; }
+}
+
+.calendar-central-times { padding:14px; border:1px solid #c9d7cd; border-radius:10px; background:#f4f8f4; }
+.partner-brilon-calendar,.partner-brilon-request { margin-top:22px; padding:16px; border:1px solid #c9d7cd; border-radius:14px; background:#f7faf7; }
+.partner-brilon-request form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.partner-brilon-request form label { display:grid; gap:6px; }
+.partner-brilon-request form label:nth-last-of-type(1) { grid-column:1/-1; }
+@media(max-width:640px) {
+  .partner-brilon-calendar,.partner-brilon-request { padding:12px; }
+  .partner-brilon-request form { grid-template-columns:minmax(0,1fr); }
+  .partner-brilon-request form label:nth-last-of-type(1) { grid-column:auto; }
+}
+.calendar-central-times p { margin:5px 0 12px; }
+.calendar-central-times-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.calendar-central-times-toggle { display:flex; align-items:center; gap:10px; }
+.calendar-central-times-toggle input { width:20px; height:20px; }
+@media(max-width:640px) {
+  #buchung { scroll-margin-top:76px; }
+  #buchung form { padding:18px; border-radius:16px; }
+  #buchung input, #buchung select, #buchung textarea { min-height:48px; font-size:16px; }
+  #buchung textarea { min-height:110px; }
+  #buchung button[type="submit"] { width:100%; min-height:50px; }
+  #hostel-qr-intake { padding:14px; }
+  #buchungskalender { overflow-x:auto; }
+  .calendar-central-times-grid { grid-template-columns:minmax(0,1fr); }
+}
+
 /* Verwaltung: breite Arbeitsfläche mit linker Navigation und einzelnem Bereich */
 body.admin-page { min-height:100vh; padding-top:70px; }
 .admin-page > header.admin-topbar {
@@ -992,238 +1089,4 @@ body.admin-page { min-height:100vh; padding-top:70px; }
   box-shadow:0 3px 10px #173e3508; transition:background-color .15s,border-color .15s,transform .15s;
 }
 .admin-page .admin-dashboard-link:hover,
-.admin-page .admin-dashboard-link:focus-visible {
-  background:#edf4ec; border-color:#86a58f; outline:2px solid #173e35; outline-offset:2px;
-}
-.admin-page .admin-dashboard-link:active { transform:translateY(1px); }
-.admin-page .admin-dashboard-link.employee-area-link { background:#edf6d7; border-color:#bfdc73; }
-.admin-page .admin-dashboard-link.employee-area-link:hover,
-.admin-page .admin-dashboard-link.employee-area-link:focus-visible { background:#e1f0bb; }
-@media(max-width:760px) {
-  body.admin-page { padding-top:62px; }
-  .admin-page > header.admin-topbar { height:62px; min-height:62px; }
-  .admin-page .admin-main { padding:18px 14px 36px; }
-  .admin-page .admin-layout { grid-template-columns:minmax(0,1fr); gap:14px; }
-  .admin-page .admin-sidebar { position:sticky; top:62px; z-index:15; max-height:none; padding:8px; border-radius:12px; }
-  .admin-page .admin-sidebar > #logout { align-self:flex-end; width:auto; min-height:40px; padding:8px 14px; }
-  .admin-page .admin-navigation {
-    flex-direction:row; gap:5px; max-height:none; overflow-x:auto; overflow-y:hidden;
-    overscroll-behavior-inline:contain; scrollbar-width:thin;
-  }
-  .admin-page .admin-navigation a { width:auto; min-height:42px; flex:0 0 auto; white-space:nowrap; }
-  .admin-page .admin-view { padding:18px 14px; }
-}
-@media(max-width:560px) {
-  .admin-page .admin-dashboard-grid { grid-template-columns:minmax(0,1fr); }
-}
-
-.feedback-form{max-width:760px;margin-top:22px}
-.feedback-summary{display:inline-block;padding:13px 18px;border:1px solid #536b75;border-radius:10px;background:#17242f;color:#f4c447;font-weight:750}
-
-
-/* Standortneutrales Markenlogo: bewusst über den grünen Hero-Bereich gelegt. */
-header.site-header{overflow:visible}
-.site-header .header-inner{position:relative;min-height:96px}
-.site-header .brand-logo{position:relative;z-index:2;display:block;flex:0 1 440px;max-width:min(44vw,440px);margin-bottom:-30px;align-self:flex-end}
-.site-header .brand-logo img{display:block;width:100%;height:auto;object-fit:contain}
-.site-header .navlinks{position:relative;z-index:3}
-.site-header .navlinks a.nav-widerruf{color:#b42318!important;border:1px solid #b42318;border-radius:10px;padding:9px 12px;text-align:center;text-decoration:none;font-weight:850}
-.site-header .navlinks a.nav-widerruf:hover,.site-header .navlinks a.nav-widerruf:focus-visible{background:#fff0ee;color:#8f1d14!important;outline:2px solid #b42318;outline-offset:2px}
-.angebote-filter{max-width:440px;margin:22px 0 26px}
-#angebote{scroll-margin-top:130px}
-.angebote-filter label{display:grid;gap:7px;margin-bottom:7px;color:var(--pine);font-weight:750}
-#angebote-standort-filter{width:100%;padding:12px 14px;border:1px solid #cbd8ce;border-radius:10px;background:#fff;color:var(--pine);font:inherit}
-.angebote-karte-bild{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:15px;margin:0 0 16px}
-.angebote-karte-meta{font-size:14px}
-.angebote-anfragen-link{display:inline-block;margin-top:12px;color:var(--pine);font-weight:750;text-decoration:underline;text-underline-offset:3px}
-@media(max-width:900px){.site-header .brand-logo{max-width:39vw;margin-bottom:-14px}}
-@media(max-width:750px){.site-header .header-inner{min-height:75px}.site-header .brand-logo{flex:0 1 260px;max-width:min(67vw,260px);margin-bottom:-17px}.site-header .menu-toggle{position:relative;z-index:4}}
-
-/* Zentrale Einsatzplanung – gut lesbare, responsive Verwaltungsformulare */
-.einsatz-zuweisung {display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:12px 0;}
-.einsatz-zuweisung>label {flex:1 1 180px;min-width:150px;}
-.einsatz-zuweisung>select {flex:1 1 220px;min-width:190px;}
-.einsatz-vertragsformular {display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;padding:12px 0;background:transparent;border:0;box-shadow:none;}
-.einsatz-vertragsformular>p{grid-column:1/-1;}
-.einsatz-vertragsformular>button{align-self:end;}
-#einsatzplanung-termine .booking,#arbeitsvertraege-admin .booking,#staff-planning-list .booking{
- background:#f8faf7;color:#173e35;border:1px solid #d5dfd8;border-radius:14px;padding:16px;
-}
-#staff-planning-list{display:grid;gap:12px;margin-top:16px;}
-#staff-planning-list .booking>button{margin-right:10px;margin-bottom:8px;}
-@media(max-width:620px){.einsatz-zuweisung{flex-direction:column;align-items:stretch}.einsatz-zuweisung>*{width:100%;}}
-
-/* Einheitliche Eingabemaske für zeitversetzte Kundenbestätigungen. */
-#kundenbestaetigung-settings-form {
-  grid-template-columns:minmax(190px,1.1fr) repeat(2,minmax(145px,.9fr)) minmax(190px,1.25fr) minmax(165px,.95fr);
-  align-items:stretch;
-}
-#kundenbestaetigung-settings-form>label {
-  min-width:0;
-  display:grid;
-  grid-template-rows:minmax(44px,auto) 52px;
-  align-content:start;
-  gap:8px;
-  line-height:1.35;
-}
-#kundenbestaetigung-settings-form>label>span:first-child {
-  display:flex;
-  align-items:flex-end;
-  min-height:44px;
-}
-#kundenbestaetigung-settings-form input {
-  width:100%;min-width:0;height:52px;min-height:52px;padding:0 13px;
-  border:1px solid #bfd0c5;border-radius:10px;background:#fff;color:#173e35;
-  font-size:15px;font-variant-numeric:tabular-nums;
-}
-#kundenbestaetigung-settings-form .kundenbestaetigung-unit {position:relative;display:block;}
-#kundenbestaetigung-settings-form .kundenbestaetigung-unit input {padding-right:76px;}
-#kundenbestaetigung-settings-form .kundenbestaetigung-unit>span {
-  position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  color:#506358;font-size:13px;font-weight:650;pointer-events:none;
-}
-#kundenbestaetigung-settings-form>small {align-self:center;font-size:12px;line-height:1.45;}
-#kundenbestaetigung-settings-form>button {
-  width:100%;min-height:52px;height:52px;align-self:end;display:flex;align-items:center;justify-content:center;
-  padding:0 14px;text-align:center;line-height:1.25;
-}
-#kundenbestaetigung-settings-form>#kundenbestaetigung-settings-status {grid-column:1/-1;min-height:1.4em;margin:0;}
-.staff-special-approval {
-  display:grid;grid-template-columns:minmax(190px,1fr) minmax(220px,1.5fr) auto;
-  align-items:center;gap:12px;margin:4px 0 14px;padding:14px;
-  border:1px solid #d3dfd7;border-radius:10px;background:#f8faf7;
-}
-.staff-special-approval label {display:grid;gap:6px;margin:0;color:#173e35;font-weight:750;}
-.staff-special-approval select {width:100%;height:46px;min-height:46px;padding:8px 10px;border:1px solid #bfd0c5;border-radius:8px;background:#fff;color:#173e35;font:inherit;}
-.staff-special-approval p {margin:0;color:#40594f;font-size:13px;line-height:1.4;}
-.staff-special-approval button {min-height:46px;padding:8px 14px;white-space:nowrap;}
-.staff-special-approval .staff-special-approval-status {grid-column:1/-1;min-height:1.35em;}
-.staff-grants .staff-grant-place[type="radio"] {accent-color:#087847;}
-@media(max-width:1100px){
-  #kundenbestaetigung-settings-form {grid-template-columns:repeat(3,minmax(0,1fr));}
-  #kundenbestaetigung-settings-form>small {grid-column:1/3;align-self:start;}
-  #kundenbestaetigung-settings-form>button {grid-column:3;}
-}
-@media(max-width:700px){
-  #kundenbestaetigung-settings-form {grid-template-columns:repeat(2,minmax(0,1fr));}
-  #kundenbestaetigung-settings-form>small {grid-column:1/-1;}
-  #kundenbestaetigung-settings-form>button {grid-column:1/-1;}
-  .staff-special-approval {grid-template-columns:minmax(0,1fr);}
-  .staff-special-approval .staff-special-approval-status {grid-column:auto;}
-}
-/* Equal-size, centered menu items on the public website. */
-.site-header .navlinks {
-  display:grid;flex:1 1 auto;grid-template-columns:repeat(5,minmax(0,1fr));
-  align-items:stretch;gap:10px;min-width:0;
-}
-.site-header .navlinks>a {
-  display:flex;min-width:0;min-height:62px;align-items:center;justify-content:center;
-  padding:8px 9px;border:1px solid #d5ded6;border-radius:10px;color:var(--pine);
-  font-size:13px;font-weight:750;line-height:1.25;text-align:center;text-decoration:none;overflow-wrap:anywhere;
-}
-.site-header .navlinks>a:hover,.site-header .navlinks>a:focus-visible {
-  background:#eff5ee;outline:2px solid #6b9981;outline-offset:1px;
-}
-.site-header .navlinks>a.nav-widerruf {color:#b42318!important;border:1px solid #b42318;font-weight:850;background:transparent;}
-.site-header .navlinks>a.nav-widerruf:hover,.site-header .navlinks>a.nav-widerruf:focus-visible {
-  color:#8f1d14!important;background:#fff0ee;
-}
-@media(max-width:900px){
-  .site-header .navlinks {gap:7px;}
-  .site-header .navlinks>a {min-height:58px;padding:7px 6px;font-size:12px;}
-}
-@media(max-width:750px){
-  .site-header .navlinks {
-    display:none;position:absolute;top:75px;left:0;right:0;z-index:5;
-    grid-template-columns:minmax(0,1fr);flex-direction:column;align-items:stretch;gap:10px;
-    padding:18px 23px 25px;background:#fcfdf8;
-  }
-  .site-header .navlinks.open {display:grid;}
-  .site-header .navlinks>a {width:100%;min-height:50px;font-size:15px;}
-}
-.angebot-standort-auswahl{border:1px solid #bfd3c9;border-radius:10px;padding:14px;display:grid;gap:10px}
-.angebot-standort-auswahl legend{font-weight:700;padding:0 6px}
-.angebot-standort-auswahl small{color:#49645b}
-.check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
-.check-grid label.check{display:flex;align-items:center;gap:8px;margin:0}
-.admin-page .einsatz-personalstatus{margin:12px 0;padding:12px;border:1px solid #c8dccd;border-radius:10px;background:#f5faf5}
-.admin-page .einsatz-personalstatus>summary{cursor:pointer;font-weight:850;color:#124d36}
-.admin-page .einsatz-personalstatus-liste{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:7px;margin-top:10px}
-.admin-page .einsatz-personalstatus-zeile{display:flex;align-items:center;gap:10px;min-width:0;padding:8px 10px;border:1px solid #d5e4d8;border-radius:8px;background:#fff}
-.admin-page .einsatz-personalstatus-marker{font-size:30px;line-height:1;font-weight:950;flex:0 0 26px;text-align:center}
-.admin-page .einsatz-personalstatus-zeile.is-available .einsatz-personalstatus-marker{color:#13794c}
-.admin-page .einsatz-personalstatus-zeile.is-not-applied .einsatz-personalstatus-marker{color:#a33b3b}
-.admin-page .einsatz-personalstatus-details{display:grid;min-width:0}
-.admin-page .einsatz-personalstatus-details strong{overflow-wrap:anywhere}
-.admin-page .einsatz-personalstatus-details small{color:#52695a}
-.admin-page #einsatzplanung-termine .booking.is-assignment-target{outline:3px solid #1a8c5b;outline-offset:2px}
-.angebot-stufen-editor{display:grid;gap:10px}
-.angebot-stufen-zeile{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr)) auto;align-items:end;gap:10px;padding:12px;border:1px solid #bfd3c9;border-radius:9px;background:#f8faf8}
-.angebot-stufen-zeile label{font-size:13px}
-.angebot-stufen-zeile button{min-height:42px}
-@media(max-width:800px){.angebot-stufen-zeile{grid-template-columns:repeat(2,minmax(100px,1fr))}.angebot-stufen-zeile button{grid-column:1/-1}}
-.special-offer-proposal{border:3px solid #c7352e!important;background:#fff8f3!important}
-.special-offer-proposal-badge{font-weight:800;color:#a1221d;background:#ffe5dc;border:2px solid #d94a3d;border-radius:10px;padding:12px}
-
-/* Kompakte Verwaltung: die Untermenüs werden nur für den aktuellen Bereich angezeigt. */
-.admin-page .admin-subnavigation{
-  display:block; margin:0 0 20px; padding:10px 12px;
-  border:1px solid #d6e3d9; border-radius:14px; background:#f3f7f2;
-}
-.admin-page .admin-subnav-row{
-  display:flex; align-items:center; flex-wrap:wrap; gap:8px;
-}
-.admin-page .admin-subnav-row a{
-  display:inline-flex; align-items:center; justify-content:center; min-height:40px;
-  padding:8px 13px; border:1px solid #bfd6c6; border-radius:10px;
-  background:#fff; color:#174333; text-decoration:none; font-size:13px;
-  line-height:1.3; font-weight:760; text-align:center;
-}
-.admin-page .admin-subnav-row a:hover,.admin-page .admin-subnav-row a:focus-visible{
-  border-color:#087847; outline:2px solid #087847; outline-offset:1px;
-}
-.admin-page .admin-subnav-row a[aria-current="page"]{
-  background:#087847; border-color:#087847; color:#fff;
-}
-.admin-page .admin-navigation a.admin-nav-main-group::after{
-  content:"›"; margin-left:auto; padding-left:8px; font-size:18px; line-height:1;
-}
-.admin-page .admin-navigation a.admin-nav-main-group[aria-current="page"]{
-  background:#174c3b; color:#fff;
-}
-@media(max-width:760px){
-  .admin-page .admin-subnavigation{
-    padding:8px; margin-bottom:14px; overflow-x:auto;
-    scrollbar-width:thin; overscroll-behavior-inline:contain;
-  }
-  .admin-page .admin-subnav-row{flex-wrap:nowrap; width:max-content; min-width:100%;}
-  .admin-page .admin-subnav-row a{flex:0 0 auto; white-space:nowrap;}
-}
-/* WhatsApp-Button auf der öffentlichen Seite: ohne Buchungselemente zu blockieren. */
-.whatsapp-float{
-  position:fixed; right:max(18px,env(safe-area-inset-right)); bottom:max(18px,env(safe-area-inset-bottom));
-  z-index:35; display:inline-flex; gap:8px; align-items:center; min-height:48px;
-  padding:12px 19px; border-radius:30px; background:#087b50;
-  color:#fff!important; border:2px solid #fff; box-shadow:0 7px 24px #113f2c42;
-  font:750 15px/1.25 system-ui,-apple-system,Segoe UI,sans-serif; text-decoration:none;
-}
-.whatsapp-float:hover,.whatsapp-float:focus-visible{background:#075b3d;outline:3px solid #c7e7d0;outline-offset:2px;}
-@media(max-width:540px){.whatsapp-float{min-height:44px;padding:10px 13px;font-size:13px;}}
-
-/* WhatsApp-Freigabe innerhalb öffentlich gelisteter Programme und Aktionen. */
-.whatsapp-share-link{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 12px;margin:12px 0 0 9px;border-radius:10px;background:#e5f6ea;border:1px solid #8ccfa6;color:#125b3a!important;font-size:13px;font-weight:760;text-decoration:none;line-height:1.25;}
-.whatsapp-share-link:hover,.whatsapp-share-link:focus-visible{background:#c7ecd4;outline:2px solid #0c6842;outline-offset:1px;}
-@media(max-width:440px){.whatsapp-share-link{margin:10px 0 0;}}
-.whatsapp-share-list{display:grid;gap:10px;max-width:920px;}
-.whatsapp-share-list article{background:#fff;border:1px solid #d7e3d9;border-radius:10px;padding:12px;}
-.whatsapp-share-list article p{margin:4px 0;font-size:13px;}
-
-/* Kalender: freie Tage, Teilbelegung und ganztägige Sperrzeiten unterscheiden. */
-.kalender-tag.teilweise-belegt{background:#fff0c2;border-color:#e5bb4a;color:#684b00;}
-.kalender-tag.teilweise-belegt:not(:disabled):hover{border-color:#bd8b10;}
-.kalender-legende{display:flex;flex-wrap:wrap;gap:9px 18px;margin-top:14px;padding-top:12px;border-top:1px solid #dfe7df;color:#315244;font-size:12px;line-height:1.4;}
-.kalender-legende-eintrag{display:inline-flex;align-items:center;gap:7px;min-width:0;}
-.kalender-legende-farbe{display:inline-block;flex:0 0 17px;width:17px;height:17px;border:1px solid transparent;border-radius:5px;}
-.kalender-legende-farbe.frei{background:#e2f1d5;border-color:#9cc69b;}
-.kalender-legende-farbe.teilweise-belegt{background:#fff0c2;border-color:#e5bb4a;}
-.kalender-legende-farbe.gesperrt{background:#f6d9da;border-color:#dca9ae;}
+.admin-page .admin
