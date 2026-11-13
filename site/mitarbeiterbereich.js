@@ -162,4 +162,68 @@ function render(data){
     const programs=locationAreas.filter(area=>area.art==='programm');
     if(!locationAreas.some(area=>area.art==='standort'||area.art==='partner'||area.art==='programm'))continue;
     entries.push({key:'location:'+place.id,title:place.name,kind:'location',place,areas:locationAreas});
-    for(const area of programs)entries.push({...entryForArea(area,'location:'+place.id),title:
+    for(const area of programs)entries.push({...entryForArea(area,'location:'+place.id),title:area.titel+' · '+place.name,child:true});
+  }
+  for(const area of areas.filter(item=>item.art==='partner'&&!(item.standorte||[]).length))entries.push(entryForArea(area));
+  if(!entries.length){
+    $('staff-area-content').replaceChildren(node('h2','Noch keine Bereiche freigegeben'),
+      node('p','Die Verwaltung hat noch keine Informationen für den Mitarbeiterbereich veröffentlicht.'));
+    return;
+  }
+  for(const entry of entries){
+    if(entry.kind==='location'){
+      const group=node('div');group.className='staff-location-nav-group';
+      group.append(node('span',entry.title));addNavButton(group,entry);
+      for(const program of entries.filter(item=>item.key.startsWith('area:')&&item.key.endsWith(':location:'+entry.place.id)))addNavButton(group,program,true);
+      nav.append(group);
+    }else if(entry.child){
+      continue;
+    }else addNavButton(nav,entry);
+  }
+  showEntry(entries[0]);
+}
+async function load(){
+  $('staff-portal-status').textContent='Mitarbeiterbereiche werden geladen …';
+  try{
+    const profile=await request('/api/pruefung/mitarbeiterbereiche');
+    try{profile.kalender=await request('/api/pruefung/qr-kalender');}catch{profile.kalender={events:[]};}
+    render(profile);$('staff-portal-status').textContent='';
+  }
+  catch(error){$('staff-login').hidden=false;$('staff-portal-workspace').hidden=true;$('staff-portal-status').textContent=error.message;}
+}
+$('staff-login').addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+  $('staff-reset-request').hidden=true;
+  button.disabled=true;$('staff-portal-status').textContent='Anmeldung wird geprüft …';
+  try{await request('/api/pruefung/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.fromEntries(new FormData(form)))});form.reset();await load();}
+  catch(error){$('staff-portal-status').textContent='Anmeldung fehlgeschlagen: '+error.message;
+    if(error.passwortResetMoeglich)$('staff-reset-request').hidden=false;}
+  finally{button.disabled=false;}
+});
+$('staff-reset-request').addEventListener('click',async event=>{
+  const button=event.currentTarget,email=$('staff-login').elements.email.value.trim();
+  if(!email){$('staff-portal-status').textContent='Bitte zuerst die hinterlegte E-Mail-Adresse eintragen.';return;}
+  button.disabled=true;
+  try{
+    const result=await request('/api/pruefung/passwort-reset-anfordern',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    $('staff-portal-status').textContent=result.message;
+  }catch(error){$('staff-portal-status').textContent='Anfrage fehlgeschlagen: '+error.message;}
+  finally{button.disabled=false;}
+});
+$('staff-profile-form').addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+  const status=$('staff-profile-status');button.disabled=true;status.textContent='Kontaktdaten werden gespeichert …';
+  try{
+    await request('/api/pruefung/profil',{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:form.elements.name.value,telefon:form.elements.telefon.value})});
+    await load();status.textContent='Kontaktdaten gespeichert. Die Mitarbeiterkontaktliste wurde aktualisiert.';
+  }catch(error){status.textContent='Kontaktdaten konnten nicht gespeichert werden: '+error.message;}
+  finally{button.disabled=false;}
+});
+$('staff-portal-logout').addEventListener('click',async()=>{
+  try{await request('/api/pruefung/abmelden',{method:'POST'});}
+  finally{$('staff-portal-workspace').hidden=true;$('staff-login').hidden=false;$('staff-portal-status').textContent='Du wurdest abgemeldet.';}
+});
+load();

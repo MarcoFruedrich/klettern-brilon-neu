@@ -41,4 +41,16 @@ document.getElementById('partner-logout').addEventListener('click',async()=>{
   try{await request('/api/netzwerkpartner/logout',{method:'POST'});}catch{}
   workspace.hidden=true;form.hidden=false;form.reset();status.textContent='Du wurdest abgemeldet.';
 });
-document.getElementById('partne
+document.getElementById('partner-calendar-refresh').addEventListener('click',async()=>{
+  const status=document.getElementById('partner-calendar-status');status.textContent='Kalender wird aktualisiert …';
+  try{await loadProfile();status.textContent='Kalender aktualisiert.';}catch(error){status.textContent=error.message;}
+});
+document.getElementById('partner-appointment-form').addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]'),status=document.getElementById('partner-request-status');
+  button.disabled=true;status.textContent='Terminwunsch wird übermittelt …';
+  try{const data=await request('/api/netzwerkpartner/terminanfrage',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(Object.fromEntries(new FormData(form)))});status.textContent=data.message;form.reset();}
+  catch(error){status.textContent='Terminwunsch konnte nicht gesendet werden: '+error.message;}
+  finally{button.disabled=false;}
+});
+loadProfile().then(()=>{status.textContent='Du bist bereits angemeldet.';}).catch(()=>{});

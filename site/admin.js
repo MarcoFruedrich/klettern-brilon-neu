@@ -2359,4 +2359,726 @@ async function erlebnisangeboteLaden() {
 
       const titel = document.createElement('h3');
       titel.textContent = angebot.name;
-      const angebotOrte=Arra
+      const angebotOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
+        ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
+      if(!angebot.archiviert&&angebot.aktiv!==false&&angebot.buchbar!==false&&angebot.veroeffentlicht!==false&&angebotOrte.includes('Jugendherberge Brilon')){
+        const qrButton=document.createElement('button');qrButton.type='button';qrButton.className='btn secondary';
+        qrButton.textContent='QR-Anmeldung für Brilon drucken';
+        qrButton.addEventListener('click',()=>qrAnmeldungDrucken(angebot));
+        eintrag.append(qrButton);
+      }
+
+      if(angebot.archiviert){
+        titel.textContent='Archiviert · '+angebot.name;
+        const wiederherstellen=document.createElement('button');
+        wiederherstellen.type='button';wiederherstellen.textContent='Wiederherstellen';
+        wiederherstellen.addEventListener('click',async()=>{
+          wiederherstellen.disabled=true;
+          try{await api(`/api/admin/angebote/${angebot.id}/archivieren`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({archiviert:false})});await erlebnisangeboteLaden();}
+          catch(error){wiederherstellen.disabled=false;alert('Wiederherstellen fehlgeschlagen: '+error.message);}
+        });
+        eintrag.append(titel,el('p','Archivierte Angebote bleiben für bisherige Buchungen und deren Verlauf gespeichert.'),wiederherstellen,programmDauerhaftLoeschenButton(angebot));
+        liste.append(eintrag);
+        continue;
+      }
+
+      const reihenfolge=aktiveAngebote.findIndex(item=>String(item.id)===String(angebot.id));
+      const bewegen=async richtung=>{
+        const next=[...aktiveAngebote];
+        const ziel=reihenfolge+richtung;
+        if(ziel<0||ziel>=next.length)return;
+        [next[reihenfolge],next[ziel]]=[next[ziel],next[reihenfolge]];
+        try{
+          await api('/api/admin/angebote/reihenfolge',{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({ids:next.map(item=>item.id)})});
+          await erlebnisangeboteLaden();
+        }catch(error){alert('Reihenfolge konnte nicht gespeichert werden: '+error.message);}
+      };
+      const aufwaerts=document.createElement('button');aufwaerts.type='button';aufwaerts.textContent='↑ Nach oben';
+      aufwaerts.disabled=reihenfolge<=0;aufwaerts.setAttribute('aria-label',angebot.name+' nach oben verschieben');
+      aufwaerts.addEventListener('click',()=>bewegen(-1));
+      const abwaerts=document.createElement('button');abwaerts.type='button';abwaerts.textContent='↓ Nach unten';
+      abwaerts.disabled=reihenfolge===aktiveAngebote.length-1;abwaerts.setAttribute('aria-label',angebot.name+' nach unten verschieben');
+      abwaerts.addEventListener('click',()=>bewegen(1));
+      eintrag.append(aufwaerts,abwaerts);
+
+      if(angebot.name.startsWith('GPS-Schatzsuche:')){
+        eintrag.append(titel,el('p','GPS-Angebot · Inhalt und Aktivierung werden im GPS-Bereich verwaltet.'));
+        const archivieren=document.createElement('button');archivieren.type='button';archivieren.textContent='Archivieren';
+        archivieren.addEventListener('click',async()=>{
+          if(!confirm('GPS-Angebot archivieren? Eine aktive GPS-Tour muss zuerst deaktiviert werden.'))return;
+          try{await api(`/api/admin/angebote/${angebot.id}/archivieren`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({archiviert:true})});await erlebnisangeboteLaden();}
+          catch(error){alert('Archivieren fehlgeschlagen: '+error.message);}
+        });
+        eintrag.append(archivieren);liste.append(eintrag);continue;
+      }
+
+     const beschreibung = document.createElement('textarea');
+beschreibung.value = angebot.beschreibung || '';
+beschreibung.rows = 4;
+beschreibung.placeholder = 'Beschreibung des Angebots eingeben';
+beschreibung.style.width = '100%';
+
+      const metadaten=document.createElement('div');
+      const feld=(labelText,value,name,type='text')=>{
+        const label=document.createElement('label');label.textContent=labelText;
+        const input=type==='textarea'?document.createElement('textarea'):document.createElement('input');
+        input.name=name;input.value=value??'';label.append(input);metadaten.append(label);return input;
+      };
+      const programmName=feld('Programmname',angebot.name,'name');
+      const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
+      const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
+      const zugeordneteGruppenIds=[...new Set([
+        ...(Array.isArray(angebot.besuchergruppen)?angebot.besuchergruppen:[]),
+        ...besuchergruppen.filter(group=>group.programmIds?.some(id=>String(id)===String(angebot.id))).map(group=>group.id)
+      ])];
+      const besuchergruppenFeld=gruppenAuswahlErstellen(zugeordneteGruppenIds);
+      metadaten.append(besuchergruppenFeld);
+      const standortFeld=document.createElement('fieldset');
+      const standortLegende=document.createElement('legend');standortLegende.textContent='Veröffentlichte Standorte';standortFeld.append(standortLegende);
+      const standortAuswahl=document.createElement('div');standortAuswahl.className='check-grid';
+      const aktiveOrte=verwaltungsOrte.filter(item=>item.aktiv);
+      const bestehendeOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
+        ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
+      for(const ort of aktiveOrte){
+        const label=document.createElement('label');label.className='check';
+        const input=document.createElement('input');input.type='checkbox';input.name='programm-standort';input.value=ort.name;input.checked=bestehendeOrte.includes(ort.name);
+        label.append(input,el('span',ort.name));standortAuswahl.append(label);
+      }
+      for(const ort of bestehendeOrte.filter(name=>!aktiveOrte.some(item=>item.name===name))){
+        const label=document.createElement('label');label.className='check';
+        const input=document.createElement('input');input.type='checkbox';input.name='programm-standort';input.value=ort;input.checked=true;
+        label.append(input,el('span',ort+' (inaktiv, bestehende Zuordnung)'));standortAuswahl.append(label);
+      }
+      standortFeld.append(standortAuswahl);metadaten.append(standortFeld);
+      const dauer=feld('Basisdauer / feste Dauer (Minuten)',angebot.dauer,'dauer','number');
+      dauer.min='15';dauer.max='1440';dauer.step='1';
+      const dauerModusLabel=document.createElement('label');dauerModusLabel.textContent='Dauerberechnung';
+      const dauerModus=document.createElement('select');
+      for(const [value,labelText] of [['gruppenstufe','Dauer je Teilnehmerstufe'],['fest','Feste Dauer für alle Gruppengrößen']]){const option=el('option',labelText);option.value=value;dauerModus.append(option);}
+      dauerModus.value=angebot.dauer_modus||'gruppenstufe';dauerModusLabel.append(dauerModus);metadaten.append(dauerModusLabel);
+      const dauerHinweis=el('p','Bei stufenweiser Dauer wird die Dauer aus der passenden Gruppenstufe übernommen. Bei fester Dauer gilt der oben eingetragene Wert für alle.');
+      dauerHinweis.className='hint';metadaten.append(dauerHinweis);
+      const kapazitaet=feld('Kapazität',angebot.kapazitaet,'kapazitaet','number');
+      kapazitaet.min='1';kapazitaet.max='1000';
+      const termine=feld('Verfügbare Termine (ein Datum je Zeile)',(angebot.verfuegbare_termine||[]).join('\n'),'verfuegbare_termine','textarea');
+      const hinweise=feld('Besondere Hinweise',angebot.hinweise,'hinweise','textarea');
+      const modusLabel=document.createElement('label');modusLabel.textContent='Buchungsart';
+      const modus=document.createElement('select');
+      for(const [value,label] of [['gruppe','Gruppenanfrage'],['einzelplatz','Einzelplätze reservieren']]){
+        const option=el('option',label);option.value=value;modus.append(option);
+      }
+      modus.value=angebot.buchungsmodus||'gruppe';modusLabel.append(modus);metadaten.append(modusLabel);
+      const mindest=feld('Mindestanmeldungen für Durchführung',angebot.mindestteilnehmer||5,'mindestteilnehmer','number');
+      mindest.min='5';mindest.max='12';
+      const einzelpreis=feld('Preis pro Person (€)',angebot.preis_pro_person||'','preis_pro_person','number');
+      einzelpreis.min='0.01';einzelpreis.step='0.01';
+      const bookable=document.createElement('input');bookable.type='checkbox';bookable.checked=angebot.buchbar===true;
+      const publish=document.createElement('input');publish.type='checkbox';publish.checked=angebot.veroeffentlicht===true;
+      const check=(labelText,input)=>{const l=document.createElement('label');l.className='check';const s=el('span',labelText);l.append(input,s);metadaten.append(l);};
+      check('Buchbar',bookable);check('Auf Website veröffentlichen',publish);
+
+      const details = document.createElement('p');
+      details.textContent =
+        (angebot.dauer_modus==='fest'?'Feste Dauer: '+angebot.dauer+' Minuten':'Dauer je Teilnehmerstufe') + ' | ' +
+        (angebot.aktiv ? 'Aktiv' : 'Deaktiviert') + ' · ' +
+        (angebot.buchbar ? 'buchbar' : 'nicht buchbar') + ' · ' +
+        (angebot.veroeffentlicht ? 'veröffentlicht' : 'nicht veröffentlicht');
+
+
+const preisbereich = document.createElement('div');
+const einzelPreisHinweis=el('p','Einzelplatzmodus: Preis gilt pro Person; Anmeldungen reservieren je einen Platz und der Termin findet ab der Mindestzahl statt.');
+einzelPreisHinweis.className='hint';
+const legacyRanges=Object.entries(angebot.preise||{}).map(([key,price])=>{
+  const match=String(key).match(/^(\d+)-(\d+)$/);if(!match)return null;
+  const min=Number(match[1]),max=Number(match[2]),factor=max<=4?.6:max<=10?1:max<=15?1.2:max<=20?1.4:1.6;
+  return {min,max,preis:price,dauer:Math.max(15,Math.round((Number(angebot.dauer)*factor)/5)*5)};
+}).filter(Boolean);
+const tierEditor=document.createElement('div');tierEditor.className='angebot-stufen-editor';
+programmStufenEditor(tierEditor,angebot.gruppenstufen?.length?angebot.gruppenstufen:legacyRanges);
+const addTierButton=el('button','Teilnehmerstufe hinzufügen');addTierButton.type='button';addTierButton.className='btn secondary';
+addTierButton.addEventListener('click',()=>{tierEditor.onaddprogramtier?.();gruppenDauerEingabenAktualisieren();});
+const tierLegend=el('h4','Teilnehmerstufen · Preis je Gruppe');
+preisbereich.append(tierLegend,tierEditor,addTierButton);
+function preisEingabenAktualisieren(){
+  const einzel=modus.value==='einzelplatz';
+  tierLegend.hidden=einzel;tierEditor.hidden=einzel;addTierButton.hidden=einzel;
+  einzelPreisHinweis.hidden=!einzel;
+  mindest.parentElement.hidden=!einzel;
+  einzelpreis.parentElement.hidden=!einzel;
+}
+function gruppenDauerEingabenAktualisieren(){
+  const fest=dauerModus.value==='fest';
+  tierEditor.querySelectorAll('[data-tier-field="dauer"]').forEach(label=>{
+    label.hidden=fest;const input=label.querySelector('input');if(input)input.required=!fest;
+  });
+}
+modus.addEventListener('change',preisEingabenAktualisieren);
+dauerModus.addEventListener('change',gruppenDauerEingabenAktualisieren);
+preisbereich.append(einzelPreisHinweis);
+preisEingabenAktualisieren();
+gruppenDauerEingabenAktualisieren();
+
+
+
+      eintrag.append(titel, beschreibung, details,metadaten);
+      eintrag.appendChild(preisbereich);
+      const bildBereich = document.createElement('div');
+
+const bildVorschau = document.createElement('img');
+bildVorschau.alt = 'Foto zum Angebot ' + angebot.name;
+bildVorschau.style.maxWidth = '300px';
+bildVorschau.style.width = '100%';
+bildVorschau.style.marginTop = '12px';
+bildVorschau.style.borderRadius = '8px';
+
+if (angebot.bild_url) {
+  bildVorschau.src = angebot.bild_url;
+  bildBereich.appendChild(bildVorschau);
+}
+
+const bildAuswahl = document.createElement('input');
+bildAuswahl.type = 'file';
+bildAuswahl.accept = 'image/jpeg,image/png,image/webp';
+bildAuswahl.style.display = 'block';
+bildAuswahl.style.marginTop = '12px';
+
+const bildButton = document.createElement('button');
+bildButton.type = 'button';
+bildButton.className = 'btn';
+bildButton.textContent = 'Bild hochladen';
+
+bildButton.addEventListener('click', async () => {
+  const datei = bildAuswahl.files[0];
+
+  if (!datei) {
+    alert('Bitte zuerst ein Bild auswählen.');
+    return;
+  }
+
+  if (datei.size > 5 * 1024 * 1024) {
+    alert('Das Bild darf maximal 5 MB groß sein.');
+    return;
+  }
+
+  bildButton.disabled = true;
+
+  try {
+    const antwort = await fetch(
+      '/api/admin/angebote/' + angebot.id + '/bild',
+      {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': datei.type,
+          'X-Original-Filename': datei.name,
+          'X-CSRF-Token': await adminCsrfTokenLaden()
+        },
+        body: datei
+      }
+    );
+
+    const ergebnis = await antwort.json();
+
+    if (!antwort.ok) {
+      throw new Error(ergebnis.error || 'Upload fehlgeschlagen.');
+    }
+
+    bildVorschau.src = ergebnis.bild_url;
+    if (!bildVorschau.parentNode) {
+      bildBereich.insertBefore(bildVorschau, bildAuswahl);
+    }
+
+    alert('Bild erfolgreich hochgeladen.');
+  } catch (fehler) {
+    alert('Fehler beim Bildupload: ' + fehler.message);
+  } finally {
+    bildButton.disabled = false;
+  }
+});
+
+const bildAusBibliothekButton=document.createElement('button');
+bildAusBibliothekButton.type='button';
+bildAusBibliothekButton.className='btn secondary';
+bildAusBibliothekButton.textContent='Bild aus Medienbibliothek wählen';
+bildAusBibliothekButton.addEventListener('click',async()=>{
+  if(typeof window.medienpoolBildAuswaehlen!=='function'){alert('Die Medienbibliothek ist noch nicht verfügbar.');return;}
+  try{
+    await window.medienpoolBildAuswaehlen(async url=>{
+      await api('/api/admin/angebote/'+angebot.id,{method:'PATCH',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({bild_url:url})});
+      bildVorschau.src=url;
+      if(!bildVorschau.parentNode)bildBereich.insertBefore(bildVorschau,bildAuswahl);
+      alert('Programmbild aus der Medienbibliothek übernommen.');
+    });
+  }catch(error){alert('Bild konnte nicht übernommen werden: '+error.message);}
+});
+const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
+bildFormatHinweis.className='hint';
+bildBereich.append(bildAuswahl,bildButton,bildAusBibliothekButton,bildFormatHinweis);
+eintrag.appendChild(bildBereich);
+
+const preisButton = document.createElement('button');
+preisButton.type = 'button';
+preisButton.className = 'btn';
+preisButton.textContent = 'Programm speichern';
+
+preisButton.addEventListener('click', async () => {
+  let gruppenstufen=programmStufenAuslesen(tierEditor);
+  if(dauerModus.value==='fest')gruppenstufen=gruppenstufen.map(stufe=>({...stufe,dauer:Number(dauer.value)}));
+  if(modus.value!=='einzelplatz'&&gruppenstufen.some(stufe=>!Number.isInteger(stufe.min)||!Number.isInteger(stufe.max)||
+      !Number.isFinite(stufe.preis)||!Number.isInteger(stufe.dauer))){
+    alert('Bitte für jede Teilnehmerstufe von/bis, Gruppenpreis und Dauer vollständig eintragen.');return;
+  }
+
+  preisButton.disabled = true;
+
+  try {
+    const preise=Object.fromEntries(gruppenstufen.map(stufe=>[`${stufe.min}-${stufe.max}`,stufe.preis]));
+    await api('/api/admin/angebote/' + angebot.id, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+  preise,gruppenstufen,dauer_modus:dauerModus.value,
+  aktiv: aktivSchalter.checked,
+        beschreibung: beschreibung.value,
+        name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
+        besuchergruppen:[...besuchergruppenFeld.querySelectorAll('input:checked')].map(input=>input.value),
+        veranstaltungsorte:[...standortAuswahl.querySelectorAll('input:checked')].map(input=>input.value),
+        veranstaltungsort:standortAuswahl.querySelector('input:checked')?.value||'',dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
+        verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),
+        hinweise:hinweise.value,buchbar:bookable.checked,veroeffentlicht:publish.checked
+        ,buchungsmodus:modus.value,mindestteilnehmer:Number(mindest.value),preis_pro_person:Number(einzelpreis.value||0)
+})
+    });
+
+    alert('Gruppenpreise erfolgreich gespeichert.');
+    await erlebnisangeboteLaden();
+  } catch (fehler) {
+    alert('Speichern fehlgeschlagen: ' + fehler.message);
+  } finally {
+    preisButton.disabled = false;
+  }
+});
+
+
+const aktivSchalter = document.createElement('input');
+aktivSchalter.type = 'checkbox';
+aktivSchalter.checked = angebot.aktiv === true;
+aktivSchalter.style.display = 'none';
+
+const aktivButton = document.createElement('button');
+aktivButton.type = 'button';
+
+function aktivButtonAktualisieren() {
+  const aktiv = aktivSchalter.checked;
+
+  aktivButton.textContent = aktiv
+    ? '✓ Aktiviert'
+    : '✕ Deaktiviert';
+
+  aktivButton.style.backgroundColor = aktiv
+    ? '#168447'
+    : '#bd3030';
+
+  aktivButton.style.color = '#ffffff';
+  aktivButton.style.border = 'none';
+  aktivButton.style.borderRadius = '8px';
+  aktivButton.style.padding = '12px 20px';
+  aktivButton.style.fontWeight = 'bold';
+  aktivButton.style.cursor = 'pointer';
+}
+
+aktivButtonAktualisieren();
+
+aktivButton.addEventListener('click', async () => {
+  const neuerStatus = !aktivSchalter.checked;
+  const preise = {};
+
+  for (const eingabe of preisbereich.querySelectorAll('input')) {
+    preise[eingabe.dataset.gruppe] = eingabe.value;
+  }
+
+  aktivButton.disabled = true;
+  aktivButton.textContent = 'Wird gespeichert ...';
+
+  try {
+    await api('/api/admin/angebote/' + angebot.id, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        aktiv: neuerStatus,
+        beschreibung: beschreibung.value
+      })
+    });
+
+    aktivSchalter.checked = neuerStatus;
+    aktivButtonAktualisieren();
+  } catch (fehler) {
+    aktivButtonAktualisieren();
+    alert('Aktivierung fehlgeschlagen: ' + fehler.message);
+  } finally {
+    aktivButton.disabled = false;
+  }
+});
+
+eintrag.appendChild(aktivButton);
+
+eintrag.appendChild(preisButton);
+
+const archivierenButton=document.createElement('button');
+archivierenButton.type='button';archivierenButton.textContent='Angebot archivieren';
+archivierenButton.addEventListener('click',async()=>{
+  if(!confirm(`„${angebot.name}“ archivieren? Bestehende Buchungen bleiben erhalten.`))return;
+  archivierenButton.disabled=true;
+  try{
+    await api(`/api/admin/angebote/${angebot.id}/archivieren`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({archiviert:true})});
+    await erlebnisangeboteLaden();
+  }catch(error){archivierenButton.disabled=false;alert('Archivieren fehlgeschlagen: '+error.message);}
+});
+eintrag.appendChild(archivierenButton);
+eintrag.appendChild(programmDauerhaftLoeschenButton(angebot));
+
+      liste.appendChild(eintrag);
+    }
+    adminProgrammEinzelansicht(ausgewaehltesAdminProgramm);
+  } catch (fehler) {
+    liste.textContent = 'Laden fehlgeschlagen: ' + fehler.message;
+  }
+}
+
+
+
+
+
+
+
+function anschlussrabattStarten() {
+  const liste = document.getElementById('anschlussrabatt-positionen');
+  const ergebnis = document.getElementById('anschlussrabatt-ergebnis');
+  const hinzufuegen = document.getElementById('anschlussrabatt-hinzufuegen');
+  const berechnen = document.getElementById('anschlussrabatt-berechnen');
+  if (!liste || !ergebnis || !hinzufuegen || !berechnen) return;
+  const kandidatenButton = document.getElementById('anschlussrabatt-kandidaten');
+  const kandidatenDatum = document.getElementById('anschlussrabatt-datum');
+  const kandidatenListe = document.getElementById('anschlussrabatt-kandidaten-liste');
+  const kandidatenVorschau = document.getElementById('anschlussrabatt-kandidaten-vorschau');
+  const anwendenButton = document.getElementById('anschlussrabatt-anwenden');
+  let geladeneKandidaten = [];
+  const euro = cent => (cent / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+  async function ausgewaehlteBuchungenVorschauen() {
+    const ids = Array.from(kandidatenListe.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);
+    if (anwendenButton) anwendenButton.hidden = ids.length < 2;
+    if (!kandidatenVorschau) return;
+    kandidatenVorschau.replaceChildren();
+    if (ids.length < 2) {
+      kandidatenVorschau.textContent = 'Wähle mindestens zwei bestätigte Buchungen für die Rabattvorschau.';
+      return;
+    }
+    const programme = geladeneKandidaten.filter(k => ids.includes(k.id)).map(k => ({
+      id: k.id,
+      start: new Date(Date.parse(kandidatenDatum.value + 'T00:00:00Z') + k.beginnMinuten * 60000).toISOString(),
+      ende: new Date(Date.parse(kandidatenDatum.value + 'T00:00:00Z') + k.endeMinuten * 60000).toISOString(),
+      preisCent: k.preisCent
+    }));
+    if (programme.some(p => p.preisCent === null)) {
+      kandidatenVorschau.textContent = 'Für mindestens eine Buchung fehlt ein gültiger Preis; sie kann nicht rabattiert werden.';
+      if (anwendenButton) anwendenButton.hidden = true;
+      return;
+    }
+    try {
+      const daten = await api('/api/admin/anschlussrabatt/vorschau', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ programme })
+      });
+      kandidatenVorschau.replaceChildren();
+      for (const position of daten.positionen) {
+        const kandidat = geladeneKandidaten.find(k => k.id === position.id);
+        kandidatenVorschau.append(el('p', (kandidat?.buchungsnummer || kandidat?.angebot || 'Buchung') + ': ' +
+          euro(position.endpreisCent) + ' (Rabatt ' + euro(position.rabattCent) + ')'));
+      }
+      kandidatenVorschau.append(el('strong', 'Rabatt gesamt: ' + euro(daten.rabattGesamtCent)));
+      if (!daten.rabattGesamtCent && anwendenButton) anwendenButton.hidden = true;
+      else if (anwendenButton) anwendenButton.hidden = false;
+    } catch (fehler) {
+      kandidatenVorschau.textContent = 'Vorschau fehlgeschlagen: ' + fehler.message;
+      if (anwendenButton) anwendenButton.hidden = true;
+    }
+  }
+  if (kandidatenButton && kandidatenDatum && kandidatenListe) {
+    kandidatenButton.addEventListener('click', async () => {
+      if (!kandidatenDatum.value) {
+        kandidatenListe.textContent = 'Bitte zuerst ein Datum waehlen.';
+        return;
+      }
+      kandidatenButton.disabled = true;
+      kandidatenListe.textContent = 'Bestaetigte Buchungen werden geladen ...';
+      try {
+        const daten = await api('/api/admin/anschlussrabatt/kandidaten?datum=' +
+          encodeURIComponent(kandidatenDatum.value));
+        kandidatenListe.replaceChildren();
+        geladeneKandidaten = daten.kandidaten;
+        if (!daten.kandidaten.length) {
+          kandidatenListe.append(el('p', 'Keine bestaetigten Buchungen an diesem Tag.'));
+        }
+        const zeit = minuten => minuten === null ? 'unbekannt' :
+          String(Math.floor(minuten / 60)).padStart(2, '0') + ':' +
+          String(minuten % 60).padStart(2, '0');
+        for (const kandidat of daten.kandidaten) {
+          const label = el('label',
+            (kandidat.buchungsnummer || 'Ohne Buchungsnummer') + ' | ' +
+            (kandidat.angebot || 'Angebot unbekannt') + ' | ' +
+            zeit(kandidat.beginnMinuten) + ' bis ' +
+            zeit(kandidat.endeMinuten) + ' | ' + euro(kandidat.preisCent || 0));
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = kandidat.id;
+          checkbox.addEventListener('change', ausgewaehlteBuchungenVorschauen);
+          label.prepend(checkbox);
+          kandidatenListe.append(label, document.createElement('br'));
+        }
+        kandidatenListe.append(el('small', daten.hinweis));
+        await ausgewaehlteBuchungenVorschauen();
+      } catch (fehler) {
+        kandidatenListe.textContent = 'Fehler: ' + fehler.message;
+      } finally {
+        kandidatenButton.disabled = false;
+      }
+    });
+  }
+  if (anwendenButton) anwendenButton.addEventListener('click', async () => {
+    const buchungsIds = Array.from(kandidatenListe.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);
+    if (buchungsIds.length < 2 || !window.confirm('Den angezeigten Anschlussrabatt jetzt dauerhaft auf die ausgewählten bestätigten Buchungen anwenden? Die Buchungsbeträge und Restbeträge werden angepasst und betroffene Kunden erhalten eine Benachrichtigung.')) return;
+    anwendenButton.disabled = true;
+    kandidatenVorschau.textContent = 'Rabatt wird gespeichert ...';
+    try {
+      const daten = await api('/api/admin/anschlussrabatt/anwenden', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buchungsIds })
+      });
+      kandidatenVorschau.textContent = 'Rabatt gespeichert für ' + daten.updates.length + ' Buchungen. Preise, Zahlungen und Restbeträge wurden neu berechnet.';
+      anwendenButton.hidden = true;
+      kandidatenListe.querySelectorAll('input[type="checkbox"]').forEach(input => { input.checked = false; input.disabled = true; });
+    } catch (fehler) {
+      kandidatenVorschau.textContent = 'Rabatt konnte nicht angewendet werden: ' + fehler.message;
+    } finally {
+      anwendenButton.disabled = false;
+    }
+  });
+  let zaehler = 0;
+
+  function programmHinzufuegen() {
+    const nummer = ++zaehler;
+    const zeile = document.createElement('fieldset');
+    zeile.className = 'booking';
+    zeile.dataset.programmId = String(nummer);
+    const titel = el('legend', 'Programm ' + nummer);
+    zeile.append(titel);
+
+    function feld(text, typ, name, wert) {
+      const label = el('label', text);
+      const eingabe = document.createElement('input');
+      eingabe.type = typ;
+      eingabe.name = name;
+      eingabe.required = true;
+      if (typ === 'number') {
+        eingabe.min = '0';
+        eingabe.step = '0.01';
+      }
+      if (wert) eingabe.value = wert;
+      label.append(eingabe);
+      zeile.append(label);
+    }
+
+    feld('Bezeichnung', 'text', 'bezeichnung', 'Programm ' + nummer);
+    feld('Beginn', 'datetime-local', 'start');
+    feld('Ende', 'datetime-local', 'ende');
+    feld('Preis in Euro', 'number', 'preis');
+
+    const entfernen = el('button', 'Programm entfernen');
+    entfernen.type = 'button';
+    entfernen.onclick = () => {
+      zeile.remove();
+      ergebnis.textContent = '';
+    };
+    zeile.append(entfernen);
+    liste.append(zeile);
+  }
+
+  hinzufuegen.addEventListener('click', programmHinzufuegen);
+  berechnen.addEventListener('click', async () => {
+    const zeilen = Array.from(liste.querySelectorAll('fieldset'));
+    if (zeilen.length < 2 || zeilen.length > 20) {
+      ergebnis.textContent = 'Bitte 2 bis 20 Programme eingeben.';
+      return;
+    }
+    const programme = [];
+    for (const zeile of zeilen) {
+      const eingaben = Object.fromEntries(
+        Array.from(zeile.querySelectorAll('input')).map(input => [input.name, input.value])
+      );
+      const preis = Number(eingaben.preis);
+      if (!eingaben.bezeichnung || !eingaben.start || !eingaben.ende ||
+          eingaben.preis === '' || !Number.isFinite(preis) || preis < 0) {
+        ergebnis.textContent = 'Bitte alle Programmfelder korrekt ausfuellen.';
+        return;
+      }
+      programme.push({
+        id: zeile.dataset.programmId,
+        start: new Date(eingaben.start).toISOString(),
+        ende: new Date(eingaben.ende).toISOString(),
+        preisCent: Math.round(preis * 100)
+      });
+    }
+
+    berechnen.disabled = true;
+    ergebnis.textContent = 'Rabatt wird berechnet ...';
+    try {
+      const daten = await api('/api/admin/anschlussrabatt/vorschau', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ programme })
+      });
+      ergebnis.replaceChildren();
+      const euro = cent => (cent / 100).toLocaleString('de-DE', {
+        style: 'currency', currency: 'EUR'
+      });
+      for (const position of daten.positionen) {
+        const programm = programme.find(p => p.id === position.id);
+        const zeile = zeilen.find(z => z.dataset.programmId === position.id);
+        const name = zeile.querySelector('[name="bezeichnung"]').value;
+        ergebnis.append(el('p', name + ': ' + euro(position.endpreisCent) +
+          ' (Rabatt ' + euro(position.rabattCent) + ')'));
+      }
+      ergebnis.append(el('strong', 'Gesamtpreis: ' +
+        euro(daten.endpreisGesamtCent) + ' | Ersparnis: ' +
+        euro(daten.rabattGesamtCent)));
+      ergebnis.append(el('p', 'Nur Vorschau: Es wurden keine Buchungen oder Zahlungen geaendert.'));
+    } catch (fehler) {
+      ergebnis.textContent = 'Fehler: ' + fehler.message;
+    } finally {
+      berechnen.disabled = false;
+    }
+  });
+  programmHinzufuegen();
+  programmHinzufuegen();
+}
+anschlussrabattStarten();
+
+async function rechnungsdatenLaden(){
+  const form=document.getElementById('invoice-settings-form');if(!form)return;
+  const status=document.getElementById('invoice-settings-status');
+  try{
+    const data=await api('/api/admin/rechnungsdaten');
+    for(const [key,value] of Object.entries(data)){
+      const field=form.elements.namedItem(key);if(!field)continue;
+      if(field.type==='checkbox')field.checked=value===true;else if(key!=='naechsteNummer')field.value=value??'';
+    }
+    const agbField=form.elements.namedItem('agbText');
+    if(agbField)agbField.value=agbField.value.replace(/^MUSTER[^\n]*\n\s*\n/i,'').trimStart();
+    document.getElementById('invoice-settings-version').textContent=`AGB-Fassung ${data.agbVersion||1} · nächste Rechnungsnummer ${data.rechnungsPraefix||'KA-'}${new Date().getFullYear()}-${String(data.naechsteNummer||1).padStart(4,'0')}`;
+    if(status)status.textContent='Rechnungsdaten und Geschäftsbedingungen geladen.';
+  }catch(error){if(status)status.textContent='Einstellungen konnten nicht geladen werden: '+error.message;}
+}
+
+document.getElementById('invoice-settings-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,status=document.getElementById('invoice-settings-status');
+  const button=form.querySelector('button[type="submit"]');button.disabled=true;status.textContent='Wird gespeichert …';
+  try{
+    const values=Object.fromEntries(new FormData(form));
+    values.agbAktiv=form.elements.agbAktiv.checked;
+    values.empfehlungAktiv=form.elements.empfehlungAktiv.checked;
+    const result=await api('/api/admin/rechnungsdaten',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
+    status.textContent=`Gespeichert. AGB-Fassung ${result.data.agbVersion} ${result.data.agbAktiv?'ist veröffentlicht.':'ist nicht veröffentlicht.'}`;
+    await rechnungsdatenLaden();
+  }catch(error){status.textContent='Speichern fehlgeschlagen: '+error.message;}
+  finally{button.disabled=false;}
+});
+
+async function rechnungenLaden(){
+  const list=document.getElementById('invoice-list'),status=document.getElementById('invoice-list-status');if(!list)return;
+  status.textContent='Rechnungen werden geladen …';list.replaceChildren();
+  try{
+    const result=await api('/api/admin/rechnungen');
+    if(!result.rechnungen.length){status.textContent='Noch keine Rechnungen erstellt.';return;}
+    status.textContent=`${result.rechnungen.length} Rechnung(en), höchstens 100 angezeigt.`;
+    for(const row of result.rechnungen){
+      const card=el('article');card.className='booking invoice-record';
+      const data=row.data||{};
+      card.append(el('strong',`${row.rechnungsnummer} · ${row.kunde||'Kunde'}`));
+      card.append(el('p',`${data.buchung?.angebot||'Programm'} · ${data.buchung?.datum||'Termin offen'} · ${data.betragCent?euroCent(data.betragCent):''}`));
+      card.append(el('p',`E-Mail-Status: ${row.email_status}${row.email_fehler?' · '+row.email_fehler:''}`));
+      const link=el('a','PDF herunterladen');link.href='/api/admin/rechnungen/'+encodeURIComponent(row.id)+'.pdf';card.append(link);
+      if(row.email_status!=='angenommen'){
+        const resend=el('button','E-Mail erneut senden');resend.type='button';resend.className='btn secondary';
+        resend.addEventListener('click',async()=>{resend.disabled=true;try{await api('/api/admin/rechnungen/'+encodeURIComponent(row.id)+'/versenden',{method:'POST'});await rechnungenLaden();}catch(error){status.textContent='Versand konnte nicht bestätigt werden: '+error.message;resend.disabled=false;}});
+        card.append(resend);
+      }
+      list.append(card);
+    }
+  }catch(error){status.textContent='Rechnungsübersicht nicht verfügbar: '+error.message;}
+}
+document.getElementById('invoice-list-refresh')?.addEventListener('click',rechnungenLaden);
+document.getElementById('invoice-backfill')?.addEventListener('click',async event=>{
+  const button=event.currentTarget,status=document.getElementById('invoice-list-status');button.disabled=true;
+  status.textContent='Vollständig bezahlte Buchungen werden geprüft …';
+  try{const result=await api('/api/admin/rechnungen/ausstehend',{method:'POST'});status.textContent=`Nachverarbeitung abgeschlossen: ${result.verarbeitet} Rechnung(en) bearbeitet.`;await rechnungenLaden();}
+  catch(error){status.textContent='Nachverarbeitung fehlgeschlagen: '+error.message;}
+  finally{button.disabled=false;}
+});
+
+async function teamerbaseProgrammeLaden(){
+  const list=document.getElementById('teamerbase-program-list');
+  const status=document.getElementById('teamerbase-sync-status');
+  if(!list||!status)return;
+  try{
+    const result=await api('/api/admin/teamerbase/programme');
+    list.replaceChildren();
+    if(!result.konfiguriert){
+      status.textContent='Der eingeschränkte Teamerbase-Lesezugang ist noch nicht in Render eingerichtet. Die Programmregeln können hier bereits gepflegt werden.';
+    }else if(result.status?.letzter_fehler){
+      status.textContent='Letzter Abgleichfehler: '+result.status.letzter_fehler;
+    }else if(result.status?.zuletzt_geprueft_am){
+      status.textContent='Zuletzt abgeglichen: '+new Date(result.status.zuletzt_geprueft_am).toLocaleString('de-DE')+' · '+result.status.anzahl_termine+' Termine im Standortfilter.';
+    }else status.textContent='Noch kein erfolgreicher Abgleich erfolgt.';
+    if(!result.programme.length){list.append(el('p','Noch keine Teamerbase-Programmnamen gespeichert.'));return;}
+    for(const program of result.programme){
+      const form=el('form');form.className='booking';
+      const title=el('strong',program.source_name+' · '+program.standort);
+      const display=el('label','Anzeigename');const nameInput=el('input');nameInput.name='name';nameInput.maxLength=180;nameInput.required=true;nameInput.value=program.angezeigter_name;display.append(nameInput);
+      const ruleLabel=el('label','Turmregel');const rule=el('select');
+      for(const [value,label] of [['pruefen','Noch prüfen'],['turm','Benötigt Kletterturm'],['kein_turm','Kein Kletterturm']]){const option=el('option',label);option.value=value;rule.append(option);}
+      rule.value=program.turm_bedarf;ruleLabel.append(rule);
+      const save=el('button','Änderungen speichern');save.type='submit';save.className='btn secondary';
+      const remove=el('button','Programmregel löschen');remove.type='button';remove.className='btn danger';
+      form.append(title,display,ruleLabel,save,remove);
+      form.addEventListener('submit',async event=>{event.preventDefault();save.disabled=true;
+        try{await api('/api/admin/teamerbase/programme/'+program.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({angezeigterName:nameInput.value,turmBedarf:rule.value})});status.textContent='Programmregel gespeichert.';await teamerbaseProgrammeLaden();}
+        catch(error){status.textContent='Programmregel konnte nicht gespeichert werden: '+error.message;save.disabled=false;}
+      });
+      remove.addEventListener('click',async()=>{if(!confirm('Programmregel für „'+program.source_name+'“ aus der Verwaltung entfernen?'))return;remove.disabled=true;
+        try{await api('/api/admin/teamerbase/programme/'+program.id,{method:'DELETE'});await teamerbaseProgrammeLaden();}
+        catch(error){status.textContent='Programmregel konnte nicht entfernt werden: '+error.message;remove.disabled=false;}
+      });
+      list.append(form);
+    }
+  }catch(error){status.textContent='Teamerbase-Programmnamen konnten nicht geladen werden: '+error.message;}
+}
+
+document.getElementById('teamerbase-program-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]'),status=document.getElementById('teamerbase-sync-status');button.disabled=true;
+  try{await api('/api/admin/teamerbase/programme',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({angezeigterName:form.elements.angezeigterName.value,standort:form.elements.standort.value,turmBedarf:form.elements.turmBedarf.value})});form.reset();form.elements.standort.value='Brilon';await teamerbaseProgrammeLaden();}
+  catch(error){status.textContent='Programmregel konnte nicht angelegt werden: '+error.message;}
+  finally{button.disabled=false;}
+});
+document.getElementById('teamerbase-sync-now')?.addEventListener('click',async event=>{
+  const button=event.currentTarget,status=document.getElementById('teamerbase-sync-status');button.disabled=true;
+  try{const result=await api('/api/admin/teamerbase/sync',{method:'POST'});status.textContent=result.synced?`Abgleich abgeschlossen: ${result.anzahlTermine} Termine übernommen.`:result.reason||'Abgleich wurde übersprungen.';await teamerbaseProgrammeLaden();await kalenderLaden();}
+  catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+});

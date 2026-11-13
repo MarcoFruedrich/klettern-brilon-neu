@@ -858,4 +858,266 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       inhalt.append(beschreibung);
     }
     if(meta){
-      const details=documen
+      const details=document.createElement('p');
+      details.className='angebote-karte-meta';
+      details.textContent=meta;
+      inhalt.append(details);
+    }
+    if(angebot.hinweise){
+      const hinweis=document.createElement('p');
+      hinweis.className='angebote-karte-meta';
+      hinweis.textContent=angebot.hinweise;
+      inhalt.append(hinweis);
+    }
+    const zugeordneteGruppen=(window.besuchergruppenListe?.()||[])
+      .filter(group=>Array.isArray(angebot.besuchergruppen)&&angebot.besuchergruppen.includes(group.id)||group.programmIds?.some(id=>String(id)===String(angebot.id)));
+    if(zugeordneteGruppen.length){
+      const groupTags=document.createElement('div');
+      groupTags.className='angebote-programm-gruppen';
+      groupTags.setAttribute('aria-label','Zugeordnete Gruppen');
+      for(const group of zugeordneteGruppen){
+        const tag=document.createElement('span');
+        tag.className='angebote-programm-gruppe';
+        if(group.iconBild){
+          const icon=document.createElement('img');icon.src=group.iconBild;icon.alt='';icon.loading='lazy';
+          tag.append(icon);
+        }else if(group.icon)tag.append(document.createTextNode(group.icon+' '));
+        tag.append(document.createTextNode(group.titel));
+        groupTags.append(tag);
+      }
+      inhalt.append(groupTags);
+    }
+    const aktionen=document.createElement('div');
+    aktionen.className='angebote-karte-aktionen';
+    const anfrage=document.createElement('a');
+    anfrage.className='besuchergruppe-button angebote-programm-anfrage';
+    anfrage.href='#buchung';
+    anfrage.dataset.location=(!alleStandorte?standortFilter:angebotOrte[0])||'';
+    anfrage.dataset.program=angebot.name;
+    anfrage.textContent='Angebot anfragen →';
+    aktionen.append(anfrage);
+    aktionen.append(whatsappTeilButton(angebot.name,meta,angebot.id!=null?angebotBuchungslink('programm',angebot.id):'/#buchung'));
+    inhalt.append(aktionen);
+    karte.append(inhalt);
+    ausgabe.append(karte);
+  });
+}
+
+document.addEventListener('besuchergruppenwechsel',()=>angeboteUebersichtAnzeigen(
+  document.getElementById('angebote-standort-filter')?.value||''
+));
+
+async function angeboteLaden() {
+  const auswahl = document.getElementById('angebot-auswahl');
+  if (!auswahl || !standortAuswahl) return;
+
+  function angeboteFuerStandortAnzeigen(){
+    const standort=standortAuswahl.value;
+    const passend=angeboteCache.filter(angebot=>(Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
+      ?angebot.veranstaltungsorte:[angebot.veranstaltungsort]).includes(standort));
+    auswahl.replaceChildren();
+    const platzhalter=document.createElement('option');
+    platzhalter.value='';
+    platzhalter.textContent=!standort?'Bitte zuerst den Veranstaltungsort auswählen':
+      passend.length?'Bitte Angebot auswählen':'Für diesen Ort sind derzeit keine buchbaren Angebote verfügbar';
+    auswahl.append(platzhalter);
+    for(const angebot of passend){
+      const option=document.createElement('option');
+      option.value=angebot.name;
+      option.textContent=angebot.name;
+      auswahl.append(option);
+    }
+    auswahl.value='';
+    auswahl.disabled=!standort||!passend.length;
+    einzelplatzFormAktualisieren();
+    buchungsdauerBerechnen();
+    belegteUhrzeitenLaden();
+  }
+
+  auswahl.addEventListener('change',()=>{
+    einzelplatzFormAktualisieren();
+    buchungsdauerBerechnen();
+    belegteUhrzeitenLaden();
+  });
+  standortAuswahl.addEventListener('change',()=>{
+    angeboteFuerStandortAnzeigen();
+    datumPruefen();
+    kalenderAnzeigen();
+    const filter=document.getElementById('angebote-standort-filter');
+    const filterWert=standortAuswahl.value||'alle';
+    if(filter&&filter.value!==filterWert){
+      filter.value=filterWert;
+      filter.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  });
+
+  try {
+    const [angeboteAntwort,orteAntwort]=await Promise.all([
+      fetch('/api/angebote'),fetch('/api/orte')
+    ]);
+    if(!angeboteAntwort.ok)throw new Error('Angebote nicht erreichbar');
+    if(!orteAntwort.ok)throw new Error('Veranstaltungsorte nicht erreichbar');
+    angeboteCache=await angeboteAntwort.json();
+    const orte=await orteAntwort.json();
+    const standortFilter=document.getElementById('angebote-standort-filter');
+    if(standortFilter){
+      standortFilter.replaceChildren();
+      const alle=document.createElement('option');
+      alle.value='alle';
+      alle.textContent='Alle Standorte';
+      standortFilter.append(alle);
+      for(const ort of orte){
+        const option=document.createElement('option');
+        option.value=ort.name;
+        option.textContent=ort.name;
+        standortFilter.append(option);
+      }
+      standortFilter.addEventListener('change',()=>{
+        window.ausgewaehlterAngebotsStandort=standortFilter.value;
+        if(window.aktiveBesuchergruppe)window.besuchergruppeZuruecksetzen?.();
+        angeboteUebersichtAnzeigen(standortFilter.value);
+        document.dispatchEvent(new CustomEvent('standortwechsel',{detail:{standort:standortFilter.value}}));
+        const buchungsStandort=standortFilter.value==='alle'?'':standortFilter.value;
+        if(standortAuswahl.value!==buchungsStandort){
+          standortAuswahl.value=buchungsStandort;
+          standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+      });
+      document.getElementById('angebote-uebersicht')?.addEventListener('click',ereignis=>{
+        const link=ereignis.target.closest('.angebote-anfragen-link');
+        if(!link)return;
+        standortAuswahl.value=link.dataset.location;
+        standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+        auswahl.value=link.dataset.program;
+        auswahl.dispatchEvent(new Event('change',{bubbles:true}));
+      });
+    }
+    angeboteUebersichtAnzeigen(standortFilter?.value||'');
+    for(const ort of orte){
+      const option=document.createElement('option');
+      option.value=ort.name;
+      option.textContent=ort.name;
+      standortAuswahl.append(option);
+    }
+    if(qrAnmeldung&&orte.some(ort=>ort.name==='Jugendherberge Brilon')){
+      standortAuswahl.value='Jugendherberge Brilon';
+      standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    angeboteFuerStandortAnzeigen();
+    einzelplatzFormAktualisieren();
+    angeboteFertig=true;
+    angebotslinkAnwenden();
+  } catch (fehler) {
+    console.error('Erlebnisangebote oder Veranstaltungsorte konnten nicht geladen werden:', fehler);
+    uhrzeitHinweis.textContent='Standorte und Angebote konnten nicht geladen werden. Bitte lade die Seite erneut.';
+  }
+}
+
+angeboteLaden();
+
+async function preisanzeigeStarten() {
+  const auswahl = document.getElementById('angebot-auswahl');
+  const teilnehmer = document.getElementById('buchungs-teilnehmer');
+  const anzeige = document.getElementById('angebots-preis');
+  const bildAnzeige = document.getElementById('angebots-bildanzeige');
+
+  if (!auswahl || !teilnehmer || !anzeige) return;
+
+  try {
+    const res = await fetch('/api/angebote');
+    if (!res.ok) throw new Error('Preise nicht erreichbar');
+
+    const angebote = await res.json();
+
+    function preisAktualisieren() {
+      const angebot = angebote.find(a => a.name === auswahl.value);
+
+      anzeige.textContent = '';
+
+      if (!angebot) return;
+      bildAnzeige.innerHTML = '';
+
+      if (angebot.bild_url) {
+        const foto = document.createElement('img');
+        foto.src = angebot.bild_url;
+        foto.alt = angebot.name;
+        foto.style.width = '100%';
+        foto.style.maxWidth = '450px';
+        foto.style.aspectRatio = '4 / 3';
+        foto.style.objectFit = 'cover';
+        foto.style.objectPosition = 'center';
+        foto.style.borderRadius = '10px';
+        foto.style.marginBottom = '12px';
+        foto.style.display = 'block';
+
+        bildAnzeige.appendChild(foto);
+      }
+
+      if (angebot.beschreibung) {
+        const beschreibung = document.createElement('p');
+        beschreibung.textContent = angebot.beschreibung;
+        bildAnzeige.appendChild(beschreibung);
+      }
+
+      const meta=angebot.veranstaltungsort?'Standort: '+angebot.veranstaltungsort:'';
+      if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
+      if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
+      teilnehmer.max=String(Math.min(1000,Number(angebot.kapazitaet)||1000));
+      if(Number(teilnehmer.value)>Number(teilnehmer.max)){teilnehmer.value=teilnehmer.max;}
+      const anzahl = Number(teilnehmer.value);
+      const termine=Array.isArray(angebot.verfuegbare_termine)?angebot.verfuegbare_termine:[];
+      date.setCustomValidity(termine.length&&!termine.includes(date.value)
+        ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
+      date.onchange=()=>date.setCustomValidity(termine.length&&!termine.includes(date.value)
+        ?'Für dieses Programm ist das gewählte Datum nicht freigegeben.':'');
+      const specialPrice=ausgewaehlteSonderaktion&&String(ausgewaehlteSonderaktion.programm_id)===String(angebot.id)
+        ?Number(String(ausgewaehlteSonderaktion.preis??'').replace(',','.')):null;
+
+      if(angebot.buchungsmodus==='einzelplatz'){
+        const price=Number.isFinite(specialPrice)?specialPrice:Number(angebot.preis_pro_person);
+        anzeige.textContent=`${price.toLocaleString('de-DE',{style:'currency',currency:'EUR'})} ${Number.isFinite(specialPrice)?'Tagesangebotspreis':'pro Person · keine Anzahlung'}`;
+        return;
+      }
+      const stufe=Array.isArray(angebot.gruppenstufen)?angebot.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max)):null;
+      const legacy=Object.entries(angebot.preise||{}).find(([range])=>{
+        const match=range.match(/^(\d+)-(\d+)$/);return match&&anzahl>=Number(match[1])&&anzahl<=Number(match[2]);
+      });
+      const preis=stufe?.preis??(legacy?legacy[1]:null);
+
+      if (preis !== undefined && preis !== null) {
+        anzeige.textContent = (termine.length?'Freigegebene Termine: '+termine.map(t=>new Date(t+'T12:00:00').toLocaleDateString('de-DE')).join(', ')+' · ':'')+
+          (Number.isFinite(specialPrice)?'Tagesangebotspreis: ':'Gruppenpreis: ') +
+          (Number.isFinite(specialPrice)?specialPrice:Number(preis)).toLocaleString('de-DE', {
+            style: 'currency',
+            currency: 'EUR'
+          });
+      } else {
+        anzeige.textContent = 'Preis auf Anfrage';
+      }
+    }
+
+    auswahl.addEventListener('change', preisAktualisieren);
+    teilnehmer.addEventListener('input', preisAktualisieren);
+    preisAktualisieren();
+
+  } catch (fehler) {
+    console.error('Preisanzeige:', fehler);
+  }
+}
+
+function einzelplatzFormAktualisieren(){
+  const angebot=angeboteCache.find(a=>a.name===angebotAuswahl?.value);
+  const input=document.getElementById('buchungs-teilnehmer');
+  const hinweis=document.getElementById('buchungs-modus-hinweis');
+  if(!input)return;
+  const einzel=angebot?.buchungsmodus==='einzelplatz';
+  input.readOnly=einzel;
+  if(einzel){input.value='1';input.min='1';input.max='1';
+    if(hinweis)hinweis.textContent=`Einzelplatzreservierung. Der Termin findet ab ${Number(angebot.mindestteilnehmer)||5} Anmeldungen statt.`;
+  }else{
+    input.min='1';input.max=String(Math.min(1000,Number(angebot?.kapazitaet)||1000));
+    if(hinweis)hinweis.textContent='';
+  }
+}
+
+preisanzeigeStarten();

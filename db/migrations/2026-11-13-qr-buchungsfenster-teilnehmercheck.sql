@@ -34,4 +34,20 @@ CREATE TABLE IF NOT EXISTS brilon_mitarbeiter_buchungsbestaetigungen (
   letzter_fehler TEXT,versendet_am TIMESTAMPTZ,aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS brilon_mitarbeiter_buchungsbestaetigungen_ausstehend_idx
-  ON brilon_mitarbeiter_
+  ON brilon_mitarbeiter_buchungsbestaetigungen(versand_nach,id) WHERE status='ausstehend';
+ALTER TABLE brilon_netzwerkpartner
+  ADD COLUMN IF NOT EXISTS programm_benachrichtigung_email TEXT;
+CREATE TABLE IF NOT EXISTS brilon_partner_terminanfragen(
+  id UUID PRIMARY KEY,
+  netzwerkpartner_id UUID NOT NULL REFERENCES brilon_netzwerkpartner(id) ON DELETE CASCADE,
+  datum DATE NOT NULL,
+  uhrzeit TIME NOT NULL,
+  programm TEXT NOT NULL,
+  personen INTEGER NOT NULL CHECK(personen BETWEEN 1 AND 150),
+  nachricht TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'offen',
+  mail_status TEXT,
+  erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS brilon_partner_terminanfragen_datum_idx
+  ON brilon_partner_terminanfragen(datum, erstellt_am DESC);

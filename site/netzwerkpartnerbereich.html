@@ -34,4 +34,17 @@
     <section class="partner-brilon-request">
       <h3>Gezielten Termin anfragen</h3>
       <form id="partner-appointment-form">
-        <label>Wun
+        <label>Wunschdatum<input name="datum" type="date" required></label>
+        <label>Startzeit<input name="uhrzeit" type="time" required></label>
+        <label>Programm<input name="programm" maxlength="120" required></label>
+        <label>Teilnehmende<input name="personen" type="number" min="1" max="150" inputmode="numeric" required></label>
+        <label>Nachricht an das Team<textarea name="nachricht" maxlength="1500" rows="3"></textarea></label>
+        <button type="submit" class="btn">Terminwunsch senden</button>
+      </form>
+      <p id="partner-request-status" role="status" aria-live="polite"></p>
+    </section>
+  </section>
+</main>
+<script src="/netzwerkpartnerbereich.js?v=20261105-1"></script>
+</body>
+</html>

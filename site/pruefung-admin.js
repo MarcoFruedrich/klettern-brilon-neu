@@ -686,4 +686,269 @@
               body:JSON.stringify({ortId})
             });
             find('tablet-admin-status').textContent=ortId===null
-              ?'Werbestandort entfernt. Das Tab
+              ?'Werbestandort entfernt. Das Tablet zeigt keine Programme mehr.'
+              :'Werbestandort gespeichert. Das Tablet zeigt nur die dort veröffentlichten Programme.';
+            await refresh();
+          }catch(error){
+            find('tablet-admin-status').textContent='Werbestandort konnte nicht gespeichert werden: '+error.message;
+            saveSite.disabled=false;
+          }
+        });
+        block.append(siteLabel,saveSite);
+      }
+      if(device.aktiv&&!device.pruefdisplay){
+        const select=elt('button','Als Prüfdisplay für diesen Standort auswählen');select.type='button';
+        select.className='btn secondary';
+        select.addEventListener('click',async()=>{
+          if(!confirm('Dieses Tablet als Prüfdisplay für den zugewiesenen Standort festlegen? Ein bisheriges Prüfdisplay an diesem Standort wird ersetzt.'))return;
+          select.disabled=true;
+          try{
+            await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id)+'/pruefdisplay',{method:'PATCH'});
+            find('tablet-admin-status').textContent='Prüfdisplay für diesen Standort gespeichert. Bisherige Codes dieses Standorts sind ungültig.';
+            await refresh();
+          }catch(error){
+            find('tablet-admin-status').textContent='Prüfdisplay konnte nicht umgestellt werden: '+error.message;
+            select.disabled=false;
+          }
+        });
+        block.append(select);
+      }
+      if(device.aktiv){
+        const replace=elt('button','Tablet ersetzen / neu koppeln');
+        replace.type='button';replace.className='btn secondary';
+        replace.addEventListener('click',async()=>{
+          if(!confirm('Der bisherige Tablet-Zugang wird sofort gesperrt und sämtliche noch aktiven Codes dieses Geräts werden ungültig. Neuen einmaligen Kopplungscode erzeugen?'))return;
+          replace.disabled=true;
+          try{
+            const data=await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id)+'/ersetzen',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({wechselBestaetigt:true})
+            });
+            find('tablet-pair-code').textContent='Ersatzgerät jetzt koppeln: '+data.code+
+              ' (zehn Minuten gültig, einmalig). Anschließend das neue Gerät bei Bedarf als Prüfdisplay auswählen.';
+            await refresh();
+          }catch(error){
+            find('tablet-admin-status').textContent='Gerätewechsel fehlgeschlagen: '+error.message;
+            replace.disabled=false;
+          }
+        });
+        block.append(replace);
+      }
+      if(device.aktiv){
+        const button=elt('button','Tablet-Zugang sperren');button.type='button';
+        button.className='btn secondary';
+        button.addEventListener('click',async()=>{
+          if(!confirm('Dieses Tablet dauerhaft aus der Codeanzeige aussperren? Eine neue Kopplung wird erforderlich.'))return;
+          button.disabled=true;
+          try{
+            await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id)+'/sperren',
+              {method:'PATCH'});
+            await refresh();
+          }catch(error){
+            find('tablet-admin-status').textContent='Tablet konnte nicht gesperrt werden: '+error.message;
+            button.disabled=false;
+          }
+        });
+        block.append(button);
+      }
+      // Löschen ist unabhängig vom Zustand und erfordert niemals Zugriff auf das Tablet.
+      const deleteButton=elt('button','Tablet löschen');
+      deleteButton.type='button';
+      deleteButton.className='btn danger tablet-delete-button';
+      deleteButton.title='Zugang sofort sperren und Gerät aus der Verwaltung entfernen';
+      deleteButton.addEventListener('click',async()=>{
+        if(!confirm('Tablet „'+device.name+'“ endgültig aus der Geräteverwaltung entfernen? Der Gerätezugang wird sofort gesperrt, laufende Prüfcodes werden ungültig. Eine spätere Nutzung erfordert einen neuen Kopplungscode.'))return;
+        deleteButton.disabled=true;
+        try{
+          await api('/api/admin/pruefung/tablets/'+encodeURIComponent(device.id),
+            {method:'DELETE'});
+          // Entferne die Karte sofort; andere Teile der Prüfverwaltung bleiben nutzbar.
+          block.remove();
+          find('tablet-admin-status').textContent='Tablet „'+device.name+
+            '“ gelöscht. Der Zugang ist sofort gesperrt. Erneute Nutzung nur mit neuer Kopplung.';
+          await refresh();
+          // Refresh kann die Statusmeldung ersetzen; erfolgreiche Löschung bestätigen.
+          find('tablet-admin-status').textContent='Tablet „'+device.name+
+            '“ gelöscht und serverseitig gesperrt. Für die erneute Nutzung neu koppeln.';
+        }catch(error){
+          find('tablet-admin-status').textContent='Tablet konnte nicht gelöscht werden: '+error.message;
+          deleteButton.disabled=false;
+        }
+      });
+      block.append(deleteButton);
+      target.append(block);
+    }
+  }
+  function renderMailStatus(target,notifications){
+    target.replaceChildren();
+    const outstanding=notifications.filter(x=>x.status!=='angenommen');
+    find('pruef-mail-status').textContent=outstanding.length+
+      ' nicht als angenommen bestätigte Sicherheitsmängelmeldungen von '+
+      notifications.length+' angezeigten Einträgen.';
+    for(const item of notifications){
+      const card=elt('article');card.className='booking';
+      const statuses={ausstehend:'Ausstehend',sendet:'Versand unklar – Anbieter prüfen',
+        angenommen:'Vom Anbieter angenommen (Zustellung nicht bestätigt)',
+        fehlgeschlagen:'Versand fehlgeschlagen',nicht_konfiguriert:'E-Mail nicht konfiguriert'};
+      card.append(elt('strong',item.programm+' · '+(item.stationen||[]).join(', ')),
+        elt('p','Prüfbericht: '+item.bericht_id),
+        elt('p','Status: '+(statuses[item.status]||'Unbekannt')),
+        elt('p','Versuche: '+item.versuche+
+          ' · Letzter Versuch: '+(item.letzter_versuch?
+          new Date(item.letzter_versuch).toLocaleString('de-DE'):'–')));
+      if(item.letzter_fehler)card.append(elt('p',item.letzter_fehler));
+      if(['fehlgeschlagen','nicht_konfiguriert','ausstehend'].includes(item.status)){
+        const resend=elt('button','Mängelmeldung erneut senden');
+        resend.type='button';resend.className='btn secondary';
+        resend.addEventListener('click',async()=>{
+          if(!confirm('Vor erneutem Versand prüfen, ob die Nachricht bereits beim Empfänger oder E-Mail-Anbieter eingegangen ist. Trotzdem erneut versuchen?'))return;
+          resend.disabled=true;
+          try{
+            const result=await api('/api/admin/pruefung/meldungen/'+encodeURIComponent(item.bericht_id)+'/erneut-senden',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({doppelversandGeprueft:true})
+            });
+            find('pruef-mail-status').textContent=result.status==='gesendet'?
+              'Mail-Anbieter hat den Versand angenommen; Zustellung nicht bestätigt.':
+              'Neuer Versand nicht bestätigt: '+result.status+'. Verantwortliche direkt informieren.';
+            await refresh();
+          }catch(error){
+            find('pruef-mail-status').textContent='Erneuter Versand fehlgeschlagen: '+error.message;
+            resend.disabled=false;
+          }
+        });
+        card.append(resend);
+      }else if(item.status==='sendet'){
+        card.append(elt('p','Kein automatischer Neuversand: Versandstatus zuerst beim Anbieter klären.'));
+      }
+      target.append(card);
+    }
+  }
+  function renderHints(target,hints){
+    target.replaceChildren();
+    const offene=hints.filter(x=>!x.erledigt_am);
+    find('pruef-hinweis-status').textContent=offene.length+
+      ' offene Hinweise zur Nachprüfung'+(hints.length>=200?' (maximal 200 angezeigt)':'')+'.';
+    for(const item of hints){
+      const article=elt('article');article.className='booking';
+      const erledigt=!!item.erledigt_am;
+      article.append(elt('strong',(erledigt?'Geprüfter Hinweis: ':'Offener Hinweis: ')+item.station),
+        elt('p',item.beschreibung),
+        elt('p','Gemeldet von: '+item.erstellt_von+' · '+
+          new Date(item.erstellt_am).toLocaleString('de-DE')));
+      if(item.gesperrt_am)article.append(elt('p','ACHTUNG: Station ist bereits gesperrt.'));
+      if(erledigt){
+        article.append(elt('p','Geprüft von: '+item.erledigt_von+' · '+item.erledigt_notiz));
+      }else{
+        const button=elt('button','Nach Prüfung als erledigt markieren');
+        button.type='button';button.className='btn secondary';
+        button.addEventListener('click',async()=>{
+          const pruefer=prompt('Wer hat den Hinweis geprüft?');
+          if(!pruefer)return;
+          const ergebnis=prompt('Prüfergebnis und ggf. durchgeführte Maßnahmen (mindestens 20 Zeichen):');
+          if(!ergebnis)return;
+          if(!confirm('Ist der Hinweis tatsächlich geprüft und darf als erledigt gekennzeichnet werden?'))return;
+          button.disabled=true;
+          try{
+            await api('/api/admin/pruefung/hinweise/'+encodeURIComponent(item.id)+'/erledigen',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({pruefer,ergebnis,geprueft:true})
+            });
+            await refresh();
+          }catch(error){
+            find('pruef-hinweis-status').textContent='Prüfvermerk konnte nicht gespeichert werden: '+error.message;
+            button.disabled=false;
+          }
+        });
+        article.append(button);
+      }
+      target.append(article);
+    }
+  }
+  function renderReports(target,reports){
+    target.replaceChildren();
+    for(const report of reports){
+      const article=elt('article');article.className='booking';
+      article.append(elt('strong',report.programm+' · '+report.beginn),
+        elt('p','Prüfer: '+report.pruefer+' · Ergebnis: '+(report.hat_mangel?'Sicherheitsmangel – gesperrte Station prüfen':
+          report.hat_hinweis?'Hinweis(e) zur Prüfung vorgemerkt':'Kein Mangel gemeldet')));
+      for(const p of report.pruefungen){
+        article.append(elt('p',(p.station||'Station')+
+          (p.ort?' · '+p.ort:'')+(p.qualifikation?' · '+p.qualifikation:'')+': '+
+          (p.zustand==='ok'?'In Ordnung':p.zustand==='hinweis'?
+          'Hinweis – zur Prüfung vorgemerkt: '+p.beschreibung:'Sicherheitsmangel – '+p.beschreibung)));
+        if(p.hatFoto){
+          const link=elt('a','Fotobeleg herunterladen – '+(p.station||'Station'));
+          link.href='/api/admin/pruefung/berichte/'+encodeURIComponent(report.id)+
+            '/foto/'+encodeURIComponent(p.stationId);
+          link.download='stationsfoto.jpg';
+          article.append(link);
+        }
+      }
+      target.append(article);
+    }
+  }
+  find('pruef-personal-form')?.addEventListener('submit',async event=>{
+    event.preventDefault();const form=event.currentTarget;
+    const status=find('pruef-einladung-status')||find('pruef-personal-status');
+    const submit=form.querySelector('button[type="submit"]');
+    status.replaceChildren();submit.disabled=true;
+    const values=Object.fromEntries(new FormData(form));
+    try{if(await einladungSenden(values.name,values.email))form.reset();}
+    finally{submit.disabled=false;}
+  });
+  find('netzwerkpartner-invite-form')?.addEventListener('submit',async event=>{
+    event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+    const status=find('netzwerkpartner-invite-status');button.disabled=true;status.replaceChildren();
+    try{
+      const result=await api('/api/admin/netzwerkpartner/einladungen',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({name:form.elements.name.value,email:form.elements.email.value})});
+      status.textContent=result.emailVersand==='gesendet'?
+        'Einladung an '+result.email+' versandt. Der Mailanbieter hat sie angenommen; eine Zustellung ist damit nicht bestätigt.':
+        'Einladung gespeichert, E-Mailversand fehlgeschlagen. Registrierungslink sicher weitergeben:';
+      if(result.registrierungsLink){const link=elt('a',result.registrierungsLink);link.href=result.registrierungsLink;
+        link.className='invite-link';link.style.display='block';link.style.overflowWrap='anywhere';status.append(link);}
+      form.reset();await refresh();
+    }catch(error){status.textContent='Einladung fehlgeschlagen: '+error.message;}
+    finally{button.disabled=false;}
+  });
+  find('pruef-station-form')?.addEventListener('submit',async event=>{
+    event.preventDefault();const form=event.currentTarget;
+    try{
+      await api('/api/admin/pruefung/stationen',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({...Object.fromEntries(new FormData(form)),ortId:form.elements.ortId.value,
+          qualifikation:form.elements.qualifikation.value})});
+      form.reset();find('pruef-station-status').textContent='Station gespeichert.';
+      await refresh();
+    }catch(err){find('pruef-station-status').textContent='Fehler: '+err.message;}
+  });
+  find('tablet-pair-generate')?.addEventListener('click',async()=>{
+    const display=find('tablet-pair-code');display.textContent='Kopplungscode wird erzeugt …';
+    try{
+      const data=await api('/api/admin/pruefung/tablet/kopplung',{method:'POST'});
+      display.textContent='Tablet-Kopplungscode: '+data.code+' (zehn Minuten gültig, einmalig)';
+    }catch(error){display.textContent='Kopplung fehlgeschlagen: '+error.message;}
+  });
+  find('pruef-code-generate')?.addEventListener('click',async()=>{
+    const target=find('pruef-code-display');target.textContent='Code wird erzeugt …';
+    try{
+      const response=await api('/api/admin/pruefung/code',{method:'POST'});
+      target.textContent=response.code+' (120 Sekunden gültig, einmalig)';
+    }catch(err){target.textContent='Fehler: '+err.message;}
+  });
+  find('pruef-uebersicht-refresh')?.addEventListener('click',refresh);
+  find('pruef-report-refresh')?.addEventListener('click',refresh);
+  find('pruef-hinweis-refresh')?.addEventListener('click',refresh);
+  find('pruef-mail-refresh')?.addEventListener('click',refresh);
+  find('tablet-admin-refresh')?.addEventListener('click',refresh);
+  document.querySelectorAll('[data-admin-view-link]').forEach(link=>link.addEventListener('click',()=>{
+    if(['#netzwerkpartner-section','#kundenfeedback-section'].includes(link.hash))setTimeout(refresh,0);
+  }));
+  // The admin workspace is revealed by the existing login flow.
+  const observer=new MutationObserver(()=>{
+    if(!find('workspace')?.hidden && !initialized){initialized=true;refresh();}
+    if(find('workspace')?.hidden)initialized=false;
+  });
+  if(find('workspace'))observer.observe(find('workspace'),{attributes:true,attributeFilter:['hidden']});
+})();
