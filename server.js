@@ -454,7 +454,7 @@ const kundenService=createKundenbestaetigungService({pool,brevoMail});
 const einsatzplanungApi=createEinsatzplanungApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,brevoMail,kundenService});
 const netzwerkpartnerApi=createNetzwerkpartnerApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 const kundenfeedbackApi=createKundenfeedbackApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
-const spontangruppenApi=createSpontanGruppenApi({pool,admin,reply,body,sameOriginMutation,limit});
+const spontangruppenApi=createSpontanGruppenApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,limit,brevoMail});
 
 const marketingCampaignApi=createMarketingCampaignApi({pool,admin,reply,body});
 const wissensportalApi=createWissensportalApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation});
@@ -3560,10 +3560,20 @@ async function start(){
       session_id UUID NOT NULL REFERENCES brilon_spontan_sessions(id) ON DELETE CASCADE,
       teilnahme_id UUID NOT NULL,interesse BOOLEAN NOT NULL,personen INTEGER NOT NULL DEFAULT 0,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(session_id,teilnahme_id))`);
+    await pool.query(`ALTER TABLE brilon_spontan_teilnahmen
+      ADD COLUMN IF NOT EXISTS gast_name TEXT,
+      ADD COLUMN IF NOT EXISTS gast_email TEXT,
+      ADD COLUMN IF NOT EXISTS anwesend BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS anwesend_personen INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS geprueft_am TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS geprueft_von UUID`);
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_zeiten(
       id UUID PRIMARY KEY,session_id UUID NOT NULL REFERENCES brilon_spontan_sessions(id) ON DELETE CASCADE,
       datum DATE NOT NULL,uhrzeit TIME NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(session_id,datum,uhrzeit))`);
+    await pool.query(`ALTER TABLE brilon_spontan_zeiten
+      ADD COLUMN IF NOT EXISTS gruppe_bestaetigt_am TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS mail_status TEXT`);
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_zeitstimmen(
       zeit_id UUID NOT NULL REFERENCES brilon_spontan_zeiten(id) ON DELETE CASCADE,
       teilnahme_id UUID NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
