@@ -24,6 +24,7 @@
   place.addEventListener('change',loadSetting);
   save.addEventListener('click',async()=>{
     const numeric=Number(price.value.trim().replace(',','.'));
+    if(!price.value.trim()){message('Bitte den Preis je Person eintragen.','error');return;}
     if(!place.value||!Number.isFinite(numeric)||numeric<0||numeric>500){message('Bitte einen gültigen Preis von 0 bis 500 Euro eintragen.','error');return;}
     save.disabled=true;message('Preis wird gespeichert …');
     try{
