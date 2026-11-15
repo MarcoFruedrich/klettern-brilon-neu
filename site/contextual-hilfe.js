@@ -24,7 +24,7 @@
     [/partner|netzwerk/, 'Die Auswahl bestimmt, welcher Partner für Standort, Angebot oder Anlageninformation zuständig ist und welche Ansicht freigegeben wird.'],
     [/kategorie|zielgruppe/, 'Die Auswahl ordnet das Angebot in die passende Übersicht ein und hilft Gästen, geeignete Programme zu finden.']
   ];
-  const norm=s=>(s||'').replace(/\\s+/g,' ').trim().toLocaleLowerCase('de-DE');
+  const norm=s=>(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase('de-DE');
   function helpText(label){const text=norm(label);for(const [re,msg] of rules)if(re.test(text))return msg;return '';}
   let seq=0;
   function attach(target,label){
