@@ -504,7 +504,7 @@
             row.append(move);row.addEventListener('dragstart',event=>{event.dataTransfer.setData('text/plain',person.id);event.dataTransfer.effectAllowed='move';});
             return row;
           };
-          const eligible=staffRows.filter(person=>person.zugeordnet||!selectedIds.has(person.id));
+          const eligible=staffRows.filter(person=>!selectedIds.has(person.id));
           const selected=staffRows.filter(person=>selectedIds.has(person.id));
           for(const person of eligible)availableList.append(rowNode(person,false));
           for(const person of selected)assignedList.append(rowNode(person,true));
