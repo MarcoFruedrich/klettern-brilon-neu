@@ -3538,6 +3538,13 @@ async function start(){
         ALTER TABLE brilon_netzwerkpartner
           ADD COLUMN IF NOT EXISTS mitarbeiter_ids UUID[] NOT NULL DEFAULT '{}';
       END IF;
+      IF to_regclass('public.brilon_partner_terminanfragen') IS NOT NULL THEN
+        ALTER TABLE brilon_partner_terminanfragen
+          ADD COLUMN IF NOT EXISTS reaktion_token_hash CHAR(64),
+          ADD COLUMN IF NOT EXISTS reaktion_token_ablauf TIMESTAMPTZ,
+          ADD COLUMN IF NOT EXISTS reaktion_status TEXT,
+          ADD COLUMN IF NOT EXISTS reaktion_am TIMESTAMPTZ;
+      END IF;
     END;
     $migration$`);
     // Customer feedback is private to the admin API and linked to one existing booking.
