@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#17483b">
+<title>Spontan zusammen klettern · Klettern &amp; Abenteuer</title>
+<style>
+:root{color-scheme:light;--green:#17483b;--green2:#0b5a42;--lime:#d8f584;--line:#cadbd1}
+*{box-sizing:border-box}body{margin:0;background:#f8f7f1;color:#193f35;font:16px/1.5 system-ui,sans-serif}
+header{padding:16px 22px;border-bottom:1px solid var(--line);font-weight:800;font-size:1.1rem}header small{display:block;font-size:.68rem;letter-spacing:.13em}
+main{width:min(820px,calc(100% - 28px));margin:24px auto 50px}.hero{padding:clamp(22px,5vw,38px);background:#eaf1e9;border-radius:18px}
+h1{font-size:clamp(1.7rem,5vw,2.5rem);line-height:1.1;margin:0 0 12px}p{margin:8px 0 18px}
+.card{margin-top:18px;padding:20px;background:#fff;border:1px solid var(--line);border-radius:14px}
+label{display:block;font-weight:700;margin:12px 0 6px}input,select{width:100%;min-height:46px;padding:10px 12px;border:1px solid #b7cfc1;border-radius:9px;font:inherit;color:#153d34;background:white}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.slots{display:grid;gap:8px;margin:10px 0}.slot{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:9px;background:#f7faf7}.slot input{width:20px;min-height:20px}
+button{border:0;border-radius:10px;padding:12px 17px;background:var(--green);color:white;font:700 1rem system-ui;cursor:pointer}button:disabled{opacity:.55;cursor:wait}
+.secondary{background:#e9f1e9;color:var(--green);border:1px solid var(--line)}
+#status{padding:11px 13px;border-radius:9px;background:#f1f5ef;min-height:45px}#status.ok{background:var(--lime)}#status.error{background:#fce8e6;color:#842626}
+.summary{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}.pill{padding:8px 12px;border-radius:99px;background:#eff5eb;font-weight:700}
+.hidden{display:none!important}.hint{font-size:.91rem;color:#4e6e63}
+@media(max-width:560px){.row{grid-template-columns:1fr}header{padding:14px}}
+</style></head>
+<body>
+<header>🧗 Klettern &amp; Abenteuer<small>SPONTAN ZUSAMMEN KLETTERN</small></header>
+<main>
+<section class="hero">
+<h1>Wer hat Lust auf ein Kletterabenteuer?</h1>
+<p>Du bist in der Jugendherberge Brilon und möchtest spontan mit anderen Gästen klettern? Trag dein Interesse ein, schlag passende Zeiten vor oder stimme für bereits vorgeschlagene Zeiten ab. Familien, Freunde und einzelne Gäste können sich hier zu einer kleinen Gruppe zusammenfinden.</p>
+<p class="hint">Zum Abstimmen brauchst du den aktuellen Sicherheitscode vom Monitor vor Ort. Es werden keine Namen oder E-Mail-Adressen abgefragt.</p>
+<div class="row">
+<div><label for="place">Standort</label><select id="place"><option value="">Standort auswählen …</option></select></div>
+<div><label for="code">Sicherheitscode vom Monitor</label><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-stelliger Code"></div>
+</div>
+</section>
+<section class="card">
+<h2>Aktueller Gruppenstand</h2>
+<div class="summary"><span class="pill" id="interest-count">Noch keine Interessierten</span><span class="pill" id="people-count">0 Personen</span></div>
+<div id="slot-results" class="slots"><p class="hint">Wähle einen Standort, um mögliche Zeiten zu sehen.</p></div>
+</section>
+<form id="poll" class="card">
+<h2>Interesse und Zeiten abstimmen</h2>
+<label class="slot"><input type="checkbox" id="interested" checked><span>Wir haben Interesse am gemeinsamen Klettern.</span></label>
+<div class="row">
+<div><label for="people">Wie viele Personen seid ihr?</label><input id="people" type="number" min="1" max="15" value="1" required></div>
+<div><label for="new-date">Weitere mögliche Zeit vorschlagen</label><input id="new-date" type="date"></div>
+</div>
+<div class="row">
+<div><label for="new-time">Uhrzeit dazu</label><input id="new-time" type="time"></div>
+<div><label>Deine Stimme</label><p class="hint">Du kannst mehrere Zeiten auswählen. Ein eigener Vorschlag zählt automatisch als deine Stimme.</p></div>
+</div>
+<div id="time-options" class="slots"></div>
+<button id="submit" type="submit">Abstimmung speichern</button>
+<p id="status" role="status" aria-live="polite">Wähle den Standort und gib den Code vom Monitor ein.</p>
+</form>
+</main>
+<script src="/spontangruppen.js?v=20261115-1" defer></script>
+</body></html>
