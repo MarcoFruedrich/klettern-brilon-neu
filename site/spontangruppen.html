@@ -25,7 +25,7 @@ button{border:0;border-radius:10px;padding:12px 17px;background:var(--green);col
 <section class="hero">
 <h1>Wer hat Lust auf ein Kletterabenteuer?</h1>
 <p>Du bist in der Jugendherberge Brilon und möchtest spontan mit anderen Gästen klettern? Trag dein Interesse ein, schlag passende Zeiten vor oder stimme für bereits vorgeschlagene Zeiten ab. Familien, Freunde und einzelne Gäste können sich hier zu einer kleinen Gruppe zusammenfinden.</p>
-<p class="hint">Zum Abstimmen brauchst du den aktuellen Sicherheitscode vom Monitor vor Ort. Es werden keine Namen oder E-Mail-Adressen abgefragt. Die Zeitvorschläge sind unverbindlich und werden vor einer festen Terminbestätigung auf Verfügbarkeit geprüft.</p>
+<p class="hint">Zum Abstimmen brauchst du den aktuellen Sicherheitscode vom Monitor vor Ort. Name und E-Mail-Adresse werden verwendet, damit wir dich bei Zustandekommen der Gruppe erreichen können. Ab 5 Personen für denselben Termin erhalten alle angemeldeten Gäste und die Jugendherberge eine Nachricht. Die Zeitvorschläge sind unverbindlich und werden vor einer festen Terminbestätigung auf Verfügbarkeit geprüft.</p>
 <div class="row">
 <div><label for="place">Standort</label><select id="place"><option value="">Standort auswählen …</option></select></div>
 <div><label for="code">Sicherheitscode vom Monitor</label><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-stelliger Code"></div>
@@ -38,6 +38,10 @@ button{border:0;border-radius:10px;padding:12px 17px;background:var(--green);col
 </section>
 <form id="poll" class="card">
 <h2>Interesse und Zeiten abstimmen</h2>
+<div class="row">
+<div><label for="guest-name">Dein Name</label><input id="guest-name" name="name" autocomplete="name" maxlength="120" required></div>
+<div><label for="guest-email">Deine E-Mail-Adresse</label><input id="guest-email" name="email" type="email" autocomplete="email" maxlength="180" required></div>
+</div>
 <label class="slot"><input type="checkbox" id="interested" checked><span>Wir haben Interesse am gemeinsamen Klettern.</span></label>
 <div class="row">
 <div><label for="people">Wie viele Personen seid ihr?</label><input id="people" type="number" min="1" max="15" value="1" required></div>
