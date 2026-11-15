@@ -3519,6 +3519,18 @@ async function start(){
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_netzwerkpartner_sessions_ablauf_idx ON brilon_netzwerkpartner_sessions(ablauf)');
       console.log('Getrenntes Netzwerkpartnerschema geprüft (RUN_NETWORK_PARTNER_MIGRATION=true)');
     }
+    // Assign each network partner to an existing venue. This idempotent upgrade
+    // preserves existing partner accounts and leaves assignment optional until admin review.
+    await pool.query(`DO $migration$
+    BEGIN
+      IF to_regclass('public.brilon_netzwerkpartner') IS NOT NULL
+         AND to_regclass('public.brilon_orte') IS NOT NULL THEN
+        ALTER TABLE brilon_netzwerkpartner
+          ADD COLUMN IF NOT EXISTS standort_id BIGINT
+          REFERENCES brilon_orte(id) ON DELETE SET NULL;
+      END IF;
+    END
+    $migration$`);
     // Customer feedback is private to the admin API and linked to one existing booking.
     if(process.env.RUN_CUSTOMER_FEEDBACK_MIGRATION==='true'){
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenfeedback(

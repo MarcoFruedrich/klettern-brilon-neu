@@ -6,6 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <title>Netzwerkpartnerbereich | Klettern & Abenteuer</title>
 <link rel="stylesheet" href="/style.css?v=20261105-employee-network-feedback">
+<link rel="stylesheet" href="/netzwerkpartnerbereich.css?v=20261115-calendar">
 </head>
 <body class="admin-page pruef-page">
 <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -19,14 +20,34 @@
     <button class="btn" type="submit">Anmelden</button>
   </form>
   <p id="partner-login-status" role="status" aria-live="polite"></p>
-  <section id="partner-workspace" class="booking" hidden aria-live="polite">
+  <section id="partner-workspace" class="booking partner-workspace" hidden aria-live="polite">
     <div class="staff-portal-heading"><h2 id="partner-title"></h2><button id="partner-logout" class="btn secondary" type="button">Abmelden</button></div>
     <p class="staff-access-status is-active">Zugang freigeschaltet</p>
     <h3>Deine Kontaktdaten</h3>
     <div id="partner-profile" class="staff-contact-list"></div>
-    <p class="hint">Der Bereich ist getrennt von der Verwaltung und dem Mitarbeiterportal. Weitere gemeinsame Funktionen können hier später ergänzt werden.</p>
+    <section id="partner-calendar-card" class="partner-calendar-card" aria-labelledby="partner-calendar-heading">
+      <h3 id="partner-calendar-heading">Standortkalender</h3>
+      <p id="partner-calendar-intro">Belegungen und Sperrzeiten für deinen freigegebenen Standort. Namen und Zimmernummern anderer Gäste werden nicht angezeigt.</p>
+      <p id="partner-calendar-status" class="partner-calendar-status" role="status" aria-live="polite"></p>
+      <div id="partner-calendar-content" hidden>
+        <div class="partner-calendar-toolbar">
+          <button id="partner-calendar-prev" type="button" class="btn secondary" aria-label="Vorheriger Monat">‹</button>
+          <strong id="partner-calendar-month"></strong>
+          <button id="partner-calendar-next" type="button" class="btn secondary" aria-label="Nächster Monat">›</button>
+        </div>
+        <div class="partner-calendar-legend" aria-label="Kalenderlegende">
+          <span><i class="legend-free"></i>Frei</span>
+          <span><i class="legend-booked"></i>Belegt / Anfrage</span>
+          <span><i class="legend-blocked"></i>Sperrzeit</span>
+        </div>
+        <div class="partner-calendar-weekdays" aria-hidden="true">
+          <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+        </div>
+        <div id="partner-calendar-grid" class="partner-calendar-grid" aria-label="Monatskalender"></div>
+      </div>
+    </section>
   </section>
 </main>
-<script src="/netzwerkpartnerbereich.js?v=20261105-1"></script>
+<script src="/netzwerkpartnerbereich.js?v=20261115-calendar"></script>
 </body>
 </html>
