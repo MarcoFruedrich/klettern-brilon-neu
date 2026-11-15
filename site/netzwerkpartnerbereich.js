@@ -91,6 +91,8 @@ async function loadProfile(){
   addProfile('Ansprechperson',profile.ansprechpartner);addProfile('E-Mail',profile.email);
   addProfile('Telefon',profile.telefon);addProfile('Anschrift',[profile.strasse,[profile.plz,profile.ort].filter(Boolean).join(' ')].filter(Boolean).join(', '));
   addProfile('Weitere Kontakthinweise',profile.weitere_angaben);
+  const requestSection=document.getElementById('partner-brilon-request');
+  requestSection.hidden=!profile.standort_id||profile.standort_aktiv===false;
   await loadCalendar();
 }
 form.addEventListener('submit',async event=>{
