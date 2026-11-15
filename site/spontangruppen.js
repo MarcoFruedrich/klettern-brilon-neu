@@ -52,7 +52,7 @@
     const button=$('submit');button.disabled=true;status('Abstimmung wird gespeichert …');
     try{
       const result=await request('/api/spontangruppen/abstimmung',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ortId,code:codeValue,teilnahmeId,interesse:$('interested').checked,personen:Number($('people').value||1),
+        body:JSON.stringify({ortId,code:codeValue,teilnahmeId,name:$('guest-name').value.trim(),email:$('guest-email').value.trim(),interesse:$('interested').checked,personen:Number($('people').value||1),
           neueZeiten:date&&time?[{datum:date,uhrzeit:time}]:[],
           zeitenIds:[...$('time-options').querySelectorAll('input:checked')].map(x=>x.value)})});
       renderBoard(result);status('Deine Rückmeldung wurde gespeichert. Du kannst später mit demselben Gerät erneut abstimmen.');$('new-date').value='';$('new-time').value='';
