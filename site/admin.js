@@ -2992,7 +2992,7 @@ document.getElementById('invoice-settings-form')?.addEventListener('submit',asyn
   finally{button.disabled=false;}
 });
 
-async function rechnungenLaden(){
+async function standardRechnungenLaden(){
   const list=document.getElementById('invoice-list'),status=document.getElementById('invoice-list-status');if(!list)return;
   status.textContent='Rechnungen werden geladen …';list.replaceChildren();
   try{
@@ -3015,6 +3015,33 @@ async function rechnungenLaden(){
     }
   }catch(error){status.textContent='Rechnungsübersicht nicht verfügbar: '+error.message;}
 }
+async function partnerRechnungenLaden(){
+  const list=document.getElementById('partner-invoice-list'),status=document.getElementById('partner-invoice-status');
+  if(!list||!status)return;
+  status.textContent='Partnerabrechnungen werden geladen …';list.replaceChildren();
+  try{
+    const result=await api('/api/spontangruppen/buchhaltung'),rows=result.abrechnungen||[];
+    if(!rows.length){status.textContent='Noch keine Partnerabrechnungen erfasst.';return;}
+    status.textContent=rows.length+' Partnerabrechnung(en), höchstens 100 angezeigt.';
+    for(const row of rows){
+      const card=el('article');card.className='booking invoice-record';const data=row.data||{};
+      card.append(el('strong',row.rechnungsnummer+' · '+(row.unternehmen||row.ansprechpartner||'Netzwerkpartner')));
+      card.append(el('p',(data.angebot||'Spontane Klettergruppe')+' · '+(data.standort||row.standort||'')+' · '+(data.leistungsdatum||'')));
+      card.append(el('p','Teilnehmende: '+(data.teilnehmer||[]).reduce((n,item)=>n+Number(item.personen||0),0)+
+        ' · Leistung: '+euroCent(data.bruttoCent)+' · Partnerabzug: −'+euroCent(data.abzugCent)+' · Auszahlungsbetrag: '+euroCent(data.nettoCent)));
+      card.append(el('p','E-Mail-Status: '+row.email_status+(row.email_fehler?' · '+row.email_fehler:'')));
+      const link=el('a','PDF herunterladen');link.href='/api/spontangruppen/buchhaltung/'+encodeURIComponent(row.id)+'.pdf';card.append(link);
+      if(row.email_status!=='angenommen'){
+        const resend=el('button','Rechnung erneut senden');resend.type='button';resend.className='btn secondary';
+        resend.addEventListener('click',async()=>{resend.disabled=true;try{await api('/api/spontangruppen/buchhaltung/'+encodeURIComponent(row.id)+'/versenden',{method:'POST'});await partnerRechnungenLaden();}catch(error){status.textContent='Versand fehlgeschlagen: '+error.message;resend.disabled=false;}});
+        card.append(resend);
+      }
+      list.append(card);
+    }
+  }catch(error){status.textContent='Partnerbuchhaltung konnte nicht geladen werden: '+error.message;}
+}
+async function rechnungenLaden(){await standardRechnungenLaden();await partnerRechnungenLaden();}
+document.getElementById('partner-invoice-refresh')?.addEventListener('click',partnerRechnungenLaden);
 document.getElementById('invoice-list-refresh')?.addEventListener('click',rechnungenLaden);
 document.getElementById('invoice-backfill')?.addEventListener('click',async event=>{
   const button=event.currentTarget,status=document.getElementById('invoice-list-status');button.disabled=true;
