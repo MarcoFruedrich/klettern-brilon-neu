@@ -17,6 +17,7 @@
   function renderBoard(board){
     $('interest-count').textContent=board.interessierte?board.interessierte+' Gruppe(n) interessiert':'Noch keine Interessierten';
     $('people-count').textContent=(board.personen||0)+' Personen';
+    const cents=board.preisProPersonCent;$('unit-price').textContent=cents===null?'Preis je Person: noch nicht festgelegt':'Preis je Person: '+new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(cents/100);
     const results=$('slot-results'),options=$('time-options');
     const checked=new Set([...options.querySelectorAll('input:checked')].map(x=>x.value));
     results.replaceChildren();options.replaceChildren();
