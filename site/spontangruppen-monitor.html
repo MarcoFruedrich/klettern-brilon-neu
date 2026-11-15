@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#17483b">
+<title>Vor-Ort-Abstimmung · Klettern &amp; Abenteuer</title>
+<style>
+:root{--green:#124839;--green2:#0a5c43;--lime:#d8f584;--line:#c4d7cc}
+*{box-sizing:border-box}body{margin:0;background:#eef2ec;color:#173f34;font:18px/1.45 system-ui,sans-serif}
+main{min-height:100vh;display:flex;flex-direction:column;padding:clamp(20px,4vw,48px);gap:22px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:18px}h1{font-size:clamp(1.6rem,3vw,2.8rem);margin:0}select{font:inherit;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--green);min-width:240px}
+.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);gap:22px;flex:1}
+.panel{background:white;border:1px solid var(--line);border-radius:20px;padding:clamp(20px,3vw,36px);box-shadow:0 8px 28px #153f3010}
+.code-panel{display:flex;flex-direction:column;justify-content:center;text-align:center;background:var(--green);color:white}
+.code{font-size:clamp(4rem,12vw,9rem);font-weight:900;letter-spacing:.16em;line-height:1.1;margin:20px 0}
+.label{font-size:1.2rem;font-weight:700}small{opacity:.8}.link{font-size:clamp(1rem,2vw,1.45rem);font-weight:750;overflow-wrap:anywhere;color:var(--green2)}
+.pills{display:flex;gap:14px;flex-wrap:wrap;margin:20px 0}.pill{padding:10px 15px;border-radius:99px;background:#eff5eb;font-weight:750}
+ol{padding-left:26px}li{margin:8px 0}.times{display:grid;gap:8px}.time{padding:10px 12px;border:1px solid var(--line);border-radius:10px;display:flex;justify-content:space-between;gap:10px}
+footer{display:flex;justify-content:space-between;gap:16px;align-items:center}.refresh{border:0;border-radius:10px;padding:11px 16px;background:#d8f584;color:var(--green);font:700 1rem system-ui}
+@media(max-width:780px){.grid{grid-template-columns:1fr}.code{font-size:clamp(4rem,20vw,7rem)}.top,footer{align-items:flex-start;flex-direction:column}select{width:100%}}
+</style></head>
+<body><main>
+<div class="top"><div><h1>Spontan zusammen klettern</h1><div>Vor-Ort-Abstimmung für Gäste der Jugendherberge</div></div><label>Standort <select id="place"><option value="">Standort auswählen …</option></select></label></div>
+<div class="grid">
+<section class="panel code-panel">
+<div class="label" id="place-name">Sicherheitscode für Gäste</div>
+<div class="code" id="code">······</div>
+<div>Gib diesen aktuellen Code auf der Abstimmungsseite ein.</div>
+<p>Der Code wechselt alle 10 Minuten und ist 10 Minuten gültig.</p>
+<div class="label">Direkter Link</div><a class="link" id="guest-link" href="#">Abstimmungsseite öffnen</a>
+<div id="expires"></div>
+</section>
+<section class="panel">
+<h2>Wer möchte mitklettern?</h2>
+<div class="pills"><span class="pill" id="groups">0 interessierte Gruppen</span><span class="pill" id="people">0 Personen</span></div>
+<h3>Mögliche Zeiten</h3><div class="times" id="times"><p>Noch keine Zeiten vorgeschlagen.</p></div>
+<footer><small>Die Anzeige aktualisiert sich automatisch.</small><button class="refresh" id="refresh">Jetzt aktualisieren</button></footer>
+</section>
+</div>
+</main><script src="/spontangruppen-monitor.js?v=20261115-1" defer></script></body></html>
