@@ -449,6 +449,35 @@
       if(address)card.append(elt('p','Anschrift: '+address));
       if(partner.weitere_angaben)card.append(elt('p','Weitere Kontakthinweise: '+partner.weitere_angaben));
       if(partner.art==='konto'){
+        const locationLabel=elt('label','Standortfreigabe');
+        const locationSelect=document.createElement('select');
+        const emptyOption=elt('option',activePlaces.length?'Standort auswählen':'Zuerst einen Standort anlegen');
+        emptyOption.value='';locationSelect.append(emptyOption);
+        const selectedLocation=partner.standort_id===null||partner.standort_id===undefined?'':String(partner.standort_id);
+        for(const place of activePlaces){
+          const option=elt('option',place.name);option.value=String(place.id);
+          option.selected=option.value===selectedLocation;locationSelect.append(option);
+        }
+        if(!selectedLocation)locationSelect.value='';
+        locationLabel.append(locationSelect);card.append(locationLabel);
+        const saveLocation=elt('button','Standortfreigabe speichern');saveLocation.type='button';saveLocation.className='btn secondary';
+        saveLocation.addEventListener('click',async()=>{
+          saveLocation.disabled=true;
+          try{
+            await api('/api/admin/netzwerkpartner/'+encodeURIComponent(partner.id)+'/standort',{
+              method:'PATCH',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({standortId:locationSelect.value||null})
+            });
+            await refresh();
+            find('netzwerkpartner-status').textContent=locationSelect.value?
+              'Standortfreigabe dauerhaft gespeichert.':'Standortfreigabe entfernt.';
+          }catch(error){
+            find('netzwerkpartner-status').textContent='Standortfreigabe konnte nicht gespeichert werden: '+error.message;
+            saveLocation.disabled=false;
+          }
+        });
+        card.append(saveLocation);
+        if(partner.standort_name)card.append(elt('small','Freigegeben: '+partner.standort_name));
         const label=elt('label','Separate E-Mail für Teilnehmermeldungen (nicht die Login-Adresse)');
         const input=document.createElement('input');input.type='email';input.maxLength=180;
         input.value=partner.programm_benachrichtigung_email||'';input.placeholder='programm-brilon@…';label.append(input);card.append(label);
