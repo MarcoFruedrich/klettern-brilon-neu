@@ -22,6 +22,7 @@ const { createEinsatzplanungApi } = require('./lib/einsatzplanung-api');
 const { createKundenbestaetigungService } = require('./lib/kundenbestaetigung-service');
 const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
 const { createKundenfeedbackApi } = require('./lib/kundenfeedback-api');
+const { createSpontanGruppenApi } = require('./lib/spontangruppen-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { createWissensportalApi } = require('./lib/wissensportal-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
@@ -453,6 +454,7 @@ const kundenService=createKundenbestaetigungService({pool,brevoMail});
 const einsatzplanungApi=createEinsatzplanungApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,brevoMail,kundenService});
 const netzwerkpartnerApi=createNetzwerkpartnerApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 const kundenfeedbackApi=createKundenfeedbackApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
+const spontangruppenApi=createSpontanGruppenApi({pool,reply,body,sameOriginMutation,limit});
 
 const marketingCampaignApi=createMarketingCampaignApi({pool,admin,reply,body});
 const wissensportalApi=createWissensportalApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation});
@@ -500,6 +502,7 @@ async function main(req,res){
     if(route.startsWith('/api/admin/marketing/kampagnen'))return await marketingCampaignApi(req,res,route);
     if(route.startsWith('/api/pruefung/')||route.startsWith('/api/admin/pruefung/'))
       return await pruefungApi(req,res,u,route,ip);
+    if(route.startsWith('/api/spontangruppen/'))return await spontangruppenApi(req,res,u,route,ip);
     if(route.startsWith('/api/netzwerkpartner/')||route.startsWith('/api/admin/netzwerkpartner/'))
       return await netzwerkpartnerApi(req,res,u,route,ip);
     if(route==='/api/kundenfeedback'||route==='/api/admin/kundenfeedback')
@@ -3547,6 +3550,24 @@ async function start(){
       END IF;
     END;
     $migration$`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_sessions(
+      id UUID PRIMARY KEY,standort_id BIGINT NOT NULL REFERENCES brilon_orte(id) ON DELETE CASCADE,
+      code TEXT NOT NULL,code_hash CHAR(64) NOT NULL,code_ablauf TIMESTAMPTZ NOT NULL,
+      ablauf TIMESTAMPTZ NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
+      erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_spontan_one_active_idx ON brilon_spontan_sessions(standort_id) WHERE aktiv=true');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_teilnahmen(
+      session_id UUID NOT NULL REFERENCES brilon_spontan_sessions(id) ON DELETE CASCADE,
+      teilnahme_id UUID NOT NULL,interesse BOOLEAN NOT NULL,personen INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(session_id,teilnahme_id))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_zeiten(
+      id UUID PRIMARY KEY,session_id UUID NOT NULL REFERENCES brilon_spontan_sessions(id) ON DELETE CASCADE,
+      datum DATE NOT NULL,uhrzeit TIME NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(session_id,datum,uhrzeit))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_zeitstimmen(
+      zeit_id UUID NOT NULL REFERENCES brilon_spontan_zeiten(id) ON DELETE CASCADE,
+      teilnahme_id UUID NOT NULL,erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(zeit_id,teilnahme_id))`);
     // Customer feedback is private to the admin API and linked to one existing booking.
     if(process.env.RUN_CUSTOMER_FEEDBACK_MIGRATION==='true'){
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenfeedback(
