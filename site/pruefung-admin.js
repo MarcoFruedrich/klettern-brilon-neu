@@ -478,6 +478,59 @@
         });
         card.append(saveLocation);
         if(partner.standort_name)card.append(elt('small','Freigegeben: '+partner.standort_name));
+        const staffField=elt('fieldset');staffField.className='partner-staff-assignment';
+        staffField.append(elt('legend','Standortmitarbeitende für schnelle Rückmeldungen'));
+        staffField.append(elt('p','Mitarbeitende per Drag-and-drop zuordnen. Zugeordnete Personen erhalten Terminwünsche per E-Mail und können direkt reagieren.'));
+        const staffLists=document.createElement('div');staffLists.style.display='grid';staffLists.style.gridTemplateColumns='repeat(auto-fit,minmax(220px,1fr))';staffLists.style.gap='12px';
+        const availableList=elt('div');availableList.setAttribute('aria-label','Freigegebene Mitarbeitende');
+        const assignedList=elt('div');assignedList.setAttribute('aria-label','Zugeordnete Mitarbeitende');
+        for(const [list,title] of [[availableList,'Freigegeben am Standort'],[assignedList,'Für diesen Partner zugeordnet']]){
+          list.style.minHeight='64px';list.style.padding='10px';list.style.border='1px dashed #9bbcaf';list.style.borderRadius='10px';
+          list.style.background='#f6faf6';list.append(elt('strong',title));
+        }
+        staffLists.append(availableList,assignedList);staffField.append(staffLists);
+        const staffStatus=elt('small',partner.standort_id?'Mitarbeitende werden geladen …':'Bitte zuerst einen Standort zuweisen.');
+        const saveStaff=elt('button','Mitarbeiterzuordnung speichern');saveStaff.type='button';saveStaff.className='btn secondary';saveStaff.disabled=!partner.standort_id;
+        staffField.append(saveStaff,staffStatus);card.append(staffField);
+        let staffRows=[],selectedIds=new Set();
+        const drawStaff=()=>{
+          availableList.replaceChildren(elt('strong','Freigegeben am Standort'));
+          assignedList.replaceChildren(elt('strong','Für diesen Partner zugeordnet'));
+          const rowNode=(person,assigned)=>{
+            const row=elt('div');row.draggable=true;row.dataset.staffId=person.id;row.style.marginTop='8px';row.style.padding='8px';row.style.border='1px solid #cbd9d0';row.style.borderRadius='8px';row.style.background='#fff';row.style.cursor='grab';
+            const details=elt('span',(person.name||'Mitarbeiter')+' · '+person.email);row.append(details);
+            const move=elt('button',assigned?'Entfernen':'Zuordnen');move.type='button';move.className='btn secondary';move.style.marginLeft='8px';
+            move.addEventListener('click',()=>{if(assigned)selectedIds.delete(person.id);else selectedIds.add(person.id);drawStaff();});
+            row.append(move);row.addEventListener('dragstart',event=>{event.dataTransfer.setData('text/plain',person.id);event.dataTransfer.effectAllowed='move';});
+            return row;
+          };
+          const eligible=staffRows.filter(person=>person.zugeordnet||!selectedIds.has(person.id));
+          const selected=staffRows.filter(person=>selectedIds.has(person.id));
+          for(const person of eligible)availableList.append(rowNode(person,false));
+          for(const person of selected)assignedList.append(rowNode(person,true));
+          if(!eligible.length)availableList.append(elt('small','Keine weiteren Mitarbeitenden freigegeben.'));
+          if(!selected.length)assignedList.append(elt('small','Noch keine Mitarbeitenden zugeordnet.'));
+        };
+        for(const [list,assign] of [[availableList,true],[assignedList,false]]){
+          list.addEventListener('dragover',event=>{event.preventDefault();event.dataTransfer.dropEffect='move';});
+          list.addEventListener('drop',event=>{event.preventDefault();const id=event.dataTransfer.getData('text/plain');if(!staffRows.some(person=>person.id===id))return;if(assign)selectedIds.add(id);else selectedIds.delete(id);drawStaff();});
+        }
+        if(partner.standort_id){
+          api('/api/admin/netzwerkpartner/'+encodeURIComponent(partner.id)+'/mitarbeitende').then(result=>{
+            staffRows=(result.mitarbeitende||[]).map(person=>({...person,id:String(person.id)}));
+            selectedIds=new Set(staffRows.filter(person=>person.zugeordnet).map(person=>person.id));
+            drawStaff();staffStatus.textContent=staffRows.length?'Standortfreigaben geladen.':'Für diesen Standort sind keine Mitarbeitenden freigegeben.';
+          }).catch(error=>{staffStatus.textContent='Mitarbeitende konnten nicht geladen werden: '+error.message;});
+        }
+        saveStaff.addEventListener('click',async()=>{
+          saveStaff.disabled=true;
+          try{
+            await api('/api/admin/netzwerkpartner/'+encodeURIComponent(partner.id)+'/mitarbeitende',{
+              method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({mitarbeiterIds:[...selectedIds]})
+            });
+            staffStatus.textContent='Mitarbeiterzuordnung dauerhaft gespeichert.';saveStaff.disabled=false;
+          }catch(error){staffStatus.textContent='Zuordnung konnte nicht gespeichert werden: '+error.message;saveStaff.disabled=false;}
+        });
         const label=elt('label','Separate E-Mail für Teilnehmermeldungen (nicht die Login-Adresse)');
         const input=document.createElement('input');input.type='email';input.maxLength=180;
         input.value=partner.programm_benachrichtigung_email||'';input.placeholder='programm-brilon@…';label.append(input);card.append(label);
