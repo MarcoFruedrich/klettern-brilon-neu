@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/admin-kalender-v2.css?v=20261109-assigned-employee-names">
   <link rel="stylesheet" href="/admin-forest.css?v=20261110-demo-owner-profile">
   <link rel="stylesheet" href="/besuchergruppen.css?v=20261110-program-groups-v2">
+  <script src="/contextual-hilfe.js?v=20261115b" defer></script>
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -74,6 +75,7 @@
             <a href="#stationspruefung" data-admin-view-link>Stationsprüfungen</a>
             <a href="#website-effekte-section" data-admin-view-link>Website-Effekte</a>
             <a href="#wissensportal-admin-section" class="employee-area-link" data-admin-view-link>Wissensportal</a>
+            <a href="#admin-faq-section" data-admin-view-link>Hilfe &amp; FAQ</a>
           </nav>
         </aside>
         <div class="admin-content"><nav id="admin-subnavigation" class="admin-subnavigation" aria-label="Untermenü" hidden>
@@ -141,6 +143,7 @@
           <a class="admin-dashboard-link employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
           <a class="admin-dashboard-link employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
           <a class="admin-dashboard-link employee-area-link" href="#wissensportal-admin-section" data-admin-view-link>Wissensportal pflegen</a>
+          <a class="admin-dashboard-link" href="#admin-faq-section" data-admin-view-link>Hilfe &amp; FAQ</a>
           <a class="admin-dashboard-link" href="#gps-verwaltung" data-admin-view-link>GPS-Touren</a>
           <a class="admin-dashboard-link" href="#social-media-section" data-admin-view-link>Social Media</a>
           <a class="admin-dashboard-link" href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
@@ -849,7 +852,50 @@
         </div>
       </div>
       </div>
-  </main>
+  <section id="admin-faq-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="admin-faq-heading">
+  <h2 id="admin-faq-heading">Hilfe &amp; FAQ für die Verwaltung</h2>
+  <p>Hier findest du Antworten zur Pflege der Website und zu den verbundenen Verwaltungsbereichen. Die Hilfe erklärt den vorgesehenen Ablauf. Welche Funktionen aktiv sind, hängt von deiner Rolle, den freigegebenen Standorten und der jeweiligen Systemkonfiguration ab.</p>
+  <p><a href="#standorte-section" data-admin-view-link>Standorte</a> · <a href="#angebote-verwaltung" data-admin-view-link>Programme</a> · <a href="#calendar-view" data-admin-view-link>Kalender</a> · <a href="#bookings-section" data-admin-view-link>Buchungen</a> · <a href="#mitarbeiter-section" data-admin-view-link>Mitarbeiter</a> · <a href="#netzwerkpartner-section" data-admin-view-link>Netzwerkpartner</a> · <a href="#rechnungen-agb-section" data-admin-view-link>Rechnungen</a> · <a href="#stationspruefung" data-admin-view-link>Stationsprüfung</a></p>
+  <h3>Grundlagen und Berechtigungen</h3>
+  <details><summary>Warum sehe ich nicht alle Verwaltungsbereiche?</summary><p>Die sichtbaren Bereiche richten sich nach deinem angemeldeten Konto, deiner Rolle und dem freigegebenen Standortumfang. Fehlt ein Bereich, bitte die Hauptverwaltung um Prüfung der Berechtigung. Nicht über ein fremdes Konto arbeiten.</p></details>
+  <details><summary>Was bedeutet Standortfreigabe?</summary><p>Sie beschränkt, auf welche Orte sich ein Konto, Programm oder Partnerzugang bezieht. Eine Freigabe für Brilon gilt nicht automatisch für Olpe, Rüthen oder andere Orte.</p></details>
+  <details><summary>Wie werden Rechte sicher vergeben?</summary><p>Rolle, Standort und Aufgabe gemeinsam festlegen und nur die nötigen Rechte aktivieren. Vor dem Speichern prüfen, ob sensible Gästedaten, Mitarbeiterunterlagen oder Prüfberichte enthalten sind. Beim Austritt Zugang sperren und aktive Geräte oder Sitzungen widerrufen.</p></details>
+  <h3>Standorte und Programme</h3>
+  <details><summary>Wie lege ich einen Standort an?</summary><p>Im Bereich „Standorte“ den Ort mit eindeutiger Bezeichnung und den abgestimmten Kontaktdaten anlegen. Danach zuständige Partner, Anlagen, Kalender, Programme, Trainerfreigaben und Sicherheitsabläufe prüfen. Erst nach interner Abstimmung öffentlich freischalten.</p></details>
+  <details><summary>Wie ordne ich ein Programm einem oder mehreren Standorten zu?</summary><p>Im Programmdatensatz die passenden Standorte auswählen. Vor einer Ausweitung für jeden Ort Ausstattung, Dauer, Kapazität, Preis, Verfügbarkeit, Personalqualifikation und Sicherheitsfreigabe separat bestätigen.</p></details>
+  <details><summary>Warum erscheint ein Programm nicht auf der Website?</summary><p>Programmstatus, öffentliche Veröffentlichung, Buchbarkeit und Standortzuordnung prüfen. Danach auf der öffentlichen Seite den gleichen Standortfilter verwenden. Ein gespeicherter Entwurf wird nicht automatisch öffentlich angezeigt.</p></details>
+  <details><summary>Was ist der Unterschied zwischen veröffentlicht und buchbar?</summary><p>„Veröffentlicht“ steuert, ob Gäste den Eintrag sehen. „Buchbar“ steuert, ob eine Anfrage für konfigurierte Termine möglich ist. Beide Einstellungen müssen passend gesetzt und getestet sein.</p></details>
+  <details><summary>Kann ich ein Programm löschen?</summary><p>Vor dem Löschen prüfen, ob Buchungen, Termine oder Berichte darauf verweisen. Bei vorhandener Historie pausieren oder archivieren, damit frühere Vorgänge nachvollziehbar bleiben. Dauerhaftes Löschen nur, wenn die Anwendung es zulässt und keine Aufbewahrungspflicht entgegensteht.</p></details>
+  <h3>Preise, Termine und Buchungen</h3>
+  <details><summary>Wie ändere ich einen Preis?</summary><p>Preisregel im zuständigen Programm oder Standortbereich bearbeiten, Gültigkeitsbeginn notieren und anschließend eine Testanfrage prüfen. Bestehende Buchungen können einen früheren Preisstand haben; Änderungen nicht rückwirkend unterstellen.</p></details>
+  <details><summary>Warum ist ein Termin im Kalender nicht auswählbar?</summary><p>Startzeiten, Sperrzeiten, andere Buchungen, Kapazität, Standort und Datum prüfen. Zusätzlich müssen passende Trainer und die Anlage verfügbar sein. Ein freier Kalendereintrag allein ist noch keine Durchführungszusage.</p></details>
+  <details><summary>Wann wird aus einer Anfrage eine verbindliche Buchung?</summary><p>Erst nach der vorgesehenen Verfügbarkeitsprüfung und Bestätigung durch die zuständige Verwaltung bzw. den vereinbarten Prozess. Eine Interessensmeldung oder Trainerzusage allein kann unverbindlich sein.</p></details>
+  <details><summary>Wie bündele ich Einzelinteressen zu einem gemeinsamen Klettertermin?</summary><p>Im Gruppenlink Interessen und Zeitwünsche sammeln, bestehende passende Gruppe zuerst auffüllen und Mindest- sowie Höchstzahl beachten. Danach Personal, Halle, Anlage und Jugendherberge abstimmen. Termin erst anschließend verbindlich bestätigen.</p></details>
+  <details><summary>Wie gehe ich mit zu vielen Anmeldungen um?</summary><p>Die eingestellte Höchstzahl nicht überschreiten. Freie Plätze nach einer transparenten Reihenfolge vergeben und weitere Personen auf eine Warteliste setzen oder einen zusätzlichen Termin anbieten. Über zusätzliche Termine erst informieren, wenn Personal und Anlage geprüft sind.</p></details>
+  <details><summary>Wie ändere oder storniere ich eine Buchung?</summary><p>Buchung öffnen, bisherigen Status und Zahlungen prüfen, Änderung nach den vereinbarten Bedingungen vornehmen und alle betroffenen Personen informieren. Zahlung, Kalender und Rechnung anschließend kontrollieren. Belege nicht still überschreiben; Korrekturen nachvollziehbar dokumentieren.</p></details>
+  <h3>Mitarbeiter und Netzwerkpartner</h3>
+  <details><summary>Wann darf ein neuer Trainer Einsätze annehmen?</summary><p>Erst wenn die Verwaltung Identität und Qualifikationen geprüft sowie mindestens den erforderlichen Standortzugang und die passende Aktivität freigegeben hat. Eine Einladung allein ist keine Einsatzfreigabe.</p></details>
+  <details><summary>Was passiert, wenn ein Trainer nicht rechtzeitig antwortet?</summary><p>Offene Rückmeldung prüfen, bei Bedarf erinnern und innerhalb der konfigurierten Regel eine andere geeignete Person anfragen oder selbst neu planen. Eine zweistündige Frist gilt nur, wenn sie im aktuellen System tatsächlich aktiviert ist.</p></details>
+  <details><summary>Werden nachts Buchungs- oder Einsatzmails verschickt?</summary><p>Für gewöhnliche Mitteilungen ist ein Ruhezeitfenster vorgesehen. Die konfigurierte Zeitzone, Beginn und Ende vor dem Betrieb testen. Wichtige Sicherheits- oder Notfallwege müssen getrennt geregelt sein.</p></details>
+  <details><summary>Welche Daten sieht ein Netzwerkpartner?</summary><p>Nur die für ihn freigegebenen Standorte, Programme und Informationen. Teste den Zugang nach jeder Änderung mit der Partnerrolle und achte darauf, dass fremde Gästedaten und andere Standorte verborgen bleiben.</p></details>
+  <h3>Zahlung und Rechnung</h3>
+  <details><summary>Warum wurde keine Rechnung erstellt oder versendet?</summary><p>Rechnungseinstellungen, Absenderdaten, Buchungsstatus und Zahlungsstand prüfen. Danach Versandstatus kontrollieren. Die Annahme durch einen Mailanbieter ist kein Zustellnachweis. Keine zweite Rechnung erzeugen, bevor die erste nicht geprüft wurde.</p></details>
+  <details><summary>Wie dokumentiere ich Barzahlung oder Teilzahlung?</summary><p>Zahlung direkt der passenden Buchung zuordnen und tatsächlichen Betrag, Datum und Zahlungsweg erfassen. Barzahlung mit dem vereinbarten Beleg dokumentieren. Offene Restbeträge anschließend kontrollieren.</p></details>
+  <details><summary>Wie werden Erstattungen oder Gutschriften bearbeitet?</summary><p>Stornobedingungen und Zahlungshistorie prüfen. Gutschrift oder Korrekturbeleg nach dem Abrechnungsverfahren erstellen und die tatsächliche Auszahlung separat dokumentieren. Eine erfasste Gutschrift beweist nicht automatisch die erfolgte Rückzahlung.</p></details>
+  <h3>Sicherheitsprüfung und Anlagen</h3>
+  <details><summary>Wie richte ich eine Anlage und ihre Prüfpunkte ein?</summary><p>Anlage dem richtigen Standort zuordnen, konkrete Stationen und Prüffragen festlegen und erforderliche Qualifikation sowie Zuständigkeit dokumentieren. Kletterwand, Abseilplattform oder Bogenschießanlage erhalten jeweils passende Prüflisten.</p></details>
+  <details><summary>Wie läuft die Vor-Ort-Prüfung mit Tablet-Code?</summary><p>Prüfdisplay dem Standort zuordnen. Die berechtigte prüfende Person meldet sich an, fordert einen zeitlich begrenzten Code an, übernimmt ihn am gekoppelten Tablet und wählt die tatsächlich geprüften Stationen. Ergebnis und Mängel pro Station speichern.</p></details>
+  <details><summary>Was ist bei einem Sicherheitsmangel zu tun?</summary><p>Betroffene Anlage oder Station sofort sperren und die zuständige Stelle informieren. Eine Reparatur allein hebt die Sperre nicht auf. Erforderliche fachliche Nachprüfung, Ergebnis, verantwortliche Person und ausdrückliche Freigabe mit Zeitstempel dokumentieren.</p></details>
+  <details><summary>Kann ich mehrere Prüfungen am selben Tag erfassen?</summary><p>Ja, jede Prüfung muss als eigener Vorgang mit eigenem Zeitstempel geführt werden. Frühere Prüfberichte nicht überschreiben. Eine spätere positive Prüfung hebt eine vorherige Sperre nur mit autorisierter und dokumentierter Freigabe auf.</p></details>
+  <details><summary>Was beweist der Sicherheitscode?</summary><p>Der Code unterstützt die Zuordnung zum gekoppelten Prüfdisplay. Er beweist allein weder die Qualifikation der Person noch die tatsächliche Anwesenheit oder den sicheren Zustand der Anlage.</p></details>
+  <details><summary>Ist ein gespeichertes Prüfprotokoll automatisch rechtskonform?</summary><p>Nein. Für die konkrete Anlage müssen geltende Prüffristen, erforderliche Qualifikationen, Verantwortlichkeiten, Dokumentations- und Aufbewahrungsregeln fachlich festgelegt und eingehalten werden. Das System unterstützt die Dokumentation, ersetzt aber nicht die fachliche Prüfung.</p></details>
+  <h3>Demo, Verknüpfungen und Fehler</h3>
+  <details><summary>Wo finde ich Demo-Zugangsdaten?</summary><p>Ein Login-Link ist kein Demo-Konto. Verwende nur ein ausdrücklich eingerichtetes, lesendes Testkonto mit künstlichen Beispieldaten. Produktive Zugangsdaten oder Passwörter gehören nicht in diese FAQ.</p></details>
+  <details><summary>Welche externen Dienste sind automatisch verbunden?</summary><p>Kalender, E-Mail, Zahlungsanbieter, Buchhaltung oder soziale Netzwerke nur dann als verbunden behandeln, wenn die jeweilige Schnittstelle eingerichtet und erfolgreich getestet wurde. Zugangsdaten niemals in Textfelder oder Handbücher schreiben.</p></details>
+  <details><summary>Was mache ich, wenn eine Änderung nicht sichtbar ist?</summary><p>Speichern bestätigen, Standortfilter und Status prüfen und Seite neu laden. Bei weiterem Fehler Zeitpunkt, betroffenen Datensatz und sichtbare Meldung notieren und der Hauptverwaltung melden. Keine kritischen Buchungs- oder Sicherheitsdaten doppelt anlegen.</p></details>
+  <p class="hint">Diese FAQ ist eine Bedienhilfe. Maßgeblich sind die tatsächlich freigeschalteten Funktionen, die aktuelle Konfiguration und die abgestimmten Vereinbarungen des jeweiligen Standorts.</p>
+</section>
+</main>
 
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
