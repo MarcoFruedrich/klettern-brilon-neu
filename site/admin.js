@@ -3026,7 +3026,7 @@ async function partnerRechnungenLaden(){
     for(const row of rows){
       const card=el('article');card.className='booking invoice-record';const data=row.data||{};
       card.append(el('strong',row.rechnungsnummer+' · '+(row.unternehmen||row.ansprechpartner||'Netzwerkpartner')));
-      card.append(el('p',(data.angebot||'Spontane Klettergruppe')+' · '+(data.standort||row.standort||'')+' · '+(data.leistungsdatum||'')));
+      card.append(el('p',(data.angebot||'Spontane Klettergruppe')+' · '+(data.standort||row.standort||'')+' · '+(data.leistungsdatum||'')+' · '+(data.leistungszeit||'')));
       card.append(el('p','Teilnehmende: '+(data.teilnehmer||[]).reduce((n,item)=>n+Number(item.personen||0),0)+
         ' · Leistung: '+euroCent(data.bruttoCent)+' · Partnerabzug: −'+euroCent(data.abzugCent)+' · Auszahlungsbetrag: '+euroCent(data.nettoCent)));
       card.append(el('p','E-Mail-Status: '+row.email_status+(row.email_fehler?' · '+row.email_fehler:'')));
