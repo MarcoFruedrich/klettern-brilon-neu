@@ -29,7 +29,7 @@
   let seq=0;
   function attach(target,label){
     if(!target||target.dataset.contextHelp==='1')return;
-    const message=helpText(label);if(!message)return;
+    const mapped=helpText(label);\n    const formTitle=target.closest('form')?.querySelector('h2,h3,legend')?.textContent?.trim();\n    const context=formTitle?` „${formTitle}“`:'';\n    const message=mapped||(admin?`Diese Angabe hilft,${context} den Datensatz eindeutig zuzuordnen und die Bearbeitung korrekt auszuführen. Bitte nur erforderliche Informationen eintragen.`:`Diese Angabe wird benötigt, damit${context} deine Anfrage vollständig zugeordnet und bearbeitet werden kann. Bitte nur erforderliche Informationen eintragen.`);
     target.dataset.contextHelp='1';
     const wrap=document.createElement('span');wrap.className='context-help';
     const button=document.createElement('button');button.type='button';button.className='context-help-button';button.textContent='?';button.setAttribute('aria-label','Hinweis zu '+label);button.setAttribute('aria-expanded','false');
