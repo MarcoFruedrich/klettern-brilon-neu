@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#17483b"><title>Anwesenheit spontane Klettergruppen</title>
+<style>
+:root{--green:#17483b;--line:#c8d9cf}*{box-sizing:border-box}body{margin:0;background:#f8f7f1;color:#173f34;font:16px/1.5 system-ui,sans-serif}
+header{padding:15px 22px;background:#fff;border-bottom:1px solid var(--line);font-weight:800}header small{display:block;letter-spacing:.12em;font-size:.7rem}
+main{width:min(1000px,calc(100% - 28px));margin:24px auto 50px}.panel{background:#eef2ed;border:1px solid var(--line);border-radius:16px;padding:clamp(18px,4vw,30px);margin:16px 0}
+h1{font-size:clamp(1.5rem,4vw,2.1rem);margin-top:0}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}label{display:block;font-weight:700}select,input{width:100%;min-height:44px;padding:9px 11px;border:1px solid #b7cec0;border-radius:9px;font:inherit;background:#fff;color:#193f35}
+.guest{display:grid;grid-template-columns:minmax(140px,1fr) minmax(180px,1.2fr) 110px 115px 130px;gap:12px;align-items:center;background:white;border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}
+.guest strong,.guest span{display:block}.muted{color:#587368;font-size:.9rem}.check{display:flex;gap:9px;align-items:center}.check input{width:22px;min-height:22px}
+button{border:0;border-radius:10px;padding:12px 17px;background:var(--green);color:#fff;font:700 1rem system-ui;cursor:pointer}button:disabled{opacity:.55;cursor:wait}
+#status{padding:11px;border-radius:8px;background:#fff;min-height:40px}.ok{background:#d8f584!important}.error{background:#fce8e6!important;color:#842626}
+@media(max-width:720px){.row{grid-template-columns:1fr}.guest{grid-template-columns:1fr 1fr}.guest .person{grid-column:span 2}}
+@media(max-width:450px){.guest{grid-template-columns:1fr}.guest .person{grid-column:auto}}
+</style></head>
+<body><header>🧗 Klettern &amp; Abenteuer<small>MITARBEITERBEREICH · ANWESENHEIT</small></header>
+<main>
+<section class="panel">
+<h1>Anwesenheit spontane Klettergruppe</h1>
+<p>Prüfe zu Beginn des Termins die angemeldeten Gruppen anhand der Liste. Hake anwesende Gruppen ab und passe ihre tatsächliche Personenzahl bei Bedarf an.</p>
+<div class="row"><label>Standort<select id="place"><option value="">Standort auswählen …</option></select></label><label>Bestätigter Termin<select id="event" disabled><option value="">Zuerst Standort auswählen …</option></select></label></div>
+<p id="group-summary" class="muted"></p>
+<div id="roster"></div>
+<button id="save" type="button" disabled>Anwesenheit speichern</button>
+<p id="status" role="status" aria-live="polite">Bitte anmelden und einen Standort auswählen.</p>
+<a href="/mitarbeiterbereich.html">Zurück zum Mitarbeiterbereich</a>
+</section></main><script src="/spontangruppen-anwesenheit.js?v=20261115-1" defer></script></body></html>
