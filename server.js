@@ -3556,6 +3556,10 @@ async function start(){
       ablauf TIMESTAMPTZ NOT NULL,aktiv BOOLEAN NOT NULL DEFAULT true,
       erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_spontan_one_active_idx ON brilon_spontan_sessions(standort_id) WHERE aktiv=true');
+    await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_einstellungen(
+      standort_id BIGINT PRIMARY KEY REFERENCES brilon_orte(id) ON DELETE CASCADE,
+      preis_pro_person_cent INTEGER CHECK(preis_pro_person_cent>=0),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_teilnahmen(
       session_id UUID NOT NULL REFERENCES brilon_spontan_sessions(id) ON DELETE CASCADE,
       teilnahme_id UUID NOT NULL,interesse BOOLEAN NOT NULL,personen INTEGER NOT NULL DEFAULT 0,
