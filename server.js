@@ -454,7 +454,7 @@ const kundenService=createKundenbestaetigungService({pool,brevoMail});
 const einsatzplanungApi=createEinsatzplanungApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,brevoMail,kundenService});
 const netzwerkpartnerApi=createNetzwerkpartnerApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 const kundenfeedbackApi=createKundenfeedbackApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
-const spontangruppenApi=createSpontanGruppenApi({pool,reply,body,sameOriginMutation,limit});
+const spontangruppenApi=createSpontanGruppenApi({pool,admin,reply,body,sameOriginMutation,limit});
 
 const marketingCampaignApi=createMarketingCampaignApi({pool,admin,reply,body});
 const wissensportalApi=createWissensportalApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation});
