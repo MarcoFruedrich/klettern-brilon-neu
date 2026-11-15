@@ -1,15 +1,25 @@
 'use strict';
 (() => {
-  const $=id=>document.getElementById(id),place=$('place'),price=$('price'),status=$('status'),save=$('save');
+  const $=id=>document.getElementById(id),place=$('place'),price=$('price'),partner=$('partner'),
+    deductionType=$('deduction-type'),deductionValue=$('deduction-value'),status=$('status'),save=$('save');
   async function api(url,options){const r=await fetch(url,options);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Anfrage fehlgeschlagen.');return d;}
   function message(text,type=''){status.textContent=text;status.className=type;}
+  async function loadPartners(selected=''){
+    partner.replaceChildren(new Option('Partner auswählen …',''));
+    if(!place.value)return;
+    const list=await api('/api/spontangruppen/partner?ortId='+encodeURIComponent(place.value));
+    for(const item of list)partner.append(new Option((item.unternehmen||item.ansprechpartner)+' · '+item.email,String(item.id)));
+    if(selected&&[...partner.options].some(option=>option.value===selected))partner.value=selected;
+  }
   async function loadSetting(){
-    if(!place.value){save.disabled=true;price.value='';return;}
-    save.disabled=true;message('Preiseinstellung wird geladen …');
+    if(!place.value){save.disabled=true;price.value='';partner.replaceChildren(new Option('Partner auswählen …',''));return;}
+    save.disabled=true;message('Einstellungen werden geladen …');
     try{
       const d=await api('/api/spontangruppen/einstellungen?ortId='+encodeURIComponent(place.value));
       price.value=d.preisProPersonCent===null?'':(d.preisProPersonCent/100).toFixed(2).replace('.',',');
-      message(d.preisProPersonCent===null?'Für diesen Standort ist noch kein Preis hinterlegt.':'Aktueller Preis: '+new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(d.preisProPersonCent/100));
+      deductionType.value=d.abzugTyp||'prozent';deductionValue.value=String(d.abzugWert??'').replace('.',',');
+      await loadPartners(d.netzwerkpartnerId||'');
+      message('Preis, Netzwerkpartner und Partnerabzug geladen. Änderungen werden dauerhaft gespeichert.');
       save.disabled=false;
     }catch(error){message(error.message,'error');}
   }
@@ -24,12 +34,17 @@
   place.addEventListener('change',loadSetting);
   save.addEventListener('click',async()=>{
     const numeric=Number(price.value.trim().replace(',','.'));
-    if(!price.value.trim()){message('Bitte den Preis je Person eintragen.','error');return;}
-    if(!place.value||!Number.isFinite(numeric)||numeric<0||numeric>500){message('Bitte einen gültigen Preis von 0 bis 500 Euro eintragen.','error');return;}
-    save.disabled=true;message('Preis wird gespeichert …');
+    const cut=Number(deductionValue.value.trim().replace(',','.'));
+    if(!place.value||!Number.isFinite(numeric)||numeric<=0||numeric>500||!partner.value||
+      !Number.isFinite(cut)||cut<0||cut>5000||(deductionType.value==='prozent'&&cut>100)){
+      message('Bitte Preis, Netzwerkpartner und gültige Abzugsvereinbarung eintragen.','error');return;
+    }
+    save.disabled=true;message('Einstellungen werden gespeichert …');
     try{
-      const result=await api('/api/spontangruppen/einstellungen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ortId:Number(place.value),preisProPerson:numeric})});
-      message('Preis je Person dauerhaft gespeichert: '+new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(result.preisProPersonCent/100));
+      const result=await api('/api/spontangruppen/einstellungen',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ortId:Number(place.value),preisProPerson:numeric,netzwerkpartnerId:partner.value,
+          abzugTyp:deductionType.value,abzugWert:cut})});
+      message('Dauerhaft gespeichert. Preis je Person: '+new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(result.preisProPersonCent/100));
     }catch(error){message(error.message,'error');}
     finally{save.disabled=false;}
   });
