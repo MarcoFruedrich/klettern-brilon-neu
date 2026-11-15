@@ -4,11 +4,11 @@
   const rules=[
     [/sicherheits|prüfung|pruefung|prüf|pruef|mangel|station|anlage/, 'Diese Angabe ordnet die Prüfung einer konkreten Anlage zu und hilft, Ergebnis, Zuständigkeit und notwendige Maßnahmen sicher zu dokumentieren.'],
     [/standort|ort|herberge|venue/, 'Die Angabe grenzt Programm, Verfügbarkeit, Zuständigkeit und Zugriffsrechte auf den passenden Standort ein.'],
-    [/programm|angebot|aktivität|aktivitaet|tour/, 'Die Auswahl verbindet deine Anfrage mit Beschreibung, Dauer, Preis und den passenden Durchführungsbedingungen.'],
+    [/programm|angebot|aktivität|aktivitaet|tour/, 'Die Auswahl verbindet den Vorgang mit Beschreibung, Dauer, Preis und den passenden Durchführungsbedingungen.'],
     [/datum|termin|startzeit|uhrzeit|zeitfenster/, 'Die Angabe wird mit Kalender und Verfügbarkeit abgeglichen. Ein gewünschter Termin ist erst nach Bestätigung verbindlich.'],
     [/teilnehmer|personen|gruppe|anzahl|plätze|plaetze|kapazität|kapazitaet/, 'Die Zahl wird für Gruppengröße, freie Plätze, Preisberechnung und sichere Einsatzplanung benötigt.'],
     [/zimmernummer|zimmer/, 'Diese Angabe unterstützt bei Bedarf die Zuordnung von Hausgästen vor Ort. Sie wird nur für den vorgesehenen Ablauf gebraucht und soll nicht öffentlich geteilt werden.'],
-    [/e-mail|email/, 'An diese Adresse gehen Rückfragen und die für deine Anfrage nötigen Bestätigungen. Bitte auf korrekte Schreibweise achten.'],
+    [/e-mail|email/, 'An diese Adresse gehen Rückfragen und die für den Vorgang nötigen Bestätigungen. Bitte auf korrekte Schreibweise achten.'],
     [/telefon|mobilnummer|handy/, 'Über diese Nummer kann die zuständige Stelle kurzfristige Rückfragen oder Änderungen zum Termin klären.'],
     [/name|kontaktperson|ansprechpartner/, 'Der Name hilft, die Anfrage bzw. Zuständigkeit eindeutig zuzuordnen und Rückfragen gezielt zu stellen.'],
     [/preis|kosten|betrag|zahlung|anzahlung/, 'Der Betrag macht die Kostenregel für diesen Vorgang nachvollziehbar. Vor dem Speichern prüfen, ob er pro Person oder für die ganze Gruppe gilt.'],
