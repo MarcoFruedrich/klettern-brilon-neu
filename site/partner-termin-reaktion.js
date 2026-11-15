@@ -16,6 +16,9 @@
     if(!response.ok)throw new Error(data.error||'Die Anfrage konnte nicht verarbeitet werden.');
     return data;
   }
+  const requestedDecision=query.get('entscheidung');
+  if(requestedDecision==='bestaetigt')document.getElementById('decline').hidden=true;
+  if(requestedDecision==='abgelehnt')document.getElementById('confirm').hidden=true;
   async function load(){
     if(!/^[a-f0-9]{64}$/i.test(token)){show('Der Rückmeldelink ist ungültig.','error');return;}
     try{
