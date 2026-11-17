@@ -797,14 +797,14 @@ try{
     WHERE m.aktiv=true AND m.freigabe_am IS NOT NULL AND o.aktiv=true
       AND lower(btrim(o.name))=lower(btrim($1))
     ORDER BY m.name,m.id`,[data.veranstaltungsort]);
-  const mitarbeiterUrl=(process.env.PUBLIC_BASE_URL||'https://klettern-brilon-neu.onrender.com').replace(/\/$/,'')+'/mitarbeiterbereich.html';
+  const mitarbeiterUrl=(process.env.PUBLIC_BASE_URL||'https://klettern-brilon-neu.onrender.com').replace(/\/$/,'')+'/mitarbeiterbereich.html?bereich=termine#staff-planning-heading';
   for(const person of standortMitarbeiter.rows){
     const adresse=safeText(person.email,180);
     if(!/^\S+@\S+\.\S+$/.test(adresse))continue;
     const anrede=safeText(person.name,120);
     enqueueMail(adresse,
       'Neue Terminanfrage am Standort '+data.veranstaltungsort+' – Bewerbung möglich',
-      `Hallo${anrede?' '+anrede:''},\n\nfür deinen freigegebenen Standort ist eine neue Buchungsanfrage eingegangen.\n\nProgramm: ${data.angebot}\nTermin: ${data.datum} um ${data.uhrzeit||'Uhrzeit offen'} Uhr\nStandort: ${data.veranstaltungsort||'—'}\nTeilnehmer: ${data.teilnehmer}\nBuchungsnummer: ${data.buchungsnummer}\n\nBitte melde dich im Mitarbeiterbereich an und öffne den Termin unter „Termine und meine Bewerbungen“: ${mitarbeiterUrl}\nDort kannst du dich auf die Anfrage bewerben. Die Anfrage ist noch nicht verbindlich bestätigt; die Verwaltung entscheidet über die Einteilung.\n\nViele Grüße\nKlettern & Abenteuer Brilon`
+      `Hallo${anrede?' '+anrede:''},\n\nfür deinen freigegebenen Standort ist eine neue Buchungsanfrage eingegangen.\n\nProgramm: ${data.angebot}\nTermin: ${data.datum} um ${data.uhrzeit||'Uhrzeit offen'} Uhr\nStandort: ${data.veranstaltungsort||'—'}\nTeilnehmer: ${data.teilnehmer}\nBuchungsnummer: ${data.buchungsnummer}\n\nBitte melde dich im Mitarbeiterbereich an und öffne direkt „Termine und meine Buchungen“: ${mitarbeiterUrl}\nDort kannst du dich auf die Anfrage bewerben. Eine verbindliche Zusage ist nur möglich, wenn dir die Verwaltung die besondere Freigabe erteilt hat. Die Anfrage ist noch nicht verbindlich bestätigt; die Verwaltung entscheidet über die Einteilung.\n\nViele Grüße\nKlettern & Abenteuer Brilon`
     );
   }
 }catch(error){

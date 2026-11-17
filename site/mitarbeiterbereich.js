@@ -180,7 +180,12 @@ function render(data){
       continue;
     }else addNavButton(nav,entry);
   }
-  showEntry(entries[0]);
+  const zielbereich=new URLSearchParams(location.search).get('bereich');
+  const startEintrag=zielbereich==='termine'?entries.find(entry=>entry.kind==='planning'):entries[0];
+  showEntry(startEintrag||entries[0]);
+  if(zielbereich==='termine'){
+    requestAnimationFrame(()=>$('staff-planning-heading')?.scrollIntoView({block:'start'}));
+  }
 }
 async function load(){
   $('staff-portal-status').textContent='Mitarbeiterbereiche werden geladen …';
