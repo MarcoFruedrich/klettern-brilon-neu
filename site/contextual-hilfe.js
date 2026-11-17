@@ -1,5 +1,5 @@
 (()=>{
-  const css=document.createElement('link');css.rel='stylesheet';css.href='/contextual-hilfe.css?v=20261117-fields';document.head.append(css);
+  const css=document.createElement('link');css.rel='stylesheet';css.href='/contextual-hilfe.css?v=20261117-fields2';document.head.append(css);
   const admin=document.body.classList.contains('admin-page');
   const rules=[
     [/sicherheits|prüfung|pruefung|prüf|pruef|mangel|station|anlage/, 'Diese Angabe ordnet die Prüfung einer konkreten Anlage zu und hilft, Ergebnis, Zuständigkeit und notwendige Maßnahmen sicher zu dokumentieren.'],
@@ -44,6 +44,9 @@
     if(control){
       const field=document.createElement('span');field.className='context-help-control';
       control.insertAdjacentElement('beforebegin',field);field.append(control,wrap);
+    }else if(target.querySelector('input[type="checkbox"],input[type="radio"]')){
+      const choice=document.createElement('span');choice.className='context-help-choice';
+      target.insertAdjacentElement('beforebegin',choice);choice.append(target,wrap);
     }else target.insertAdjacentElement('afterend',wrap);
   }
   function scan(root=document){
