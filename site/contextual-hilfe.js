@@ -1,5 +1,5 @@
 (()=>{
-  const css=document.createElement('link');css.rel='stylesheet';css.href='/contextual-hilfe.css?v=20261115';document.head.append(css);
+  const css=document.createElement('link');css.rel='stylesheet';css.href='/contextual-hilfe.css?v=20261117-fields';document.head.append(css);
   const admin=document.body.classList.contains('admin-page');
   const rules=[
     [/sicherheits|prüfung|pruefung|prüf|pruef|mangel|station|anlage/, 'Diese Angabe ordnet die Prüfung einer konkreten Anlage zu und hilft, Ergebnis, Zuständigkeit und notwendige Maßnahmen sicher zu dokumentieren.'],
@@ -48,7 +48,6 @@
   }
   function scan(root=document){
     root.querySelectorAll?.('label').forEach(label=>{const txt=label.textContent||'';attach(label,txt.replace(/[＊*]/g,'').trim());});
-    root.querySelectorAll?.('h1,h2,h3,legend').forEach(heading=>{const text=heading.textContent||'';if(helpText(text))attach(heading,text.trim());});
     root.querySelectorAll?.('[data-help]').forEach(node=>attach(node,node.getAttribute('data-help')||'Hinweis'));
   }
   document.addEventListener('click',event=>{if(!event.target.closest('.context-help'))document.querySelectorAll('.context-help-button[aria-expanded="true"]').forEach(b=>{b.setAttribute('aria-expanded','false');const t=b.parentElement?.querySelector('.context-help-tip');if(t)t.hidden=true;});});
