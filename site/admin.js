@@ -143,12 +143,23 @@ async function api(path, options = {}) {
   const headers=new Headers(options.headers||{});
   if(!['GET','HEAD','OPTIONS'].includes(method)&&path!=='/api/admin/login')
     headers.set('X-CSRF-Token',await adminCsrfTokenLaden());
-  const r = await fetch(path, {
+  const requestOptions = {
     credentials: 'same-origin',
     ...options,
     headers
-  });
-  const j = await r.json();
+  };
+  let r = await fetch(path, requestOptions);
+  let j = await r.clone().json().catch(()=>({}));
+  // A second open admin tab can replace the session cookie while this tab
+  // still holds the previous CSRF token. Refresh and retry only when the
+  // server explicitly rejected the request for CSRF, before any mutation ran.
+  if(r.status===403&&j.error==='CSRF-Prüfung fehlgeschlagen. Bitte Verwaltung neu laden.'&&
+     !['GET','HEAD','OPTIONS'].includes(method)&&path!=='/api/admin/login'){
+    csrfToken=null;
+    headers.set('X-CSRF-Token',await adminCsrfTokenLaden());
+    r=await fetch(path,requestOptions);
+    j=await r.clone().json().catch(()=>({}));
+  }
   if (!r.ok) {
     const fehler=Error(j.error||'Fehler');
     fehler.data=j;
