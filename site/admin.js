@@ -420,7 +420,10 @@ async function refresh() {
 
       const gesamtpreis = Number(b.data.gesamtpreis);
 
-if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
+if (b.data.partnerhausAbwicklung===true) {
+  const handoff=el('p',`Partnerhaus-Abwicklung: Der Preis dient nur zur Orientierung. Buchung und Abrechnung erfolgen über ${b.data.veranstaltungsort||'den Standortpartner'}.`);
+  handoff.className='booking-partnerhouse-note';c.append(handoff);
+} else if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
   const zahlungen = Array.isArray(b.data.zahlungen) ? b.data.zahlungen : [];
   if (b.data.zahlungsstatus && zahlungen.length === 0) {
     const altHinweis=el('p','Altes Zahlungskennzeichen vorhanden, aber ohne einzelnen Zahlungseintrag. Bitte tatsächlichen Eingang prüfen.');
@@ -2070,6 +2073,7 @@ async function orteLaden(){
   if(!sitePicker&&!liste&&!kalenderStandortListe)return;
   try{
     const orte=await api('/api/admin/orte');
+    window.adminOrteCache=orte;
     kalenderStandortAuswahlAnzeigen(orte);
     if(sitePicker){
       const selected=new Set([...sitePicker.querySelectorAll('input:checked')].map(input=>input.value));
@@ -2087,6 +2091,8 @@ async function orteLaden(){
       for(const ort of orte){
         const card=el('article');card.className='booking';
         const details=el('div');details.append(el('strong',ort.name),el('p',ort.aktiv?'Aktiv · für neue Programme auswählbar':'Inaktiv · bestehende Programme und Buchungen bleiben erhalten'));
+        details.append(el('p',ort.partnerhaus?'Partnerhaus · Preisangabe zur Orientierung; Buchung und Abrechnung über das Partnerhaus':'Eigene Buchungs- und Abrechnungsabwicklung'));
+        if(ort.partnerhaus&&ort.partnerkontakt_email)details.append(el('p',`Standortkontakt: ${ort.partnerkontakt_name||ort.partnerkontakt_email} · ${ort.partnerkontakt_email}`));
         const actions=el('div');actions.className='button-row';
         const edit=el('button','Bearbeiten');edit.type='button';edit.className='btn secondary';edit.dataset.placeAction='edit';edit.dataset.placeId=ort.id;
         const toggle=el('button',ort.aktiv?'Deaktivieren':'Aktivieren');toggle.type='button';toggle.className='btn secondary';toggle.dataset.placeAction='toggle';toggle.dataset.placeId=ort.id;toggle.dataset.active=String(ort.aktiv);
@@ -2103,7 +2109,8 @@ document.getElementById('admin-place-form')?.addEventListener('submit',async eve
   const button=form.querySelector('button[type="submit"]');button.disabled=true;
   try{
     const result=await api('/api/admin/orte',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:form.elements.name.value})});
+      body:JSON.stringify({name:form.elements.name.value,partnerhaus:form.elements.partnerhaus.checked,
+        partnerkontakt_name:form.elements.partnerkontakt_name.value.trim(),partnerkontakt_email:form.elements.partnerkontakt_email.value.trim()})});
     await orteLaden();
     await erlebnisangeboteLaden();
     const picker=document.getElementById('angebot-orte-auswahl');
@@ -2121,17 +2128,27 @@ document.getElementById('admin-place-list')?.addEventListener('click',async even
   try{
     if(button.dataset.placeAction==='edit'){
       const card=button.closest('article'),current=card?.querySelector('strong')?.textContent||'';
-      const form=document.createElement('form');form.className='place-edit-form';
+      const form=document.createElement('form');form.className='place-edit-form booking';
+      const ort=window.adminOrteCache?.find(item=>String(item.id)===String(button.dataset.placeId))||{};
       const label=el('label','Standortbezeichnung');const input=document.createElement('input');
       input.name='name';input.maxLength=80;input.required=true;input.value=current;label.append(input);
+      const partnerLabel=document.createElement('label');partnerLabel.className='check';
+      const partnerInput=document.createElement('input');partnerInput.type='checkbox';partnerInput.name='partnerhaus';partnerInput.checked=Boolean(ort.partnerhaus);
+      partnerLabel.append(partnerInput,el('span','Partnerhaus: Preisangabe nur zur Orientierung; Buchung und Abrechnung über den Standortpartner'));
+      const contactNameLabel=el('label','Ansprechpartner des Partnerhauses');const contactNameInput=document.createElement('input');
+      contactNameInput.name='partnerkontakt_name';contactNameInput.maxLength=120;contactNameInput.value=ort.partnerkontakt_name||'';contactNameLabel.append(contactNameInput);
+      const contactEmailLabel=el('label','E-Mail des Standortkontakts');const contactEmailInput=document.createElement('input');
+      contactEmailInput.name='partnerkontakt_email';contactEmailInput.type='email';contactEmailInput.maxLength=180;contactEmailInput.value=ort.partnerkontakt_email||'';contactEmailLabel.append(contactEmailInput);
+      const help=el('small','Nach Bestätigung der Verfügbarkeit gehen E-Mails an den Anfragenden und den Standortkontakt. Die Buchung erscheint anschließend im Verwaltungskalender.');
       const save=el('button','Änderung speichern');save.type='submit';save.className='btn';
       const cancel=el('button','Abbrechen');cancel.type='button';cancel.className='btn secondary';
-      cancel.onclick=orteLaden;form.append(label,save,cancel);
+      cancel.onclick=orteLaden;form.append(label,partnerLabel,contactNameLabel,contactEmailLabel,help,save,cancel);
       form.onsubmit=async submitEvent=>{
         submitEvent.preventDefault();save.disabled=true;message.textContent='Standort wird gespeichert …';
         try{
           const result=await api(`/api/admin/orte/${encodeURIComponent(button.dataset.placeId)}`,{
-            method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:input.value.trim()})
+            method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:input.value.trim(),partnerhaus:partnerInput.checked,
+              partnerkontakt_name:contactNameInput.value.trim(),partnerkontakt_email:contactEmailInput.value.trim()})
           });
           await orteLaden();await erlebnisangeboteLaden();message.textContent=`Standort „${current}“ wurde in „${result.name}“ umbenannt. Programme und zukünftige aktive Buchungen wurden aktualisiert.`;
         }catch(error){message.textContent='Standort konnte nicht umbenannt werden: '+error.message;save.disabled=false;}

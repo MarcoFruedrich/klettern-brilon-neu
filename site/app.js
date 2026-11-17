@@ -872,6 +872,12 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       details.textContent=meta;
       inhalt.append(details);
     }
+    const partnerSites=Array.isArray(angebot.partnerhaus_standorte)?angebot.partnerhaus_standorte:[];
+    if(partnerSites.length){
+      const billing=document.createElement('p');billing.className='angebote-karte-meta partnerhaus-hinweis';
+      billing.textContent='Preisangabe nur zur Orientierung · Buchung und Abrechnung über '+partnerSites.join(', ');
+      inhalt.append(billing);
+    }
     if(angebot.hinweise){
       const hinweis=document.createElement('p');
       hinweis.className='angebote-karte-meta';
@@ -1108,6 +1114,12 @@ async function preisanzeigeStarten() {
 
       const meta=angebot.veranstaltungsort?'Standort: '+angebot.veranstaltungsort:'';
       if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
+      const bookingSite=standortAuswahl?.value||angebot.veranstaltungsort;
+      const partnerSites=Array.isArray(angebot.partnerhaus_standorte)?angebot.partnerhaus_standorte:[];
+      const partnerBooking=partnerSites.includes(bookingSite);
+      if(partnerBooking){const p=document.createElement('p');p.className='partnerhaus-hinweis';
+        p.textContent='Preisangabe nur zur Orientierung. Die verbindliche Buchung und gesamte Abrechnung erfolgen über das Partnerhaus.';
+        bildAnzeige.appendChild(p);}
       if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
       teilnehmer.max=String(Math.min(1000,Number(angebot.kapazitaet)||1000));
       if(Number(teilnehmer.value)>Number(teilnehmer.max)){teilnehmer.value=teilnehmer.max;}
@@ -1122,7 +1134,7 @@ async function preisanzeigeStarten() {
 
       if(angebot.buchungsmodus==='einzelplatz'){
         const price=Number.isFinite(specialPrice)?specialPrice:Number(angebot.preis_pro_person);
-        anzeige.textContent=`${price.toLocaleString('de-DE',{style:'currency',currency:'EUR'})} ${Number.isFinite(specialPrice)?'Tagesangebotspreis':'pro Person · keine Anzahlung'}`;
+        anzeige.textContent=`${price.toLocaleString('de-DE',{style:'currency',currency:'EUR'})} ${partnerBooking?'zur Orientierung':Number.isFinite(specialPrice)?'Tagesangebotspreis':'pro Person · keine Anzahlung'}`;
         return;
       }
       const stufe=Array.isArray(angebot.gruppenstufen)?angebot.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max)):null;
@@ -1133,7 +1145,7 @@ async function preisanzeigeStarten() {
 
       if (preis !== undefined && preis !== null) {
         anzeige.textContent = (termine.length?'Freigegebene Termine: '+termine.map(t=>new Date(t+'T12:00:00').toLocaleDateString('de-DE')).join(', ')+' · ':'')+
-          (Number.isFinite(specialPrice)?'Tagesangebotspreis: ':'Gruppenpreis: ') +
+          (partnerBooking?'Preis zur Orientierung: ':Number.isFinite(specialPrice)?'Tagesangebotspreis: ':'Gruppenpreis: ') +
           (Number.isFinite(specialPrice)?specialPrice:Number(preis)).toLocaleString('de-DE', {
             style: 'currency',
             currency: 'EUR'

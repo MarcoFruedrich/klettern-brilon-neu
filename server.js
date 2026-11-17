@@ -619,6 +619,10 @@ async function main(req,res){
       const programm=preisAbfrage.rows[0];
       if(angefragterStandort&&angefragterStandort!==programm.veranstaltungsort)
         return reply(res,409,{error:'Das ausgewählte Angebot gehört nicht zum gewählten Veranstaltungsort.'});
+      const bookingSite=angefragterStandort||programm.veranstaltungsort;
+      const locationSettings=await pool.query(`SELECT partnerhaus,partnerkontakt_name,partnerkontakt_email
+        FROM brilon_orte WHERE name=$1 AND aktiv=true LIMIT 1`,[bookingSite]);
+      const partnerhausEinstellung=locationSettings.rows[0]||{partnerhaus:false,partnerkontakt_name:'',partnerkontakt_email:''};
       const einzelplatz=programm.buchungsmodus==='einzelplatz';
       if(einzelplatz&&teilnehmer!==1)return reply(res,400,{error:'Für dieses Angebot kannst du nur einen Einzelplatz pro Anmeldung reservieren.'});
       const verfuegbareTermine=Array.isArray(programm.verfuegbare_termine)?programm.verfuegbare_termine:[];
@@ -648,9 +652,12 @@ async function main(req,res){
       if(!['ja','nein'].includes(istGast)||(istGast==='ja'&&!gastEinrichtung))
         return reply(res,400,{error:'Bitte Gästeangabe und gegebenenfalls die Unterkunft angeben.'});
       const data={
+       ...(partnerhausEinstellung.partnerhaus?{partnerhausAbwicklung:true,
+         partnerhausKontaktName:partnerhausEinstellung.partnerkontakt_name||'',
+         partnerhausKontaktEmail:partnerhausEinstellung.partnerkontakt_email}:{}),
        istGast,gastEinrichtung:istGast==='ja'?gastEinrichtung:null,
        gaesteRabattStatus:istGast==='ja'?'pruefung_offen':'nicht_beantragt',
-       name,vorname,nachname,email,datum,angebot,veranstaltungsort:programm.veranstaltungsort,teilnehmer,rechnungsadresse,
+       name,vorname,nachname,email,datum,angebot,veranstaltungsort:bookingSite,teilnehmer,rechnungsadresse,
 gesamtpreis,
 anzahlung: einzelplatz ? 0 : Math.round(gesamtpreis * 25) / 100,
 restbetrag: einzelplatz ? gesamtpreis : Math.round(gesamtpreis * 75) / 100,
@@ -760,7 +767,8 @@ const ende = fenster
     ':' + String(fenster[1] % 60).padStart(2, '0')
   : 'nach Absprache';
 
-const buchungsdetails=buchungsDetails({...data,ende:`${ende}${fenster?' Uhr':''}`});
+const buchungsdetails=buchungsDetails({...data,ende:`${ende}${fenster?' Uhr':''}`,
+  ...(data.partnerhausAbwicklung===true?{gesamtpreis:Number.NaN}:{})});
 
 
 
@@ -1831,7 +1839,10 @@ if (
     gesamtCent, Array.isArray(kunde.zahlungen) ? kunde.zahlungen : []
   );
 
-  const nachricht=buchungsstatusNachricht(status,kunde,stand);
+  const nachricht=kunde?.partnerhausAbwicklung===true&&status==='bestaetigt'
+    ?{betreff:`Deine Anfrage bei ${kunde.veranstaltungsort||'deinem Partnerhaus'} ist möglich – nächster Schritt zur Buchung`,
+      text:`Die Verfügbarkeit deines Programms wurde geprüft und der Termin ist am Standort möglich. Die verbindliche Buchung sowie die gesamte Abrechnung erfolgen im nächsten Schritt direkt über ${kunde.veranstaltungsort||'das Partnerhaus'}. Die auf unserer Website angezeigte Preisangabe dient nur zur Orientierung. Kontakt: ${kunde.partnerhausKontaktEmail||'Standortkontakt'}.`}
+    :buchungsstatusNachricht(status,kunde,stand);
 
   if (empfaenger && nachricht) {
     const inhalt =
@@ -1840,8 +1851,10 @@ if (
       `Datum: ${kunde.datum || 'Nicht angegeben'}\n` +
       `Beginn: ${kunde.uhrzeit || 'Nach Absprache'} Uhr\n` +
       `Teilnehmer: ${kunde.teilnehmer || 'Nicht angegeben'}\n\n` +
-      (status==='bestaetigt'&&anschlussLink(ergebnis.buchung.id)
+      (kunde.partnerhausAbwicklung!==true&&status==='bestaetigt'&&anschlussLink(ergebnis.buchung.id)
         ?`Passende Anschlussprogramme mit 10 % Rabatt: ${anschlussLink(ergebnis.buchung.id)}\n\n`:'' )+
+      (kunde.partnerhausAbwicklung===true&&status==='bestaetigt'
+        ?`Anfrage geprüft und an den Standortkontakt weitergeleitet: ${kunde.partnerhausKontaktEmail||''}\nStandortkontakt anschreiben: mailto:${kunde.partnerhausKontaktEmail||''}?subject=${encodeURIComponent('Rückfrage zu '+(kunde.angebot||'deiner Buchung')+' · '+(kunde.buchungsnummer||''))}\n\n`:'' )+
       (ergebnis.elternRabatt?.angewendet?'Der Anschlussrabatt wurde auch auf die ursprüngliche Buchung angewendet.\n\n':
         ergebnis.elternRabatt?.hoehererRabattBestand?'Der bereits bestehende höhere Rabatt bleibt erhalten. Empfehlungs- und Anschlussrabatte werden nicht addiert.\n\n':'')+
       (ergebnis.elternRabattZurueck?.zurueckgenommen
@@ -1852,6 +1865,11 @@ if (
     if(status==='bestaetigt'){
       ergebnis.buchung.data.bestaetigungsEmail=await buchungsbestaetigungsEmail({
         buchungId:ergebnis.buchung.id,email:empfaenger,betreff:nachricht.betreff,text:inhalt});
+      if(kunde.partnerhausAbwicklung===true&&/^\S+@\S+\.\S+$/.test(kunde.partnerhausKontaktEmail||'')){
+        const partnerText=`Guten Tag${kunde.partnerhausKontaktName?' '+kunde.partnerhausKontaktName:''},\n\ndie Verwaltung hat die Verfügbarkeit der folgenden Anfrage geprüft. Der Termin ist am Standort möglich. Bitte übernehmen Sie die verbindliche Buchung und Abrechnung direkt mit dem Anfragenden.\n\nProgramm: ${kunde.angebot||'—'}\nTermin: ${kunde.datum||'—'}${kunde.uhrzeit?' um '+kunde.uhrzeit+' Uhr':''}\nTeilnehmende: ${kunde.teilnehmer||'—'}\nAnfragende Person: ${kunde.name||'—'}\nE-Mail: ${kunde.email||'—'}\nBuchungsnummer: ${kunde.buchungsnummer||'—'}\n\nBitte stimmen Sie die Buchung und Zahlungsfragen direkt mit dem Gast ab. Die Website führt keine Abrechnung für dieses Partnerhaus durch.\nAnfragenden anschreiben: mailto:${kunde.email||''}?subject=${encodeURIComponent('Buchung '+(kunde.buchungsnummer||''))}\n\nViele Grüße\nKlettern & Abenteuer Brilon`;
+        brevoMail(kunde.partnerhausKontaktEmail,`Verfügbarkeit geprüft: ${kunde.angebot||'Programm'} am ${kunde.datum||'Termin'}`,partnerText)
+          .catch(error=>console.error('Partnerhaus-Hinweis fehlgeschlagen:',error.message));
+      }
     }else{
       brevoMail(empfaenger,nachricht.betreff,inhalt)
         .catch(fehler=>console.error('Status-E-Mail fehlgeschlagen:',fehler.message));
@@ -2734,36 +2752,60 @@ preis=safeText(d.preis,50);
      
   
 if(route==='/api/admin/orte'&&req.method==='GET'){
-  const q=await pool.query('SELECT id,name,aktiv FROM brilon_orte ORDER BY name');
+  const q=await pool.query('SELECT id,name,aktiv,partnerhaus,partnerkontakt_name,partnerkontakt_email FROM brilon_orte ORDER BY name');
   return reply(res,200,q.rows);
 }
 if(route==='/api/admin/orte'&&req.method==='POST'){
-  const d=await body(req),name=safeText(d.name,80);
+  const d=await body(req),name=safeText(d.name,80),partnerhaus=d.partnerhaus===true,
+    partnerkontaktName=safeText(d.partnerkontakt_name,120),partnerkontaktEmail=safeText(d.partnerkontakt_email,180).toLowerCase();
   if(!name)return reply(res,400,{error:'Ort ist erforderlich.'});
+  if(partnerhaus&&!/^\S+@\S+\.\S+$/.test(partnerkontaktEmail))return reply(res,400,{error:'Für ein Partnerhaus bitte die E-Mail-Adresse des Standortkontakts hinterlegen.'});
+  if(partnerkontaktEmail&&!/^\S+@\S+\.\S+$/.test(partnerkontaktEmail))return reply(res,400,{error:'Bitte eine gültige E-Mail-Adresse für den Standortkontakt eingeben.'});
   const q=await pool.query(
-    `INSERT INTO brilon_orte(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET aktiv=true RETURNING id,name,aktiv`,[name]
+    `INSERT INTO brilon_orte(name,partnerhaus,partnerkontakt_name,partnerkontakt_email) VALUES($1,$2,$3,$4)
+      ON CONFLICT(name) DO UPDATE SET aktiv=true
+      RETURNING id,name,aktiv,partnerhaus,partnerkontakt_name,partnerkontakt_email`,
+    [name,partnerhaus,partnerkontaktName,partnerkontaktEmail]
   );
   return reply(res,201,q.rows[0]);
 }
 const placeRoute=route.match(/^\/api\/admin\/orte\/(\d+)$/);
 if(placeRoute&&req.method==='PATCH'){
-  const d=await body(req);
-  if(d.name===undefined&&typeof d.aktiv!=='boolean')
-    return reply(res,400,{error:'Bitte eine neue Bezeichnung oder den Aktiv-Status angeben.'});
+  const d=await body(req),name=d.name===undefined?null:safeText(d.name,80),aktiv=d.aktiv===undefined?null:d.aktiv,
+    partnerhaus=d.partnerhaus===undefined?null:d.partnerhaus,
+    partnerkontaktName=d.partnerkontakt_name===undefined?null:safeText(d.partnerkontakt_name,120),
+    partnerkontaktEmail=d.partnerkontakt_email===undefined?null:safeText(d.partnerkontakt_email,180).toLowerCase();
+  if(aktiv!==null&&typeof aktiv!=='boolean')return reply(res,400,{error:'Der Aktiv-Status muss Ja oder Nein sein.'});
+  if(partnerhaus!==null&&typeof partnerhaus!=='boolean')return reply(res,400,{error:'Die Partnerhaus-Einstellung ist ungültig.'});
+  if(partnerkontaktEmail!==null&&partnerkontaktEmail!==''&&!/^\S+@\S+\.\S+$/.test(partnerkontaktEmail))
+    return reply(res,400,{error:'Bitte eine gültige E-Mail-Adresse für den Standortkontakt eingeben.'});
+  if(name!==null&&!name)return reply(res,400,{error:'Die Standortbezeichnung darf nicht leer sein.'});
+  if(name===null&&aktiv===null&&partnerhaus===null&&partnerkontaktName===null&&partnerkontaktEmail===null)
+    return reply(res,400,{error:'Bitte Standortdaten ändern.'});
   const client=await pool.connect();
   try{
     await client.query('BEGIN');
-    const current=await client.query('SELECT id,name,aktiv FROM brilon_orte WHERE id=$1 FOR UPDATE',[placeRoute[1]]);
+    const current=await client.query('SELECT id,name,aktiv,partnerhaus,partnerkontakt_name,partnerkontakt_email FROM brilon_orte WHERE id=$1 FOR UPDATE',[placeRoute[1]]);
     if(!current.rowCount){await client.query('ROLLBACK');return reply(res,404,{error:'Standort nicht gefunden.'});}
-    const oldName=current.rows[0].name;
-    const name=d.name===undefined?oldName:safeText(d.name,80);
-    if(!name){await client.query('ROLLBACK');return reply(res,400,{error:'Die Standortbezeichnung darf nicht leer sein.'});}
-    const aktiv=typeof d.aktiv==='boolean'?d.aktiv:current.rows[0].aktiv;
-    const saved=await client.query('UPDATE brilon_orte SET name=$1,aktiv=$2 WHERE id=$3 RETURNING id,name,aktiv',[name,aktiv,placeRoute[1]]);
-    if(name!==oldName){
-      await client.query('UPDATE brilon_angebote SET veranstaltungsort=$1 WHERE veranstaltungsort=$2',[name,oldName]);
+    const oldName=current.rows[0].name,newName=name||oldName;
+    const nextPartnerhaus=partnerhaus===null?current.rows[0].partnerhaus:partnerhaus;
+    const nextPartnerEmail=partnerkontaktEmail===null?current.rows[0].partnerkontakt_email:partnerkontaktEmail;
+    if(nextPartnerhaus&&(!nextPartnerEmail||!/^\S+@\S+\.\S+$/.test(nextPartnerEmail))){
+      await client.query('ROLLBACK');return reply(res,400,{error:'Für ein Partnerhaus bitte die E-Mail-Adresse des Standortkontakts hinterlegen.'});
+    }
+    if(name&&name!==oldName){
+      const duplicate=await client.query('SELECT 1 FROM brilon_orte WHERE lower(name)=lower($1) AND id<>$2',[name,placeRoute[1]]);
+      if(duplicate.rowCount){await client.query('ROLLBACK');return reply(res,409,{error:'Diese Standortbezeichnung ist bereits vergeben.'});}
+    }
+    const saved=await client.query(`UPDATE brilon_orte SET name=$1,aktiv=COALESCE($2,aktiv),
+      partnerhaus=COALESCE($3,partnerhaus),partnerkontakt_name=COALESCE($4,partnerkontakt_name),
+      partnerkontakt_email=CASE WHEN $5::text IS NULL THEN partnerkontakt_email ELSE COALESCE(NULLIF($5,''),'') END
+      WHERE id=$6 RETURNING id,name,aktiv,partnerhaus,partnerkontakt_name,partnerkontakt_email`,
+      [newName,aktiv,partnerhaus,partnerkontaktName,partnerkontaktEmail,placeRoute[1]]);
+    if(newName!==oldName){
+      await client.query('UPDATE brilon_angebote SET veranstaltungsort=$1 WHERE veranstaltungsort=$2',[newName,oldName]);
       for(const key of ['veranstaltungsort','ort','standort']){
-        await client.query(`UPDATE brilon_buchungen SET data=jsonb_set(data,'{${key}}',to_jsonb($1::text),true) WHERE data->>'${key}'=$2`,[name,oldName]);
+        await client.query(`UPDATE brilon_buchungen SET data=jsonb_set(data,'{${key}}',to_jsonb($1::text),true) WHERE data->>'${key}'=$2`,[newName,oldName]);
       }
     }
     await client.query('COMMIT');
@@ -2780,10 +2822,11 @@ if(placeRoute&&req.method==='DELETE'){
   const usage=await pool.query(`SELECT
     (SELECT COUNT(*) FROM brilon_angebote WHERE veranstaltungsort=$1)+
     (SELECT COUNT(*) FROM brilon_pruef_stationen WHERE ort_id=$2)+
-    (SELECT COUNT(*) FROM brilon_pruef_freigaben WHERE ort_id=$2) AS anzahl`,
+    (SELECT COUNT(*) FROM brilon_pruef_freigaben WHERE ort_id=$2)+
+    (SELECT COUNT(*) FROM brilon_buchungen WHERE data->>'veranstaltungsort'=$1) AS anzahl`,
     [place.rows[0].name,placeRoute[1]]);
   if(Number(usage.rows[0]?.anzahl||0)>0)
-    return reply(res,409,{error:'Dieser Standort wird noch von Programmen oder Stationsfreigaben verwendet. Deaktiviere ihn stattdessen, damit bestehende Zuordnungen und Buchungen erhalten bleiben.'});
+    return reply(res,409,{error:'Dieser Standort ist noch mit Programmen, Buchungsanfragen oder Stationsfreigaben verknüpft. Deaktiviere ihn stattdessen; bestehende Daten bleiben erhalten.'});
   await pool.query('DELETE FROM brilon_orte WHERE id=$1',[placeRoute[1]]);
   return reply(res,200,{success:true});
 }
@@ -3334,7 +3377,9 @@ if (route === '/api/angebote' && req.method === 'GET') {
   const q = await pool.query(
  `SELECT id,name,beschreibung,dauer,preise,bild_url,kategorie,zielgruppe,
         veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise,
-        buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert
+        buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,
+        (SELECT CASE WHEN o.partnerhaus THEN jsonb_build_array(o.name) ELSE '[]'::jsonb END
+          FROM brilon_orte o WHERE o.name=brilon_angebote.veranstaltungsort) AS partnerhaus_standorte
      FROM brilon_angebote
      WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
      ORDER BY sortierung ASC,name ASC`
@@ -3476,6 +3521,10 @@ async function start(){
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_orte(
         id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
         erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+      await pool.query(`ALTER TABLE brilon_orte
+        ADD COLUMN IF NOT EXISTS partnerhaus BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS partnerkontakt_name TEXT NOT NULL DEFAULT '',
+        ADD COLUMN IF NOT EXISTS partnerkontakt_email TEXT NOT NULL DEFAULT ''`);
       await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon') ON CONFLICT(name) DO NOTHING`);
       console.log('Veranstaltungsort-Tabelle geprüft (RUN_PLACES_MIGRATION=true)');
     }
@@ -3515,6 +3564,11 @@ async function start(){
         id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
         erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
       await pool.query('ALTER TABLE brilon_orte ADD COLUMN IF NOT EXISTS aktiv BOOLEAN NOT NULL DEFAULT true');
+      await pool.query(`ALTER TABLE brilon_orte
+        ADD COLUMN IF NOT EXISTS partnerhaus BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS partnerkontakt_name TEXT NOT NULL DEFAULT '',
+        ADD COLUMN IF NOT EXISTS partnerkontakt_email TEXT NOT NULL DEFAULT ''`);
+
       await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon') ON CONFLICT(name) DO NOTHING`);
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_admin_sessions (
         token_hash CHAR(64) PRIMARY KEY,
@@ -3872,6 +3926,10 @@ await pool.query(`
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_orte(
       id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,aktiv BOOLEAN NOT NULL DEFAULT true,
       erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    await pool.query(`ALTER TABLE brilon_orte
+      ADD COLUMN IF NOT EXISTS partnerhaus BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS partnerkontakt_name TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS partnerkontakt_email TEXT NOT NULL DEFAULT ''`);
     await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon'),('Rüthen'),('Soest'),('Sundern') ON CONFLICT(name) DO NOTHING`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS brilon_gps_touren (

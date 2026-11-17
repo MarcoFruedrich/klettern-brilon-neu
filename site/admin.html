@@ -580,11 +580,14 @@
 
 <section id="standorte-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="standorte-heading">
   <h2 id="standorte-heading">Standorte</h2>
-  <p>Standorte verwalten. Aktive Standorte können neuen Programmen zugeordnet werden. Inaktive Standorte bleiben bei bestehenden Programmen und Buchungen erhalten.</p>
+  <p>Standorte verwalten und Ansprechpartner hinterlegen. Bei Partnerhaus-Standorten dienen Preise nur zur Orientierung; Buchungsabwicklung und Abrechnung übernimmt das Partnerhaus. Bestehende Buchungsanfragen, Buchungsgruppen und Programme bleiben erhalten. Verknüpfte Standorte können nicht gelöscht, sondern deaktiviert werden.</p>
   <form id="admin-place-form">
     <label>Neuer Standort
       <input name="name" maxlength="80" placeholder="z. B. Sundern" required>
     </label>
+    <label class="check"><input name="partnerhaus" type="checkbox"><span>Partnerhaus: verbindliche Buchung und Abrechnung erfolgen über den Standortpartner</span></label>
+    <label>Ansprechpartner des Partnerhauses<input name="partnerkontakt_name" maxlength="120"></label>
+    <label>E-Mail des Standortkontakts<input name="partnerkontakt_email" type="email" maxlength="180"></label>
     <button class="btn" type="submit">Standort hinzufügen</button>
   </form>
   <p id="admin-place-status" role="status" aria-live="polite"></p>
@@ -899,7 +902,7 @@
   <script src="/zahlungsuebersicht.js"></script>
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
-  <script src="/admin.js?v=20261115-partner-invoice-time"></script>
+  <script src="/admin.js?v=20261117-standort-partnerhaus"></script>
   <script src="/medienpool-admin.js?v=20261110-gif-media-v2"></script>
   <script src="/besuchergruppen-admin.js?v=20261110-custom-groups-gif-icons-v3"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
