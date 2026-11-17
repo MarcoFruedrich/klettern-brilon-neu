@@ -23,6 +23,7 @@
         card.append(el('h3',t.datum+' · '+(t.uhrzeit||'Uhrzeit offen')+' Uhr'));
         card.append(el('p',(t.angebot||'Programm')+' · '+(t.ort||'Standort offen')+
           ' · '+(t.dauer||'Dauer nicht angegeben')+' Minuten'));
+        if(t.manueller_termin&&t.beschreibung)card.append(el('p',t.beschreibung));
         const statusBadge=el('p');
         statusBadge.className='staff-assignment-status';
         if(t.mein_status==='bestaetigt'){
@@ -58,7 +59,9 @@
           try{
             const result=await request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
             await loadPlanning();
-            if(data.anschlussOption&&data.anschlussOption!=='keine'){
+            if(result?.anschlussangebot){status.textContent=result.message||'Das Anschlussprogramm wurde veröffentlicht.';}
+            else if(result?.message&&url.includes('/kalender-antwort/')){status.textContent=result.message;}
+            else if(data.anschlussOption&&data.anschlussOption!=='keine'){
               const proposal=result?.tagesangebotVorschlaege;
               status.textContent=proposal?.ok?proposal.nachricht||'Deine zusätzliche Verfügbarkeit wurde der Verwaltung als Tagesangebot vorgeschlagen.':
                 proposal?.error||'Deine zusätzliche Verfügbarkeit wurde gespeichert; die Verwaltung prüft mögliche Anschlussangebote.';

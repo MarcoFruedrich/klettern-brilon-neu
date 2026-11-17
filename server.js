@@ -609,7 +609,7 @@ async function main(req,res){
 
       let gesamtpreis = null;
       const preisAbfrage = await pool.query(
-        `SELECT preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
+        `SELECT id,preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
                 veranstaltungsort,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
@@ -624,6 +624,17 @@ async function main(req,res){
       const verfuegbareTermine=Array.isArray(programm.verfuegbare_termine)?programm.verfuegbare_termine:[];
       if(verfuegbareTermine.length&&!verfuegbareTermine.includes(datum))
         return reply(res,409,{error:'Für dieses Programm ist an dem Datum kein Termin freigegeben.'});
+      const sonderaktionId=safeText(d.sonderaktion_id,36);let exactAction=null;
+      if(sonderaktionId){
+        const action=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[sonderaktionId]);
+        const special=action.rows[0]?.data||{};
+        const fixed=Boolean(special.uhrzeit&&special.endzeit&&special.veranstaltungsort&&special.programm_id);
+        if(fixed)exactAction=special;
+        if(fixed&&(String(special.programm_id)!==String(programm.id)||special.datum!==datum||
+          special.uhrzeit!==safeText(d.uhrzeit,5)||special.veranstaltungsort!==programm.veranstaltungsort||
+          Number(special.teilnehmer)!==teilnehmer))
+          return reply(res,409,{error:'Dieser Anschlusstermin ist fest an Programm, Standort, Gruppengröße und Uhrzeit gebunden.'});
+      }
       if(teilnehmer>Number(programm.kapazitaet))return reply(res,409,{error:'Die Gruppengröße überschreitet die maximale Kapazität.'});
       const einzelpreisCent=Number.isFinite(Number(programm.preis_pro_person))
         ?Math.round(Number(programm.preis_pro_person)*100):null;
@@ -647,13 +658,15 @@ buchungsmodus: einzelplatz?'einzelplatz':'gruppe',
 mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
-       nachricht:safeText(d.nachricht,2000),dauer:buchungsdauerBerechnen(teilnehmer,Number(programm.dauer)),
+       nachricht:safeText(d.nachricht,2000),sonderaktion_id:safeText(d.sonderaktion_id,36)||null,dauer:buchungsdauerBerechnen(teilnehmer,Number(programm.dauer)),
        datenschutz:'on',datenschutzBestaetigtAm:new Date().toISOString(),
        datenschutzTextVersion:BUCHUNGS_DATENSCHUTZ_VERSION,
        agbBestaetigtAm:new Date().toISOString(),agbTextVersion:Number(agbData.version),agbTextSnapshot:agbData.text
       };
 
-      if(!/^(09|1[0-9]):00$/.test(data.uhrzeit))
+      const validFixedTime=exactAction&&data.uhrzeit===exactAction.uhrzeit&&
+        /^([01]\d|2[0-3]):([0-5]\d)$/.test(data.uhrzeit);
+      if(!validFixedTime&&!/^(09|1[0-9]):00$/.test(data.uhrzeit))
         return reply(res,400,{
           error:'Bitte eine gültige Anfangszeit zwischen 09:00 und 19:00 Uhr auswählen.'
         });
@@ -912,9 +925,11 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     if(route==='/api/aktionen'&&req.method==='GET'){
       if(!pool)return reply(res,200,[]);
       const q=await pool.query(
-        `SELECT a.id,a.data->>'titel' AS titel,a.data->>'datum' AS datum,
+        `SELECT a.id,a.id AS sonderaktion_id,a.data->>'titel' AS titel,a.data->>'datum' AS datum,
           a.data->>'beschreibung' AS beschreibung,a.data->>'preis' AS preis,
-          a.data->>'bild_url' AS bild_url,
+          a.data->>'bild_url' AS bild_url,a.data->>'uhrzeit' AS uhrzeit,
+          a.data->>'endzeit' AS endzeit,a.data->>'veranstaltungsort' AS veranstaltungsort,
+          a.data->>'teilnehmer' AS teilnehmer,
           p.id AS programm_id,p.name AS programm_name
          FROM brilon_aktionen a
          LEFT JOIN brilon_angebote p ON p.id::text=a.data->>'programm_id'
@@ -1930,11 +1945,139 @@ if(!versandProtokoll.rowCount)
   });
 }
 }
+    const connectionOptionsRoute=route.match(/^\/api\/admin\/kalender\/([0-9a-f-]{36})\/anschluss-optionen$/i);
+    if(connectionOptionsRoute&&req.method==='GET'){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      const event=await pool.query("SELECT id,titel,datum::text AS datum,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender WHERE id=$1 AND typ='termin'",[connectionOptionsRoute[1]]);
+      if(!event.rowCount)return reply(res,404,{error:'Kalendereintrag nicht gefunden.'});
+      const row=event.rows[0],place=row.standorte?.length===1?row.standorte[0]:'';
+      const [programs,staff,requests]=await Promise.all([
+        place?pool.query(`SELECT id,name,dauer,kapazitaet,preise,veranstaltungsort
+          FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
+            AND veranstaltungsort=$1 ORDER BY sortierung,name,id`,[place]):Promise.resolve({rows:[]}),
+        place?pool.query(`SELECT DISTINCT m.id,m.name,m.email FROM brilon_pruef_mitarbeitende m
+          JOIN brilon_pruef_freigaben f ON f.mitarbeiter_id=m.id
+          JOIN brilon_orte o ON o.id=f.ort_id AND o.aktiv=true AND o.name=$1
+          WHERE m.aktiv=true AND m.registriert_am IS NOT NULL AND m.freigabe_am IS NOT NULL
+            AND m.name<>'Gelöschtes Mitarbeiterkonto' ORDER BY m.name`,[place]):Promise.resolve({rows:[]}),
+        pool.query(`SELECT id,titel,datum::text AS datum,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,
+            anschluss,COALESCE((SELECT m.name FROM brilon_kalender_einsaetze e JOIN brilon_pruef_mitarbeitende m
+              ON m.id=e.mitarbeiter_id WHERE e.kalender_id=k.id ORDER BY e.zugewiesen_am DESC LIMIT 1),'') AS mitarbeiter
+          FROM brilon_kalender k WHERE k.anschluss->>'anchorId'=$1 ORDER BY k.datum,k.uhrzeit`,[connectionOptionsRoute[1]])
+      ]);
+      return reply(res,200,{event:row,programme:programs.rows,mitarbeiter:staff.rows,anschlussanfragen:requests.rows});
+    }
+
+    const createConnectionRoute=route.match(/^\/api\/admin\/kalender\/([0-9a-f-]{36})\/anschlussanfrage$/i);
+    if(createConnectionRoute&&req.method==='POST'){
+      if(!await admin(req,res))return;
+      if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      if(!sameOriginMutation(req))return reply(res,403,{error:'Herkunft der Anfrage nicht zulässig.'});
+      const d=await body(req),anchorId=createConnectionRoute[1];
+      const programId=String(d?.programmId||''),staffId=String(d?.mitarbeiterId||'');
+      const directions=Array.isArray(d?.richtungen)?[...new Set(d.richtungen)]:[];
+      const participants=Number(d?.teilnehmer);
+      const booking=Boolean(d?.anschlussbuchung),discount=Boolean(d?.anschlussrabatt);
+      if(!/^[1-9]\d{0,17}$/.test(programId)||! /^[0-9a-f-]{36}$/i.test(staffId)||
+         !directions.length||directions.some(x=>!['davor','danach'].includes(x))||
+         !Number.isInteger(participants)||participants<1||participants>150||(!booking&&!discount))
+        return reply(res,400,{error:'Bitte Programm, Trainer, Gruppengröße, mindestens eine Richtung und Anschlussart auswählen.'});
+      const client=await pool.connect();let created=[],person,source,anchorEvent;
+      try{
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(7112026)');
+        const anchor=await client.query("SELECT id,titel,datum::text AS datum,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender WHERE id=$1 AND typ='termin' FOR UPDATE",[anchorId]);
+        if(!anchor.rowCount){await client.query('ROLLBACK');return reply(res,404,{error:'Der Bezugstermin ist nicht mehr vorhanden.'});}
+        const base=anchor.rows[0];anchorEvent=base;const place=base.standorte?.length===1?base.standorte[0]:'';
+        const toMinutes=value=>{const match=String(value||'').match(/^([01]\d|2[0-3]):([0-5]\d)/);return match?Number(match[1])*60+Number(match[2]):null;};
+        const anchorStart=toMinutes(base.uhrzeit),anchorEnd=toMinutes(base.endzeit);
+        if(!place||anchorStart===null||anchorEnd===null||anchorEnd<=anchorStart){
+          await client.query('ROLLBACK');return reply(res,409,{error:'Der Bezugstermin benötigt genau einen Standort sowie eine feste Anfangs- und Endzeit.'});
+        }
+        const offer=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,veranstaltungsort
+          FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true FOR SHARE`,[programId]);
+        if(!offer.rowCount||offer.rows[0].veranstaltungsort!==place){
+          await client.query('ROLLBACK');return reply(res,409,{error:'Das ausgewählte Programm ist an diesem Standort nicht buchbar.'});
+        }
+        source=offer.rows[0];
+        if(participants>Number(source.kapazitaet)){
+          await client.query('ROLLBACK');return reply(res,409,{error:'Die Gruppengröße überschreitet die Kapazität des Programms.'});
+        }
+        if(!source.preise||typeof source.preise!=='object'||!Object.keys(source.preise).length||
+           preisFuerTeilnehmer(source.preise,participants)===null){
+          await client.query('ROLLBACK');return reply(res,409,{error:'Für dieses Programm ist für die gewählte Gruppengröße kein Preis hinterlegt.'});
+        }
+        const duration=buchungsdauerBerechnen(participants,Number(source.dauer));
+        if(!duration){await client.query('ROLLBACK');return reply(res,409,{error:'Die Dauer des Anschlussprogramms kann für diese Gruppengröße nicht berechnet werden.'});}
+        const staffRow=await client.query(`SELECT m.id,m.name,m.email FROM brilon_pruef_mitarbeitende m
+          WHERE m.id=$1 AND m.aktiv=true AND m.registriert_am IS NOT NULL AND m.freigabe_am IS NOT NULL
+            AND EXISTS(SELECT 1 FROM brilon_pruef_freigaben f JOIN brilon_orte o ON o.id=f.ort_id AND o.aktiv=true
+              WHERE f.mitarbeiter_id=m.id AND o.name=$2) FOR UPDATE`,[staffId,place]);
+        if(!staffRow.rowCount){await client.query('ROLLBACK');return reply(res,409,{error:'Der ausgewählte Mitarbeiter ist für diesen Standort nicht freigegeben.'});}
+        person=staffRow.rows[0];
+        const occupied=await client.query(`SELECT id,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,typ,
+            COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender
+          WHERE datum=$1::date AND id<>$2 AND (typ='sperrzeit' OR COALESCE(cardinality(standorte),0)=0 OR $3=ANY(standorte))`,
+          [base.datum,anchorId,place]);
+        const bookings=await client.query(`SELECT id,data FROM brilon_buchungen WHERE data->>'datum'=$1
+          AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum]);
+        const slots=[];
+        for(const row of occupied.rows){
+          const a=toMinutes(row.uhrzeit),b=toMinutes(row.endzeit);
+          if(row.typ==='sperrzeit'||a===null)slots.push([0,1440]);
+          else if(b!==null&&b>a)slots.push([a,b]);
+        }
+        for(const row of bookings.rows){
+          const item=row.data||{},where=String(item.veranstaltungsort||'').toLowerCase();
+          if(where&&where!==place.toLowerCase())continue;
+          const a=toMinutes(item.uhrzeit),len=Number(item.dauer);
+          if(a!==null&&Number.isInteger(len)&&len>0)slots.push([a,a+len]);
+          else slots.push([0,1440]);
+        }
+        for(const direction of directions){
+          const start=direction==='davor'?anchorStart-15-duration:anchorEnd+15;
+          const end=start+duration;
+          if(start<0||end>1440){await client.query('ROLLBACK');return reply(res,409,{error:'Für '+(direction==='davor'?'den Termin davor':'den Termin danach')+' reicht der verfügbare Tageszeitraum nicht aus.'});}
+          if(slots.some(([a,b])=>start<b&&a<end)){
+            await client.query('ROLLBACK');return reply(res,409,{error:'Das berechnete Anschlusszeitfenster überschneidet sich mit einem bestehenden Termin oder einer Sperrzeit.'});
+          }
+          const time=value=>String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0');
+          const details={anchorId,sourceOfferId:source.id,sourceOfferName:source.name,mitarbeiterId:person.id,
+            mitarbeiterName:person.name,anschlussbuchung:booking,anschlussrabatt:discount,richtung:direction,
+            teilnehmer:participants,dauer:duration,status:'angefragt',angefragtAm:new Date().toISOString()};
+          const description=`Bitte bestätige, ob du „${source.name}“ als Anschlussprogramm am ${base.datum} von ${time(start)} bis ${time(end)} Uhr übernehmen kannst. Bei Zusage wird das passende Angebot für ${place} mit ${participants} Teilnehmenden automatisch veröffentlicht${discount?' und mit 10 % Anschlussrabatt versehen':''}. Bei Ablehnung erhält die Verwaltung eine Rückfrage.`;
+          const entry=await client.query(`INSERT INTO brilon_kalender
+            (titel,datum,uhrzeit,endzeit,typ,beschreibung,standorte,bewerbung_oeffentlich_ab,anschluss)
+            VALUES($1,$2::date,$3::time,$4::time,'termin',$5,$6::text[],NOW(),$7::jsonb) RETURNING id`,
+            ['Traineranfrage · '+source.name,base.datum,time(start),time(end),description,[place],JSON.stringify(details)]);
+          await client.query(`INSERT INTO brilon_kalender_einsaetze
+            (kalender_id,mitarbeiter_id,status,zugewiesen_am,aktualisiert_am)
+            VALUES($1,$2,'eingeteilt',NOW(),NOW())
+            ON CONFLICT(kalender_id,mitarbeiter_id) DO UPDATE SET status='eingeteilt',zugewiesen_am=NOW(),aktualisiert_am=NOW()`,
+            [entry.rows[0].id,person.id]);
+          created.push({id:entry.rows[0].id,direction,start:time(start),end:time(end)});
+          slots.push([start,end]);
+        }
+        await client.query('COMMIT');
+      }catch(error){await client.query('ROLLBACK');console.error('Anschlussanfrage konnte nicht angelegt werden:',error.message);return reply(res,500,{error:'Die Anschlussanfrage konnte nicht gespeichert werden.'});}
+      finally{client.release();}
+      let emailVersand='keine_adresse';
+      if(person?.email){
+        try{
+          await brevoMail(person.email,'Anschlussprogramm prüfen: '+source.name,
+            `Hallo ${person.name},\n\nbitte prüfe im Mitarbeiterbereich, ob du das Anschlussprogramm „${source.name}“ übernehmen kannst. Termin: ${anchorEvent.datum}, ${created.map(x=>x.start+'–'+x.end+' Uhr').join(' sowie ')}. Die Termine stehen dort unter „Termine und meine Buchungen“. Mit deiner verbindlichen Zusage wird das Angebot automatisch für den Standort veröffentlicht.\n\nKlettern & Abenteuer`);
+          emailVersand='gesendet';
+        }catch(error){console.error('Anschlussanfrage: Mitarbeiter-E-Mail fehlgeschlagen:',error.message);emailVersand='fehlgeschlagen';}
+      }
+      return reply(res,201,{success:true,termine:created,emailVersand,message:emailVersand==='gesendet'?'Die Anschlussanfrage wurde angelegt und der Trainer per E-Mail informiert.':'Die Anschlussanfrage wurde angelegt. Bitte den Trainer zusätzlich direkt informieren.'});
+    }
+
     if(route==='/api/admin/kalender'&&req.method==='GET'){
       if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       const q=await pool.query(
-        "SELECT id,titel,datum::text AS datum,enddatum::text AS enddatum,uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,typ,beschreibung,COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender ORDER BY datum,uhrzeit NULLS LAST LIMIT 1000"
+        "SELECT k.id,k.titel,k.datum::text AS datum,k.enddatum::text AS enddatum,k.uhrzeit::text AS uhrzeit,k.endzeit::text AS endzeit,k.typ,k.beschreibung,COALESCE(k.standorte,'{}'::text[]) AS standorte,k.anschluss,COALESCE((SELECT json_agg(json_build_object('mitarbeiter_id',m.id,'name',m.name,'status',e.status) ORDER BY m.name) FROM brilon_kalender_einsaetze e JOIN brilon_pruef_mitarbeitende m ON m.id=e.mitarbeiter_id WHERE e.kalender_id=k.id),'[]'::json) AS staff FROM brilon_kalender k ORDER BY k.datum,k.uhrzeit NULLS LAST LIMIT 1000"
       );
       return reply(res,200,q.rows);
     }
@@ -3279,6 +3422,10 @@ async function start(){
       )`);
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_admin_sessions_expires_at_idx ON brilon_admin_sessions(expires_at)');
       console.log('Admin-Sitzungstabelle geprüft (RUN_ADMIN_SESSION_MIGRATION=true)');
+    }
+    if(process.env.RUN_ANSCHLUSSANFRAGE_MIGRATION==='true'){
+      await pool.query('ALTER TABLE brilon_kalender ADD COLUMN IF NOT EXISTS anschluss JSONB');
+      console.log('Anschlussanfrage-Spalte geprüft (RUN_ANSCHLUSSANFRAGE_MIGRATION=true)');
     }
     // Separate, explicit one-time opt-in for the venue settings table.
     // This stays independent of both session initialization and broad schema migrations.

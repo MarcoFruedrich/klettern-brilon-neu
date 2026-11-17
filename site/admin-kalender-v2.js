@@ -262,7 +262,7 @@
         id:'manual-'+e.id,manualId:String(e.id),type:e.typ==='sperrzeit'?'sperrzeit':'termin',
         date:e.datum,last:e.enddatum&&e.enddatum>=e.datum?e.enddatum:e.datum,
         start,end,reliable:start!=null&&till!=null&&till>start,
-        title:e.titel||'Eigener Termin',description:e.beschreibung||'',
+        title:e.titel||'Eigener Termin',description:e.beschreibung||'',anschluss:e.anschluss||null,
         standorte:Array.isArray(e.standorte)?e.standorte.filter(Boolean):[],
         site:Array.isArray(e.standorte)&&e.standorte.length?e.standorte.join(', '):'Alle Standorte',
         status:'',staff:Array.isArray(e.staff)?e.staff:[],name:''
@@ -593,6 +593,58 @@
       panel.append(list);status.textContent='';
     }catch(error){status.textContent='Mitarbeiterliste konnte nicht geladen werden: '+(error.message||'Fehler');}
   }
+  function renderAnschlussAnfrage(anchor,card){
+     const box=mk('div','ck-repeat-box');
+     box.append(mk('strong','','Anschlussprogramm beim Trainer anfragen'));
+     box.append(mk('p','','Der Bezugstermin bleibt unverändert. Davor endet das Anschlussprogramm 15 Minuten vorher; danach beginnt es frühestens 15 Minuten nach dem Ende. Die Dauer richtet sich nach der Gruppengröße.'));
+     const status=mk('p','ck-action-status');status.setAttribute('role','status');box.append(status);
+     const siteLabel=mk('label','','Standort'),siteSelect=mk('select');siteSelect.setAttribute('aria-label','Standort für Anschlussprogramm');
+     for(const name of anchor.standorte||[]){const option=mk('option','',name);option.value=name;siteSelect.append(option);}
+     siteLabel.append(siteSelect);box.append(siteLabel);
+     const programLabel=mk('label','','Programm aus der Angebotsverwaltung'),programSelect=mk('select');programSelect.setAttribute('aria-label','Anschlussprogramm');programLabel.append(programSelect);box.append(programLabel);
+     const staffLabel=mk('label','','Trainer mit Standortfreigabe'),staffSelect=mk('select');staffSelect.setAttribute('aria-label','Trainer für Rückfrage');staffLabel.append(staffSelect);box.append(staffLabel);
+     const participantsLabel=mk('label','','Gruppengröße'),participants=mk('input');participants.type='number';participants.min='1';participants.max='150';participants.value='10';participants.required=true;participantsLabel.append(participants);box.append(participantsLabel);
+     const directionLabel=mk('label','','Mögliche Anschlusszeiten'),directionSelect=mk('select');directionSelect.setAttribute('aria-label','Mögliche Anschlusszeiten');
+     for(const [value,label] of [['davor','Nur davor'],['danach','Nur danach'],['beides','Davor und danach']]){const option=mk('option','',label);option.value=value;directionSelect.append(option);}
+     directionLabel.append(directionSelect);box.append(directionLabel);
+     const bookingLabel=mk('label','ck-addon-choice','Anschlussbuchung veröffentlichen'),bookingChoice=mk('input');bookingChoice.type='checkbox';bookingChoice.checked=true;bookingLabel.prepend(bookingChoice);box.append(bookingLabel);
+     const discountLabel=mk('label','ck-addon-choice','10 % Anschlussrabatt anbieten'),discountChoice=mk('input');discountChoice.type='checkbox';discountLabel.prepend(discountChoice);box.append(discountLabel);
+     const requests=mk('div','ck-addon-requests');box.append(requests);
+     const send=btn('Trainer anfragen','',async()=>{
+       if(!siteSelect.value||!programSelect.value||!staffSelect.value||!participants.reportValidity())return;
+       send.disabled=true;status.textContent='Anfrage wird erstellt und der Trainer informiert …';
+       const directions=directionSelect.value==='beides'?['davor','danach']:[directionSelect.value];
+       try{
+         const result=await api('/api/admin/kalender/'+encodeURIComponent(anchor.manualId)+'/anschlussanfrage',{
+           method:'POST',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({programmId:programSelect.value,mitarbeiterId:staffSelect.value,richtungen:directions,
+             teilnehmer:Number(participants.value),anschlussbuchung:bookingChoice.checked,anschlussrabatt:discountChoice.checked})
+         });
+         status.textContent=result.message||'Traineranfrage wurde gespeichert.';await load();
+       }catch(error){status.textContent='Traineranfrage fehlgeschlagen: '+(error.message||'Fehler');send.disabled=false;}
+     });
+     box.append(send);card.append(box);
+     const loadOptions=async()=>{
+       programSelect.replaceChildren();staffSelect.replaceChildren();requests.replaceChildren();
+       const placeholder=mk('option','','Bitte auswählen');placeholder.value='';programSelect.append(placeholder);
+       const personPlaceholder=mk('option','','Bitte auswählen');personPlaceholder.value='';staffSelect.append(personPlaceholder);
+       try{
+         const data=await api('/api/admin/kalender/'+encodeURIComponent(anchor.manualId)+'/anschluss-optionen');
+         for(const program of data.programme||[]){const option=mk('option','',program.name+' · '+(program.dauer||'?')+' Min.');option.value=program.id;programSelect.append(option);}
+         for(const person of data.mitarbeiter||[]){const option=mk('option','',person.name+(person.email?' · '+person.email:''));option.value=person.id;staffSelect.append(option);}
+         for(const req of data.anschlussanfragen||[]){
+           const label={angefragt:'Wartet auf Trainerzusage',abgelehnt:'Trainer hat abgelehnt – Verwaltung kann nachfassen',veroeffentlicht:'Zugesagt und automatisch veröffentlicht'}[req.anschluss?.status]||'Anfrage';
+           requests.append(mk('p','ck-followup-availability',req.titel+' · '+label+(req.mitarbeiter?' · '+req.mitarbeiter:'')));
+         }
+         if(!(data.programme||[]).length)status.textContent='Für diesen Standort sind keine veröffentlichten und bepreisten Programme auswählbar.';
+         else if(!(data.mitarbeiter||[]).length)status.textContent='Für diesen Standort gibt es keinen freigegebenen Trainer.';
+       }catch(error){status.textContent='Anschlussoptionen konnten nicht geladen werden: '+(error.message||'Fehler');}
+     };
+     siteSelect.addEventListener('change',loadOptions);
+     if((anchor.standorte||[]).length===1){siteSelect.value=anchor.standorte[0];loadOptions();}
+     else status.textContent='Für die Anschlussanfrage muss der Bezugstermin genau einem aktiven Standort zugeordnet sein.';
+   }
+
   function renderDetail() {
     detail.replaceChildren();
     const picked=/^\d{4}-\d{2}-\d{2}$/.test(chosen.date)?chosen.date:iso(chosen.cursor);
@@ -776,6 +828,13 @@
           }catch(error){status.textContent='Eintrag konnte nicht gelöscht werden: '+(error.message||'Fehler');remove.disabled=false;}
         });
         repeatBox.append(dateLabel,timeLabel,ruleLabel,countLabel,duplicate,remove,status);card.append(repeatBox);
+        if(e.type==='termin'&&e.manualId)renderAnschlussAnfrage(e,card);
+        if(e.anschluss){
+          const requestStatus={angefragt:'Trainerzusage ausstehend',abgelehnt:'Trainer hat abgelehnt · bitte nachfassen',veroeffentlicht:'Trainer hat zugesagt · Angebot veröffentlicht'}[e.anschluss.status]||'Anschlussanfrage';
+          card.append(mk('p','ck-followup-availability',requestStatus+
+            (e.anschluss.mitarbeiterName?' · '+e.anschluss.mitarbeiterName:'')+
+            (e.anschluss.angebotId?' · Angebot #'+e.anschluss.angebotId:'')));
+        }
       }
       detail.append(card);
     }

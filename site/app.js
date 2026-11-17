@@ -118,9 +118,11 @@ function uhrzeitenAnzeigen() {
   platzhalter.textContent = 'Bitte Anfangszeit auswählen';
   uhrzeitAuswahl.append(platzhalter);
 
-  const zeiten=[...buchbareUhrzeiten];
-  if(ausgewaehlteSonderaktion?.datum===date?.value&&/^\d{2}:\d{2}$/.test(ausgewaehlteSonderaktion.uhrzeit||''))
-    zeiten.push(ausgewaehlteSonderaktion.uhrzeit);
+  const fixedAction=ausgewaehlteSonderaktion?.datum===date?.value&&
+    /^\d{2}:\d{2}$/.test(ausgewaehlteSonderaktion.uhrzeit||'')&&
+    /^\d{2}:\d{2}$/.test(ausgewaehlteSonderaktion.endzeit||'')&&
+    Boolean(ausgewaehlteSonderaktion.veranstaltungsort&&ausgewaehlteSonderaktion.programm_id);
+  const zeiten=fixedAction?[ausgewaehlteSonderaktion.uhrzeit]:[...buchbareUhrzeiten];
   [...new Set(zeiten)].sort().forEach(uhrzeit => {
     const option = document.createElement('option');
     option.value = uhrzeit;
