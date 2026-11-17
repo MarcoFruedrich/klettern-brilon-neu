@@ -3255,10 +3255,6 @@ async function migrateEinsatzplanung(){
 async function start(){
   if(pool){
     await pool.query('SELECT 1');
-    if(process.env.RUN_TEAMERBASE_CALENDAR_REMOVAL==='true'){
-      await pool.query('DROP TABLE IF EXISTS brilon_teamerbase_termine, brilon_teamerbase_programme, brilon_teamerbase_sync_status');
-      console.log('Teamerbase-Kalenderdaten entfernt (RUN_TEAMERBASE_CALENDAR_REMOVAL=true)');
-    }
     if(process.env.RUN_INVOICE_MIGRATION==='true'){
       const sql=fs.readFileSync(path.join(__dirname,'db/migrations/2026-11-06-rechnungen-agb.sql'),'utf8');
       await pool.query(sql);
