@@ -1331,3 +1331,12 @@ header.site-header{overflow:visible}
 .kalender-legende-farbe.frei{background:#e2f1d5;border-color:#9cc69b;}
 .kalender-legende-farbe.teilweise-belegt{background:#fff0c2;border-color:#e5bb4a;}
 .kalender-legende-farbe.gesperrt{background:#f6d9da;border-color:#dca9ae;}
+
+
+/* Mitarbeiter: Bewerbungsablauf und Programmarchiv */
+#staff-planning-list .staff-assignment-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+#staff-planning-list .staff-assignment-actions .btn{min-height:46px;white-space:normal}
+#staff-planning-list .staff-archive-card{background:#fff;border-color:#d2dfd5;color:#173f34}
+#staff-planning-list .staff-archive-card h3{color:#173f34}
+#staff-archive-list .staff-archive-card p{color:#40594f}
+#staff-archive-list .staff-archive-status{padding:9px 11px;border:1px solid #cbdacb;border-radius:8px;background:#eff5ef;font-weight:750}

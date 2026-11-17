@@ -93,12 +93,14 @@ function entryForArea(area,subtitle=''){
   return {key:'area:'+area.id+(subtitle?':'+subtitle:''),title:area.titel,area};
 }
 function showEntry(entry){
-  const content=$('staff-area-content'),planning=$('staff-planning-page'),wiki=$('wiki-staff');
-  const primary=entry.kind==='planning'||entry.kind==='wiki';
+  const content=$('staff-area-content'),planning=$('staff-planning-page'),archive=$('staff-archive-page'),wiki=$('wiki-staff');
+  const primary=['planning','archive','wiki'].includes(entry.kind);
   planning.hidden=entry.kind!=='planning';
+  if(archive)archive.hidden=entry.kind!=='archive';
   wiki.hidden=entry.kind!=='wiki';
   content.hidden=primary;
   if(primary){
+    if(entry.kind==='archive')window.staffArchiveLoad?.();
     for(const button of $('staff-areas-nav').querySelectorAll('button[data-entry-key]')){
       const selected=button.dataset.entryKey===entry.key;
       button.classList.toggle('active',selected);
@@ -150,6 +152,7 @@ function render(data){
   const nav=$('staff-areas-nav');nav.replaceChildren();
   const areas=data.bereiche||[],entries=[
     {key:'planning',title:'Termine und meine Buchungen',kind:'planning'},
+    {key:'archive',title:'Programmarchiv',kind:'archive'},
     {key:'calendar',title:'Brilon-Teilnehmerprüfung',kind:'calendar',data:data.kalender},
     {key:'wiki',title:'Wissenspool',kind:'wiki'}
   ];

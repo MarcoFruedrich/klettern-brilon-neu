@@ -68,17 +68,26 @@
             }
           }catch(error){status.textContent='Aktion nicht möglich: '+error.message;}
         };
-        if(!t.manueller_termin&&t.sonderfreigabe&&(!t.mein_status||['beworben','abgelehnt'].includes(t.mein_status))){
-          const option=t.manueller_termin?null:anschlussAuswahl();if(option)card.append(option.closest('label'));
+        const finalStatuses=['eingeteilt','bestaetigt','abgeschlossen'];
+        const kannAntworten=!finalStatuses.includes(t.mein_status);
+        if(kannAntworten&&!t.manueller_termin&&t.sonderfreigabe){
+          card.append(el('p','Du kannst diesen Termin mit deiner besonderen Freigabe direkt verbindlich übernehmen. Wähle außerdem aus, ob du davor oder danach einen weiteren Termin ermöglichen kannst.'));
+          const option=anschlussAuswahl();card.append(option.closest('label'));
+          const actions=el('div');actions.className='staff-assignment-actions';
           const direct=el('button','Programm verbindlich übernehmen');
           direct.type='button';direct.className='btn';
           direct.onclick=()=>{if(option.reportValidity())action('/api/pruefung/einsatzplanung/direkt-annehmen/'+encodeURIComponent(t.id),{anschlussOption:option.value});};
-          card.append(direct,el('small','Deine Zusage ist verbindlich. Die Kundenbestätigung wird gemäß Verwaltungseinstellung zeitversetzt versandt.'));
-        }else if((t.manueller_termin||!t.sonderfreigabe)&&(!t.mein_status||['beworben','abgelehnt'].includes(t.mein_status))){
+          actions.append(direct);card.append(actions,el('small','Mit der Zusage übernimmst du diesen Einsatz verbindlich. Die Kundenbestätigung wird gemäß Verwaltungseinstellung zeitversetzt versandt.'));
+        }else if(kannAntworten){
+          const explanation=el('p',t.mein_status==='beworben'
+            ?'Deine Bewerbung liegt der Verwaltung vor. Du kannst sie hier aktualisieren.'
+            :'Mit deiner Bewerbung bekundest du Interesse. Verbindlich wird der Termin erst nach Zuweisung durch die Verwaltung und deiner anschließenden Bestätigung.');
+          card.append(explanation);
+          const actions=el('div');actions.className='staff-assignment-actions';
           const button=el('button',t.mein_status==='beworben'?'Bewerbung aktualisieren':'Für Termin bewerben');
           button.type='button';button.className='btn secondary';
           button.onclick=()=>action((t.manueller_termin?'/api/pruefung/einsatzplanung/kalender-bewerben/':'/api/pruefung/einsatzplanung/bewerben/')+encodeURIComponent(t.id));
-          card.append(button);
+          actions.append(button);card.append(actions);
         }
         if(t.mein_status==='eingeteilt'){
           const option=t.manueller_termin?null:anschlussAuswahl();if(option)card.append(option.closest('label'));
@@ -93,6 +102,31 @@
       status.textContent='';
     }catch(error){status.textContent='Termine nicht verfügbar: '+error.message;}
   }
+  async function loadArchive(){
+    const listRoot=document.getElementById('staff-archive-list'),archiveStatus=document.getElementById('staff-archive-status');
+    if(!listRoot||!archiveStatus)return;
+    archiveStatus.textContent='Vergangene Einsätze werden geladen …';
+    try{
+      const list=await request('/api/pruefung/einsatzplanung/archiv');
+      listRoot.replaceChildren();
+      if(!list.length){listRoot.append(el('p','Im Programmarchiv sind noch keine vergangenen, zugewiesenen Termine vorhanden.'));archiveStatus.textContent='';return;}
+      for(const item of list){
+        const card=el('article');card.className='booking staff-archive-card';
+        const date=item.datum?new Date(item.datum+'T12:00:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}):'Datum nicht hinterlegt';
+        card.append(el('h3',date+(item.uhrzeit?' · '+String(item.uhrzeit).slice(0,5)+' Uhr':'')));
+        card.append(el('p',(item.angebot||'Programm')+' · '+(item.ort||'Standort nicht hinterlegt')+
+          (item.dauer?' · '+item.dauer+' Minuten':'')));
+        const state=item.mein_status==='abgeschlossen'?'Leistung als abgeschlossen dokumentiert':
+          item.mein_status==='eingeteilt'?'Termin war dir zugewiesen':'Termin wurde von dir verbindlich bestätigt';
+        card.append(Object.assign(el('p',state),{className:'staff-archive-status'}));
+        if(item.beschreibung)card.append(el('p',item.beschreibung));
+        listRoot.append(card);
+      }
+      archiveStatus.textContent=list.length+' vergangene(r) Einsatz/Einsätze';
+    }catch(error){archiveStatus.textContent='Programmarchiv konnte nicht geladen werden: '+error.message;}
+  }
+  window.staffArchiveLoad=loadArchive;
+  document.getElementById('staff-archive-refresh')?.addEventListener('click',loadArchive);
   document.getElementById('staff-planning-refresh').onclick=loadPlanning;
   const workspace=document.getElementById('staff-portal-workspace');
   const observer=new MutationObserver(()=>{if(!workspace.hidden)loadPlanning();});
