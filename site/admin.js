@@ -2773,7 +2773,45 @@ function anschlussrabattStarten() {
   const kandidatenListe = document.getElementById('anschlussrabatt-kandidaten-liste');
   const kandidatenVorschau = document.getElementById('anschlussrabatt-kandidaten-vorschau');
   const anwendenButton = document.getElementById('anschlussrabatt-anwenden');
+  const termineButton=document.getElementById('anschluss-termine-aktualisieren');
+  const termineStatus=document.getElementById('anschluss-termine-status');
+  const termineListe=document.getElementById('anschluss-termine-liste');
   let geladeneKandidaten = [];
+  async function anschlussTermineLaden(){
+    if(!termineListe||!termineStatus)return;
+    termineStatus.textContent='Bestätigte Termine werden geladen …';
+    termineListe.replaceChildren();
+    try{
+      const daten=await api('/api/admin/anschlussrabatt/termine');
+      const farben={gruen:'#16834a',rot:'#bd2638',gelb:'#e0a100',grau:'#78828a'};
+      for(const termin of daten.termine||[]){
+        const karte=document.createElement('article');karte.className='card';
+        karte.style.display='flex';karte.style.alignItems='flex-start';karte.style.gap='12px';
+        karte.style.padding='14px';karte.style.margin='0';
+        const markierung=document.createElement('span');
+        markierung.setAttribute('aria-label',termin.anschlussHinweis||'Anschlussstatus');
+        markierung.title=termin.anschlussHinweis||'Anschlussstatus';
+        Object.assign(markierung.style,{display:'block',flex:'0 0 18px',width:'18px',height:'18px',marginTop:'3px',
+          borderRadius:'50%',backgroundColor:farben[termin.anschlussStatus]||farben.grau,
+          border:'1px solid rgba(0,0,0,.18)'});
+        const inhalt=document.createElement('div');inhalt.style.minWidth='0';inhalt.style.flex='1';
+        const datum=termin.datum?new Date(termin.datum+'T12:00:00').toLocaleDateString('de-DE'):'Datum offen';
+        const uhr=termin.uhrzeit?String(termin.uhrzeit).slice(0,5)+' Uhr':'Uhrzeit offen';
+        inhalt.append(el('strong',datum+' · '+uhr+' · '+(termin.angebot||'Programm')));
+        inhalt.append(el('p',(termin.standort?termin.standort+' · ':'')+
+          (termin.buchungsnummer?'Buchung '+termin.buchungsnummer:'Bestätigte Buchung')));
+        const trainer=(termin.trainer||[]).map(person=>person.name+
+          (person.anschlussOption?(' · Anschluss '+person.anschlussOption):''));
+        inhalt.append(el('p',termin.anschlussHinweis+(trainer.length?' · '+trainer.join(', '):'')));
+        karte.append(markierung,inhalt);termineListe.append(karte);
+      }
+      termineStatus.textContent=(daten.termine||[]).length
+        ?(daten.termine.length+' bestätigte Termine der nächsten '+(daten.monate||3)+' Monate.')
+        :'In den nächsten drei Monaten liegen keine bestätigten Termine vor.';
+    }catch(error){termineStatus.textContent='Termine konnten nicht geladen werden: '+(error.message||'Fehler');}
+  }
+  if(termineButton)termineButton.addEventListener('click',anschlussTermineLaden);
+  anschlussTermineLaden();
   const euro = cent => (cent / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
   async function ausgewaehlteBuchungenVorschauen() {
     const ids = Array.from(kandidatenListe.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value);

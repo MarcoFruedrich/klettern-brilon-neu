@@ -679,15 +679,15 @@
         const connectionLabels={davor:'Termin davor',danach:'Termin danach',beides:'Termin davor und danach'};
         const connectionStaff=(e.staff||[]).filter(person=>person.status==='bestaetigt'&&connectionLabels[person.anschluss_option]);
         if(connectionStaff.length){
-          const info=mk('p','ck-followup-availability','Mitarbeiterbereitschaft für Zusatzangebote: '+
+          const info=mk('p','ck-followup-availability','Bestätigte Anschlusskapazität: '+
             connectionStaff.map(person=>person.name+' ('+connectionLabels[person.anschluss_option]+')').join(', '));
           card.append(info);
-          card.append(btn('Zusatzangebote automatisch vorschlagen','ck-plan-followup',async event=>{
-            const button=event.currentTarget;button.disabled=true;stateText.textContent='Zeitfenster werden berechnet und der Verwaltung vorgelegt …';
+          card.append(btn('Anschlussangebote anzeigen','ck-plan-followup',async event=>{
+            const button=event.currentTarget;button.disabled=true;stateText.textContent='Anschlussangebote werden geladen …';
             try{
               const result=await api('/api/admin/aktionen/vorschlaege',{method:'POST',headers:{'Content-Type':'application/json'},
                 body:JSON.stringify({buchung_id:e.id})});
-              stateText.textContent=result.nachricht||'Automatische Vorschläge wurden der Verwaltung vorgelegt.';
+              stateText.textContent=result.nachricht||'Anschlussangebote wurden erstellt und veröffentlicht.';
               window.dispatchEvent(new CustomEvent('klettern:sonderangebote-aktualisieren'));
               window.adminNavigateToElement?.('special-offers-section');
             }catch(error){stateText.textContent=error.message||'Zusatzangebote konnten nicht vorgeschlagen werden.';button.disabled=false;}

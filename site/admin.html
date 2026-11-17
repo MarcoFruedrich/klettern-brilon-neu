@@ -453,6 +453,14 @@
 
 <section id="anschlussrabatt-section" class="booking admin-view" data-admin-view aria-labelledby="anschlussrabatt-heading">
         <h2 id="anschlussrabatt-heading">Anschlussrabatt berechnen</h2>
+        <section class="booking" aria-labelledby="anschluss-terminuebersicht-heading">
+          <h3 id="anschluss-terminuebersicht-heading">Bestätigte Termine – nächste drei Monate</h3>
+          <p>Die Markierung zeigt, ob für den Termin bereits ein Anschlussprogramm veröffentlicht wurde oder noch eine Rückmeldung fehlt.</p>
+          <p><span aria-hidden="true">🟢</span> veröffentlicht · <span aria-hidden="true">🔴</span> angefragt, aber nicht möglich · <span aria-hidden="true">🟡</span> Trainerantwort offen · <span aria-hidden="true">⚪</span> noch kein Trainer bestätigt</p>
+          <button id="anschluss-termine-aktualisieren" type="button" class="btn secondary">Termine aktualisieren</button>
+          <p id="anschluss-termine-status" role="status" aria-live="polite"></p>
+          <div id="anschluss-termine-liste" class="admin-grid"></div>
+        </section>
         <p>Unverbindliche Vorschau: Bei direkt aufeinanderfolgenden Programmen
           werden beide Programme um 10 % reduziert. Ein Programm erhaelt
           den Rabatt auch bei zwei Anschluessen nur einmal.</p>

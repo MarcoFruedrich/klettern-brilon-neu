@@ -937,6 +937,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
            AND (a.data->>'datum' IS NULL OR a.data->>'datum'=''
              OR jsonb_array_length(COALESCE(p.verfuegbare_termine,'[]'::jsonb))=0
              OR p.verfuegbare_termine ? (a.data->>'datum'))
+         WHERE COALESCE(a.data->>'status','veroeffentlicht')='veroeffentlicht'
          ORDER BY a.data->>'datum' ASC NULLS LAST,a.id DESC LIMIT 100`
       );
       return reply(res,200,q.rows);
@@ -2462,11 +2463,53 @@ preis=safeText(d.preis,50);
         return reply(res,201,{id,zugangslink:`/gps.html?zugang=${encodeURIComponent(token)}`});
       }
 
+      // Lesende Anschlussübersicht für bestätigte Buchungen der kommenden drei Monate.
+      if(route==='/api/admin/anschlussrabatt/termine'&&req.method==='GET'){
+        const q=await pool.query(`
+          SELECT b.id,b.buchungsnummer,b.data,
+            COALESCE(jsonb_agg(jsonb_build_object('name',m.name,'anschlussOption',e.anschluss_option)
+              ORDER BY m.name) FILTER (WHERE e.status='bestaetigt'), '[]'::jsonb) AS trainer,
+            EXISTS(SELECT 1 FROM brilon_aktionen a
+              WHERE a.data->>'quelle_buchung_id'=b.id::text
+                AND COALESCE(a.data->>'status','veroeffentlicht')='veroeffentlicht') AS anschluss_veroeffentlicht,
+            CASE
+              WHEN EXISTS(SELECT 1 FROM brilon_aktionen a WHERE a.data->>'quelle_buchung_id'=b.id::text
+                AND COALESCE(a.data->>'status','veroeffentlicht')='veroeffentlicht') THEN 'gruen'
+              WHEN EXISTS(SELECT 1 FROM brilon_einsaetze e WHERE e.buchung_id=b.id AND e.status='bestaetigt'
+                AND e.anschluss_option IN ('keine','davor','danach','beides')) THEN 'rot'
+              WHEN EXISTS(SELECT 1 FROM brilon_einsaetze e WHERE e.buchung_id=b.id AND e.status='eingeteilt') THEN 'gelb'
+              ELSE 'grau'
+            END AS anschluss_status
+          FROM brilon_buchungen b
+          LEFT JOIN brilon_einsaetze e ON e.buchung_id=b.id
+          LEFT JOIN brilon_pruef_mitarbeitende m ON m.id=e.mitarbeiter_id
+          WHERE b.status='bestaetigt'
+            AND b.data->>'datum'>=CURRENT_DATE::text
+            AND b.data->>'datum'<=(CURRENT_DATE+INTERVAL '3 months')::date::text
+          GROUP BY b.id
+          ORDER BY b.data->>'datum',b.data->>'uhrzeit',b.created_at
+        `);
+        const termine=q.rows.map(row=>{
+          const data=row.data||{};
+          const status=row.anschluss_status;
+          return {
+            id:row.id,buchungsnummer:row.buchungsnummer||data.buchungsnummer||null,
+            datum:data.datum||'',uhrzeit:data.uhrzeit||'',angebot:data.angebot||'Programm',
+            standort:data.veranstaltungsort||'',trainer:row.trainer||[],
+            anschlussStatus:status,
+            anschlussHinweis:status==='gruen'?'Anschlussprogramm veröffentlicht':
+              status==='rot'?'Angefragt, aber nicht möglich':
+              status==='gelb'?'Trainerantwort steht noch aus':'Noch kein Trainer bestätigt'
+          };
+        });
+        return reply(res,200,{termine,monate:3});
+      }
+
       // Lesende Uebersicht: angrenzende bestaetigte Buchungen am selben Tag.
       // Keine automatische Rabattberechtigung und keine Preisveraenderung.
       if(route==='/api/admin/anschlussrabatt/kandidaten'&&req.method==='GET'){
         const datum=u.searchParams.get('datum')||'';
-        if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(datum))
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(datum))
           return reply(res,400,{error:'Datum im Format YYYY-MM-DD erforderlich.'});
         const q=await pool.query(
           `SELECT id,buchungsnummer,data FROM brilon_buchungen
