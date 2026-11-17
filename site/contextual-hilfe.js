@@ -39,7 +39,12 @@
     const tip=document.createElement('span');tip.className='context-help-tip';tip.id='context-help-'+(++seq);tip.setAttribute('role','tooltip');tip.hidden=true;tip.textContent=message;button.setAttribute('aria-describedby',tip.id);
     button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();const open=button.getAttribute('aria-expanded')==='true';document.querySelectorAll('.context-help-button[aria-expanded="true"]').forEach(b=>{b.setAttribute('aria-expanded','false');const t=b.parentElement?.querySelector('.context-help-tip');if(t)t.hidden=true;});if(!open){button.setAttribute('aria-expanded','true');tip.hidden=false;}});
     button.addEventListener('keydown',event=>{if(event.key==='Escape'){button.setAttribute('aria-expanded','false');tip.hidden=true;button.focus();}});
-    wrap.append(button,tip);target.insertAdjacentElement('afterend',wrap);
+    wrap.append(button,tip);
+    const control=target.querySelector('input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea');
+    if(control){
+      const field=document.createElement('span');field.className='context-help-control';
+      control.insertAdjacentElement('beforebegin',field);field.append(control,wrap);
+    }else target.insertAdjacentElement('afterend',wrap);
   }
   function scan(root=document){
     root.querySelectorAll?.('label').forEach(label=>{const txt=label.textContent||'';attach(label,txt.replace(/[＊*]/g,'').trim());});
