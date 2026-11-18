@@ -2094,7 +2094,7 @@ if (neuesAngebotForm) {
       await window.besuchergruppenProgrammeAktualisieren?.();
       programTab='liste';
       adminAnsichtAnzeigen('angebote-verwaltung');
-      status.textContent='Neues Erlebnisangebot wurde gespeichert.';
+      status.textContent=erstellt.gruppenZuordnungGespeichert===false?'Programm gespeichert, aber die Besuchergruppen-Zuordnung konnte nicht übernommen werden. Bitte die Gruppenpflege prüfen.':'Neues Erlebnisangebot wurde gespeichert und steht in der Gruppenauswahl bereit.';
     } catch (fehler) {
       alert('Speichern fehlgeschlagen: ' + fehler.message);
     }
@@ -2690,7 +2690,7 @@ preisButton.addEventListener('click', async () => {
 
   try {
     const preise=Object.fromEntries(gruppenstufen.map(stufe=>[`${stufe.min}-${stufe.max}`,stufe.preis]));
-    await api('/api/admin/angebote/' + angebot.id, {
+    const gespeichertesProgramm=await api('/api/admin/angebote/' + angebot.id, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json'
@@ -2709,7 +2709,7 @@ preisButton.addEventListener('click', async () => {
 })
     });
 
-    alert('Gruppenpreise erfolgreich gespeichert.');
+    alert(gespeichertesProgramm.gruppenZuordnungGespeichert===false?'Programm gespeichert, aber Besuchergruppen-Zuordnung nicht übernommen. Bitte Gruppenpflege prüfen.':'Gruppenpreise und Besuchergruppen-Zuordnung erfolgreich gespeichert.');
     await erlebnisangeboteLaden();
   } catch (fehler) {
     alert('Speichern fehlgeschlagen: ' + fehler.message);
