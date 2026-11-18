@@ -395,4 +395,39 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.close();
   });
 
+  await t.test('Programmkarten erscheinen an allen zugeordneten Standorten und nur dort',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    await fakePublicApi(page);
+    await page.route('**/api/orte',route=>route.fulfill({status:200,contentType:'application/json',
+      body:JSON.stringify(['Jugendherberge Brilon','Olpe','Rüthen','Soest'].map((name,i)=>({id:i+1,name})))}));
+    const angebot={id:77,name:'Standort-Test-Klettern',beschreibung:'Test nur für Mehrfachstandort',
+      veranstaltungsort:'Jugendherberge Brilon',
+      veranstaltungsorte:['Jugendherberge Brilon','Olpe','Rüthen'],dauer:180,
+      gruppenstufen:[{min:1,max:10,dauer:180,preis:165}],dauer_modus:'gruppenstufe',
+      preise:{'1-10':165},kapazitaet:20,aktiv:true,buchbar:true,veroeffentlicht:true,
+      verfuegbare_termine:[],kategorie:'Klettern',zielgruppe:'Gruppe'};
+    const einzel={...angebot,id:78,name:'Nur-Brilon-Test',
+      veranstaltungsorte:['Jugendherberge Brilon']};
+    await page.route('**/api/angebote',route=>route.fulfill({status:200,contentType:'application/json',
+      body:JSON.stringify([angebot,einzel])}));
+    await page.goto(root+'/#angebote');
+    const filter=page.locator('#angebote-standort-filter');
+    await filter.selectOption('Olpe');
+    await page.waitForFunction(()=>document.getElementById('standortwahl-status')?.textContent?.includes('Olpe: 1'));
+    assert.match(await page.locator('#angebote-uebersicht').textContent(),/Standort-Test-Klettern/);
+    assert.doesNotMatch(await page.locator('#angebote-uebersicht').textContent(),/Nur-Brilon-Test/);
+    assert.equal(await page.locator('#angebot-auswahl option[value="Standort-Test-Klettern"]').count(),1);
+    await filter.selectOption('Rüthen');
+    await page.waitForFunction(()=>document.getElementById('standortwahl-status')?.textContent?.includes('Rüthen: 1'));
+    assert.match(await page.locator('#angebote-uebersicht').textContent(),/Standort-Test-Klettern/);
+    await filter.selectOption('Soest');
+    await page.waitForFunction(()=>document.getElementById('standortwahl-status')?.textContent?.includes('Soest: 0'));
+    assert.doesNotMatch(await page.locator('#angebote-uebersicht').textContent(),/Standort-Test-Klettern/);
+    await filter.selectOption('Jugendherberge Brilon');
+    await page.waitForFunction(()=>document.getElementById('standortwahl-status')?.textContent?.includes('Jugendherberge Brilon: 2'));
+    assert.match(await page.locator('#angebote-uebersicht').textContent(),/Standort-Test-Klettern/);
+    assert.match(await page.locator('#angebote-uebersicht').textContent(),/Nur-Brilon-Test/);
+    await page.close();
+  });
+
 });
