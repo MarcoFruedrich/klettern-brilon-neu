@@ -360,4 +360,39 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     assert.match(await page.locator('#booking-status').textContent(),/Keine Anzahlung erforderlich/);
     await page.close();
   });
+  await t.test('Buchungsvarianten 180 und 240 Minuten bleiben pro Teilnehmerbereich separat wählbar',async()=>{
+    const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
+    await fakePublicApi(page);
+    const stufen=[
+      {min:1,max:10,preis:165,dauer:180},{min:11,max:15,preis:225,dauer:180},
+      {min:1,max:10,preis:220,dauer:240},{min:11,max:15,preis:300,dauer:240}
+    ];
+    await page.route('**/api/angebote',route=>route.fulfill({
+      status:200,contentType:'application/json',
+      body:JSON.stringify([{id:88,name:'Variantenprogramm',beschreibung:'Automatisierter Test',
+        dauer:180,dauer_modus:'gruppenstufe',gruppenstufen:stufen,
+        preise:{'1-10':165,'11-15':225},kapazitaet:20,veranstaltungsort:'Brilon',
+        buchbar:true,veroeffentlicht:true,aktiv:true,verfuegbare_termine:[]}])
+    }));
+    await page.goto(root+'/#buchung');
+    await page.locator('#buchungs-standort').selectOption('Brilon');
+    await page.locator('#angebot-auswahl option[value="Variantenprogramm"]').waitFor({state:'attached'});
+    await page.locator('#angebot-auswahl').selectOption('Variantenprogramm');
+    await page.locator('#buchungs-teilnehmer').fill('6');
+    const select=page.locator('#buchungs-programmdauer');
+    await page.waitForFunction(()=>!document.getElementById('buchungs-programmdauer-feld')?.hidden);
+    assert.equal(await select.locator('option[value="180"]').count(),1);
+    assert.equal(await select.locator('option[value="240"]').count(),1);
+    await select.selectOption('240');
+    await page.waitForFunction(()=>document.getElementById('angebots-preis')?.textContent.includes('220,00'));
+    assert.match(await page.locator('#buchungs-dauer').textContent(),/4 Std/);
+    await page.locator('#buchungs-teilnehmer').fill('12');
+    await page.waitForFunction(()=>document.getElementById('angebots-preis')?.textContent.includes('300,00'));
+    assert.match(await page.locator('#buchungs-dauer').textContent(),/4 Std/);
+    await select.selectOption('180');
+    await page.waitForFunction(()=>document.getElementById('angebots-preis')?.textContent.includes('225,00'));
+    assert.match(await page.locator('#buchungs-dauer').textContent(),/3 Std/);
+    await page.close();
+  });
+
 });
