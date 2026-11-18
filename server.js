@@ -2961,6 +2961,40 @@ if(staffArea&&req.method==='DELETE'){
 }
 
 
+// Speichert die Zuordnung neuer oder bearbeiteter Programme direkt in der
+// vorhandenen Besuchergruppen-Liste. Andere Gruppendaten bleiben unverändert.
+async function programmBesuchergruppenSynchronisieren(programmId,gewahlteIds){
+  if(!Array.isArray(gewahlteIds))return true;
+  if(gewahlteIds.length>30||gewahlteIds.some(id=>typeof id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(id)))
+    return false;
+  const auswahl=new Set(gewahlteIds);
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const q=await client.query('SELECT daten FROM brilon_besuchergruppen WHERE id=1 FOR UPDATE');
+    if(!q.rowCount||!Array.isArray(q.rows[0].daten)){
+      await client.query('ROLLBACK');
+      return false;
+    }
+    const vorher=q.rows[0].daten;
+    const aktualisiert=vorher.map(group=>{
+      if(!group||typeof group!=='object')return group;
+      const ids=Array.isArray(group.programmIds)?group.programmIds:[];
+      const sauber=[...new Set(ids.map(Number).filter(x=>Number.isSafeInteger(x)&&x>0))];
+      const ohne=sauber.filter(id=>id!==Number(programmId));
+      if(auswahl.has(group.id))ohne.push(Number(programmId));
+      return {...group,programmIds:ohne};
+    });
+    await client.query('UPDATE brilon_besuchergruppen SET daten=$1::jsonb,aktualisiert_am=NOW() WHERE id=1',[JSON.stringify(aktualisiert)]);
+    await client.query('COMMIT');
+    return true;
+  }catch(error){
+    await client.query('ROLLBACK');
+    console.error('Programm-Besuchergruppen-Zuordnung fehlgeschlagen:',error.code||error.message);
+    return false;
+  }finally{client.release();}
+}
+
 /* Besuchergruppen: zentrale öffentliche Daten und persistente Verwaltungsbearbeitung. */
 if(route==='/api/admin/besuchergruppen'&&(req.method==='GET'||req.method==='PUT')){
   if(!await admin(req,res))return;
@@ -3288,9 +3322,11 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
       buchungsmodus==='einzelplatz'?preisProPerson:0,bildUrl||null]
   );
 
+  const gruppenZuordnungGespeichert=await programmBesuchergruppenSynchronisieren(q.rows[0].id,d.besuchergruppen);
   return reply(res, 201, {
     success: true,
-    id: q.rows[0].id
+    id: q.rows[0].id,
+    gruppenZuordnungGespeichert
   });
 }
 
@@ -3389,7 +3425,8 @@ const q = await pool.query(
     });
   }
 
-  return reply(res, 200, q.rows[0]);
+  const gruppenZuordnungGespeichert=await programmBesuchergruppenSynchronisieren(q.rows[0].id,d.besuchergruppen);
+  return reply(res, 200, {...q.rows[0],gruppenZuordnungGespeichert});
 }
      const bildRoute = route.match(
   /^\/api\/admin\/angebote\/([0-9]+)\/bild$/
