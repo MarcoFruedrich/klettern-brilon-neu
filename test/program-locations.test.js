@@ -13,7 +13,7 @@ const routeStart=server.indexOf('const programmStandortRoute=route.match(');
 const routeEnd=server.indexOf('const preisRoute = route.match(',routeStart);
 assert.ok(routeStart>0&&routeEnd>routeStart,'Separater Standort-Speicherweg muss vorhanden sein');
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
-const save=new AsyncFunction('route','req','body','reply','pool','programmStandorteValidieren','programmStandorteAktivPruefen',
+const save=new AsyncFunction('route','req','res','body','reply','pool','programmStandorteValidieren','programmStandorteAktivPruefen',
   server.slice(routeStart,routeEnd));
 
 test('Mehrere gültige Standorte bleiben in ursprünglicher Auswahl erhalten',()=>{
@@ -32,7 +32,7 @@ test('Eigenständiger Speicherweg ändert nur Standortliste und Hauptstandort',a
     queryCalls.push({sql,args});
     return {rowCount:1,rows:[{id:7,veranstaltungsort:orte[0],veranstaltungsorte:orte}]};
   }};
-  const result=await save('/api/admin/angebote/7/standorte',{method:'PATCH'},
+  const result=await save('/api/admin/angebote/7/standorte',{method:'PATCH'},{},
     async()=>({veranstaltungsorte:orte}),(_res,status,data)=>({status,data}),pool,validieren,async()=>true);
   assert.equal(result.status,200);
   assert.equal(result.data.success,true);
@@ -46,10 +46,10 @@ test('Eigenständiger Speicherweg ändert nur Standortliste und Hauptstandort',a
 test('Ungültige oder deaktivierte Standortauswahl wird ohne Datenänderung abgelehnt',async()=>{
   const pool={query:async()=>{throw Error('Ungültige Auswahl darf nicht gespeichert werden');}};
   const reply=(_res,status,data)=>({status,data});
-  const bad=await save('/api/admin/angebote/7/standorte',{method:'PATCH'},
+  const bad=await save('/api/admin/angebote/7/standorte',{method:'PATCH'},{},
     async()=>({veranstaltungsorte:['Olpe','Olpe']}),reply,pool,validieren,async()=>true);
   assert.equal(bad.status,400);
-  const inactive=await save('/api/admin/angebote/7/standorte',{method:'PATCH'},
+  const inactive=await save('/api/admin/angebote/7/standorte',{method:'PATCH'},{},
     async()=>({veranstaltungsorte:['Olpe']}),reply,pool,validieren,async()=>false);
   assert.equal(inactive.status,400);
 });
