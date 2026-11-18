@@ -26,6 +26,7 @@ const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { createWissensportalApi } = require('./lib/wissensportal-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild } = require('./lib/bilddatei');
+const { createMedienarchivApi } = require('./lib/medienarchiv-api');
 const { createClamScanner } = require('./lib/malware-scanner');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 const BUCHUNGS_DATENSCHUTZ_VERSION='2026-11-03-v1';
@@ -51,6 +52,7 @@ const brevoMail=createBrevoMailer();
 const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
+const medienarchivApi=createMedienarchivApi({pool,supabase,reply,body,limit,scanForMalware,malwareScanReply});
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
 function malwareScanReply(res,error){
   const detected=error?.code==='MALWARE_FOUND';
@@ -2039,6 +2041,7 @@ preis=safeText(d.preis,50);
     if(route.startsWith('/api/admin/')){
       if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+      if(await medienarchivApi.handle(req,res,route,ip))return;
 
       if(route==='/api/admin/feedback'&&req.method==='GET'){
         const q=await pool.query(`SELECT COALESCE(b.buchungsnummer,b.data->>'buchungsnummer') AS kundennummer,
