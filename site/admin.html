@@ -48,6 +48,7 @@
             <a href="#rechnungen-agb-section" data-admin-view-link>Rechnungen &amp; AGB</a>
             <a href="#calendar-view" data-admin-view-link>Kalender</a>
             <a href="#angebote-verwaltung" data-admin-view-link>Programme</a>
+            <a href="#medienbibliothek" data-admin-view-link>Medienbibliothek</a>
             <a href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
             <a href="#anschlussrabatt-section" data-admin-view-link>Anschlussrabatte</a>
             <a href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
@@ -71,6 +72,7 @@
           <a class="admin-dashboard-link" href="#rechnungen-agb-section" data-admin-view-link>Rechnungen &amp; AGB</a>
           <a class="admin-dashboard-link" href="#calendar-view" data-admin-view-link>Kalender</a>
           <a class="admin-dashboard-link" href="#angebote-verwaltung" data-admin-view-link>Programme</a>
+          <a class="admin-dashboard-link" href="#medienbibliothek" data-admin-view-link>Medienbibliothek</a>
           <a class="admin-dashboard-link" href="#special-offers-view" data-admin-view-link>Tagesangebote</a>
           <a class="admin-dashboard-link" href="#anschlussrabatt-section" data-admin-view-link>Anschlussrabatte</a>
           <a class="admin-dashboard-link" href="#admin-guestbook-section" data-admin-view-link>Gästeliste</a>
@@ -88,6 +90,17 @@
           <a class="admin-dashboard-link" href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
         </nav></section>
 
+<section id="medienbibliothek" class="booking admin-view" data-admin-view aria-labelledby="medien-heading">
+<h2 id="medien-heading">Medienbibliothek / Bildarchiv</h2>
+<p>JPG, PNG, WebP oder statische GIFs direkt hochladen. GIF-Dateien werden als unbewegte PNGs gespeichert. Die Bilder bleiben dauerhaft im Bildspeicher und sind anschliessend in der Programmbild-Auswahl verfuegbar.</p>
+<form id="medien-upload-form" class="admin-grid">
+<label>Bilddateien auswaehlen <input id="medien-dateien" type="file" accept="image/jpeg,image/png,image/webp,image/gif,.gif" multiple required></label>
+<button class="btn" type="submit">Bilder hochladen</button>
+</form>
+<p id="medien-status" role="status" aria-live="polite"></p>
+<button id="medien-aktualisieren" class="btn secondary" type="button">Bibliothek aktualisieren</button>
+<div id="medien-liste" class="admin-grid" aria-live="polite"></div>
+</section>
       <section id="rechnungen-agb-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="rechnungen-agb-heading">
         <h2 id="rechnungen-agb-heading">Rechnungen &amp; Geschäftsbedingungen</h2>
         <p>Hinterlege hier die Rechnungsstellerdaten und die aktuelle AGB-Fassung. Vollständig bezahlte Buchungen erhalten automatisch eine PDF-Rechnung per E-Mail. Der Zahlungseingang verwendet das beim Zahlungseintrag erfasste Datum.</p>
@@ -312,9 +325,9 @@
         <option value="">Kein vorhandenes Bild auswählen</option>
       </select>
     </label>
-    <p class="hint">Oder lade ein neues JPG-, PNG- oder WebP-Bild hoch (maximal 5 MB).</p>
+    <p class="hint">Oder lade ein neues JPG-, PNG- oder WebP-Bild hoch (maximal 5 MB). Statische GIFs bitte vorher in der Medienbibliothek hochladen.</p>
     <label>Bilddatei hochladen
-      <input name="bildDatei" id="angebot-bild-datei" type="file" accept="image/jpeg,image/png,image/webp">
+      <input name="bildDatei" id="angebot-bild-datei" type="file" accept="image/jpeg,image/png,image/webp,image/gif,.gif">
     </label>
     <img id="angebot-bild-vorschau" alt="Vorschau des Programm-Titelbilds" hidden>
   </fieldset>
