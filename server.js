@@ -3006,7 +3006,7 @@ if(route==='/api/admin/medien'){
   if(req.method==='PUT'){
     if(!limit('medien-ersetzen:'+ip,20,600000))return reply(res,429,{error:'Zu viele Bildaustausche. Bitte später erneut versuchen.'});
     const pfad=safeText(new URL(req.url,'http://localhost').searchParams.get('pfad'),240);
-    if(!/^(?:[a-zA-Z0-9_-]+\\/){0,4}[a-zA-Z0-9._-]+\\.(?:png|jpe?g|webp|gif)$/i.test(pfad)||pfad.includes('..'))return reply(res,400,{error:'Ungültiger Medienpfad.'});
+    if(!/^(?:[a-zA-Z0-9_-]+\/){0,4}[a-zA-Z0-9._-]+\.(?:png|jpe?g|webp|gif)$/i.test(pfad)||pfad.includes('..'))return reply(res,400,{error:'Ungültiger Medienpfad.'});
     const vorhanden=await bucket.download(pfad);
     if(vorhanden.error)return reply(res,404,{error:'Das zu ersetzende Bild wurde in der Mediathek nicht gefunden.'});
     const typ=String(req.headers['content-type']||'').split(';')[0].toLowerCase();
