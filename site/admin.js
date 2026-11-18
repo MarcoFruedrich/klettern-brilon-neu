@@ -2091,6 +2091,7 @@ if (neuesAngebotForm) {
       angebotsKapazitaetPruefen();
       createTierDurationMode();
       await refresh();
+      await window.besuchergruppenProgrammeAktualisieren?.();
       programTab='liste';
       adminAnsichtAnzeigen('angebote-verwaltung');
       status.textContent='Neues Erlebnisangebot wurde gespeichert.';
