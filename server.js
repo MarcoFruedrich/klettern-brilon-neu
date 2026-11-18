@@ -659,6 +659,10 @@ async function main(req,res){
       if(sonderaktionId){
         const action=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[sonderaktionId]);
         const special=action.rows[0]?.data||{};
+        const erlaubteStandorte=Array.isArray(special.veranstaltungsorte)&&special.veranstaltungsorte.length
+          ?special.veranstaltungsorte:[special.veranstaltungsort].filter(Boolean);
+        if(erlaubteStandorte.length&&!erlaubteStandorte.includes(bookingSite))
+          return reply(res,409,{error:'Diese Sonderaktion ist für den ausgewählten Standort nicht freigegeben.'});
         const fixed=Boolean(special.uhrzeit&&special.endzeit&&special.veranstaltungsort&&special.programm_id);
         if(fixed)exactAction=special;
         if(fixed&&(String(special.programm_id)!==String(programm.id)||special.datum!==datum||
