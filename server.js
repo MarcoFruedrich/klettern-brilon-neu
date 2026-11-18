@@ -3356,6 +3356,30 @@ if (preisRoute && req.method === 'PATCH') {
   );
   if(!bisher.rowCount)return reply(res,404,{error:'Angebot nicht gefunden.'});
   const alt=bisher.rows[0];
+  // A selected library image must be independently saveable, without rewriting
+  // prices, participant tiers or the rest of the program.
+  if(Object.prototype.hasOwnProperty.call(d,'bild_url')){
+    if(typeof d.bild_url!=='string')return reply(res,400,{error:'Ungültige Bildadresse.'});
+    const candidate=d.bild_url.trim();
+    let safe=false;
+    if(candidate==='')safe=true;
+    else if(/^\/(?:fotos|images|bilder|assets)\/[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp|gif)$/i.test(candidate)&&!candidate.includes('..'))safe=true;
+    else {
+      try {
+        const parsed=new URL(candidate);
+        const configured=process.env.SUPABASE_URL?new URL(process.env.SUPABASE_URL).hostname:'';
+        safe=parsed.protocol==='https:'&&!!configured&&parsed.hostname===configured&&
+          parsed.pathname.startsWith('/storage/v1/object/public/angebotsbilder/')&&
+          !parsed.username&&!parsed.password&&!parsed.search&&!parsed.hash&&
+          !parsed.pathname.includes('..');
+      }catch{}
+    }
+    if(!safe||candidate.length>1000)return reply(res,400,{error:'Das Bild muss aus der Medienbibliothek oder aus den freigegebenen Website-Bildern stammen.'});
+    if(Object.keys(d).length===1){
+      const updated=await pool.query('UPDATE brilon_angebote SET bild_url=$1 WHERE id=$2 RETURNING id,bild_url',[candidate||null,preisRoute[1]]);
+      return reply(res,200,{...updated.rows[0],success:true});
+    }
+  }
 const aktiv = typeof d.aktiv === 'boolean' ? d.aktiv : null;
 const name=d.name===undefined?alt.name:safeText(d.name,120);
 const beschreibung = d.beschreibung===undefined?alt.beschreibung:safeText(d.beschreibung,1000);
@@ -3400,11 +3424,11 @@ const q = await pool.query(
        name=$4,beschreibung = $5,
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,kapazitaet=$9,
        verfuegbare_termine=$10::jsonb,hinweise=$11,buchbar=$12,veroeffentlicht=$13,dauer=$14,
-       buchungsmodus=$15,mindestteilnehmer=$16,preis_pro_person=$17,gruppenstufen=$18::jsonb,dauer_modus=$19
+       buchungsmodus=$15,mindestteilnehmer=$16,preis_pro_person=$17,gruppenstufen=$18::jsonb,dauer_modus=$19,bild_url=COALESCE($20,bild_url)
    WHERE id = $2
    RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
-             buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,gruppenstufen,dauer_modus`,
+             buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,gruppenstufen,dauer_modus,bild_url`,
   [
     JSON.stringify(neuePreise),
     preisRoute[1],
@@ -3413,7 +3437,8 @@ const q = await pool.query(
     JSON.stringify(termine),hinweise,buchbar,veroeffentlicht,dauer,
     buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
     buchungsmodus==='einzelplatz'?preisProPerson:0,
-    JSON.stringify(validStufen.stufen),dauerModus
+    JSON.stringify(validStufen.stufen),dauerModus,
+    Object.prototype.hasOwnProperty.call(d,'bild_url')?d.bild_url.trim()||null:null
   ]
 );
 
