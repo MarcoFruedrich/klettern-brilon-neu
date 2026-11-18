@@ -106,5 +106,7 @@
   }
   window.besuchergruppenAktualisieren=gruppenAktualisieren;
   document.addEventListener('besuchergruppenaktualisiert',gruppenAktualisieren);
+  // Nach einer Bearbeitung der Verwaltung in einem anderen Tab aktuelle Gruppen laden.
+  window.addEventListener('focus',gruppenAktualisieren);
   gruppenAktualisieren();
 })();
