@@ -6,6 +6,7 @@
   const input=document.getElementById('medienarchiv-upload-input');
   const filter=document.getElementById('medienarchiv-filter');
   let images=[];
+  let lastLoaded=false;
   const apiRoot='/api/admin/medienarchiv';
   async function request(method='GET',body=null,type='application/json'){
     const headers={};
@@ -32,7 +33,7 @@
     grid.replaceChildren();
     const search=(filter?.value||'').toLocaleLowerCase('de');
     const visible=images.filter(i=>(i.name+' '+i.path+' '+i.verwendung.programme.map(p=>p.name).join(' ')).toLocaleLowerCase('de').includes(search));
-    if(!visible.length){grid.append(node('p','Keine passenden Bilder gefunden.'));return;}
+    if(!visible.length){grid.append(node('p',images.length?'Keine passenden Bilder gefunden.':'Noch keine Bilder im Archiv vorhanden. Lade oben das erste Bild hoch.'));return;}
     for(const img of visible){
       const card=node('article',undefined,'medienarchiv-card');
       const preview=node('img');preview.src=img.url;preview.alt='Vorschau: '+img.name;preview.loading='lazy';
@@ -63,8 +64,8 @@
     }
   }
   async function refresh(){
-    try{status.textContent='Bildarchiv wird geladen …';images=await request();draw();status.textContent=images.length+' Bilder geladen.';}
-    catch(error){status.textContent='Bildarchiv nicht verfügbar: '+error.message;}
+    try{status.textContent='Bildarchiv wird geladen …';images=await request();lastLoaded=true;draw();status.textContent=images.length+' gespeicherte Bilder werden unten als Vorschau angezeigt.';}
+    catch(error){lastLoaded=false;status.textContent='Bildarchiv nicht verfügbar: '+error.message+' (Bitte prüfen, ob die Medienarchiv-API auf dem Server veröffentlicht ist.)';}
   }
   form?.addEventListener('submit',async event=>{
     event.preventDefault();
@@ -79,5 +80,6 @@
   document.getElementById('medienarchiv-refresh')?.addEventListener('click',refresh);
   filter?.addEventListener('input',draw);
   document.querySelector('a[href="#medienarchiv-section"]')?.addEventListener('click',refresh);
+  window.addEventListener('hashchange',()=>{if(location.hash==='#medienarchiv-section'&&!lastLoaded)refresh();});
   if(location.hash==='#medienarchiv-section')refresh();
 })();
