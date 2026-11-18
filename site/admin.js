@@ -997,6 +997,17 @@ bildAusBibliothekButton.addEventListener('click',async()=>{
   }catch(error){bildStatus.textContent='Bild konnte nicht zugeordnet werden: '+error.message;}
   finally{bildAusBibliothekButton.disabled=false;}
 });
+const bildSpeichernButton=document.createElement('button');
+bildSpeichernButton.type='button';
+bildSpeichernButton.className='btn secondary';
+bildSpeichernButton.textContent='Bild dauerhaft speichern';
+bildSpeichernButton.addEventListener('click',async()=>{
+  if(!programBildUrl){bildStatus.textContent='Bitte zuerst ein Bild hochladen oder aus der Medienbibliothek auswählen.';return;}
+  bildSpeichernButton.disabled=true;
+  try{await programmBildSpeichern(programBildUrl);}
+  catch(error){bildStatus.textContent='Bildspeicherung fehlgeschlagen: '+error.message;}
+  finally{bildSpeichernButton.disabled=false;}
+});
 const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
 bildFormatHinweis.className='hint';
 bildBereich.append(bildAuswahl,bildButton,bildAusBibliothekButton,bildStatus,bildFormatHinweis);
@@ -2698,6 +2709,25 @@ gruppenDauerEingabenAktualisieren();
       eintrag.append(titel, beschreibung, details,metadaten);
       eintrag.appendChild(preisbereich);
       const bildBereich = document.createElement('div');
+      let programBildUrl=angebot.bild_url||'';
+      const bildStatus=document.createElement('p');
+      bildStatus.className='hint';
+      bildStatus.setAttribute('role','status');
+      bildStatus.setAttribute('aria-live','polite');
+      bildStatus.textContent=programBildUrl?'Programmbild hinterlegt.':'Noch kein Programmbild hinterlegt.';
+
+      async function programmBildSpeichern(url){
+        const result=await api('/api/admin/angebote/'+angebot.id,{
+          method:'PATCH',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({bild_url:url})
+        });
+        if(result.bild_url!==url)throw new Error('Die Bildzuordnung wurde vom Server nicht bestätigt.');
+        programBildUrl=url;
+        bildVorschau.src=url;
+        if(!bildVorschau.parentNode)bildBereich.insertBefore(bildVorschau,bildAuswahl);
+        bildStatus.textContent='Bild dauerhaft gespeichert und diesem Programm zugeordnet.';
+        return result;
+      }
 
 const bildVorschau = document.createElement('img');
 bildVorschau.alt = 'Foto zum Angebot ' + angebot.name;
@@ -2758,7 +2788,9 @@ bildButton.addEventListener('click', async () => {
       throw new Error(ergebnis.error || 'Upload fehlgeschlagen.');
     }
 
+    programBildUrl=ergebnis.bild_url;
     bildVorschau.src = ergebnis.bild_url;
+    bildStatus.textContent='Bild hochgeladen und dauerhaft dem Programm zugeordnet.';
     if (!bildVorschau.parentNode) {
       bildBereich.insertBefore(bildVorschau, bildAuswahl);
     }
