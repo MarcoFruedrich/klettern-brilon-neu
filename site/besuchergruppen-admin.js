@@ -109,7 +109,35 @@
         bildField.value=bildSelect.value;g.bild=bildSelect.value;preview.src=g.bild;
       });
       bildField.addEventListener('change',()=>{g.bild=bildField.value;preview.src=g.bild;});
-      card.append(field('Bild aus bereits hochgeladenem Programm auswählen',bildSelect),field('Bildadresse',bildField),preview);
+      const coverTools=node('div','','besuchergruppen-admin-icon-tools');
+      const coverChoose=node('button','Bild aus der Mediathek wählen','btn secondary');coverChoose.type='button';
+      coverChoose.addEventListener('click',async()=>{
+        if(typeof window.medienpoolBildAuswaehlen!=='function'){status.textContent='Die Medienbibliothek wird noch geladen.';return;}
+        try{await window.medienpoolBildAuswaehlen(async url=>{g.bild=url;bildField.value=url;preview.src=url;});}
+        catch(error){status.textContent='Bildauswahl fehlgeschlagen: '+error.message;}
+      });
+      const coverUploadInput=document.createElement('input');coverUploadInput.type='file';
+      coverUploadInput.accept='image/jpeg,image/png,image/webp,image/gif';coverUploadInput.hidden=true;
+      const coverUpload=node('button','Bild hochladen','btn secondary');coverUpload.type='button';
+      coverUpload.addEventListener('click',()=>coverUploadInput.click());
+      coverUploadInput.addEventListener('change',async()=>{
+        const file=coverUploadInput.files?.[0];if(!file)return;
+        const allowed=['image/jpeg','image/png','image/webp','image/gif'];
+        const maxBytes=file.type==='image/gif'?3*1024*1024:5*1024*1024;
+        if(!allowed.includes(file.type)){status.textContent='Erlaubt sind JPG/JPEG, PNG, WebP und statische GIFs.';coverUploadInput.value='';return;}
+        if(file.size>maxBytes){status.textContent=file.type==='image/gif'?'Statische GIFs dürfen maximal 3 MB groß sein.':'Das Bild darf maximal 5 MB groß sein.';coverUploadInput.value='';return;}
+        try{
+          status.textContent='Gruppenbild wird in der Medienbibliothek gespeichert …';
+          const saved=await api('/api/admin/medien',{method:'POST',headers:{'Content-Type':file.type,'X-Original-Filename':file.name},body:file});
+          const url=saved.bild?.url||saved.bild_url||'';if(!url)throw new Error('Der Server hat keine Bildadresse zurückgegeben.');
+          g.bild=url;bildField.value=url;preview.src=url;
+          status.textContent='Bild hochgeladen und der Gruppe zugeordnet. Zum dauerhaften Speichern bitte „Besuchergruppen speichern“ wählen.';
+        }catch(error){status.textContent='Bild-Upload fehlgeschlagen: '+error.message;}
+        finally{coverUploadInput.value='';}
+      });
+      coverTools.append(coverChoose,coverUpload);
+      card.append(field('Bild aus bereits hochgeladenem Programm auswählen',bildSelect),field('Bildadresse',bildField),field('Gruppenbild verwalten',coverTools),coverUploadInput,preview,
+        node('small','Bilder werden in der zentralen Mediathek gespeichert und bleiben dort für weitere Gruppen und Programme verfügbar.'));
 
       const checkGroup=node('fieldset','','besuchergruppen-admin-zuordnung');
       checkGroup.append(node('legend','Passende Programme auswählen (Mehrfachauswahl)'));

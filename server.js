@@ -2959,6 +2959,9 @@ if(route==='/api/admin/medien'){
   const bucket=supabase.storage.from('angebotsbilder');
   if(req.method==='GET'){
     const bilder=[];
+    const referenzen=await pool.query(`SELECT bild_url AS url FROM brilon_angebote WHERE bild_url IS NOT NULL
+      UNION SELECT data->>'bild_url' AS url FROM brilon_aktionen WHERE data->>'bild_url' IS NOT NULL`);
+    const verwendeteUrls=new Set(referenzen.rows.map(eintrag=>eintrag.url));
     async function einlesen(ordner='',tiefe=0){
       if(tiefe>3||bilder.length>=500)return;
       const {data,error}=await bucket.list(ordner,{limit:500,sortBy:{column:'created_at',order:'desc'}});
@@ -2967,7 +2970,8 @@ if(route==='/api/admin/medien'){
         const pfad=ordner?ordner+'/'+item.name:item.name;
         if(item.id===null&&!item.metadata){await einlesen(pfad,tiefe+1);continue;}
         if(!/\.(png|jpe?g|webp|gif)$/i.test(item.name))continue;
-        bilder.push({name:item.name,pfad,url:bucket.getPublicUrl(pfad).data.publicUrl,groesse:item.metadata?.size||0});
+        const url=bucket.getPublicUrl(pfad).data.publicUrl;
+        bilder.push({name:item.name,pfad,url,groesse:item.metadata?.size||0,verwendet:verwendeteUrls.has(url)});
       }
     }
     try{await einlesen();return reply(res,200,{bilder:bilder.slice(0,500)});}
@@ -2998,6 +3002,54 @@ if(route==='/api/admin/medien'){
     const {error}=await bucket.upload(dateiname,bild,{contentType:format,upsert:false});
     if(error){console.error('Medien-Upload:',error.message);return reply(res,502,{error:'Datei konnte nicht im Bildspeicher gespeichert werden: '+error.message});}
     return reply(res,201,{success:true,bild:{name:dateiname.split('/').at(-1),pfad:dateiname,url:bucket.getPublicUrl(dateiname).data.publicUrl}});
+  }
+  if(req.method==='PUT'){
+    if(!limit('medien-ersetzen:'+ip,20,600000))return reply(res,429,{error:'Zu viele Bildaustausche. Bitte später erneut versuchen.'});
+    const pfad=safeText(new URL(req.url,'http://localhost').searchParams.get('pfad'),240);
+    if(!/^(?:[a-zA-Z0-9_-]+\\/){0,4}[a-zA-Z0-9._-]+\\.(?:png|jpe?g|webp|gif)$/i.test(pfad)||pfad.includes('..'))return reply(res,400,{error:'Ungültiger Medienpfad.'});
+    const vorhanden=await bucket.download(pfad);
+    if(vorhanden.error)return reply(res,404,{error:'Das zu ersetzende Bild wurde in der Mediathek nicht gefunden.'});
+    const typ=String(req.headers['content-type']||'').split(';')[0].toLowerCase();
+    if(!['image/jpeg','image/png','image/webp','image/gif'].includes(typ))return reply(res,400,{error:'Nur JPEG, PNG, WebP oder statische GIF-Dateien erlaubt.'});
+    const chunks=[];let groesse=0;
+    for await(const chunk of req){groesse+=chunk.length;if(groesse>5*1024*1024)return reply(res,413,{error:'Maximal 5 MB pro Bild.'});chunks.push(chunk);}
+    if(!groesse)return reply(res,400,{error:'Keine Bilddatei empfangen.'});
+    const zielExt=pfad.split('.').at(-1).toLowerCase();
+    let bild,format;
+    try{
+      const input=Buffer.concat(chunks),sharp=require('sharp');
+      let basis;
+      if(typ==='image/gif'){
+        const meta=await sharp(input,{animated:true,limitInputPixels:40_000_000}).metadata();
+        if(meta.format!=='gif'||meta.pages!==1)throw Error('Nur unbewegte GIF-Dateien sind erlaubt.');
+        basis=await sharp(input,{animated:false,limitInputPixels:40_000_000}).png().toBuffer();
+      }else basis=await bereinigeBild(input,typ);
+      if(zielExt==='gif'){
+        bild=await sharp(basis,{animated:false,limitInputPixels:40_000_000}).gif({effort:7}).toBuffer();
+        const meta=await sharp(bild,{animated:true,limitInputPixels:40_000_000}).metadata();
+        if(meta.format!=='gif'||meta.pages!==1)throw Error('Das Bild konnte nicht sicher als statisches GIF gespeichert werden.');
+        format='image/gif';
+        if(process.env.CLAMD_HOST?.trim()){
+          const verdict=await scanForMalware(bild);
+          if(verdict?.sauber!==true)throw Object.assign(new Error('Bildprüfung fehlgeschlagen.'),{code:verdict?.code||'MALWARE_SCAN_ERROR'});
+        }
+      }else{
+        const mimeType={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp'}[zielExt];
+        if(!mimeType)throw Error('Das gespeicherte Bildformat wird nicht unterstützt.');
+        const sharpFormat={ 'image/jpeg':'jpeg','image/png':'png','image/webp':'webp'}[mimeType];
+        const encoded=await sharp(basis,{animated:false,limitInputPixels:40_000_000}).toFormat(sharpFormat).toBuffer();
+        bild=await bereinigeBild(encoded,mimeType);format=mimeType;
+        await pruefeNeuCodiertesAdminBild(bild,format);
+      }
+    }catch(error){
+      if(error?.code==='MALWARE_FOUND'||error?.code==='MALWARE_SCAN_ERROR')return malwareScanReply(res,error);
+      return reply(res,400,{error:'Bilddatei konnte nicht verarbeitet werden: '+error.message});
+    }
+    const url=bucket.getPublicUrl(pfad).data.publicUrl;
+    const {error}=await bucket.upload(pfad,bild,{contentType:format,upsert:true,cacheControl:'0'});
+    if(error){console.error('Medien-Austausch:',error.message);return reply(res,502,{error:'Bild konnte unter der bestehenden Adresse nicht ersetzt werden: '+error.message});}
+    console.info('Medienbibliothek: Bildinhalt bei bestehender Adresse ersetzt:',pfad);
+    return reply(res,200,{success:true,bild:{name:pfad.split('/').at(-1),pfad,url,groesse:bild.length,verwendet:true}});
   }
   if(req.method==='PATCH'||req.method==='DELETE'){
     const daten=await body(req,2048),pfad=safeText(daten?.pfad,240);

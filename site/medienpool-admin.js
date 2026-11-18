@@ -32,7 +32,7 @@
       card.className='booking';
       card.style.cssText='min-width:0;max-width:100%;overflow-wrap:anywhere';
       const preview=document.createElement('img');
-      preview.src=image.url;
+      preview.src=image.url+(image.url.includes('?')?'&':'?')+'v='+encodeURIComponent(String(image.groesse||0));
       preview.alt=image.name||'Gespeichertes Bild';
       preview.loading='lazy';
       preview.style.width='100%';
@@ -47,9 +47,31 @@
       open.href=image.url;
       open.target='_blank';
       open.rel='noopener noreferrer';
+      const note=el('small','Datei bleibt in der Mediathek. Beim Austausch bleiben Dateiname, Adresse und vorhandene Verknüpfungen erhalten.');
+      note.style.cssText='display:block;margin-top:8px;color:#426457';
       const actions=el('div');actions.className='button-row';
       actions.style.cssText='display:flex;flex-wrap:wrap;gap:10px;margin-top:12px';
       if(image.pfad){
+        const replaceInput=document.createElement('input');
+        replaceInput.type='file';replaceInput.accept='image/jpeg,image/png,image/webp,image/gif';replaceInput.hidden=true;
+        const replace=el('button','Bild austauschen');replace.type='button';replace.className='btn secondary';
+        replace.addEventListener('click',()=>replaceInput.click());
+        replaceInput.addEventListener('change',async()=>{
+          const file=replaceInput.files?.[0];if(!file)return;
+          if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)){
+            status.textContent='Erlaubt sind JPG/JPEG, PNG, WebP und unbewegte GIFs.';replaceInput.value='';return;
+          }
+          const maxBytes=file.type==='image/gif'?3*1024*1024:5*1024*1024;
+          if(file.size>maxBytes){status.textContent=file.type==='image/gif'?'Statische GIFs dürfen maximal 3 MB groß sein.':'Das Bild darf maximal 5 MB groß sein.';replaceInput.value='';return;}
+          replace.disabled=true;status.textContent='Neues Bild wird geprüft und unter derselben Adresse gespeichert …';
+          try{
+            await window.api('/api/admin/medien?pfad='+encodeURIComponent(image.pfad),{
+              method:'PUT',headers:{'Content-Type':file.type},body:file
+            });
+            await fetchImages();status.textContent='Bild ausgetauscht. Name, Internetadresse und Verknüpfungen bleiben erhalten; das Bild ist weiterhin in der Mediathek verfügbar.';
+          }catch(error){status.textContent='Bild konnte nicht ausgetauscht werden: '+error.message;}
+          finally{replace.disabled=false;replaceInput.value='';}
+        });
         const rename=el('button','Umbenennen');rename.type='button';rename.className='btn secondary';
         rename.onclick=async()=>{
           const name=prompt('Neuer Bildname:',image.name.replace(/\.[^.]+$/,''));
@@ -67,9 +89,9 @@
             await fetchImages();status.textContent='Bild dauerhaft vom Server entfernt. Freigegebener Speicherplatz: '+Math.ceil((image.groesse||0)/1024)+' KB.';
           }catch(error){status.textContent='Löschen fehlgeschlagen: '+error.message;}
         };
-        actions.append(rename,remove);
+        actions.append(replace,replaceInput,rename,remove);
       }
-      card.append(preview,title,info,open,actions);
+      if(image.verwendet){const inUse=el('strong','Im Einsatz · bleibt in der Mediathek');inUse.style.cssText='display:block;margin-top:8px;color:#0b7049';card.append(preview,title,info,open,inUse,note,actions);}else card.append(preview,title,info,open,note,actions);
       list.append(card);
     }
   }
@@ -152,7 +174,7 @@
       const card=el('article');
       card.className='booking';
       const preview=document.createElement('img');
-      preview.src=image.url;
+      preview.src=image.url+(image.url.includes('?')?'&':'?')+'v='+encodeURIComponent(String(image.groesse||0));
       preview.alt=image.name||'Gespeichertes Bild';
       preview.loading='lazy';
       preview.style.width='100%';
