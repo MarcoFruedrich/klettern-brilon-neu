@@ -3244,7 +3244,7 @@ if(route==='/api/admin/angebote/bilder'&&req.method==='GET'){
 if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
     `SELECT id,name,beschreibung,mitarbeiterbeschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
-            veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
+            veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
             buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,gruppenstufen,dauer_modus
      FROM brilon_angebote
      ORDER BY archiviert ASC,sortierung ASC,id DESC`
@@ -3319,6 +3319,20 @@ if(archivRoute&&req.method==='PATCH'){
   return reply(res,200,q.rows[0]);
 }
   
+// Mehrere Standorte werden unabhängig von Preis- und Teilnehmerstaffeln gepflegt.
+function programmStandorteValidieren(auswahl, fallback=[]){
+  const liste=auswahl===undefined?fallback:auswahl;
+  if(!Array.isArray(liste)||liste.length===0||liste.length>50||
+      liste.some(x=>typeof x!=='string'||!x.trim()||x!==x.trim()||x.length>80)||
+      new Set(liste).size!==liste.length)
+    return {error:'Bitte mindestens einen gültigen Standort auswählen (keine Duplikate).'};
+  return {standorte:liste};
+}
+async function programmStandorteAktivPruefen(standorte){
+  const q=await pool.query('SELECT name FROM brilon_orte WHERE aktiv=true AND name=ANY($1::text[])',[standorte]);
+  return q.rowCount===standorte.length;
+}
+
 function pruefeProgrammstufen(raw,kapazitaet,modus,basisdauer,dauerModus){
   if(modus==='einzelplatz')return {stufen:[]};
   if(!Array.isArray(raw)||!raw.length||raw.length>100)return {error:'Bitte mindestens eine vollständige Teilnehmerstufe angeben.'};
@@ -3359,7 +3373,11 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const dauer = Number(d.dauer);
   const kategorie=safeText(d.kategorie,60)||'Klettern';
   const zielgruppe=safeText(d.zielgruppe,120);
-  const veranstaltungsort=safeText(d.veranstaltungsort,80)||'Brilon';
+  const standortPruefung=programmStandorteValidieren(d.veranstaltungsorte,
+    [safeText(d.veranstaltungsort,80)].filter(Boolean));
+  if(standortPruefung.error)return reply(res,400,{error:standortPruefung.error});
+  const veranstaltungsorte=standortPruefung.standorte;
+  const veranstaltungsort=veranstaltungsorte[0];
   const kapazitaet=Number(d.kapazitaet||20);
   const hinweise=safeText(d.hinweise,1000);
   const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:[];
@@ -3384,32 +3402,51 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
      !Number.isFinite(preisProPerson)||preisProPerson<=0))
     return reply(res,400,{error:'Bei Einzelplätzen müssen Kapazität und Mindestanmeldungen zwischen 5 und 12 liegen. Der Preis pro Person muss größer als 0 € sein.'});
 
-  const place=await pool.query('SELECT id FROM brilon_orte WHERE name=$1 AND aktiv=true',[veranstaltungsort]);
-  if(!place.rowCount)return reply(res,400,{error:'Veranstaltungsort ist nicht angelegt.'});
+  if(!await programmStandorteAktivPruefen(veranstaltungsorte))
+    return reply(res,400,{error:'Mindestens ein ausgewählter Standort ist nicht angelegt oder nicht aktiv.'});
 
   const q = await pool.query(
     `INSERT INTO brilon_angebote
       (name,beschreibung,dauer,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
-       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,bild_url,sortierung,archiviert,gruppenstufen,dauer_modus,mitarbeiterbeschreibung)
+       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,bild_url,sortierung,archiviert,gruppenstufen,dauer_modus,mitarbeiterbeschreibung,veranstaltungsorte)
      VALUES ($1,$2,$3,$16::jsonb,false,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,
-       (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false,$17::jsonb,$18,$19)
-     RETURNING id`,
+       (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false,$17::jsonb,$18,$19,$20::jsonb)
+     RETURNING id,veranstaltungsort,veranstaltungsorte`,
     [name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
       JSON.stringify(termine),hinweise,d.buchbar===true,d.veroeffentlicht===true,
       buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
       buchungsmodus==='einzelplatz'?preisProPerson:0,bildUrl||null,
-       JSON.stringify(preiseAusStufen(validStufen.stufen)),JSON.stringify(validStufen.stufen),dauerModus,mitarbeiterbeschreibung]
+       JSON.stringify(preiseAusStufen(validStufen.stufen)),JSON.stringify(validStufen.stufen),dauerModus,mitarbeiterbeschreibung,JSON.stringify(veranstaltungsorte)]
   );
 
   const gruppenZuordnungGespeichert=await programmBesuchergruppenSynchronisieren(q.rows[0].id,d.besuchergruppen);
   return reply(res, 201, {
     success: true,
     id: q.rows[0].id,
+    veranstaltungsort:q.rows[0].veranstaltungsort,
+    veranstaltungsorte:q.rows[0].veranstaltungsorte,
     gruppenZuordnungGespeichert
   });
 }
 
      
+// Separater Speicherweg: Standortwechsel darf nie Preisstaffeln oder Inhalte überschreiben.
+const programmStandortRoute=route.match(/^\/api\/admin\/angebote\/([0-9]+)\/standorte$/);
+if(programmStandortRoute&&req.method==='PATCH'){
+  const d=await body(req,8000);
+  const valid=programmStandorteValidieren(d.veranstaltungsorte);
+  if(valid.error)return reply(res,400,{error:valid.error});
+  if(!await programmStandorteAktivPruefen(valid.standorte))
+    return reply(res,400,{error:'Mindestens ein Standort ist nicht angelegt oder nicht aktiv.'});
+  const primary=valid.standorte.includes(d.veranstaltungsort)?d.veranstaltungsort:valid.standorte[0];
+  const q=await pool.query(
+    'UPDATE brilon_angebote SET veranstaltungsorte=$2::jsonb,veranstaltungsort=$3 WHERE id=$1 RETURNING id,veranstaltungsort,veranstaltungsorte',
+    [programmStandortRoute[1],JSON.stringify(valid.standorte),primary]
+  );
+  if(!q.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+  return reply(res,200,{success:true,...q.rows[0]});
+}
+
 const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
 
 if (preisRoute && req.method === 'PATCH') {
@@ -3448,7 +3485,13 @@ const name=d.name===undefined?alt.name:safeText(d.name,120);
 const beschreibung = d.beschreibung===undefined?alt.beschreibung:safeText(d.beschreibung,1000);
 const kategorie=d.kategorie===undefined?alt.kategorie:safeText(d.kategorie,60);
 const zielgruppe=d.zielgruppe===undefined?alt.zielgruppe:safeText(d.zielgruppe,120);
-const veranstaltungsort=d.veranstaltungsort===undefined?alt.veranstaltungsort:safeText(d.veranstaltungsort,80);
+const bisherigeStandorte=Array.isArray(alt.veranstaltungsorte)&&alt.veranstaltungsorte.length
+  ?alt.veranstaltungsorte:[alt.veranstaltungsort].filter(Boolean);
+const standortPruefung=programmStandorteValidieren(d.veranstaltungsorte,bisherigeStandorte);
+if(standortPruefung.error)return reply(res,400,{error:standortPruefung.error});
+const veranstaltungsorte=standortPruefung.standorte;
+const veranstaltungsort=veranstaltungsorte.includes(d.veranstaltungsort)?d.veranstaltungsort:
+  veranstaltungsorte.includes(alt.veranstaltungsort)?alt.veranstaltungsort:veranstaltungsorte[0];
 const dauer=Number(d.dauer??alt.dauer);
 const kapazitaet=Number(d.kapazitaet??alt.kapazitaet);
 const hinweise=d.hinweise===undefined?alt.hinweise:safeText(d.hinweise,1000);
@@ -3478,8 +3521,8 @@ if(!name||!kategorie||!veranstaltungsort||!Number.isInteger(dauer)||dauer<15||da
      !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<5||mindestteilnehmer>kapazitaet||
      !Number.isFinite(preisProPerson)||preisProPerson<=0)))
   return reply(res,400,{error:'Dauer, Kapazität oder verfügbare Termine sind ungültig.'});
-const place=await pool.query('SELECT id FROM brilon_orte WHERE name=$1 AND aktiv=true',[veranstaltungsort]);
-if(!place.rowCount)return reply(res,400,{error:'Veranstaltungsort ist nicht angelegt.'});
+if(!await programmStandorteAktivPruefen(veranstaltungsorte))
+  return reply(res,400,{error:'Mindestens ein ausgewählter Standort ist nicht angelegt oder nicht aktiv.'});
 
 const q = await pool.query(
   `UPDATE brilon_angebote
@@ -3489,9 +3532,9 @@ const q = await pool.query(
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,kapazitaet=$9,
        verfuegbare_termine=$10::jsonb,hinweise=$11,buchbar=$12,veroeffentlicht=$13,dauer=$14,
        buchungsmodus=$15,mindestteilnehmer=$16,preis_pro_person=$17,gruppenstufen=$18::jsonb,dauer_modus=$19,bild_url=COALESCE($20,bild_url),
-       mitarbeiterbeschreibung=$21
+       mitarbeiterbeschreibung=$21,veranstaltungsorte=$22::jsonb
    WHERE id = $2
-   RETURNING id,preise,aktiv,name,beschreibung,mitarbeiterbeschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
+   RETURNING id,preise,aktiv,name,beschreibung,mitarbeiterbeschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,veranstaltungsorte,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
              buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,gruppenstufen,dauer_modus,bild_url`,
   [
@@ -3504,7 +3547,7 @@ const q = await pool.query(
     buchungsmodus==='einzelplatz'?preisProPerson:0,
     JSON.stringify(validStufen.stufen),dauerModus,
     Object.prototype.hasOwnProperty.call(d,'bild_url')?d.bild_url.trim()||null:null,
-    mitarbeiterbeschreibung
+    mitarbeiterbeschreibung,JSON.stringify(veranstaltungsorte)
   ]
 );
 
@@ -3780,10 +3823,11 @@ if (route === '/api/angebote' && req.method === 'GET') {
 
   const q = await pool.query(
  `SELECT id,name,beschreibung,dauer,preise,bild_url,kategorie,zielgruppe,
-        veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise,
+        veranstaltungsort,veranstaltungsorte,kapazitaet,verfuegbare_termine,hinweise,
         buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,gruppenstufen,dauer_modus,
-        (SELECT CASE WHEN o.partnerhaus THEN jsonb_build_array(o.name) ELSE '[]'::jsonb END
-          FROM brilon_orte o WHERE o.name=brilon_angebote.veranstaltungsort) AS partnerhaus_standorte
+        (SELECT COALESCE(jsonb_agg(o.name), '[]'::jsonb) FROM brilon_orte o
+          WHERE o.partnerhaus=true AND (o.name=brilon_angebote.veranstaltungsort
+            OR brilon_angebote.veranstaltungsorte ? o.name)) AS partnerhaus_standorte
      FROM brilon_angebote
      WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
      ORDER BY sortierung ASC,name ASC`
@@ -3949,6 +3993,7 @@ async function start(){
         ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
         ADD COLUMN IF NOT EXISTS zielgruppe TEXT NOT NULL DEFAULT '',
         ADD COLUMN IF NOT EXISTS veranstaltungsort TEXT NOT NULL DEFAULT 'Brilon',
+        ADD COLUMN IF NOT EXISTS veranstaltungsorte JSONB NOT NULL DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS kapazitaet INTEGER NOT NULL DEFAULT 20,
         ADD COLUMN IF NOT EXISTS verfuegbare_termine JSONB NOT NULL DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS hinweise TEXT NOT NULL DEFAULT '',
@@ -3960,7 +4005,9 @@ async function start(){
         ADD COLUMN IF NOT EXISTS sortierung INTEGER NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false,
         ADD COLUMN IF NOT EXISTS mitarbeiterbeschreibung TEXT NOT NULL DEFAULT ''`);
-      console.log('Angebotsfelder geprüft (RUN_PROGRAM_FIELDS_MIGRATION=true)');
+      await pool.query(`UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array(veranstaltungsort)
+        WHERE veranstaltungsorte='[]'::jsonb AND NULLIF(TRIM(veranstaltungsort),'') IS NOT NULL`);
+      console.log('Angebotsfelder und Programmstandorte geprüft (RUN_PROGRAM_FIELDS_MIGRATION=true)');
     }
     // One-time, narrowly scoped migration for the employee and station-inspection area.
     // This does not run the booking, offers, or GPS schema migrations.
@@ -4307,6 +4354,7 @@ await pool.query(`
       ADD COLUMN IF NOT EXISTS kategorie TEXT NOT NULL DEFAULT 'Klettern',
       ADD COLUMN IF NOT EXISTS zielgruppe TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS veranstaltungsort TEXT NOT NULL DEFAULT 'Brilon',
+      ADD COLUMN IF NOT EXISTS veranstaltungsorte JSONB NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS kapazitaet INTEGER NOT NULL DEFAULT 20,
       ADD COLUMN IF NOT EXISTS verfuegbare_termine JSONB NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS hinweise TEXT NOT NULL DEFAULT '',
@@ -4322,6 +4370,8 @@ await pool.query(`
     await pool.query(`ALTER TABLE brilon_angebote
       ADD COLUMN IF NOT EXISTS gruppenstufen JSONB NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS dauer_modus TEXT NOT NULL DEFAULT 'gruppenstufe'`);
+    await pool.query(`UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array(veranstaltungsort)
+      WHERE veranstaltungsorte='[]'::jsonb AND NULLIF(TRIM(veranstaltungsort),'') IS NOT NULL`);
 
     await pool.query(`WITH sortiert AS (
       SELECT id,row_number() OVER(ORDER BY name ASC,id ASC)::integer AS position
