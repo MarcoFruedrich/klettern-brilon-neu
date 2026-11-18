@@ -2985,7 +2985,7 @@ if(route==='/api/admin/medien'){
   }
   if(req.method==='PATCH'||req.method==='DELETE'){
     const daten=await body(req,2048),pfad=safeText(daten?.pfad,240);
-    if(!/^medien\/[a-z0-9._-]+\.(png|jpg|jpeg|webp)$/i.test(pfad)||pfad.includes('..'))return reply(res,400,{error:'Ungültiger Medienpfad.'});
+    if(!/^(?:[a-zA-Z0-9_-]+\/){0,4}[a-zA-Z0-9._-]+\.(?:png|jpe?g|webp|gif)$/i.test(pfad)||pfad.includes('..'))return reply(res,400,{error:'Ungültiger Medienpfad.'});
     const url=bucket.getPublicUrl(pfad).data.publicUrl;
     const verwendet=await pool.query(`SELECT
       EXISTS(SELECT 1 FROM brilon_angebote WHERE bild_url=$1) AS programme,
@@ -2995,11 +2995,12 @@ if(route==='/api/admin/medien'){
     if(req.method==='DELETE'){
       const {error}=await bucket.remove([pfad]);
       if(error)return reply(res,502,{error:'Löschen fehlgeschlagen: '+error.message});
-      return reply(res,200,{success:true});
+      console.info('Medienbibliothek: Bild dauerhaft entfernt:',pfad);
+      return reply(res,200,{success:true,freigegebenBytes:Number(daten?.groesse)||null});
     }
     const basename=safeText(daten?.name,80).replace(/[^a-zA-Z0-9_-]/g,'-').replace(/^-+|-+$/g,'');
     if(!basename)return reply(res,400,{error:'Bitte einen gültigen Namen eingeben.'});
-    const neuerPfad='medien/'+basename+'-'+crypto.randomUUID().slice(0,8)+'.'+pfad.split('.').at(-1);
+    const neuerPfad=pfad.slice(0,pfad.lastIndexOf('/')+1)+basename+'-'+crypto.randomUUID().slice(0,8)+'.'+pfad.split('.').at(-1);
     const {error}=await bucket.move(pfad,neuerPfad);
     if(error)return reply(res,502,{error:'Umbenennen fehlgeschlagen: '+error.message});
     return reply(res,200,{success:true,pfad:neuerPfad,url:bucket.getPublicUrl(neuerPfad).data.publicUrl});
