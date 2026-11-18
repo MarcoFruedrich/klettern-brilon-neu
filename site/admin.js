@@ -997,17 +997,6 @@ bildAusBibliothekButton.addEventListener('click',async()=>{
   }catch(error){bildStatus.textContent='Bild konnte nicht zugeordnet werden: '+error.message;}
   finally{bildAusBibliothekButton.disabled=false;}
 });
-const bildSpeichernButton=document.createElement('button');
-bildSpeichernButton.type='button';
-bildSpeichernButton.className='btn secondary';
-bildSpeichernButton.textContent='Bild dauerhaft speichern';
-bildSpeichernButton.addEventListener('click',async()=>{
-  if(!programBildUrl){bildStatus.textContent='Bitte zuerst ein Bild hochladen oder aus der Medienbibliothek auswählen.';return;}
-  bildSpeichernButton.disabled=true;
-  try{await programmBildSpeichern(programBildUrl);}
-  catch(error){bildStatus.textContent='Bildspeicherung fehlgeschlagen: '+error.message;}
-  finally{bildSpeichernButton.disabled=false;}
-});
 const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
 bildFormatHinweis.className='hint';
 bildBereich.append(bildAuswahl,bildButton,bildAusBibliothekButton,bildStatus,bildFormatHinweis);
@@ -2814,6 +2803,17 @@ bildAusBibliothekButton.addEventListener('click',async()=>{
       await programmBildSpeichern(url);
     });
   }catch(error){alert('Bild konnte nicht übernommen werden: '+error.message);}
+});
+const bildSpeichernButton=document.createElement('button');
+bildSpeichernButton.type='button';
+bildSpeichernButton.className='btn secondary';
+bildSpeichernButton.textContent='Bild dauerhaft speichern';
+bildSpeichernButton.addEventListener('click',async()=>{
+  if(!programBildUrl){bildStatus.textContent='Bitte zuerst ein Bild hochladen oder aus der Medienbibliothek auswählen.';return;}
+  bildSpeichernButton.disabled=true;
+  try{await programmBildSpeichern(programBildUrl);}
+  catch(error){bildStatus.textContent='Bildspeicherung fehlgeschlagen: '+error.message;}
+  finally{bildSpeichernButton.disabled=false;}
 });
 const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
 bildFormatHinweis.className='hint';
