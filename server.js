@@ -3233,7 +3233,7 @@ if(route==='/api/admin/angebote/bilder'&&req.method==='GET'){
 
 if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
-    `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
+    `SELECT id,name,beschreibung,mitarbeiterbeschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
             veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
             buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,gruppenstufen,dauer_modus
      FROM brilon_angebote
@@ -3337,6 +3337,7 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const mindestteilnehmer=Number(d.mindestteilnehmer??5);
   const preisProPerson=Number(d.preis_pro_person??0);
   const bildUrl=safeText(d.bild_url,1000);
+  const mitarbeiterbeschreibung=safeText(d.mitarbeiterbeschreibung,20000);
   const dauerModus=d.dauer_modus==='fest'?'fest':'gruppenstufe';
   const validStufen=pruefeProgrammstufen(d.gruppenstufen,kapazitaet,buchungsmodus,dauer,dauerModus);
   if(validStufen.error)return reply(res,400,{error:validStufen.error});
@@ -3359,15 +3360,15 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const q = await pool.query(
     `INSERT INTO brilon_angebote
       (name,beschreibung,dauer,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
-       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,bild_url,sortierung,archiviert,gruppenstufen,dauer_modus)
+       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,bild_url,sortierung,archiviert,gruppenstufen,dauer_modus,mitarbeiterbeschreibung)
      VALUES ($1,$2,$3,$16::jsonb,false,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,
-       (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false,$17::jsonb,$18)
+       (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false,$17::jsonb,$18,$19)
      RETURNING id`,
     [name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
       JSON.stringify(termine),hinweise,d.buchbar===true,d.veroeffentlicht===true,
       buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
       buchungsmodus==='einzelplatz'?preisProPerson:0,bildUrl||null,
-       JSON.stringify(preiseAusStufen(validStufen.stufen)),JSON.stringify(validStufen.stufen),dauerModus]
+       JSON.stringify(preiseAusStufen(validStufen.stufen)),JSON.stringify(validStufen.stufen),dauerModus,mitarbeiterbeschreibung]
   );
 
   const gruppenZuordnungGespeichert=await programmBesuchergruppenSynchronisieren(q.rows[0].id,d.besuchergruppen);
@@ -3421,6 +3422,7 @@ const veranstaltungsort=d.veranstaltungsort===undefined?alt.veranstaltungsort:sa
 const dauer=Number(d.dauer??alt.dauer);
 const kapazitaet=Number(d.kapazitaet??alt.kapazitaet);
 const hinweise=d.hinweise===undefined?alt.hinweise:safeText(d.hinweise,1000);
+const mitarbeiterbeschreibung=d.mitarbeiterbeschreibung===undefined?(alt.mitarbeiterbeschreibung||''):safeText(d.mitarbeiterbeschreibung,20000);
 const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:alt.verfuegbare_termine;
 const buchbar=typeof d.buchbar==='boolean'?d.buchbar:alt.buchbar;
 const veroeffentlicht=typeof d.veroeffentlicht==='boolean'?d.veroeffentlicht:alt.veroeffentlicht;
@@ -3456,9 +3458,10 @@ const q = await pool.query(
        name=$4,beschreibung = $5,
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,kapazitaet=$9,
        verfuegbare_termine=$10::jsonb,hinweise=$11,buchbar=$12,veroeffentlicht=$13,dauer=$14,
-       buchungsmodus=$15,mindestteilnehmer=$16,preis_pro_person=$17,gruppenstufen=$18::jsonb,dauer_modus=$19,bild_url=COALESCE($20,bild_url)
+       buchungsmodus=$15,mindestteilnehmer=$16,preis_pro_person=$17,gruppenstufen=$18::jsonb,dauer_modus=$19,bild_url=COALESCE($20,bild_url),
+       mitarbeiterbeschreibung=$21
    WHERE id = $2
-   RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
+   RETURNING id,preise,aktiv,name,beschreibung,mitarbeiterbeschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
              buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,gruppenstufen,dauer_modus,bild_url`,
   [
@@ -3470,7 +3473,8 @@ const q = await pool.query(
     buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
     buchungsmodus==='einzelplatz'?preisProPerson:0,
     JSON.stringify(validStufen.stufen),dauerModus,
-    Object.prototype.hasOwnProperty.call(d,'bild_url')?d.bild_url.trim()||null:null
+    Object.prototype.hasOwnProperty.call(d,'bild_url')?d.bild_url.trim()||null:null,
+    mitarbeiterbeschreibung
   ]
 );
 
@@ -3924,7 +3928,8 @@ async function start(){
         ADD COLUMN IF NOT EXISTS mindestteilnehmer INTEGER NOT NULL DEFAULT 1,
         ADD COLUMN IF NOT EXISTS preis_pro_person NUMERIC(10,2) NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS sortierung INTEGER NOT NULL DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false`);
+        ADD COLUMN IF NOT EXISTS archiviert BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS mitarbeiterbeschreibung TEXT NOT NULL DEFAULT ''`);
       console.log('Angebotsfelder geprüft (RUN_PROGRAM_FIELDS_MIGRATION=true)');
     }
     // One-time, narrowly scoped migration for the employee and station-inspection area.

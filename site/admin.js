@@ -163,6 +163,7 @@ async function api(path, options = {}) {
   if (!r.ok) {
     const fehler=Error(j.error||'Fehler');
     fehler.data=j;
+    fehler.status=r.status;
     throw fehler;
   }
   if(path==='/api/admin/login'){csrfToken=j.csrfToken||null;demoReadOnly=j.readOnly===true;}
@@ -1034,10 +1035,21 @@ c.append(bildBereich);
       list.append(c);
     }
   } catch (e) {
-    login.hidden = false;
-    workspace.hidden = true;
-    if(loginStatus)loginStatus.textContent=e.message;
-    status.textContent = e.message;
+    console.error('Verwaltung konnte nicht vollständig geladen werden:',e);
+    if(e.status===401){
+      login.hidden = false;
+      workspace.hidden = true;
+      csrfToken=null;
+      if(loginStatus)loginStatus.textContent='Bitte erneut anmelden. '+e.message;
+      status.textContent=e.message;
+      return;
+    }
+    if(workspace.hidden){
+      if(loginStatus)loginStatus.textContent=e.message;
+      return;
+    }
+    if(loginStatus)loginStatus.textContent='';
+    status.textContent='Verwaltung konnte nicht vollständig geladen werden: '+e.message;
   }
 }
 
@@ -2068,6 +2080,26 @@ if (angeboteAdminListe) {
 
 /* Neues Erlebnisangebot speichern */
 
+function programmBeschreibungImport(textarea,host){
+  if(!textarea||!host)return;
+  const row=document.createElement('div');row.className='program-description-import';
+  const input=document.createElement('input');input.type='file';input.accept='.txt,.md,text/plain,text/markdown';input.hidden=true;
+  const button=el('button','Programmbeschreibung aus Textdatei laden (.txt/.md)');
+  button.type='button';button.className='btn secondary';
+  button.addEventListener('click',()=>input.click());
+  input.addEventListener('change',async()=>{
+    const file=input.files?.[0];if(!file)return;
+    if(file.size>100*1024){alert('Die Textdatei darf maximal 100 KB groß sein.');input.value='';return;}
+    try{
+      const text=await file.text();
+      if(text.length>20000){alert('Die Programmbeschreibung darf maximal 20.000 Zeichen enthalten.');return;}
+      textarea.value=text;textarea.dispatchEvent(new Event('input',{bubbles:true}));
+    }catch{alert('Die Textdatei konnte nicht gelesen werden.');}
+    finally{input.value='';}
+  });
+  row.append(button,input);host.append(row);
+}
+
 function programmStufenEditor(container, initial=[], presets=[[1,10,"",180],[11,15,"",180]]){
   if(!container)return;
   const rows=Array.isArray(initial)&&initial.length?initial:presets.map(([min,max,preis,dauer])=>({min,max,preis,dauer}));
@@ -2107,6 +2139,8 @@ const neuesAngebotForm =
 if (neuesAngebotForm) {
   const createTierEditor=document.getElementById('neues-angebot-stufen');
   programmStufenEditor(createTierEditor);
+  programmBeschreibungImport(neuesAngebotForm.elements.mitarbeiterbeschreibung,
+    document.getElementById('neues-angebot-programmbeschreibung-import'));
   document.getElementById('neues-angebot-stufe-hinzufuegen')?.addEventListener('click',()=>{createTierEditor?.onaddprogramtier?.();createTierDurationMode();});
   const angebotsModus = neuesAngebotForm.elements.buchungsmodus;
   const createTierFieldset=createTierEditor?.closest('fieldset');
@@ -2150,6 +2184,7 @@ if (neuesAngebotForm) {
     daten.verfuegbare_termine=(daten.verfuegbare_termine||'').split('\n').map(x=>x.trim()).filter(Boolean);
     daten.buchbar=neuesAngebotForm.elements.buchbar.checked;
     daten.veroeffentlicht=neuesAngebotForm.elements.veroeffentlicht.checked;
+    daten.mitarbeiterbeschreibung=neuesAngebotForm.elements.mitarbeiterbeschreibung.value;
     daten.mindestteilnehmer=Number(daten.mindestteilnehmer||5);
     daten.preis_pro_person=Number(daten.preis_pro_person||0);
     daten.gruppenstufen=angebotsModus.value==='einzelplatz'?[]:programmStufenAuslesen(createTierEditor);
@@ -2562,6 +2597,11 @@ beschreibung.style.width = '100%';
       const programmName=feld('Programmname',angebot.name,'name');
       const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
       const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
+      const mitarbeiterbeschreibung=feld('Programmbeschreibung für Mitarbeitende (Wissenspool)',
+        angebot.mitarbeiterbeschreibung||'','mitarbeiterbeschreibung','textarea');
+      mitarbeiterbeschreibung.rows=6;mitarbeiterbeschreibung.maxLength=20000;
+      mitarbeiterbeschreibung.placeholder='Interne Abläufe, Material, Hinweise und pädagogische Orientierung für das Team …';
+      programmBeschreibungImport(mitarbeiterbeschreibung,mitarbeiterbeschreibung.parentElement);
       const zugeordneteGruppenIds=[...new Set([
         ...(Array.isArray(angebot.besuchergruppen)?angebot.besuchergruppen:[]),
         ...besuchergruppen.filter(group=>group.programmIds?.some(id=>String(id)===String(angebot.id))).map(group=>group.id)
@@ -2777,6 +2817,7 @@ preisButton.addEventListener('click', async () => {
       },
       body: JSON.stringify({
   preise,gruppenstufen,dauer_modus:dauerModus.value,bild_url:programBildUrl,
+  mitarbeiterbeschreibung:mitarbeiterbeschreibung.value,
   aktiv: aktivSchalter.checked,
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
