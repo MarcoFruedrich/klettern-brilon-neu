@@ -1115,6 +1115,37 @@ async function angeboteLaden() {
 
 angeboteLaden();
 
+// Bei Rueckkehr aus der Verwaltung erscheinen neue, freigegebene Programme
+// auch auf bereits geoeffneten Startseiten ohne erneutes Laden.
+window.addEventListener('focus',async()=>{
+  if(!angeboteFertig)return;
+  try{
+    const antwort=await fetch('/api/angebote',{cache:'no-store'});
+    if(!antwort.ok)return;
+    const daten=await antwort.json();
+    if(!Array.isArray(daten))return;
+    const bisher=angeboteCache.map(a=>a.id).join(',');
+    const aktuell=daten.map(a=>a.id).join(',');
+    angeboteCache=daten;
+    angeboteUebersichtAnzeigen(document.getElementById('angebote-standort-filter')?.value||'alle');
+    // Nur wenn kein laufender Buchungsvorgang ausgewaehlt ist, das
+    // Programmauswahlfeld neu aufbauen.
+    if(bisher!==aktuell&&!document.getElementById('angebot-auswahl')?.value){
+      const auswahl=document.getElementById('angebot-auswahl');
+      if(auswahl){
+        const standort=document.getElementById('buchungs-standort')?.value;
+        const passend=daten.filter(a=>(Array.isArray(a.veranstaltungsorte)&&a.veranstaltungsorte.length
+          ?a.veranstaltungsorte:[a.veranstaltungsort]).includes(standort));
+        auswahl.replaceChildren();
+        const leer=document.createElement('option');leer.value='';leer.textContent='Bitte Angebot auswählen';
+        auswahl.append(leer);
+        for(const angebot of passend){const option=document.createElement('option');option.value=angebot.name;option.textContent=angebot.name;auswahl.append(option);}
+        auswahl.disabled=!standort||!passend.length;
+      }
+    }
+  }catch(error){console.warn('Aktualisierung der Angebote fehlgeschlagen:',error.message);}
+});
+
 async function preisanzeigeStarten() {
   const auswahl = document.getElementById('angebot-auswahl');
   const teilnehmer = document.getElementById('buchungs-teilnehmer');
