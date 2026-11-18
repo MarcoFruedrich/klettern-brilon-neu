@@ -120,7 +120,7 @@ function uhrzeitenAnzeigen() {
   const fixedAction=ausgewaehlteSonderaktion?.datum===date?.value&&
     /^\d{2}:\d{2}$/.test(ausgewaehlteSonderaktion.uhrzeit||'')&&
     /^\d{2}:\d{2}$/.test(ausgewaehlteSonderaktion.endzeit||'')&&
-    Boolean(ausgewaehlteSonderaktion.veranstaltungsort&&ausgewaehlteSonderaktion.programm_id);
+    Boolean((ausgewaehlteSonderaktion.veranstaltungsort||ausgewaehlteSonderaktion.veranstaltungsorte?.length)&&ausgewaehlteSonderaktion.programm_id);
   const zeiten=fixedAction?[ausgewaehlteSonderaktion.uhrzeit]:[...buchbareUhrzeiten];
   [...new Set(zeiten)].sort().forEach(uhrzeit => {
     const option = document.createElement('option');
@@ -682,8 +682,14 @@ function sonderaktionAnfragen(aktion){
     angeboteCache.find(a=>String(a.id)===String(aktion.programm_id));
   // A special action can be independent of the programme catalogue. Avoid
   // silently retaining a programme selected for an earlier special.
+  const gueltigeOrte=Array.isArray(aktion.veranstaltungsorte)&&aktion.veranstaltungsorte.length
+    ?aktion.veranstaltungsorte:[aktion.veranstaltungsort].filter(Boolean);
+  const gewaehlterOrt=window.ausgewaehlterAngebotsStandort;
+  const buchungsort=gueltigeOrte.includes(gewaehlterOrt)?gewaehlterOrt:
+    gueltigeOrte.find(ort=>[...standortAuswahl.options].some(option=>option.value===ort))||
+    programm?.veranstaltungsort||'';
   if(standortAuswahl){
-    standortAuswahl.value=aktion.veranstaltungsort||programm?.veranstaltungsort||'';
+    standortAuswahl.value=buchungsort;
     standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
   }
   angebotAuswahl.value=programm?.name||'';
@@ -745,14 +751,20 @@ async function specials() {
     angebotslinkAnwenden();
     root.replaceChildren();
 
-    if (!items.length) {
+    const activeLocation=window.ausgewaehlterAngebotsStandort||'alle';
+  const displayed=items.filter(item=>{
+    const locations=Array.isArray(item.veranstaltungsorte)&&item.veranstaltungsorte.length
+      ?item.veranstaltungsorte:[item.veranstaltungsort].filter(Boolean);
+    return activeLocation==='alle'||!locations.length||locations.includes(activeLocation);
+  });
+  if (!displayed.length) {
       const p = document.createElement('p');
       p.textContent =
         'Neue Sonderangebote werden hier veröffentlicht. Frage gerne nach freien Terminen!';
       root.append(p);
     }
 
-    for (const item of items) {
+    for (const item of displayed) {
       const a = document.createElement('article');
 
       if (item.bild_url) {
@@ -774,7 +786,9 @@ async function specials() {
       const d = document.createElement('p');
       d.textContent = item.datum || 'Termin nach Vereinbarung';
       if(item.uhrzeit)d.textContent+=' · '+item.uhrzeit+'–'+(item.endzeit||'')+' Uhr';
-      if(item.veranstaltungsort)d.textContent+=' · '+item.veranstaltungsort;
+      const zugeordneteOrte=Array.isArray(item.veranstaltungsorte)&&item.veranstaltungsorte.length
+        ?item.veranstaltungsorte:[item.veranstaltungsort].filter(Boolean);
+      if(zugeordneteOrte.length)d.textContent+=' · '+zugeordneteOrte.join(', ');
 
       const t = document.createElement('p');
       t.textContent = item.beschreibung || '';
@@ -813,6 +827,7 @@ a.append(anfrageButton);
 }
 
 specials();
+document.addEventListener('standortwechsel',()=>specials());
 
 function angeboteUebersichtAnzeigen(standortFilter=''){
   const ausgabe=document.getElementById('angebote-uebersicht');

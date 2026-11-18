@@ -659,6 +659,10 @@ async function main(req,res){
       if(sonderaktionId){
         const action=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[sonderaktionId]);
         const special=action.rows[0]?.data||{};
+        const erlaubteStandorte=Array.isArray(special.veranstaltungsorte)&&special.veranstaltungsorte.length
+          ?special.veranstaltungsorte:[special.veranstaltungsort].filter(Boolean);
+        if(erlaubteStandorte.length&&!erlaubteStandorte.includes(bookingSite))
+          return reply(res,409,{error:'Diese Sonderaktion ist für den ausgewählten Standort nicht freigegeben.'});
         const fixed=Boolean(special.uhrzeit&&special.endzeit&&special.veranstaltungsort&&special.programm_id);
         if(fixed)exactAction=special;
         if(fixed&&(String(special.programm_id)!==String(programm.id)||special.datum!==datum||
@@ -972,6 +976,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           a.data->>'beschreibung' AS beschreibung,a.data->>'preis' AS preis,
           a.data->>'bild_url' AS bild_url,a.data->>'uhrzeit' AS uhrzeit,
           a.data->>'endzeit' AS endzeit,a.data->>'veranstaltungsort' AS veranstaltungsort,
+           a.data->'veranstaltungsorte' AS veranstaltungsorte,
           a.data->>'teilnehmer' AS teilnehmer,
           p.id AS programm_id,p.name AS programm_name
          FROM brilon_aktionen a
@@ -2721,7 +2726,7 @@ preis=safeText(d.preis,50);
         const q=await pool.query(
           `SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,
             data->>'beschreibung' AS beschreibung,data->>'preis' AS preis,
-            data->>'bild_url' AS bild_url,data->>'programm_id' AS programm_id
+            data->>'bild_url' AS bild_url,data->>'programm_id' AS programm_id,data->'veranstaltungsorte' AS veranstaltungsorte,data->>'veranstaltungsort' AS veranstaltungsort
            FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100`);
         return reply(res,200,q.rows);
       }
@@ -2746,12 +2751,39 @@ preis=safeText(d.preis,50);
           if(datum&&Array.isArray(days)&&days.length&&!days.includes(datum))
             return reply(res,400,{error:'Aktionstag ist für das verknüpfte Programm nicht freigegeben.'});
         }
+        const selectedLocations=d.veranstaltungsorte;
+        if(!Array.isArray(selectedLocations)||!selectedLocations.length||selectedLocations.length>50||
+           selectedLocations.some(x=>typeof x!=='string'||!x.trim()||x.length>80)||
+           new Set(selectedLocations).size!==selectedLocations.length)
+          return reply(res,400,{error:'Bitte mindestens einen gültigen Standort auswählen.'});
+        const allowed=await pool.query('SELECT name FROM brilon_orte WHERE aktiv=true AND name=ANY($1::text[])',[selectedLocations]);
+        if(allowed.rowCount!==selectedLocations.length)
+          return reply(res,400,{error:'Mindestens ein gewählter Standort ist nicht aktiv oder nicht vorhanden.'});
         const q=await pool.query(
           'INSERT INTO brilon_aktionen(id,data) VALUES ($1,$2) RETURNING id',
-          [crypto.randomUUID(),JSON.stringify({titel,datum,beschreibung,preis,
-            ...(programmId?{programm_id:programmId}:{})})]
+          [crypto.randomUUID(),JSON.stringify({titel,datum,beschreibung,preis,veranstaltungsorte:selectedLocations,
+            veranstaltungsort:selectedLocations[0],...(programmId?{programm_id:programmId}:{})})]
         );
         return reply(res,201,{id:q.rows[0].id});
+      }
+
+      const actionLocations=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/standorte$/);
+      if(actionLocations&&req.method==='PATCH'){
+        const d=await body(req,8000);
+        const selected=d.veranstaltungsorte;
+        if(!Array.isArray(selected)||!selected.length||selected.length>50||
+           selected.some(x=>typeof x!=='string'||!x.trim()||x.length>80)||
+           new Set(selected).size!==selected.length)
+          return reply(res,400,{error:'Bitte mindestens einen gültigen Standort auswählen.'});
+        const valid=await pool.query('SELECT name FROM brilon_orte WHERE aktiv=true AND name=ANY($1::text[])',[selected]);
+        if(valid.rowCount!==selected.length)return reply(res,400,{error:'Ein ausgewählter Standort ist nicht mehr aktiv.'});
+        const q=await pool.query(`UPDATE brilon_aktionen SET data=
+          jsonb_set(jsonb_set(data,'{veranstaltungsorte}',$2::jsonb,true),
+          '{veranstaltungsort}',to_jsonb($3::text),true)
+          WHERE id=$1 RETURNING id,data->'veranstaltungsorte' AS veranstaltungsorte`,
+          [actionLocations[1],JSON.stringify(selected),selected[0]]);
+        if(!q.rowCount)return reply(res,404,{error:'Sonderangebot nicht gefunden.'});
+        return reply(res,200,{success:true,...q.rows[0]});
       }
 
       const specialProgramme=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/programm$/);

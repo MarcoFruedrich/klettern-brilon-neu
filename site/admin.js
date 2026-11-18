@@ -777,7 +777,33 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
     }
     await umbuchungsanfragenLaden();
 
-    const offers = await api('/api/admin/aktionen');
+    const [offers,alleAktivenOrte] = await Promise.all([api('/api/admin/aktionen'),api('/api/admin/orte')]);
+    const aktionsOrte=alleAktivenOrte.filter(x=>x.aktiv).map(x=>x.name);
+    const auswahlOrte=()=>aktionsOrte;
+    const aktionsStandortAuswahl=(selected=[])=>{
+      const field=document.createElement('fieldset');field.className='angebot-standort-auswahl';
+      const legend=document.createElement('legend');legend.textContent='Standorte (Einzel- oder Mehrfachauswahl)';
+      const grid=document.createElement('div');grid.className='check-grid';
+      const chosen=new Set(selected);
+      for(const name of [...new Set([...aktionsOrte,...chosen])]){
+        const label=document.createElement('label');label.className='check';
+        const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=name;
+        checkbox.checked=chosen.has(name);checkbox.disabled=!aktionsOrte.includes(name);
+        label.append(checkbox,document.createTextNode(' '+name));grid.append(label);
+      }
+      field.append(legend,grid);return field;
+    };
+    const createLocations=document.getElementById('special-locations-select');
+    if(createLocations){
+      const oldChecked=new Set([...createLocations.querySelectorAll('input:checked')].map(x=>x.value));
+      createLocations.replaceChildren();
+      for(const name of aktionsOrte){
+        const label=document.createElement('label');label.className='check';
+        const check=document.createElement('input');check.type='checkbox';check.value=name;
+        check.checked=oldChecked.has(name);
+        label.append(check,document.createTextNode(' '+name));createLocations.append(label);
+      }
+    }
     const list = document.getElementById('special-list');
     list.replaceChildren();
 
@@ -841,6 +867,26 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
         }finally{saveLink.disabled=false;}
       });
       c.append(offerLabel,saveLink,saveStatus);
+      const linkedLocations=Array.isArray(a.veranstaltungsorte)&&a.veranstaltungsorte.length
+        ?a.veranstaltungsorte:[a.veranstaltungsort].filter(Boolean);
+      const placePicker=aktionsStandortAuswahl(linkedLocations);
+      const placeSave=el('button','Standortzuordnung speichern');placeSave.type='button';placeSave.className='btn secondary';
+      const placeStatus=el('p',linkedLocations.length?'Aktuell zugeordnet: '+linkedLocations.join(', '):
+        'Noch keine Standortzuordnung (älteres Angebot – bisher an allen Standorten sichtbar).');
+      placeStatus.setAttribute('role','status');
+      placeSave.addEventListener('click',async()=>{
+        const selected=[...placePicker.querySelectorAll('input:checked')].map(x=>x.value);
+        if(!selected.length){placeStatus.textContent='Bitte mindestens einen Standort wählen.';return;}
+        placeSave.disabled=true;
+        try{
+          await api('/api/admin/aktionen/'+encodeURIComponent(a.id)+'/standorte',{
+            method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({veranstaltungsorte:selected})
+          });
+          placeStatus.textContent='Standortzuordnung dauerhaft gespeichert: '+selected.join(', ');
+        }catch(e){placeStatus.textContent='Standorte konnten nicht gespeichert werden: '+e.message;}
+        finally{placeSave.disabled=false;}
+      });
+      c.append(placePicker,placeSave,placeStatus);
 
       const bildBereich = document.createElement('div');
 
@@ -1460,13 +1506,15 @@ document.getElementById('special-form').onsubmit = async e => {
   e.preventDefault();
 
   try {
+    const selectedLocations=[...document.querySelectorAll('#special-locations-select input:checked')].map(x=>x.value);
+    if(!selectedLocations.length){status.textContent='Bitte mindestens einen Standort für das Sonderangebot wählen.';return;}
     await api('/api/admin/aktionen', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(
-        Object.fromEntries(new FormData(e.target).entries())
+        {...Object.fromEntries(new FormData(e.target).entries()),veranstaltungsorte:selectedLocations}
       )
     });
 
