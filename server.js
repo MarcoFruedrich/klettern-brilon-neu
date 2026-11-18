@@ -26,7 +26,7 @@ const { createSpontanGruppenApi } = require('./lib/spontangruppen-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { createWissensportalApi } = require('./lib/wissensportal-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
-const { bereinigeBild } = require('./lib/bilddatei');
+const { bereinigeBild, analysiereBild } = require('./lib/bilddatei');
 const { createClamScanner } = require('./lib/malware-scanner');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 const BUCHUNGS_DATENSCHUTZ_VERSION='2026-11-03-v1';
@@ -52,6 +52,24 @@ const brevoMail=createBrevoMailer();
 const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
+/* Nur für authentifizierte JPG/PNG/WebP-Bild-Uploads. Es werden ausschließlich
+ * von Sharp vollständig decodierte und neu codierte Bilddaten gespeichert.
+ * Falls ClamAV konfiguriert ist, bleibt sein Scan verpflichtend (fail closed).
+ * Diese Alternative ersetzt keinen Malware-Scanner und gilt nicht für
+ * Stationsprüfungen, Dokumente oder andere Dateien.
+ */
+async function pruefeNeuCodiertesAdminBild(bild,mimeType){
+  analysiereBild(bild,mimeType);
+  if(!process.env.CLAMD_HOST?.trim()){
+    return {modus:'bild-neucodierung-ohne-virenscan'};
+  }
+  const verdict=await scanForMalware(bild);
+  if(verdict?.sauber!==true)
+    throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
+  return {modus:'clamav'};
+}
+if(!process.env.CLAMD_HOST?.trim())
+  console.warn('Bild-Uploads: streng validierte Bild-Neucodierung aktiv; kein Virenscanner konfiguriert. Stationsfotos bleiben gesperrt.');
 function reply(res,status,data,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders,...headers});res.end(JSON.stringify(data))}
 function malwareScanReply(res,error){
   const detected=error?.code==='MALWARE_FOUND';
@@ -2974,10 +2992,8 @@ if(route==='/api/admin/medien'){
         bild=await bereinigeBild(bild,format);
       }else bild=await bereinigeBild(input,typ);
     }catch(error){return reply(res,400,{error:'Bilddatei konnte nicht verarbeitet werden: '+error.message});}
-    try{
-      const scan=await scanForMalware(bild);
-      if(scan?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort'),{code:'MALWARE_SCAN_ERROR'});
-    }catch(error){return malwareScanReply(res,error);}
+    try{await pruefeNeuCodiertesAdminBild(bild,format);}
+    catch(error){return malwareScanReply(res,error);}
     const dateiname='medien/'+crypto.randomUUID()+'.'+ext;
     const {error}=await bucket.upload(dateiname,bild,{contentType:format,upsert:false});
     if(error){console.error('Medien-Upload:',error.message);return reply(res,502,{error:'Datei konnte nicht im Bildspeicher gespeichert werden: '+error.message});}
@@ -3291,10 +3307,8 @@ if (bildRoute && req.method === 'POST') {
     });
   }
 
-  try{
-    const verdict=await scanForMalware(bild);
-    if(verdict?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
-  }catch(error){return malwareScanReply(res,error);}
+  try{await pruefeNeuCodiertesAdminBild(bild,dateityp);}
+  catch(error){return malwareScanReply(res,error);}
 
   const vorhanden = await pool.query(
     'SELECT id FROM brilon_angebote WHERE id = $1',
@@ -3400,10 +3414,8 @@ if (aktionsBildRoute && req.method === 'POST') {
     });
   }
 
-  try{
-    const verdict=await scanForMalware(bild);
-    if(verdict?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort.'),{code:'MALWARE_SCAN_ERROR'});
-  }catch(error){return malwareScanReply(res,error);}
+  try{await pruefeNeuCodiertesAdminBild(bild,dateityp);}
+  catch(error){return malwareScanReply(res,error);}
 
   const vorhanden = await pool.query(
     'SELECT id FROM brilon_aktionen WHERE id = $1',
