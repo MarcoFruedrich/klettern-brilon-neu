@@ -2980,7 +2980,8 @@ if(route==='/api/admin/besuchergruppen'&&(req.method==='GET'||req.method==='PUT'
     const q=await pool.query('SELECT daten FROM brilon_besuchergruppen WHERE id=1');
     return reply(res,200,Array.isArray(q.rows[0]?.daten)?q.rows[0].daten:defaults);
   }
-  const eingabe=await body(req,160000);
+  const gesendet=await body(req,160000);
+  const eingabe=Array.isArray(gesendet)?gesendet:gesendet?.gruppen;
   if(!Array.isArray(eingabe)||eingabe.length>30)return reply(res,400,{error:'Ungültige Gruppenliste.'});
   const ids=new Set();
   const gruppen=eingabe.map(g=>{
