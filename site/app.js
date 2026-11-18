@@ -897,8 +897,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     symbol.className='besuchergruppe-symbol';
     symbol.setAttribute('aria-hidden','true');
     const angebotsGruppen=(window.besuchergruppenListe?.()||[]).filter(group=>
-      (Array.isArray(angebot.besuchergruppen)&&angebot.besuchergruppen.includes(group.id))||
-      group.programmIds?.some(id=>String(id)===String(angebot.id)));
+      window.besuchergruppeProgrammPasst?.(group,angebot));
     const aktiveGruppe=angebotsGruppen.find(group=>group.id===window.aktiveBesuchergruppe)||angebotsGruppen[0];
     if(aktiveGruppe){
       karte.style.setProperty('--gruppe-farbe',aktiveGruppe.farbe||'#258451');
@@ -1052,7 +1051,10 @@ async function angeboteLaden() {
         auswahl.dispatchEvent(new Event('change',{bubbles:true}));
       });
     }
-    angeboteUebersichtAnzeigen(standortFilter?.value||'');
+    angeboteUebersichtAnzeigen(standortFilter?.value||'alle');
+    // Auch die Standardeinstellung "Alle Standorte" ist eine Auswahl.
+    window.ausgewaehlterAngebotsStandort=standortFilter?.value||'alle';
+    document.dispatchEvent(new CustomEvent('standortwechsel',{detail:{standort:window.ausgewaehlterAngebotsStandort}}));
     for(const ort of orte){
       const option=document.createElement('option');
       option.value=ort.name;
