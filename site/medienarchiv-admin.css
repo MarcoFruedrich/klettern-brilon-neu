@@ -1,0 +1,7 @@
+/* Gemeinsame Medienverwaltung innerhalb des Admin-Inhaltsbereichs. */
+.medienarchiv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem;margin-top:1rem}
+.medienarchiv-card{min-width:0}
+.medienarchiv-card img{width:100%;height:170px;object-fit:contain;background:#eef3ed;border-radius:8px}
+.medienarchiv-card strong{display:block;overflow-wrap:anywhere}
+.medienarchiv-actions{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}
+.medienarchiv-actions .btn{font-size:.82rem;padding:.45rem .6rem}
