@@ -844,21 +844,20 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
 
       const bildBereich = document.createElement('div');
 
-let programBildUrl=angebot.bild_url||'';
+let aktionsBildUrl=a.bild_url||'';
 const bildStatus=document.createElement('p');
 bildStatus.className='hint';bildStatus.setAttribute('role','status');bildStatus.setAttribute('aria-live','polite');
-bildStatus.textContent=programBildUrl?'Programmbild hinterlegt.':'Noch kein Programmbild hinterlegt.';
-async function programmBildSpeichern(url){
-  const result=await api('/api/admin/angebote/'+angebot.id,{
-    method:'PATCH',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({bild_url:url})
+bildStatus.textContent=aktionsBildUrl?'Aktionsbild hinterlegt.':'Noch kein Aktionsbild hinterlegt.';
+async function aktionsBildSpeichern(url){
+  const saved=await api('/api/admin/aktionen/'+encodeURIComponent(a.id)+'/medienbild',{
+    method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({bild_url:url})
   });
-  if(result.bild_url!==url)throw new Error('Die Bildadresse konnte nicht bestätigt werden.');
-  programBildUrl=url;
+  if(saved.bild_url!==url)throw new Error('Bildzuordnung konnte nicht bestätigt werden.');
+  aktionsBildUrl=url;
   bildVorschau.src=url;
-  if(!bildVorschau.parentNode)bildBereich.insertBefore(bildVorschau,bildAuswahl);
-  bildStatus.textContent='Bild dauerhaft gespeichert und dem Programm zugeordnet.';
-  return result;
+  if(!bildVorschau.parentNode)bildBereich.prepend(bildVorschau);
+  bildStatus.textContent='Bild dauerhaft für dieses Sonderangebot gespeichert.';
+  return saved;
 }
 const bildVorschau = document.createElement('img');
 bildVorschau.alt = 'Foto zu ' + a.titel;
@@ -921,9 +920,9 @@ bildButton.onclick = async () => {
       throw new Error(ergebnis.error || 'Upload fehlgeschlagen.');
     }
 
-    programBildUrl=ergebnis.bild_url;
+    aktionsBildUrl=ergebnis.bild_url;
     bildVorschau.src = ergebnis.bild_url;
-    bildStatus.textContent='Bild hochgeladen und dauerhaft dem Programm zugeordnet.';
+    bildStatus.textContent='Bild hochgeladen und dem Sonderangebot dauerhaft zugeordnet.';
 
     if (!bildVorschau.parentNode) {
       bildBereich.prepend(bildVorschau);
@@ -937,19 +936,23 @@ bildButton.onclick = async () => {
   }
 };
 
-const bildSpeichernButton=document.createElement('button');
-bildSpeichernButton.type='button';bildSpeichernButton.className='btn secondary';
-bildSpeichernButton.textContent='Bild dauerhaft speichern';
-bildSpeichernButton.addEventListener('click',async()=>{
-  if(!programBildUrl){bildStatus.textContent='Bitte erst ein Bild hochladen oder aus der Medienbibliothek wählen.';return;}
-  bildSpeichernButton.disabled=true;
-  try{await programmBildSpeichern(programBildUrl);}
-  catch(error){bildStatus.textContent='Bildspeicherung fehlgeschlagen: '+error.message;}
-  finally{bildSpeichernButton.disabled=false;}
+const bildAusBibliothekButton=document.createElement('button');
+bildAusBibliothekButton.type='button';
+bildAusBibliothekButton.className='btn secondary';
+bildAusBibliothekButton.textContent='Bild aus Medienbibliothek wählen';
+bildAusBibliothekButton.addEventListener('click',async()=>{
+  if(typeof window.medienpoolBildAuswaehlen!=='function'){
+    bildStatus.textContent='Die Medienbibliothek ist momentan nicht verfügbar.';return;
+  }
+  bildAusBibliothekButton.disabled=true;
+  try{
+    await window.medienpoolBildAuswaehlen(async url=>{await aktionsBildSpeichern(url);});
+  }catch(error){bildStatus.textContent='Bild konnte nicht zugeordnet werden: '+error.message;}
+  finally{bildAusBibliothekButton.disabled=false;}
 });
 const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
 bildFormatHinweis.className='hint';
-bildBereich.append(bildAuswahl,bildButton,bildFormatHinweis);
+bildBereich.append(bildAuswahl,bildButton,bildAusBibliothekButton,bildStatus,bildFormatHinweis);
 c.append(bildBereich);
       const btn = el('button', a.status==='vorschlag'?'Vorschlag verwerfen':'Löschen');
       btn.className = 'danger';

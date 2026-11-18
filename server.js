@@ -3561,6 +3561,27 @@ if (speicherung.rowCount !== 1) {
     bild_url: data.publicUrl
   });
 }
+const aktionMedienBildRoute=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/medienbild$/);
+if(aktionMedienBildRoute&&req.method==='PATCH'){
+  const d=await body(req,4000);
+  if(typeof d?.bild_url!=='string')return reply(res,400,{error:'Bitte eine gültige Bildadresse auswählen.'});
+  const bildUrl=d.bild_url.trim();
+  let valid=false;
+  if(bildUrl&&bildUrl.length<=1000&&!bildUrl.includes('..')){
+    if(/^\/(?:fotos|images|bilder|assets)\/[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp|gif)$/i.test(bildUrl))valid=true;
+    else try{
+      const url=new URL(bildUrl);
+      const hostname=process.env.SUPABASE_URL?new URL(process.env.SUPABASE_URL).hostname:'';
+      valid=Boolean(hostname)&&url.protocol==='https:'&&url.hostname===hostname&&
+        url.pathname.startsWith('/storage/v1/object/public/angebotsbilder/')&&
+        !url.username&&!url.password&&!url.search&&!url.hash;
+    }catch{}
+  }
+  if(!valid)return reply(res,400,{error:'Bitte ein Bild aus der zentralen Medienbibliothek auswählen.'});
+  const q=await pool.query("UPDATE brilon_aktionen SET data=jsonb_set(data,'{bild_url}',to_jsonb($1::text),true) WHERE id=$2 RETURNING id,data->>'bild_url' AS bild_url",[bildUrl,aktionMedienBildRoute[1]]);
+  if(!q.rowCount)return reply(res,404,{error:'Sonderangebot nicht gefunden.'});
+  return reply(res,200,{success:true,id:q.rows[0].id,bild_url:q.rows[0].bild_url});
+}
  const aktionsBildRoute = route.match(
   /^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/bild$/
 );
