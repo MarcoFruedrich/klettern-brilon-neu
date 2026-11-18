@@ -1614,6 +1614,79 @@ if (neuesAngebotForm) {
   });
 }
 
+
+/* Gemeinsame, integrierte Medienbibliothek */
+const medienAnsicht=document.getElementById('medienbibliothek');
+const medienListe=document.getElementById('medien-liste');
+const medienStatus=document.getElementById('medien-status');
+function medienMeldung(t){if(medienStatus)medienStatus.textContent=t;}
+async function medienLaden(){
+  if(!medienListe)return;
+  medienMeldung('Bildarchiv wird geladen …');
+  try{
+    const bilder=await api('/api/admin/medien');
+    medienListe.replaceChildren();
+    if(!bilder.length)medienListe.append(el('p','Noch keine Bilder vorhanden.'));
+    for(const bild of bilder){
+      const karte=el('article');karte.className='booking';
+      const img=document.createElement('img');img.src=bild.url;img.alt=bild.name;
+      img.style.cssText='display:block;width:100%;height:180px;object-fit:contain;background:#f4f7f3;border-radius:10px';
+      const name=el('strong',bild.name);
+      const info=el('p',Math.ceil((bild.groesse||0)/1024)+' KB');
+      const aktionen=el('div');aktionen.className='button-row';
+      const auswahl=el('button','Für Programm auswählen');auswahl.type='button';auswahl.className='btn secondary';
+      auswahl.onclick=async()=>{
+        await orteLaden();
+        const select=document.getElementById('angebot-bild-bibliothek');
+        if(select){select.value=bild.url;select.dispatchEvent(new Event('change'));adminAnsichtAnzeigen('angebote-verwaltung',{hash:true,focus:true});}
+      };
+      const kopieren=el('button','Bildadresse kopieren');kopieren.type='button';kopieren.className='btn secondary';
+      kopieren.onclick=async()=>{try{await navigator.clipboard.writeText(bild.url);medienMeldung('Bildadresse kopiert.');}catch{medienMeldung('Bildadresse: '+bild.url);}};
+      const umbenennen=el('button','Umbenennen');umbenennen.type='button';umbenennen.className='btn secondary';
+      umbenennen.onclick=async()=>{
+        const neuerName=prompt('Neuer Bildname (ohne Dateiendung):',bild.name.replace(/\.[^.]+$/,''));
+        if(neuerName===null)return;
+        try{await api('/api/admin/medien/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pfad:bild.pfad,name:neuerName})});await medienLaden();await orteLaden();medienMeldung('Bild umbenannt.');}
+        catch(error){medienMeldung('Umbenennen fehlgeschlagen: '+error.message);}
+      };
+      const loeschen=el('button','Dauerhaft löschen');loeschen.type='button';loeschen.className='btn danger';
+      loeschen.onclick=async()=>{
+        if(!confirm('Dieses Bild dauerhaft aus dem Bildarchiv löschen?'))return;
+        try{await api('/api/admin/medien/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pfad:bild.pfad})});await medienLaden();await orteLaden();medienMeldung('Bild gelöscht.');}
+        catch(error){medienMeldung('Löschen fehlgeschlagen: '+error.message);}
+      };
+      aktionen.append(auswahl,kopieren,umbenennen,loeschen);
+      karte.append(img,name,info,aktionen);medienListe.append(karte);
+    }
+    medienMeldung(bilder.length+' Bilddateien im Archiv.');
+  }catch(error){medienMeldung('Medienbibliothek konnte nicht geladen werden: '+error.message);}
+}
+document.getElementById('medien-aktualisieren')?.addEventListener('click',medienLaden);
+document.getElementById('medien-upload-form')?.addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget,knopf=form.querySelector('button[type="submit"]'),dateien=Array.from(document.getElementById('medien-dateien').files||[]);
+  if(!dateien.length){medienMeldung('Bitte mindestens eine Datei auswählen.');return;}
+  knopf.disabled=true;
+  let erfolgreich=0;
+  try{
+    for(const datei of dateien){
+      medienMeldung('Lade '+datei.name+' hoch ('+(erfolgreich+1)+' von '+dateien.length+') …');
+      if(datei.size>5*1024*1024)throw Error(datei.name+': maximal 5 MB');
+      const typ=datei.type||(/\.gif$/i.test(datei.name)?'image/gif':'');
+      const antwort=await fetch('/api/admin/medien/upload',{method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':typ,'X-CSRF-Token':await adminCsrfTokenLaden()},body:datei});
+      const daten=await antwort.json();
+      if(!antwort.ok)throw Error(datei.name+': '+(daten.error||'Upload fehlgeschlagen'));
+      erfolgreich++;
+    }
+    form.reset();
+    await medienLaden();await orteLaden();
+    medienMeldung(erfolgreich+' Bilddatei(en) erfolgreich hochgeladen.');
+  }catch(error){medienMeldung(erfolgreich+' hochgeladen. Fehler: '+error.message);await medienLaden();}
+  finally{knopf.disabled=false;}
+});
+document.querySelectorAll('a[href="#medienbibliothek"]').forEach(link=>link.addEventListener('click',()=>{if(!workspace.hidden)medienLaden();}));
+
 const bildBibliothek=document.getElementById('angebot-bild-bibliothek');
 const bildDateiInput=document.getElementById('angebot-bild-datei');
 const bildVorschau=document.getElementById('angebot-bild-vorschau');
