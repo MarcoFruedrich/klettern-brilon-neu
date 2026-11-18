@@ -1,5 +1,5 @@
 (()=>{
-  const css=document.createElement('link');css.rel='stylesheet';css.href='/contextual-hilfe.css?v=20261117-fields2';document.head.append(css);
+  const css=document.createElement('link');css.rel='stylesheet';css.href='/contextual-hilfe.css?v=20261118-area-faq';document.head.append(css);
   const admin=document.body.classList.contains('admin-page');
   const rules=[
     [/veröffentlichte standorte|veroeffentlichte standorte|veranstaltungsorte|standortzuordnung/, 'Hier bestimmst du, an welchen Standorten das Programm öffentlich erscheint. Mehrere Orte auswählen und „Standortzuordnung speichern“ anklicken. Nach erneutem Öffnen müssen die Häkchen erhalten bleiben.'],
@@ -63,8 +63,7 @@
     'feedback-admin-section':'Internes Kundenfeedback auswerten. Personenbezogene Rückmeldungen nicht ungewollt öffentlich anzeigen.',
     'kundenfeedback-section':'Rückmeldungen zu Programmen, Durchführung und Sicherheit verwalten. Nur freigegebene Kennzahlen beziehungsweise Ansichten veröffentlichen.',
     'admin-guestbook-section':'Einwilligungsbezogene GPS-Gästelisten prüfen. Ohne dokumentierte Einwilligung keine öffentliche Namensanzeige.',
-    'admin-faq-section':'Antworten zu Verwaltung, Programmen, Buchungen und Sicherheit. Die Fragezeichen direkt an Eingabefeldern erklären die einzelne Eingabe.',
-    'marketing-campaign-section':'Kampagnen, Zielgruppen, Medienlinks und Freigabestatus pflegen. Ein gespeicherter Entwurf wurde nicht automatisch extern veröffentlicht.'
+    'admin-faq-section':'Antworten zu Verwaltung, Programmen, Buchungen und Sicherheit. Die Fragezeichen direkt an Eingabefeldern erklären die einzelne Eingabe.'
   };
   const norm=s=>(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase('de-DE');
   function helpText(label){const text=norm(label);for(const [re,msg] of rules)if(re.test(text))return msg;return '';}
