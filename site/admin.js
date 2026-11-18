@@ -1989,7 +1989,7 @@ if (angeboteAdminListe) {
 
 /* Neues Erlebnisangebot speichern */
 
-function programmStufenEditor(container, initial=[], presets=[[1,5,"",60],[6,10,"",90],[11,15,"",120],[16,20,"",150]]){
+function programmStufenEditor(container, initial=[], presets=[[1,10,"",180],[11,15,"",180]]){
   if(!container)return;
   const rows=Array.isArray(initial)&&initial.length?initial:presets.map(([min,max,preis,dauer])=>({min,max,preis,dauer}));
   container.replaceChildren();
@@ -2511,7 +2511,7 @@ beschreibung.style.width = '100%';
       const dauerModusLabel=document.createElement('label');dauerModusLabel.textContent='Dauerberechnung';
       const dauerModus=document.createElement('select');
       for(const [value,labelText] of [['gruppenstufe','Dauer je Teilnehmerstufe'],['fest','Feste Dauer für alle Gruppengrößen']]){const option=el('option',labelText);option.value=value;dauerModus.append(option);}
-      dauerModus.value=angebot.dauer_modus||'gruppenstufe';dauerModusLabel.append(dauerModus);metadaten.append(dauerModusLabel);
+      dauerModus.value=angebot.dauer_modus||(angebot.gruppenstufen?.length?'gruppenstufe':'fest');dauerModusLabel.append(dauerModus);metadaten.append(dauerModusLabel);
       const dauerHinweis=el('p','Bei stufenweiser Dauer wird die Dauer aus der passenden Gruppenstufe übernommen. Bei fester Dauer gilt der oben eingetragene Wert für alle.');
       dauerHinweis.className='hint';metadaten.append(dauerHinweis);
       const kapazitaet=feld('Kapazität',angebot.kapazitaet,'kapazitaet','number');
@@ -2547,10 +2547,10 @@ einzelPreisHinweis.className='hint';
 const legacyRanges=Object.entries(angebot.preise||{}).map(([key,price])=>{
   const match=String(key).match(/^(\d+)-(\d+)$/);if(!match)return null;
   const min=Number(match[1]),max=Number(match[2]),factor=max<=4?.6:max<=10?1:max<=15?1.2:max<=20?1.4:1.6;
-  return {min,max,preis:price,dauer:Math.max(15,Math.round((Number(angebot.dauer)*factor)/5)*5)};
+  return {min,max,preis:price,dauer:Number(angebot.dauer)||180};
 }).filter(Boolean);
 const tierEditor=document.createElement('div');tierEditor.className='angebot-stufen-editor';
-programmStufenEditor(tierEditor,angebot.gruppenstufen?.length?angebot.gruppenstufen:legacyRanges);
+programmStufenEditor(tierEditor,angebot.gruppenstufen?.length?angebot.gruppenstufen:legacyRanges,[]);
 const addTierButton=el('button','Teilnehmerstufe hinzufügen');addTierButton.type='button';addTierButton.className='btn secondary';
 addTierButton.addEventListener('click',()=>{tierEditor.onaddprogramtier?.();gruppenDauerEingabenAktualisieren();});
 const tierLegend=el('h4','Teilnehmerstufen · Preis je Gruppe');
@@ -2681,6 +2681,11 @@ preisButton.textContent = 'Programm speichern';
 preisButton.addEventListener('click', async () => {
   let gruppenstufen=programmStufenAuslesen(tierEditor);
   if(dauerModus.value==='fest')gruppenstufen=gruppenstufen.map(stufe=>({...stufe,dauer:Number(dauer.value)}));
+  if(modus.value!=='einzelplatz'&&(!gruppenstufen.length||gruppenstufen.some((t,i)=>t.min<1||t.max<t.min||
+      t.max>Number(kapazitaet.value)||t.dauer<15||t.dauer>1440||t.preis<0||
+      gruppenstufen.some((other,j)=>i!==j&&t.min<=other.max&&other.min<=t.max)))){
+    alert('Bitte gültige, überschneidungsfreie Teilnehmerstufen mit Preis und Dauer eingeben.');return;
+  }
   if(modus.value!=='einzelplatz'&&gruppenstufen.some(stufe=>!Number.isInteger(stufe.min)||!Number.isInteger(stufe.max)||
       !Number.isFinite(stufe.preis)||!Number.isInteger(stufe.dauer))){
     alert('Bitte für jede Teilnehmerstufe von/bis, Gruppenpreis und Dauer vollständig eintragen.');return;
