@@ -957,6 +957,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       return reply(res,200,q.rows);
     }
 
+    if(route==='/api/besuchergruppen'&&req.method==='GET'){
+      if(!pool)return reply(res,200,[]);
+      const vorhanden=(await pool.query("SELECT to_regclass('public.brilon_besuchergruppen') AS tabelle")).rows[0]?.tabelle;
+      if(!vorhanden)return reply(res,200,[]);
+      const q=await pool.query('SELECT daten FROM brilon_besuchergruppen WHERE id=1');
+      return reply(res,200,Array.isArray(q.rows[0]?.daten)?q.rows[0].daten:[]);
+    }
+
     if(route==='/api/aktionen'&&req.method==='GET'){
       if(!pool)return reply(res,200,[]);
       const q=await pool.query(
@@ -2953,8 +2961,49 @@ if(staffArea&&req.method==='DELETE'){
 }
 
 
+/* Besuchergruppen: zentrale öffentliche Daten und persistente Verwaltungsbearbeitung. */
+if(route==='/api/admin/besuchergruppen'&&(req.method==='GET'||req.method==='PUT')){
+  if(!await admin(req,res))return;
+  if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
+  await pool.query(`CREATE TABLE IF NOT EXISTS brilon_besuchergruppen(
+    id INTEGER PRIMARY KEY CHECK(id=1),daten JSONB NOT NULL,aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  const defaults=[
+    {id:'familien',titel:'Familien',icon:'👨‍👩‍👧‍👦',farbe:'#599f47',beschreibung:'Gemeinsam Abenteuer erleben, Neues ausprobieren und als Familie zusammenwachsen.',punkte:['Erlebnisse für Groß und Klein','Begleitete Aktivitäten','Gemeinsame Erinnerungen'],bild:'/fotos/kletterheldin-helm.jpg',iconBild:'',programmIds:[],aktiv:true},
+    {id:'kindergeburtstage',titel:'Kindergeburtstage',icon:'🎂',farbe:'#bf4e7b',beschreibung:'Ein besonderer Geburtstag mit Bewegung, Mut, Teamgeist und ganz viel Spaß.',punkte:['Abwechslungsreiche Erlebnisse','Altersgerechte Betreuung','Gemeinsam feiern und staunen'],bild:'/fotos/halle.jpg',iconBild:'',programmIds:[],aktiv:true},
+    {id:'schulen',titel:'Schulen',icon:'🎓',farbe:'#578fce',beschreibung:'Erlebnispädagogische Programme, die Klassengemeinschaft und Vertrauen stärken.',punkte:['Klassen- und Projekttage','Kooperation und Zusammenhalt','Gemeinsame Herausforderungen'],bild:'/fotos/abseilen.jpg',iconBild:'',programmIds:[],aktiv:true},
+    {id:'vereine',titel:'Vereine',icon:'🛡️',farbe:'#7553b5',beschreibung:'Gemeinsame Herausforderungen und sportliche Erlebnisse für euren Verein.',punkte:['Teamgeist stärken','Sportlich und kreativ','Für verschiedene Vereinsgruppen'],bild:'/fotos/halle.jpg',iconBild:'',programmIds:[],aktiv:true},
+    {id:'jugendgruppen',titel:'Jugendgruppen',icon:'🧭',farbe:'#e18a24',beschreibung:'Abenteuer für Jugendverbände, Freizeiten und andere Gruppen.',punkte:['Natur und Bewegung','Altersgerechte Herausforderungen','Gemeinsam etwas erreichen'],bild:'/fotos/kletterheldin-helm.jpg',iconBild:'',programmIds:[],aktiv:true},
+    {id:'unternehmen',titel:'Unternehmen',icon:'💼',farbe:'#21989c',beschreibung:'Teamerlebnisse für mehr Vertrauen, Kommunikation und ein starkes Miteinander.',punkte:['Zusammenarbeit fördern','Gemeinsam Herausforderungen meistern','Individuell planbare Aktionen'],bild:'/fotos/abseilen.jpg',iconBild:'',programmIds:[],aktiv:true}
+  ];
+  if(req.method==='GET'){
+    await pool.query('INSERT INTO brilon_besuchergruppen(id,daten) VALUES(1,$1::jsonb) ON CONFLICT(id) DO NOTHING',[JSON.stringify(defaults)]);
+    const q=await pool.query('SELECT daten FROM brilon_besuchergruppen WHERE id=1');
+    return reply(res,200,Array.isArray(q.rows[0]?.daten)?q.rows[0].daten:defaults);
+  }
+  const eingabe=await body(req,160000);
+  if(!Array.isArray(eingabe)||eingabe.length>30)return reply(res,400,{error:'Ungültige Gruppenliste.'});
+  const ids=new Set();
+  const gruppen=eingabe.map(g=>{
+    const id=safeText(g?.id,80),titel=safeText(g?.titel,55),icon=safeText(g?.icon,16);
+    const farbe=/^#[0-9a-f]{6}$/i.test(String(g?.farbe||''))?String(g.farbe):'#267c50';
+    const beschreibung=safeText(g?.beschreibung,650);
+    const bild=safeText(g?.bild,1000),iconBild=safeText(g?.iconBild,1000);
+    const punkte=Array.isArray(g?.punkte)?g.punkte.slice(0,3).map(x=>safeText(x,160)).filter(Boolean):[];
+    const programmIds=Array.isArray(g?.programmIds)?[...new Set(g.programmIds.map(Number).filter(x=>Number.isSafeInteger(x)&&x>0))].slice(0,500):[];
+    if(!/^[a-zA-Z0-9_-]{1,80}$/.test(id)||ids.has(id)||!titel||[...icon].length<1||[...icon].length>8||beschreibung.length>650)
+      return null;
+    ids.add(id);
+    return {id,titel,icon,farbe,beschreibung,punkte,bild,iconBild,programmIds,aktiv:g.aktiv===true};
+  });
+  if(gruppen.some(g=>!g))return reply(res,400,{error:'Bitte Gruppenname, Symbol und Beschreibung überprüfen.'});
+  await pool.query(`INSERT INTO brilon_besuchergruppen(id,daten,aktualisiert_am) VALUES(1,$1::jsonb,NOW())
+    ON CONFLICT(id) DO UPDATE SET daten=EXCLUDED.daten,aktualisiert_am=NOW()`,[JSON.stringify(gruppen)]);
+  return reply(res,200,{success:true,gruppen});
+}
+
 /* Medienbibliothek: authentifizierte Verwaltung, persistente Supabase-Dateien. */
 if(route==='/api/admin/medien'){
+  if(!await admin(req,res))return;
   if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
   const bucket=supabase.storage.from('angebotsbilder');
   if(req.method==='GET'){

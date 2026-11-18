@@ -86,9 +86,14 @@
       iconClear.addEventListener('click',()=>{g.iconBild='';iconPreview.removeAttribute('src');iconPreview.hidden=true;});
       const iconTools=node('div','','besuchergruppen-admin-icon-tools');iconTools.append(iconChoose,iconUpload,iconClear);
       card.append(field('Zentrales GIF-/Bild-Icon',iconTools),iconUploadInput,iconPreview,node('small','GIF-Animationen: maximal 3 MB und 1200 × 1200 Pixel. Uploads werden zentral gespeichert und bleiben wiederverwendbar.'));
-      const description=node('textarea');description.value=g.beschreibung;description.rows=3;description.maxLength=350;
-      description.addEventListener('input',()=>g.beschreibung=description.value);
-      card.append(field('Kurzbeschreibung',description));
+      const description=node('textarea');description.value=g.beschreibung||'';description.rows=4;description.maxLength=650;
+      const descriptionCount=node('small',description.value.length+' von 650 Zeichen');
+      descriptionCount.setAttribute('aria-live','polite');
+      description.addEventListener('input',()=>{
+        g.beschreibung=description.value;
+        descriptionCount.textContent=description.value.length+' von 650 Zeichen';
+      });
+      card.append(field('Kurzbeschreibung',description),descriptionCount);
       const benefits=node('textarea');benefits.value=(g.punkte||[]).join('\n');benefits.rows=3;
       benefits.addEventListener('input',()=>g.punkte=benefits.value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,3));
       card.append(field('Vorteile (max. 3 Zeilen)',benefits));
