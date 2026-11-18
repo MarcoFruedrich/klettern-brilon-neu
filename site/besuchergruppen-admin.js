@@ -36,11 +36,17 @@
         b.addEventListener('click',()=>{const [moved]=gruppen.splice(i,1);gruppen.splice(i+delta,0,moved);render();});
         controls.append(b);
       }
+      const remove=node('button','Gruppe entfernen','btn secondary');remove.type='button';
+      remove.addEventListener('click',()=>{
+        if(!confirm('Gruppe „'+g.titel+'“ aus der Liste entfernen? Die Änderung wird erst nach dem Speichern übernommen.'))return;
+        gruppen.splice(i,1);render();
+      });
+      controls.append(remove);
       head.append(controls);card.append(head);
       const textName=input(g.titel,55);
       textName.addEventListener('input',()=>g.titel=textName.value);
       card.append(field('Titel',textName));
-      const description=node('textarea');description.value=g.beschreibung;description.rows=3;description.maxLength=350;
+      const description=node('textarea');description.value=g.beschreibung;description.rows=3;description.maxLength=650;
       description.addEventListener('input',()=>g.beschreibung=description.value);
       card.append(field('Kurzbeschreibung',description));
       const benefits=node('textarea');benefits.value=(g.punkte||[]).join('\n');benefits.rows=3;
@@ -99,6 +105,14 @@
       render();
     }catch(e){status.textContent='Besuchergruppen konnten nicht geladen werden: '+e.message;}
   };
+  document.getElementById('besuchergruppen-admin-neu')?.addEventListener('click',()=>{
+    if(gruppen.length>=40){status.textContent='Maximal 40 Gruppen möglich.';return;}
+    const id='gruppe-'+(typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.floor(Math.random()*10000));
+    gruppen.push({id,titel:'Neue Gruppe',icon:'👥',farbe:'#599f47',beschreibung:'',punkte:[],bild:'',programmIds:[],aktiv:false});
+    render();
+    container.lastElementChild?.scrollIntoView({behavior:'smooth',block:'start'});
+    status.textContent='Neue Gruppe angelegt. Bitte Angaben ergänzen und Besuchergruppen speichern.';
+  });
   document.getElementById('besuchergruppen-admin-speichern')?.addEventListener('click',write);
   document.getElementById('besuchergruppen-admin-neuladen')?.addEventListener('click',()=>{
     geladen=false;window.besuchergruppenAdminLaden();
