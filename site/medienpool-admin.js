@@ -30,6 +30,7 @@
     for(const image of loadedImages){
       const card=el('article');
       card.className='booking';
+      card.style.cssText='min-width:0;max-width:100%;overflow-wrap:anywhere';
       const preview=document.createElement('img');
       preview.src=image.url;
       preview.alt=image.name||'Gespeichertes Bild';
@@ -40,12 +41,15 @@
       preview.style.objectFit='contain';
       preview.style.borderRadius='8px';
       const title=el('strong',image.name||'Gespeichertes Bild');
+      title.style.cssText='display:block;overflow-wrap:anywhere;margin-top:8px';
+      const info=el('small',image.groesse?Math.ceil(image.groesse/1024)+' KB':'Dateigröße unbekannt');
       const open=el('a','Bild in neuem Tab ansehen');
       open.href=image.url;
       open.target='_blank';
       open.rel='noopener noreferrer';
       const actions=el('div');actions.className='button-row';
-      if(image.pfad&&image.pfad.startsWith('medien/')){
+      actions.style.cssText='display:flex;flex-wrap:wrap;gap:10px;margin-top:12px';
+      if(image.pfad){
         const rename=el('button','Umbenennen');rename.type='button';rename.className='btn secondary';
         rename.onclick=async()=>{
           const name=prompt('Neuer Bildname:',image.name.replace(/\.[^.]+$/,''));
@@ -55,17 +59,17 @@
             await fetchImages();status.textContent='Bild umbenannt.';
           }catch(error){status.textContent='Umbenennen fehlgeschlagen: '+error.message;}
         };
-        const remove=el('button','Dauerhaft löschen');remove.type='button';remove.className='btn secondary';
+        const remove=el('button','Dauerhaft löschen');remove.type='button';remove.className='btn danger';
         remove.onclick=async()=>{
-          if(!confirm('Dieses Bild dauerhaft löschen?'))return;
+          if(!confirm('Bild „'+image.name+'“ endgültig vom Server löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.'))return;
           try{
-            await window.api('/api/admin/medien',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({pfad:image.pfad})});
-            await fetchImages();status.textContent='Bild dauerhaft gelöscht.';
+            await window.api('/api/admin/medien',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({pfad:image.pfad,groesse:image.groesse||0})});
+            await fetchImages();status.textContent='Bild dauerhaft vom Server entfernt. Freigegebener Speicherplatz: '+Math.ceil((image.groesse||0)/1024)+' KB.';
           }catch(error){status.textContent='Löschen fehlgeschlagen: '+error.message;}
         };
         actions.append(rename,remove);
       }
-      card.append(preview,title,open,actions);
+      card.append(preview,title,info,open,actions);
       list.append(card);
     }
   }
