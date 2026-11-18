@@ -170,8 +170,17 @@
       container.append(card);
     });
   }
+  window.besuchergruppenProgrammeAktualisieren=async()=>{
+    if(!geladen)return;
+    try{
+      const latest=await api('/api/admin/angebote');
+      if(!Array.isArray(latest))throw Error('Ungültige Programmliste.');
+      programme=latest;
+      render();
+    }catch(error){status.textContent='Die neuen Programme konnten noch nicht geladen werden: '+error.message;}
+  };
   window.besuchergruppenAdminLaden=async()=>{
-    if(geladen)return;
+    if(geladen){await window.besuchergruppenProgrammeAktualisieren();return;}
     try{
       const [g,p]=await Promise.all([api('/api/admin/besuchergruppen'),api('/api/admin/angebote')]);
       gruppen=g;programme=p;geladen=true;status.textContent='Änderungen an Texten, Bildern oder Programmen unten speichern.';
@@ -187,7 +196,8 @@
     container.lastElementChild?.scrollIntoView({behavior:'smooth',block:'center'});
   });
     document.getElementById('besuchergruppen-admin-speichern')?.addEventListener('click',write);
-  document.getElementById('besuchergruppen-admin-neuladen')?.addEventListener('click',()=>{
-    geladen=false;window.besuchergruppenAdminLaden();
+  document.getElementById('besuchergruppen-admin-neuladen')?.addEventListener('click',async()=>{
+    if(!confirm('Ungespeicherte Änderungen verwerfen und Daten neu vom Server laden?'))return;
+    geladen=false;await window.besuchergruppenAdminLaden();
   });
 })();
