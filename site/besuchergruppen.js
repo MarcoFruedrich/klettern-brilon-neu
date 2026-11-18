@@ -42,11 +42,12 @@
   }
   function render(){
     root.replaceChildren();
-    const standortGewaehlt=Boolean(window.ausgewaehlterAngebotsStandort);
-    root.hidden=!standortGewaehlt;
+    // "Alle Standorte" ist bereits eine gueltige Auswahl. Neue Besuchergruppen
+    // erscheinen auch ohne vorherige manuelle Aenderung des Standortfilters.
+    const standort=window.ausgewaehlterAngebotsStandort||'alle';
+    root.hidden=false;
     const hinweis=document.getElementById('besuchergruppen-standorthinweis');
-    if(hinweis)hinweis.hidden=standortGewaehlt;
-    if(!standortGewaehlt)return;
+    if(hinweis)hinweis.hidden=true;
     gruppen.filter(g=>g.aktiv).forEach(g=>{
       const card=element('article','besuchergruppe-karte');
       card.style.setProperty('--gruppe-farbe',g.farbe||'#267c50');
