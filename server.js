@@ -3374,7 +3374,7 @@ const mindestteilnehmer=Number(d.mindestteilnehmer??alt.mindestteilnehmer??5);
 const preisProPerson=Number(d.preis_pro_person??alt.preis_pro_person??0);
 const dauerModus=d.dauer_modus===undefined?(alt.dauer_modus||'gruppenstufe'):(d.dauer_modus==='fest'?'fest':'gruppenstufe');
 const legacy=Object.entries(alt.preise||{}).map(([range,preis])=>{
-  const m=/^(\\d+)-(\\d+)$/.exec(range);
+  const m=/^(\d+)-(\d+)$/.exec(range);
   return m?{min:Number(m[1]),max:Number(m[2]),preis:Number(preis),dauer:Number(alt.dauer)}:null;
 }).filter(Boolean);
 const rawStufen=d.gruppenstufen===undefined
