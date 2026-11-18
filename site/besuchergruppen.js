@@ -51,7 +51,8 @@
       const card=element('article','besuchergruppe-karte');
       card.style.setProperty('--gruppe-farbe',g.farbe||'#267c50');
       const image=element('img','besuchergruppe-bild');
-      image.src=g.bild;image.alt='Erlebnisbild: '+g.titel;image.loading='lazy';
+      image.src=g.bild||'/fotos/halle.jpg';image.alt='Erlebnisbild: '+g.titel;image.loading='lazy';
+      image.addEventListener('error',()=>{if(image.src!==new URL('/fotos/halle.jpg',location.href).href)image.src='/fotos/halle.jpg';},{once:true});
       const content=element('div','besuchergruppe-inhalt');
       const heading=element('h3','besuchergruppe-titel',g.titel);
       const badge=element('span','besuchergruppe-symbol');
@@ -59,6 +60,7 @@
       if(g.iconBild){
         const iconImage=element('img','besuchergruppe-iconbild');
         iconImage.src=g.iconBild;iconImage.alt='';iconImage.loading='lazy';
+        iconImage.addEventListener('error',()=>{badge.textContent=g.icon||'✨';},{once:true});
         badge.append(iconImage);
       }else badge.textContent=g.icon||'✨';
       const head=element('div','besuchergruppe-head');head.append(badge,heading);
@@ -78,8 +80,18 @@
   }
   document.addEventListener('standortwechsel',render);
   render();
-  fetch('/api/besuchergruppen')
-    .then(r=>{if(!r.ok)throw Error('Besuchergruppen nicht erreichbar');return r.json();})
-    .then(data=>{if(Array.isArray(data)){gruppen=data;render();document.dispatchEvent(new CustomEvent('besuchergruppenwechsel'));}})
-    .catch(()=>{}); // Die sechs sichtbaren Standardkacheln bleiben verfügbar.
+  async function gruppenAktualisieren(){
+    try{
+      const response=await fetch('/api/besuchergruppen',{cache:'no-store'});
+      if(!response.ok)throw Error('Besuchergruppen nicht erreichbar');
+      const data=await response.json();
+      if(Array.isArray(data)){
+        gruppen=data;render();
+        document.dispatchEvent(new CustomEvent('besuchergruppenwechsel'));
+      }
+    }catch(error){console.warn('Besuchergruppen konnten nicht aktualisiert werden:',error.message);}
+  }
+  window.besuchergruppenAktualisieren=gruppenAktualisieren;
+  document.addEventListener('besuchergruppenaktualisiert',gruppenAktualisieren);
+  gruppenAktualisieren();
 })();

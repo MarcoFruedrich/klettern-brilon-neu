@@ -326,11 +326,43 @@ function datumPruefen() {
 }
 
 const kalenderBereich = document.getElementById('buchungskalender');
+// One source of truth for visitor-group media across offers and booking calendar.
+function gruppenIconAnhaengen(container,gruppe,cssClass='gruppen-kontext-icon'){
+  if(!gruppe)return;
+  if(gruppe.iconBild){
+    const image=document.createElement('img');
+    image.src=gruppe.iconBild;image.alt='';image.loading='lazy';image.className=cssClass;
+    image.addEventListener('error',()=>{image.replaceWith(document.createTextNode(gruppe.icon||'✨'));},{once:true});
+    container.append(image);
+  }else container.append(document.createTextNode(gruppe.icon||'✨'));
+}
+function buchungskalenderGruppenKontext(){
+  if(!kalenderBereich)return;
+  let banner=document.getElementById('kalender-besuchergruppen-kontext');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='kalender-besuchergruppen-kontext';
+    banner.className='kalender-besuchergruppen-kontext';
+    kalenderBereich.before(banner);
+  }
+  banner.replaceChildren();
+  const gruppe=(window.besuchergruppenListe?.()||[]).find(g=>g.id===window.aktiveBesuchergruppe);
+  banner.hidden=!gruppe;
+  if(gruppe){
+    gruppenIconAnhaengen(banner,gruppe);
+    const label=document.createElement('span');
+    label.textContent='Buchung für: '+gruppe.titel;
+    banner.append(label);
+  }
+}
+document.addEventListener('besuchergruppenwechsel',buchungskalenderGruppenKontext);
+
 let kalenderMonat = new Date();
 kalenderMonat.setDate(1);
 
 function kalenderAnzeigen() {
   if (!kalenderBereich) return;
+  buchungskalenderGruppenKontext();
 
   kalenderBereich.replaceChildren();
 
@@ -805,7 +837,9 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     filterhinweis.hidden=!gruppenname;
     if(gruppenname){
       const label=document.createElement('span');
-      label.textContent='Angebote für: '+gruppenname;
+      const gruppe=(window.besuchergruppenListe?.()||[]).find(g=>g.id===window.aktiveBesuchergruppe);
+      gruppenIconAnhaengen(label,gruppe);
+      label.append(document.createTextNode(' Angebote für: '+gruppenname));
       const clear=document.createElement('button');
       clear.type='button';clear.textContent='Alle Besuchergruppen anzeigen';
       clear.addEventListener('click',()=>window.besuchergruppeZuruecksetzen?.());
@@ -862,7 +896,14 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     const symbol=document.createElement('span');
     symbol.className='besuchergruppe-symbol';
     symbol.setAttribute('aria-hidden','true');
-    symbol.textContent='🧗';
+    const angebotsGruppen=(window.besuchergruppenListe?.()||[]).filter(group=>
+      (Array.isArray(angebot.besuchergruppen)&&angebot.besuchergruppen.includes(group.id))||
+      group.programmIds?.some(id=>String(id)===String(angebot.id)));
+    const aktiveGruppe=angebotsGruppen.find(group=>group.id===window.aktiveBesuchergruppe)||angebotsGruppen[0];
+    if(aktiveGruppe){
+      karte.style.setProperty('--gruppe-farbe',aktiveGruppe.farbe||'#258451');
+      gruppenIconAnhaengen(symbol,aktiveGruppe,'besuchergruppe-iconbild');
+    }else symbol.textContent='🧗';
     const titel=document.createElement('h3');
     titel.className='besuchergruppe-titel';
     titel.textContent=angebot.name;
@@ -892,8 +933,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       hinweis.textContent=angebot.hinweise;
       inhalt.append(hinweis);
     }
-    const zugeordneteGruppen=(window.besuchergruppenListe?.()||[])
-      .filter(group=>Array.isArray(angebot.besuchergruppen)&&angebot.besuchergruppen.includes(group.id)||group.programmIds?.some(id=>String(id)===String(angebot.id)));
+    const zugeordneteGruppen=angebotsGruppen;
     if(zugeordneteGruppen.length){
       const groupTags=document.createElement('div');
       groupTags.className='angebote-programm-gruppen';
@@ -901,10 +941,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       for(const group of zugeordneteGruppen){
         const tag=document.createElement('span');
         tag.className='angebote-programm-gruppe';
-        if(group.iconBild){
-          const icon=document.createElement('img');icon.src=group.iconBild;icon.alt='';icon.loading='lazy';
-          tag.append(icon);
-        }else if(group.icon)tag.append(document.createTextNode(group.icon+' '));
+        gruppenIconAnhaengen(tag,group,'angebote-programm-tag-icon');
         tag.append(document.createTextNode(group.titel));
         groupTags.append(tag);
       }
