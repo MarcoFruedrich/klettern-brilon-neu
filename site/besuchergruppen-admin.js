@@ -75,7 +75,7 @@
         try{
           status.textContent='Icon wird in der Medienbibliothek gespeichert …';
           const saved=await api('/api/admin/medien',{method:'POST',headers:{'Content-Type':file.type,'X-Original-Filename':file.name},body:file});
-          g.iconBild=saved.bild_url;iconPreview.src=g.iconBild;iconPreview.hidden=false;
+          g.iconBild=saved.bild?.url||saved.bild_url||'';if(!g.iconBild)throw new Error('Der Server hat keine Bildadresse zurückgegeben.');iconPreview.src=g.iconBild;iconPreview.hidden=false;
           status.textContent='Icon zentral gespeichert. Nach „Besuchergruppen speichern“ ist die Zuordnung dauerhaft.';
         }catch(error){status.textContent='Icon-Upload fehlgeschlagen: '+error.message;}
         finally{iconUploadInput.value='';}
