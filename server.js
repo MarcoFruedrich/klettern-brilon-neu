@@ -3314,10 +3314,19 @@ function pruefeProgrammstufen(raw,kapazitaet,modus,basisdauer,dauerModus){
   if(!Array.isArray(raw)||!raw.length||raw.length>100)return {error:'Bitte mindestens eine vollständige Teilnehmerstufe angeben.'};
   const stufen=raw.map(v=>({min:Number(v.min),max:Number(v.max),preis:v.preis==null||v.preis===''?NaN:Number(v.preis),
     dauer:dauerModus==='fest'?basisdauer:Number(v.dauer)})).sort((a,b)=>a.min-b.min);
-  if(stufen.some((v,i)=>!Number.isInteger(v.min)||!Number.isInteger(v.max)||v.min<1||v.max<v.min||
-    v.max>kapazitaet||!Number.isFinite(v.preis)||v.preis<0||!Number.isInteger(v.dauer)||v.dauer<15||v.dauer>1440||
-    (i>0&&v.min<=stufen[i-1].max)))
-    return {error:'Bitte Teilnehmerzahlen ohne Überschneidungen, einen gültigen Gruppenpreis und eine Dauer zwischen 15 und 1440 Minuten eingeben.'};
+  for(let i=0;i<stufen.length;i++){
+    const v=stufen[i],nummer=i+1;
+    if(!Number.isInteger(v.min)||v.min<1||!Number.isInteger(v.max)||v.max<v.min)
+      return {error:'Teilnehmerstufe '+nummer+': Bitte gültige Teilnehmerzahlen von/bis eingeben.'};
+    if(v.max>kapazitaet)
+      return {error:'Teilnehmerstufe '+nummer+': Die Obergrenze '+v.max+' überschreitet die Programmkapazität '+kapazitaet+'.'};
+    if(!Number.isFinite(v.preis)||v.preis<0)
+      return {error:'Teilnehmerstufe '+nummer+': Der Gruppenpreis fehlt oder ist ungültig.'};
+    if(!Number.isInteger(v.dauer)||v.dauer<15||v.dauer>1440)
+      return {error:'Teilnehmerstufe '+nummer+': Die Dauer muss zwischen 15 und 1440 Minuten liegen.'};
+    if(i>0&&v.min<=stufen[i-1].max)
+      return {error:'Teilnehmerstufe '+nummer+': Die Teilnehmerzahlen überschneiden sich mit der vorherigen Stufe.'};
+  }
   return {stufen};
 }
 const preiseAusStufen=stufen=>Object.fromEntries(stufen.map(v=>[v.min+'-'+v.max,v.preis]));
