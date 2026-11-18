@@ -702,12 +702,10 @@ loeschen.onclick = async () => {
     });
     if (!ergebnis.success) throw Error('Buchungsanfrage wurde nicht gelöscht.');
     c.remove();
-    await refresh();
-    try {
-      await kalenderLaden();
-    } catch (kalenderFehler) {
-      meldung.textContent = 'Buchungsanfrage gelöscht; Kalender konnte nicht aktualisiert werden.';
-    }
+    kalenderBuchungen=kalenderBuchungen.filter(eintrag=>String(eintrag.id)!==String(b.id));
+    kalenderAnzeigen();
+    meldung.textContent='Buchungsanfrage gelöscht.';
+    await Promise.allSettled([refresh(),kalenderLaden()]);
   } catch (err) {
 
     meldung.textContent = 'Fehler beim Löschen: ' + err.message;
@@ -1475,6 +1473,7 @@ async function kalenderMitarbeitendeLaden(){
 }
 let eigeneKalenderTermine = [];
 let kalenderLadeSequenz=0;
+let kalenderAusgewaehltesDatum=null;
 function kalenderAnzeigen() {
   if (!kalenderRaster) return;
 
@@ -1584,7 +1583,8 @@ if (eigeneTermine.length) {
 }
 
 
-    feld.onclick = () => {
+    const kalendertagAnzeigen = () => {
+      kalenderAusgewaehltesDatum=datum;
       kalenderInfo.replaceChildren();
 
       const titel = document.createElement('strong');
@@ -1611,6 +1611,37 @@ if (eigeneTermine.length) {
         // Aktuelle Bewerbungen und zugewiesene Mitarbeiter befinden sich
         // im zentralen Einsatzplanungsbereich desselben Verwaltungskalenders.
         kalenderInfo.append(el('p','Mitarbeiterzuweisung und Stundenkontrolle siehe zentrale Einsatzplanung oben.'));
+        if(b.status==='offen'&&b.source!=='teamerbase'){
+          const bestaetigen=document.createElement('button');
+          bestaetigen.type='button';
+          bestaetigen.className='btn secondary';
+          bestaetigen.textContent='Buchung bestätigen';
+          bestaetigen.addEventListener('click',async()=>{
+            if(!window.confirm('Buchung verbindlich bestätigen und die Bestätigungs-E-Mail an den Kunden senden?'))return;
+            bestaetigen.disabled=true;
+            bestaetigen.textContent='Wird bestätigt …';
+            try{
+              const aktualisiert=await api('/api/admin/buchungen/'+encodeURIComponent(b.id),{
+                method:'PATCH',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({status:'bestaetigt',bearbeitungsnotiz:b.bearbeitungsnotiz||''})
+              });
+              const lokalerEintrag=kalenderBuchungen.find(item=>String(item.id)===String(b.id));
+              if(lokalerEintrag){
+                lokalerEintrag.status=aktualisiert.status;
+                lokalerEintrag.data=aktualisiert.data||lokalerEintrag.data;
+              }
+              kalenderAnzeigen();
+              await Promise.allSettled([refresh(),kalenderLaden()]);
+            }catch(error){
+              bestaetigen.disabled=false;
+              bestaetigen.textContent='Buchung bestätigen';
+              const fehler=el('p','Bestätigung fehlgeschlagen: '+error.message);
+              fehler.setAttribute('role','alert');
+              kalenderInfo.append(fehler);
+            }
+          });
+          kalenderInfo.append(bestaetigen);
+        }
       }
 
 for (const e of eigeneTermine) {
@@ -1642,7 +1673,9 @@ for (const e of eigeneTermine) {
   kalenderInfo.append(eintrag);
 }
 
-};
+    };
+    feld.onclick = kalendertagAnzeigen;
+    if(kalenderAusgewaehltesDatum===datum)kalendertagAnzeigen();
     kalenderRaster.append(feld);
   }
 }

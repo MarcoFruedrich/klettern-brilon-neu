@@ -2274,7 +2274,7 @@ preis=safeText(d.preis,50);
         const endDate=new Date(Date.UTC(Number(match[1]),Number(match[2]),1));
         const ende=endDate.toISOString().slice(0,10);
         const q=await pool.query(
-          `SELECT id,data,status,created_at
+          `SELECT id,data,status,bearbeitungsnotiz,created_at
            FROM brilon_buchungen
            WHERE data->>'datum'>=$1 AND data->>'datum'<$2
              AND COALESCE(status,'offen') IN ('offen','bestaetigt')
