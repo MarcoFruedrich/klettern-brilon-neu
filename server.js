@@ -8,7 +8,7 @@ const { datenbankKonfiguration } = require('./lib/datenbank-konfiguration');
 const { anschlussrabatte } = require('./lib/anschlussrabatt');
 const { zugelasseneAnschlusszeiten, anschlussPreis, erzeugeZugang, pruefeZugang } = require('./lib/anschlussangebote');
 const { preisFuerTeilnehmer, zahlungsstand, preisNachAnschlussrabatt, preisBeiAnschlussstorno, zahlungErgaenzen } = require('./lib/buchungslogik');
-const { buchungsdauerBerechnen } = require('./lib/buchungsdauer');
+const { buchungsdauerBerechnen, buchungsdauerFuerProgramm } = require('./lib/buchungsdauer');
 const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpsspiel');
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 const { sameOriginMutation } = require('./lib/sicherheit');
@@ -388,7 +388,7 @@ async function anschlussApi(req,res,url,route,ip){
   }
   if(route==='/api/anschlussangebote/vorschau'&&req.method==='POST'){
     const [programs,bookings,blocked]=await Promise.all([
-      pool.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine,veranstaltungsort FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
+      pool.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine,veranstaltungsort,gruppenstufen,dauer_modus FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
       pool.query(`SELECT id,data FROM brilon_buchungen WHERE data->>'datum'=$1 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum]),
       pool.query(`SELECT COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender WHERE typ='sperrzeit' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date`,[base.datum])
     ]);
@@ -401,7 +401,7 @@ async function anschlussApi(req,res,url,route,ip){
       if(blocked.rows.some(entry=>!entry.standorte.length||entry.standorte.includes(p.veranstaltungsort)))continue;
       if(p.name===base.angebot)continue;
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
-      const price=preisFuerTeilnehmer(p.preise,participants),duration=buchungsdauerBerechnen(participants,Number(p.dauer));
+      const price=preisFuerTeilnehmer(p.preise,participants,p.gruppenstufen),duration=buchungsdauerFuerProgramm(participants,p);
       if((dates.length&&!dates.includes(base.datum))||participants>Number(p.kapazitaet)||price===null||!Number.isInteger(duration)||duration<1)continue;
       const cap=await pool.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum,p.name]);
       if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))continue;
@@ -420,14 +420,14 @@ async function anschlussApi(req,res,url,route,ip){
       const q=await client.query('SELECT id,status,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[parentId]);
       if(!q.rowCount||q.rows[0].status!=='bestaetigt')return {ungueltig:true};
       const original=q.rows[0].data,oldWindow=buchungsfenster(original),participants=Number(original.teilnehmer);
-      const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
+      const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine,gruppenstufen,dauer_modus FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
       if(!pQuery.rowCount)return {programm:false};
-      const p=pQuery.rows[0],duration=Number(p.dauer),start=Number(time.slice(0,2))*60;
+      const p=pQuery.rows[0],duration=buchungsdauerFuerProgramm(participants,p),start=Number(time.slice(0,2))*60;
       if(!oldWindow||!gueltigesDatum(original.datum)||original.datum<heuteInBerlin()||!Number.isInteger(participants)||participants<1||participants>150||p.name===original.angebot||!Number.isInteger(duration)||participants>Number(p.kapazitaet)||
          !zugelasseneAnschlusszeiten(oldWindow[0],oldWindow[1],duration).some(t=>t.beginnMinuten===start&&t.endeMinuten<=1440))return {zeit:false};
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
       if(dates.length&&!dates.includes(original.datum))return {freigabe:false};
-      const price=preisFuerTeilnehmer(p.preise,participants);if(price===null)return {preis:false};
+      const price=preisFuerTeilnehmer(p.preise,participants,p.gruppenstufen);if(price===null)return {preis:false};
       const duplicate=await client.query(`SELECT 1 FROM brilon_buchungen WHERE data->>'anschlussElternId'=$1
         AND data->>'angebot'=$2 AND data->>'uhrzeit'=$3 AND COALESCE(status,'offen') NOT IN ('abgelehnt','storniert') LIMIT 1`,
         [parentId,p.name,time]);
@@ -637,7 +637,7 @@ async function main(req,res){
       let gesamtpreis = null;
       const preisAbfrage = await pool.query(
         `SELECT id,preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
-                veranstaltungsort,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer
+                veranstaltungsort,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer,gruppenstufen,dauer_modus
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
          LIMIT 1`,[angebot]
@@ -671,7 +671,7 @@ async function main(req,res){
         ?Math.round(Number(programm.preis_pro_person)*100):null;
       const preisCent=einzelplatz
         ?(einzelpreisCent>0?einzelpreisCent:null)
-        :preisFuerTeilnehmer(programm.preise,teilnehmer);
+        :preisFuerTeilnehmer(programm.preise,teilnehmer,programm.gruppenstufen);
       if(preisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
       gesamtpreis=preisCent/100;
       const istGast=d.istGast===undefined?'nein':d.istGast;
@@ -692,7 +692,7 @@ buchungsmodus: einzelplatz?'einzelplatz':'gruppe',
 mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
-       nachricht:safeText(d.nachricht,2000),sonderaktion_id:safeText(d.sonderaktion_id,36)||null,dauer:buchungsdauerBerechnen(teilnehmer,Number(programm.dauer)),
+       nachricht:safeText(d.nachricht,2000),sonderaktion_id:safeText(d.sonderaktion_id,36)||null,dauer:buchungsdauerFuerProgramm(teilnehmer,programm),
        datenschutz:'on',datenschutzBestaetigtAm:new Date().toISOString(),
        datenschutzTextVersion:BUCHUNGS_DATENSCHUTZ_VERSION,
        agbBestaetigtAm:new Date().toISOString(),agbTextVersion:Number(agbData.version),agbTextSnapshot:agbData.text
@@ -907,11 +907,11 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
       const angebot=safeText(u.searchParams.get('angebot'),120);
       const programm=await pool.query(
-        `SELECT dauer,buchungsmodus,mindestteilnehmer,kapazitaet FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
+        `SELECT dauer,buchungsmodus,mindestteilnehmer,kapazitaet,gruppenstufen,dauer_modus FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
       );
       if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
       const einzelplatz=programm.rows[0].buchungsmodus==='einzelplatz';
-      const dauer=buchungsdauerBerechnen(teilnehmer,Number(programm.rows[0].dauer));
+      const dauer=buchungsdauerFuerProgramm(teilnehmer,programm.rows[0]);
       if(!dauer)return reply(res,409,{error:'Für diese Gruppengröße konnte die Programmdauer nicht berechnet werden.'});
 
       const zeiten=[];
@@ -2049,7 +2049,7 @@ if(!versandProtokoll.rowCount)
         if(!place||anchorStart===null||anchorEnd===null||anchorEnd<=anchorStart){
           await client.query('ROLLBACK');return reply(res,409,{error:'Der Bezugstermin benötigt genau einen Standort sowie eine feste Anfangs- und Endzeit.'});
         }
-        const offer=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,veranstaltungsort
+        const offer=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,veranstaltungsort,gruppenstufen,dauer_modus
           FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true FOR SHARE`,[programId]);
         if(!offer.rowCount||offer.rows[0].veranstaltungsort!==place){
           await client.query('ROLLBACK');return reply(res,409,{error:'Das ausgewählte Programm ist an diesem Standort nicht buchbar.'});
@@ -2059,10 +2059,10 @@ if(!versandProtokoll.rowCount)
           await client.query('ROLLBACK');return reply(res,409,{error:'Die Gruppengröße überschreitet die Kapazität des Programms.'});
         }
         if(!source.preise||typeof source.preise!=='object'||!Object.keys(source.preise).length||
-           preisFuerTeilnehmer(source.preise,participants)===null){
+           preisFuerTeilnehmer(source.preise,participants,source.gruppenstufen)===null){
           await client.query('ROLLBACK');return reply(res,409,{error:'Für dieses Programm ist für die gewählte Gruppengröße kein Preis hinterlegt.'});
         }
-        const duration=buchungsdauerBerechnen(participants,Number(source.dauer));
+        const duration=buchungsdauerFuerProgramm(participants,source);
         if(!duration){await client.query('ROLLBACK');return reply(res,409,{error:'Die Dauer des Anschlussprogramms kann für diese Gruppengröße nicht berechnet werden.'});}
         const staffRow=await client.query(`SELECT m.id,m.name,m.email FROM brilon_pruef_mitarbeitende m
           WHERE m.id=$1 AND m.aktiv=true AND m.registriert_am IS NOT NULL AND m.freigabe_am IS NOT NULL
