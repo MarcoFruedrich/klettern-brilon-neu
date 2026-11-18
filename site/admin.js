@@ -2672,7 +2672,41 @@ beschreibung.style.width = '100%';
         const input=document.createElement('input');input.type='checkbox';input.name='programm-standort';input.value=ort;input.checked=true;
         label.append(input,el('span',ort+' (inaktiv, bestehende Zuordnung)'));standortAuswahl.append(label);
       }
-      standortFeld.append(standortAuswahl);metadaten.append(standortFeld);
+      standortFeld.append(standortAuswahl);
+      const standortSpeichern=document.createElement('button');
+      standortSpeichern.type='button';
+      standortSpeichern.className='btn secondary';
+      standortSpeichern.textContent='Standortzuordnung speichern';
+      const standortStatus=el('p','Die Auswahl wird erst durch Speichern übernommen.');
+      standortStatus.className='hint';
+      standortStatus.setAttribute('role','status');
+      standortStatus.setAttribute('aria-live','polite');
+      const standortHinweis=el('p','Mehrfachauswahl möglich: Ein Programm kann z. B. an der Jugendherberge Brilon, in Olpe und in Rüthen erscheinen. Änderungen werden unabhängig von Preisen und Teilnehmerstaffeln gespeichert.');
+      standortHinweis.className='hint';
+      standortSpeichern.addEventListener('click',async()=>{
+        const ausgewaehlt=[...standortAuswahl.querySelectorAll('input:checked')].map(input=>input.value);
+        if(!ausgewaehlt.length){standortStatus.textContent='Bitte mindestens einen Standort auswählen.';return;}
+        standortSpeichern.disabled=true;
+        standortStatus.textContent='Standorte werden gespeichert …';
+        try{
+          const gespeichert=await api('/api/admin/angebote/'+angebot.id+'/standorte',{
+            method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({veranstaltungsorte:ausgewaehlt,veranstaltungsort:
+              ausgewaehlt.includes(angebot.veranstaltungsort)?angebot.veranstaltungsort:ausgewaehlt[0]})
+          });
+          if(!Array.isArray(gespeichert.veranstaltungsorte)||
+              gespeichert.veranstaltungsorte.length!==ausgewaehlt.length||
+              ausgewaehlt.some(v=>!gespeichert.veranstaltungsorte.includes(v)))
+            throw new Error('Der Server hat nicht alle gewählten Standorte bestätigt.');
+          angebot.veranstaltungsort=gespeichert.veranstaltungsort;
+          angebot.veranstaltungsorte=gespeichert.veranstaltungsorte;
+          standortStatus.textContent='Dauerhaft gespeichert: '+gespeichert.veranstaltungsorte.join(', ')+'. Die öffentliche Programmübersicht verwendet diese Zuordnung.';
+        }catch(error){
+          standortStatus.textContent='Speichern fehlgeschlagen: '+error.message;
+        }finally{standortSpeichern.disabled=false;}
+      });
+      standortFeld.append(standortHinweis,standortSpeichern,standortStatus);
+      metadaten.append(standortFeld);
       const dauer=feld('Basisdauer / feste Dauer (Minuten)',angebot.dauer,'dauer','number');
       dauer.min='15';dauer.max='1440';dauer.step='1';
       const dauerModusLabel=document.createElement('label');dauerModusLabel.textContent='Dauerberechnung';

@@ -1,0 +1,54 @@
+name: Programme – mehrere öffentliche Standorte
+
+on:
+  pull_request:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
+  push:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  multi-standort-logik:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript-Syntax prüfen
+        run: |
+          node --check server.js
+          node --check site/admin.js
+          node --check site/app.js
+      - name: Mehrfachstandorte, Speicherung, Freigabe und Buchungen prüfen
+        run: node --test test/program-locations.test.js test/program-duration-variants.test.js
+
+  multi-standort-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node-Module installieren
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Chromium und Testwerkzeuge installieren
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Website- und Mehrfachstandort-Browsertests
+        env:
+          DATABASE_URL: ''
+          RUN_SCHEMA_MIGRATIONS: 'false'
+          BREVO_API_KEY: ''
+          BREVO_SENDER_EMAIL: ''
+          SUPABASE_URL: ''
+          SUPABASE_SECRET_KEY: ''
+        run: node --test browser-tests/browser-smoke.test.js
