@@ -2693,6 +2693,70 @@ if(staffArea&&req.method==='DELETE'){
   return reply(res,200,{success:true});
 }
 
+
+/* Zentrale Medienbibliothek; geschuetzt durch die Admin-Sitzung und CSRF-Pruefung. */
+if(route==='/api/admin/medien' || route==='/api/admin/medien/upload' || route==='/api/admin/medien/rename' || route==='/api/admin/medien/delete'){
+  if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert. SUPABASE_URL und SUPABASE_SECRET_KEY pruefen.'});
+  const speicher=supabase.storage.from('angebotsbilder');
+  const gueltigerPfad=p=>typeof p==='string'&&/^medien\/[a-zA-Z0-9._-]{1,120}\.(png|jpg|jpeg|webp)$/.test(p)&&!p.includes('..');
+  if(route==='/api/admin/medien'&&req.method==='GET'){
+    const {data,error}=await speicher.list('medien',{limit:1000,sortBy:{column:'created_at',order:'desc'}});
+    if(error)return reply(res,502,{error:'Medienbibliothek konnte nicht geladen werden: '+error.message});
+    return reply(res,200,(data||[]).filter(f=>f.name&&f.id!==null).map(f=>{
+      const pfad='medien/'+f.name;
+      return {pfad,name:f.name,url:speicher.getPublicUrl(pfad).data.publicUrl,groesse:f.metadata?.size||0};
+    }));
+  }
+  if(route==='/api/admin/medien/upload'&&req.method==='POST'){
+    if(!limit('media-upload:'+ip,20,600000))return reply(res,429,{error:'Zu viele Uploads. Bitte spaeter erneut versuchen.'});
+    const typ=String(req.headers['content-type']||'').split(';')[0].toLowerCase();
+    if(!['image/png','image/jpeg','image/webp','image/gif'].includes(typ))
+      return reply(res,400,{error:'Erlaubt sind JPG, PNG, WebP und statische GIFs.'});
+    const teile=[];let bytezahl=0;
+    for await(const teil of req){bytezahl+=teil.length;if(bytezahl>5*1024*1024)return reply(res,413,{error:'Maximal 5 MB pro Bild.'});teile.push(teil);}
+    if(!bytezahl)return reply(res,400,{error:'Bitte eine Bilddatei auswaehlen.'});
+    let datei,ausgabeTyp=typ,endung={ 'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'png'}[typ];
+    try{
+      const eingabe=Buffer.concat(teile);
+      if(typ==='image/gif'){
+        const sharp=require('sharp');
+        const info=await sharp(eingabe,{animated:true,limitInputPixels:40_000_000}).metadata();
+        if(info.pages!==1)throw Error('Animierte GIFs sind nicht erlaubt.');
+        if(info.width*info.height>40_000_000)throw Error('Bild zu gross.');
+        datei=await sharp(eingabe,{animated:false,limitInputPixels:40_000_000}).png().toBuffer();
+        ausgabeTyp='image/png';
+        datei=await bereinigeBild(datei,ausgabeTyp);
+      }else datei=await bereinigeBild(eingabe,typ);
+    }catch(error){return reply(res,400,{error:'Bild ungueltig: '+error.message});}
+    try{const pruefung=await scanForMalware(datei);if(pruefung?.sauber!==true)throw Object.assign(new Error('Scannerantwort ungueltig'),{code:'MALWARE_SCAN_ERROR'});}
+    catch(error){return malwareScanReply(res,error);}
+    const dateiname='medien/'+crypto.randomUUID()+'.'+endung;
+    const {error}=await speicher.upload(dateiname,datei,{contentType:ausgabeTyp,upsert:false});
+    if(error)return reply(res,502,{error:'Speicherung fehlgeschlagen: '+error.message});
+    return reply(res,201,{success:true,pfad:dateiname,url:speicher.getPublicUrl(dateiname).data.publicUrl});
+  }
+  if((route==='/api/admin/medien/rename'||route==='/api/admin/medien/delete')&&req.method==='POST'){
+    const daten=await body(req,3000),alterPfad=daten.pfad;
+    if(!gueltigerPfad(alterPfad))return reply(res,400,{error:'Ungueltiger Medienpfad.'});
+    const alteUrl=speicher.getPublicUrl(alterPfad).data.publicUrl;
+    const benutzt=await pool.query("SELECT EXISTS(SELECT 1 FROM brilon_angebote WHERE bild_url=$1) AS angebote",[alteUrl]);
+    const aktionen=await pool.query("SELECT EXISTS(SELECT 1 FROM brilon_aktionen WHERE data->>'bild_url'=$1) AS aktionen",[alteUrl]);
+    if(benutzt.rows[0].angebote||aktionen.rows[0].aktionen)
+      return reply(res,409,{error:'Bild wird noch in einem Programm oder einer Aktion verwendet. Bitte zuerst dort ein anderes Bild auswaehlen.'});
+    if(route==='/api/admin/medien/delete'){
+      const {error}=await speicher.remove([alterPfad]);
+      if(error)return reply(res,502,{error:'Loeschen fehlgeschlagen: '+error.message});
+      return reply(res,200,{success:true});
+    }
+    const name=safeText(daten.name,90).replace(/[^a-zA-Z0-9_-]/g,'-').replace(/^-+|-+$/g,'');
+    if(!name)return reply(res,400,{error:'Bitte einen gueltigen Dateinamen eingeben.'});
+    const neuerPfad='medien/'+name+'-'+crypto.randomUUID().slice(0,8)+'.'+alterPfad.split('.').at(-1);
+    const {error}=await speicher.move(alterPfad,neuerPfad);
+    if(error)return reply(res,502,{error:'Umbenennen fehlgeschlagen: '+error.message});
+    return reply(res,200,{success:true,pfad:neuerPfad,url:speicher.getPublicUrl(neuerPfad).data.publicUrl});
+  }
+}
+
 if(route==='/api/admin/angebote/bilder'&&req.method==='GET'){
   if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
   const storage=supabase.storage.from('angebotsbilder'),bilder=[];
