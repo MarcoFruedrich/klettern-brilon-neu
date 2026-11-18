@@ -48,7 +48,7 @@
       if(image.pfad&&image.pfad.startsWith('medien/')){
         const rename=el('button','Umbenennen');rename.type='button';rename.className='btn secondary';
         rename.onclick=async()=>{
-          const name=prompt('Neuer Bildname:',image.name.replace(/\\.[^.]+$/,''));
+          const name=prompt('Neuer Bildname:',image.name.replace(/\.[^.]+$/,''));
           if(name===null)return;
           try{
             await window.api('/api/admin/medien',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pfad:image.pfad,name})});
