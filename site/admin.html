@@ -61,6 +61,7 @@
             <a class="employee-area-link" href="#netzwerkpartner-einladen-section" data-admin-view-link>Neue Netzwerkpartner</a>
             <a class="employee-area-link" href="#mitarbeiterbereiche-admin-section" data-admin-view-link>Mitarbeiterbereiche</a>
             <a class="employee-area-link" href="#wissensportal-admin-section" data-admin-view-link>Wissensportal</a>
+            <a href="#medienarchiv-section" data-admin-view-link>Webseiten-Effekte · Bildarchiv</a>
             <a href="#admin-faq-section" data-admin-view-link>Hilfe &amp; FAQ</a>
           </nav>
         </aside>
@@ -87,6 +88,27 @@
           <a class="admin-dashboard-link" href="#social-media-section" data-admin-view-link>Social Media</a>
           <a class="admin-dashboard-link" href="#marketing-campaign-section" data-admin-view-link>Marketing · Kampagnen</a>
         </nav></section>
+
+      <section id="medienarchiv-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="medienarchiv-heading">
+        <h2 id="medienarchiv-heading">Webseiten-Effekte · Bildarchiv / Medienbibliothek</h2>
+        <p>Alle Bilder an einem Ort verwalten und für Programme mehrfach verwenden. Die Dateien werden im bestehenden Bildspeicher hinterlegt.</p>
+        <article>
+          <h3>Bild hinzufügen</h3>
+          <form id="medienarchiv-upload-form">
+            <label>Bilddatei (JPG, PNG oder WebP, maximal 5 MB)
+              <input id="medienarchiv-upload-input" type="file" accept="image/jpeg,image/png,image/webp" required>
+            </label>
+            <button class="btn" type="submit">Bild zentral hochladen</button>
+          </form>
+          <p id="medienarchiv-status" role="status" aria-live="polite"></p>
+        </article>
+        <article>
+          <h3>Gespeicherte Bilder</h3>
+          <label>Suche <input id="medienarchiv-filter" type="search" placeholder="Dateiname oder Programm suchen"></label>
+          <button class="btn secondary" type="button" id="medienarchiv-refresh">Bildarchiv aktualisieren</button>
+          <div id="medienarchiv-grid" class="medienarchiv-grid" aria-live="polite"></div>
+        </article>
+      </section>
 
       <section id="rechnungen-agb-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="rechnungen-agb-heading">
         <h2 id="rechnungen-agb-heading">Rechnungen &amp; Geschäftsbedingungen</h2>
@@ -666,6 +688,7 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261107-calendar-and-place-fixes"></script>
+  <script src="/medienarchiv-admin.js?v=20261118"></script>
   <script src="/pruefung-admin.js?v=20261106-freigabe-pause-fix"></script>
   <script src="/feedback-admin.js"></script>
   <script src="/einsatzplanung-admin.js?v=20261107-settings-readback"></script>
