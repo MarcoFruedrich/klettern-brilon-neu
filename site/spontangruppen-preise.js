@@ -1,8 +1,34 @@
 'use strict';
 (() => {
-  const $=id=>document.getElementById(id),place=$('place'),price=$('price'),partner=$('partner'),
+  const prefix=document.getElementById('spontan-preis-editor')?'spontan-preis-':'';
+  const $=id=>document.getElementById(prefix+id),place=$('place'),price=$('price'),partner=$('partner'),
     deductionType=$('deduction-type'),deductionValue=$('deduction-value'),status=$('status'),save=$('save');
-  async function api(url,options){const r=await fetch(url,options);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Anfrage fehlgeschlagen.');return d;}
+  if(!place||!price||!partner||!deductionType||!deductionValue||!status||!save)return;
+  let csrfToken=null;
+  async function csrfLaden(force=false){
+    if(csrfToken&&!force)return csrfToken;
+    const r=await fetch('/api/admin/csrf',{credentials:'same-origin',cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||typeof d.csrfToken!=='string')throw new Error(d.error||'Admin-Sitzung oder Sicherheitstoken nicht verfügbar. Bitte erneut anmelden.');
+    csrfToken=d.csrfToken;
+    return csrfToken;
+  }
+  async function api(url,options={}){
+    const method=(options.method||'GET').toUpperCase();
+    const mutation=!['GET','HEAD','OPTIONS'].includes(method);
+    const headers=new Headers(options.headers||{});
+    if(mutation)headers.set('X-CSRF-Token',await csrfLaden());
+    const request=()=>fetch(url,{...options,headers,credentials:'same-origin'});
+    let r=await request();
+    let d=await r.json().catch(()=>({}));
+    if(mutation&&r.status===403&&d.error==='CSRF-Prüfung fehlgeschlagen. Bitte Verwaltung neu laden.'){
+      headers.set('X-CSRF-Token',await csrfLaden(true));
+      r=await request();
+      d=await r.json().catch(()=>({}));
+    }
+    if(!r.ok)throw new Error(d.error||'Anfrage fehlgeschlagen.');
+    return d;
+  }
   function message(text,type=''){status.textContent=text;status.className=type;}
   async function loadPartners(selected=''){
     partner.replaceChildren(new Option('Partner auswählen …',''));
@@ -23,13 +49,17 @@
       save.disabled=false;
     }catch(error){message(error.message,'error');}
   }
+  let initialisiert=false;
   async function init(){
+    if(initialisiert)return;
+    initialisiert=true;
     try{
+      await csrfLaden();
       const places=await api('/api/spontangruppen/standorte');
       for(const item of places)place.append(new Option(item.name,String(item.id)));
       if(places.length===1)place.value=String(places[0].id);
       await loadSetting();
-    }catch(error){message(error.message,'error');}
+    }catch(error){initialisiert=false;message(error.message,'error');}
   }
   place.addEventListener('change',loadSetting);
   save.addEventListener('click',async()=>{
@@ -48,5 +78,9 @@
     }catch(error){message(error.message,'error');}
     finally{save.disabled=false;}
   });
-  init();
+  if(prefix){
+    document.querySelector('a[href="#spontangruppen-preis-section"]')?.addEventListener('click',init);
+    if(location.hash==='#spontangruppen-preis-section')init();
+    window.addEventListener('hashchange',()=>{if(location.hash==='#spontangruppen-preis-section')init();});
+  }else init();
 })();
