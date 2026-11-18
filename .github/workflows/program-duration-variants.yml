@@ -1,0 +1,33 @@
+name: Programmvarianten – gezielte Regressionstests
+
+on:
+  pull_request:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
+  push:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  programmdauer-und-preis:
+    name: 180/240 Minuten – Staffeln und Buchungslogik
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript auf Syntax prüfen
+        run: |
+          node --check site/admin.js
+          node --check site/app.js
+          node --check server.js
+          node --check lib/buchungsdauer.js
+          node --check lib/buchungslogik.js
+      - name: Vier Preis-/Dauerstaffeln und Buchungslogik testen
+        run: node --test test/program-duration-variants.test.js test/buchungslogik.test.js

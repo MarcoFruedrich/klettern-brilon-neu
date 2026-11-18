@@ -42,6 +42,8 @@ function datumTeilweiseBelegt(datum){
 const uhrzeitAuswahl = document.getElementById('buchungs-uhrzeit');
 const uhrzeitHinweis = document.getElementById('uhrzeit-hinweis');
 const angebotAuswahl = document.getElementById('angebot-auswahl');
+const programmDauerAuswahl = document.getElementById('buchungs-programmdauer');
+const programmDauerFeld = document.getElementById('buchungs-programmdauer-feld');
 const standortAuswahl = document.getElementById('buchungs-standort');
 let angeboteCache=[];
 window.ausgewaehlterAngebotsStandort='alle';
@@ -81,14 +83,66 @@ function angebotslinkAnwenden(){
   angebotAuswahl.value=programm.name;
   angebotAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
 }
+// Teilnehmerzahl und Programmdauer bilden zusammen die buchbare Variante.
+function passendeProgrammVarianten(programm,anzahl){
+  if(!programm||!Number.isInteger(anzahl)||anzahl<1)return [];
+  const stufen=Array.isArray(programm.gruppenstufen)?programm.gruppenstufen:[];
+  return stufen.filter(stufe=>anzahl>=Number(stufe.min)&&anzahl<=Number(stufe.max)&&
+    Number.isInteger(Number(stufe.dauer))&&Number(stufe.dauer)>=15);
+}
+function gruppenDauerAuswahlAktualisieren(){
+  if(!programmDauerAuswahl||!programmDauerFeld)return;
+  const programm=angeboteCache.find(a=>a.name===angebotAuswahl?.value);
+  const teilnehmer=Number(document.getElementById('buchungs-teilnehmer')?.value);
+  const bisher=programmDauerAuswahl.value;
+  programmDauerAuswahl.replaceChildren();
+  if(!programm||programm.buchungsmodus==='einzelplatz'){
+    programmDauerAuswahl.disabled=true;
+    programmDauerAuswahl.required=false;
+    programmDauerFeld.hidden=true;
+    return;
+  }
+  const varianten=passendeProgrammVarianten(programm,teilnehmer);
+  const dauern=programm.dauer_modus==='fest'?[Number(programm.dauer)]:
+    [...new Set(varianten.map(v=>Number(v.dauer)))].sort((a,b)=>a-b);
+  // Alte Programme ohne explizite Staffel benötigen keine Dauerauswahl.
+  if(!Array.isArray(programm.gruppenstufen)||!programm.gruppenstufen.length){
+    programmDauerAuswahl.disabled=true;
+    programmDauerAuswahl.required=false;
+    programmDauerFeld.hidden=true;
+    return;
+  }
+  const placeholder=document.createElement('option');
+  placeholder.value='';
+  placeholder.textContent=dauern.length?'Bitte gewünschte Programmdauer wählen':
+    'Keine Dauer für diese Teilnehmerzahl verfügbar';
+  programmDauerAuswahl.append(placeholder);
+  for(const dauer of dauern){
+    if(!Number.isInteger(dauer)||dauer<15||dauer>1440)continue;
+    const stufe=varianten.find(v=>Number(v.dauer)===dauer);
+    const option=document.createElement('option');
+    option.value=String(dauer);
+    const text=dauer%60===0?(dauer/60)+' Stunden':dauer+' Minuten';
+    const preis=stufe?.preis;
+    option.textContent=text+(preis===undefined||preis===null?'':' · '+Number(preis).toLocaleString('de-DE',{style:'currency',currency:'EUR'})+' je Gruppe');
+    programmDauerAuswahl.append(option);
+  }
+  programmDauerAuswahl.disabled=!dauern.length;
+  programmDauerFeld.hidden=dauern.length<=1;
+  programmDauerAuswahl.required=dauern.length>1;
+  if(dauern.length===1)programmDauerAuswahl.value=String(dauern[0]);
+  else if(dauern.some(d=>String(d)===bisher))programmDauerAuswahl.value=bisher;
+  else programmDauerAuswahl.value='';
+}
 function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
   const anzahl=Number(teilnehmer),basis=Number(programm?.dauer);
   if(!programm||!Number.isInteger(anzahl)||anzahl<1||!Number.isFinite(basis)||basis<15)return null;
+  if(programm.dauer_modus==='fest')return basis;
   if(Array.isArray(programm.gruppenstufen)&&programm.gruppenstufen.length){
-    const stufe=programm.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max));
-    const gruppenDauer=Number(stufe?.dauer);
-    return Number.isFinite(gruppenDauer)&&gruppenDauer>=15?gruppenDauer:null;
+    const gewaehlteDauer=Number(programmDauerAuswahl?.value||0);
+    const stufe=passendeProgrammVarianten(programm,anzahl).find(item=>Number(item.dauer)===gewaehlteDauer);
+    return stufe?Number(stufe.dauer):null;
   }
   return basis;
 }
@@ -156,6 +210,7 @@ async function belegteUhrzeitenLaden() {
   );
   const angebot=angebotAuswahl?.value;
   const teilnehmerWert=document.getElementById('buchungs-teilnehmer')?.value;
+  const dauerWert=programmDauerAuswahl?.value||'';
   if(!angebot){
     uhrzeitenAnzeigen();
     uhrzeitAuswahl.disabled=true;
@@ -163,6 +218,12 @@ async function belegteUhrzeitenLaden() {
     return;
   }
   const vorherigeAuswahl = uhrzeitAuswahl.value;
+  if(!dauerFuer(teilnehmer,angebot)){
+    uhrzeitenAnzeigen();
+    uhrzeitAuswahl.disabled=true;
+    uhrzeitHinweis.textContent='Bitte zuerst eine verfügbare Programmdauer auswählen.';
+    return;
+  }
 
   uhrzeitHinweis.textContent = 'Freie Uhrzeiten werden geprüft …';
   uhrzeitAuswahl.disabled = true;
@@ -171,6 +232,7 @@ async function belegteUhrzeitenLaden() {
     const antwort = await fetch(
       '/api/belegte-zeiten?datum=' + encodeURIComponent(datum) +
       '&teilnehmer=' + encodeURIComponent(teilnehmer) +
+      '&programmdauer=' + encodeURIComponent(dauerWert) +
       '&angebot=' + encodeURIComponent(angebot) +
       '&standort=' + encodeURIComponent(standortAuswahl?.value||'')+
       (qrAnmeldung?'&zugang=jh-brilon':'')+
@@ -184,6 +246,7 @@ async function belegteUhrzeitenLaden() {
     if (anfrageId!==verfuegbarkeitsAnfrage || date.value!==datum ||
         angebotAuswahl?.value!==angebot ||
         document.getElementById('buchungs-teilnehmer')?.value!==teilnehmerWert ||
+        (programmDauerAuswahl?.value||'')!==dauerWert ||
         datumIstGesperrt(datum)) return;
 
     // Der Server prüft jedes auswählbare Startfenster gegen die belegten Zeiträume.
@@ -232,6 +295,7 @@ async function belegteUhrzeitenLaden() {
     if (anfrageId===verfuegbarkeitsAnfrage &&
         date.value===datum && angebotAuswahl?.value===angebot &&
         document.getElementById('buchungs-teilnehmer')?.value===teilnehmerWert &&
+        (programmDauerAuswahl?.value||'')===dauerWert &&
         !datumIstGesperrt(datum) &&
         !uhrzeitHinweis.textContent.includes('nicht abrufbar')) {
       uhrzeitAuswahl.disabled = false;
@@ -293,6 +357,7 @@ function buchungsdauerBerechnen() {
 }
 
 if (teilnehmerEingabe) {
+  teilnehmerEingabe.addEventListener('input', gruppenDauerAuswahlAktualisieren);
   teilnehmerEingabe.addEventListener('input', buchungsdauerBerechnen);
   teilnehmerEingabe.addEventListener('input', belegteUhrzeitenLaden);
   buchungsdauerBerechnen();
@@ -301,6 +366,10 @@ if (teilnehmerEingabe) {
 if (uhrzeitAuswahl) {
   uhrzeitAuswahl.addEventListener('change', buchungsdauerBerechnen);
 }
+programmDauerAuswahl?.addEventListener('change',()=>{
+  buchungsdauerBerechnen();
+  belegteUhrzeitenLaden();
+});
 
 function datumPruefen() {
   const gewaehltesDatum = date.value;
@@ -627,6 +696,7 @@ form.addEventListener('submit', async e => {
     });
 
     form.reset();
+    gruppenDauerAuswahlAktualisieren();
     sonderaktionsPrefix='';
     const angebotHinweis=document.getElementById('selected-special');
     if(angebotHinweis)angebotHinweis.hidden=true;
@@ -1004,12 +1074,14 @@ async function angeboteLaden() {
     auswahl.value='';
     auswahl.disabled=!standort||!passend.length;
     einzelplatzFormAktualisieren();
+    gruppenDauerAuswahlAktualisieren();
     buchungsdauerBerechnen();
     belegteUhrzeitenLaden();
   }
 
   auswahl.addEventListener('change',()=>{
     einzelplatzFormAktualisieren();
+    gruppenDauerAuswahlAktualisieren();
     buchungsdauerBerechnen();
     belegteUhrzeitenLaden();
   });
@@ -1230,8 +1302,11 @@ async function preisanzeigeStarten() {
         anzeige.textContent=`${price.toLocaleString('de-DE',{style:'currency',currency:'EUR'})} ${partnerBooking?'zur Orientierung':Number.isFinite(specialPrice)?'Tagesangebotspreis':'pro Person · keine Anzahlung'}`;
         return;
       }
-      const stufe=Array.isArray(angebot.gruppenstufen)?angebot.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max)):null;
-      const legacy=Object.entries(angebot.preise||{}).find(([range])=>{
+      const stufen=Array.isArray(angebot.gruppenstufen)?angebot.gruppenstufen:[];
+      const gewaehlteDauer=Number(programmDauerAuswahl?.value||0);
+      const stufe=stufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max)&&
+        Number(item.dauer)===gewaehlteDauer);
+      const legacy=stufen.length?null:Object.entries(angebot.preise||{}).find(([range])=>{
         const match=range.match(/^(\d+)-(\d+)$/);return match&&anzahl>=Number(match[1])&&anzahl<=Number(match[2]);
       });
       const preis=stufe?.preis??(legacy?legacy[1]:null);
@@ -1250,6 +1325,7 @@ async function preisanzeigeStarten() {
 
     auswahl.addEventListener('change', preisAktualisieren);
     teilnehmer.addEventListener('input', preisAktualisieren);
+    programmDauerAuswahl?.addEventListener('change',preisAktualisieren);
     preisAktualisieren();
 
   } catch (fehler) {

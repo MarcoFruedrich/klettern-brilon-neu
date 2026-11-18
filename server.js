@@ -652,6 +652,13 @@ async function main(req,res){
       const partnerhausEinstellung=locationSettings.rows[0]||{partnerhaus:false,partnerkontakt_name:'',partnerkontakt_email:''};
       const einzelplatz=programm.buchungsmodus==='einzelplatz';
       if(einzelplatz&&teilnehmer!==1)return reply(res,400,{error:'Für dieses Angebot kannst du nur einen Einzelplatz pro Anmeldung reservieren.'});
+      const dauerWunsch=d.programmdauer===undefined||d.programmdauer===null||d.programmdauer===''?
+        null:Number(d.programmdauer);
+      if(dauerWunsch!==null&&(!Number.isInteger(dauerWunsch)||dauerWunsch<15||dauerWunsch>1440))
+        return reply(res,400,{error:'Die gewählte Programmdauer ist ungültig.'});
+      const buchungsdauer=buchungsdauerFuerProgramm(teilnehmer,programm,dauerWunsch);
+      if(!buchungsdauer)
+        return reply(res,409,{error:'Bitte für diese Teilnehmerzahl eine angebotene Programmdauer auswählen.'});
       const verfuegbareTermine=Array.isArray(programm.verfuegbare_termine)?programm.verfuegbare_termine:[];
       if(verfuegbareTermine.length&&!verfuegbareTermine.includes(datum))
         return reply(res,409,{error:'Für dieses Programm ist an dem Datum kein Termin freigegeben.'});
@@ -675,7 +682,7 @@ async function main(req,res){
         ?Math.round(Number(programm.preis_pro_person)*100):null;
       const preisCent=einzelplatz
         ?(einzelpreisCent>0?einzelpreisCent:null)
-        :preisFuerTeilnehmer(programm.preise,teilnehmer,programm.gruppenstufen);
+        :preisFuerTeilnehmer(programm.preise,teilnehmer,programm.gruppenstufen,dauerWunsch);
       if(preisCent===null)return reply(res,409,{error:'Für diese Teilnehmerzahl ist kein Preis hinterlegt.'});
       gesamtpreis=preisCent/100;
       const istGast=d.istGast===undefined?'nein':d.istGast;
@@ -696,7 +703,8 @@ buchungsmodus: einzelplatz?'einzelplatz':'gruppe',
 mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         uhrzeit:safeText(d.uhrzeit,5),
         telefon:safeText(d.telefon,40),
-       nachricht:safeText(d.nachricht,2000),sonderaktion_id:safeText(d.sonderaktion_id,36)||null,dauer:buchungsdauerFuerProgramm(teilnehmer,programm),
+       nachricht:safeText(d.nachricht,2000),sonderaktion_id:safeText(d.sonderaktion_id,36)||null,
+       dauer:buchungsdauer,programmdauer:buchungsdauer,
        datenschutz:'on',datenschutzBestaetigtAm:new Date().toISOString(),
        datenschutzTextVersion:BUCHUNGS_DATENSCHUTZ_VERSION,
        agbBestaetigtAm:new Date().toISOString(),agbTextVersion:Number(agbData.version),agbTextSnapshot:agbData.text
@@ -915,8 +923,10 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       );
       if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
       const einzelplatz=programm.rows[0].buchungsmodus==='einzelplatz';
-      const dauer=buchungsdauerFuerProgramm(teilnehmer,programm.rows[0]);
-      if(!dauer)return reply(res,409,{error:'Für diese Gruppengröße konnte die Programmdauer nicht berechnet werden.'});
+      const dauerWunschRaw=u.searchParams.get('programmdauer');
+      const dauerWunsch=dauerWunschRaw===null||dauerWunschRaw===''?null:Number(dauerWunschRaw);
+      const dauer=buchungsdauerFuerProgramm(teilnehmer,programm.rows[0],dauerWunsch);
+      if(!dauer)return reply(res,409,{error:'Bitte eine gültige Programmdauer für diese Gruppengröße auswählen.'});
 
       const zeiten=[];
 
@@ -3324,12 +3334,23 @@ function pruefeProgrammstufen(raw,kapazitaet,modus,basisdauer,dauerModus){
       return {error:'Teilnehmerstufe '+nummer+': Der Gruppenpreis fehlt oder ist ungültig.'};
     if(!Number.isInteger(v.dauer)||v.dauer<15||v.dauer>1440)
       return {error:'Teilnehmerstufe '+nummer+': Die Dauer muss zwischen 15 und 1440 Minuten liegen.'};
-    if(i>0&&v.min<=stufen[i-1].max)
-      return {error:'Teilnehmerstufe '+nummer+': Die Teilnehmerzahlen überschneiden sich mit der vorherigen Stufe.'};
+    const konflikt=stufen.slice(0,i).find(a=>a.dauer===v.dauer&&v.min<=a.max&&a.min<=v.max);
+    if(konflikt)
+      return {error:'Teilnehmerstufe '+nummer+': Überschneidung mit '+konflikt.min+'–'+konflikt.max+
+        ' Personen bei derselben Dauer ('+v.dauer+' Minuten). Abweichende Dauern sind zulässig.'};
   }
   return {stufen};
 }
-const preiseAusStufen=stufen=>Object.fromEntries(stufen.map(v=>[v.min+'-'+v.max,v.preis]));
+// Alte Preisabfragen kennen nur die Gruppengrenze. Dort als Kompatibilitätswert
+// die kürzeste Dauer ablegen; alle Varianten bleiben vollständig in gruppenstufen.
+const preiseAusStufen=stufen=>{
+  const map=new Map();
+  for(const v of [...stufen].sort((a,b)=>a.dauer-b.dauer)){
+    const key=v.min+'-'+v.max;
+    if(!map.has(key))map.set(key,v.preis);
+  }
+  return Object.fromEntries(map);
+};
 if (route === '/api/admin/angebote' && req.method === 'POST') {
   const d = await body(req);
 
@@ -3760,7 +3781,7 @@ if (route === '/api/angebote' && req.method === 'GET') {
   const q = await pool.query(
  `SELECT id,name,beschreibung,dauer,preise,bild_url,kategorie,zielgruppe,
         veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise,
-        buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,
+        buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert,gruppenstufen,dauer_modus,
         (SELECT CASE WHEN o.partnerhaus THEN jsonb_build_array(o.name) ELSE '[]'::jsonb END
           FROM brilon_orte o WHERE o.name=brilon_angebote.veranstaltungsort) AS partnerhaus_standorte
      FROM brilon_angebote

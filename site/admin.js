@@ -2171,9 +2171,10 @@ function programmStufenValidieren(container, kapazitaet, dauerModus, basisdauer)
       return fehler(dauerFeld,'Bitte die Dauer der Teilnehmerstufe eingeben.');
     if(!Number.isInteger(dauer)||dauer<15||dauer>1440)
       return fehler(dauerModus==='fest'?null:dauerFeld,'Die Dauer muss zwischen 15 und 1440 Minuten liegen.');
-    const konflikt=ausgabe.find(e=>min<=e.max&&e.min<=max);
+    const konflikt=ausgabe.find(e=>e.dauer===dauer&&min<=e.max&&e.min<=max);
     if(konflikt)
-      return fehler(minFeld,'Der Bereich '+min+'–'+max+' überschneidet sich mit '+konflikt.min+'–'+konflikt.max+'.');
+      return fehler(minFeld,'Die Teilnehmerbereiche '+min+'–'+max+' und '+konflikt.min+'–'+konflikt.max+
+        ' überschneiden sich bei derselben Dauer von '+dauer+' Minuten. Eine andere Dauer ist ausdrücklich erlaubt.');
     ausgabe.push({min,max,preis,dauer});
   }
   return ausgabe;
@@ -2720,7 +2721,10 @@ programmStufenEditor(tierEditor,angebot.gruppenstufen?.length?angebot.gruppenstu
 const addTierButton=el('button','Teilnehmerstufe hinzufügen');addTierButton.type='button';addTierButton.className='btn secondary';
 addTierButton.addEventListener('click',()=>{tierEditor.onaddprogramtier?.();gruppenDauerEingabenAktualisieren();});
 const tierLegend=el('h4','Teilnehmerstufen · Preis je Gruppe');
-preisbereich.append(tierLegend,tierEditor,addTierButton);
+const dauerVariantenHinweis=el('p','Ein Teilnehmerbereich darf mehrfach vorkommen, wenn die Programmdauer unterschiedlich ist (z. B. 1–10 Personen: 180 und 240 Minuten). Im Buchungsformular wählen Gäste dann die Dauer aus.');
+dauerVariantenHinweis.className='hint';
+
+preisbereich.append(tierLegend,dauerVariantenHinweis,tierEditor,addTierButton);
 function preisEingabenAktualisieren(){
   const einzel=modus.value==='einzelplatz';
   tierLegend.hidden=einzel;tierEditor.hidden=einzel;addTierButton.hidden=einzel;
