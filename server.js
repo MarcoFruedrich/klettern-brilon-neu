@@ -3191,6 +3191,44 @@ if(route==='/api/admin/angebote/reihenfolge'&&req.method==='PATCH'){
   return reply(res,200,{success:true});
 }
 
+// Dauerhaftes Löschen: nur nicht verwendete Programme entfernen.
+// Buchungen, Rechnungen und verknüpfte GPS-Touren bleiben geschützt.
+const angebotLoeschenRoute=route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
+if(angebotLoeschenRoute&&req.method==='DELETE'){
+  const angebotId=angebotLoeschenRoute[1];
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const angebot=await client.query('SELECT id,name FROM brilon_angebote WHERE id=$1 FOR UPDATE',[angebotId]);
+    if(!angebot.rowCount){
+      await client.query('ROLLBACK');
+      return reply(res,404,{error:'Programm nicht gefunden. Bitte Programmliste neu laden.'});
+    }
+    const buchungen=await client.query(`SELECT 1 FROM brilon_buchungen
+      WHERE data->>'angebot'=$1 OR data->>'programmId'=$2 OR data->>'programm_id'=$2
+      LIMIT 1`,[angebot.rows[0].name,String(angebotId)]);
+    if(buchungen.rowCount){
+      await client.query('ROLLBACK');
+      return reply(res,409,{error:'Zu diesem Programm gibt es Buchungen. Bitte archivieren, damit Buchungen und Rechnungen erhalten bleiben.'});
+    }
+    const gpsTabelle=await client.query("SELECT to_regclass('brilon_gps_touren') AS name");
+    if(gpsTabelle.rows[0]?.name){
+      const touren=await client.query('SELECT 1 FROM brilon_gps_touren WHERE angebot_id=$1 LIMIT 1',[angebotId]);
+      if(touren.rowCount){
+        await client.query('ROLLBACK');
+        return reply(res,409,{error:'Das Programm wird von einer GPS-Tour verwendet. Bitte GPS-Tour zuerst entfernen oder Programm archivieren.'});
+      }
+    }
+    const deleted=await client.query('DELETE FROM brilon_angebote WHERE id=$1 RETURNING id',[angebotId]);
+    await client.query('COMMIT');
+    return reply(res,200,{success:true,id:Number(deleted.rows[0].id)});
+  }catch(error){
+    await client.query('ROLLBACK');
+    if(error.code==='23503')return reply(res,409,{error:'Das Programm wird noch an anderer Stelle verwendet. Bitte stattdessen archivieren.'});
+    throw error;
+  }finally{client.release();}
+}
+
 const archivRoute=route.match(/^\/api\/admin\/angebote\/([0-9]+)\/archivieren$/);
 if(archivRoute&&req.method==='PATCH'){
   const d=await body(req);
