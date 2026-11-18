@@ -32,55 +32,62 @@ const DEFAULT_VISITOR_GROUPS=Object.freeze([
 function sichereBesucherBildUrl(value) {
   if(typeof value!=='string')return '';
   const url=value.trim();
-  if(url.length>900)return '';
-  if(/^\/(?:fotos\/|images\/|bilder\/|assets\/)[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp|svg)$/i.test(url)
-    && !url.includes('..'))return url;
-  if(/^https:\/\/fssjruvxkdqeltjdrlfo\.supabase\.co\/storage\/v1\/object\/public\/angebotsbilder\/[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp)$/i.test(url)
-    && !url.includes('..'))return url;
-  return '';
+  if(!url||url.length>900||url.includes('..'))return '';
+  if(/^\/(?:fotos\/|images\/|bilder\/|assets\/)[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp|svg|gif)$/i.test(url))return url;
+  try {
+    const parsed=new URL(url);
+    if(parsed.protocol!=='https:'||parsed.username||parsed.password||parsed.search||parsed.hash)return '';
+    if(parsed.hostname!=='fssjruvxkdqeltjdrlfo.supabase.co')return '';
+    if(!/^\/storage\/v1\/object\/public\/angebotsbilder\/[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp|gif)$/i.test(parsed.pathname))return '';
+    return url;
+  } catch {return '';}
 }
-
+function sichereId(v) {
+  return typeof v==='string'&&/^[a-z0-9][a-z0-9_-]{0,79}$/i.test(v)?v:'';
+}
 function prepareVisitorGroups(input) {
-  const configured=Array.isArray(input)?input:[];
-  const orderedDefaults=Array.isArray(input)
-    ?[...DEFAULT_VISITOR_GROUPS].sort((a,b)=>{
-      const ai=input.findIndex(g=>g?.id===a.id),bi=input.findIndex(g=>g?.id===b.id);
-      return (ai<0?DEFAULT_VISITOR_GROUPS.indexOf(a):ai)-(bi<0?DEFAULT_VISITOR_GROUPS.indexOf(b):bi);
-    })
-    :DEFAULT_VISITOR_GROUPS;
-  return orderedDefaults.map(defaults=>{
-    const source=configured.find(g=>g&&g.id===defaults.id)||{};
+  // Existing user-managed groups are authoritative; never recreate or silently
+  // discard renamed/added groups when reading a stored array.
+  const configured=Array.isArray(input)?input:DEFAULT_VISITOR_GROUPS;
+  return configured.filter(g=>g&&sichereId(g.id)).slice(0,40).map((source,index)=>{
+    const defaults=DEFAULT_VISITOR_GROUPS.find(g=>g.id===source.id)||{};
     const text=(key,max)=>typeof source[key]==='string'&&source[key].trim()
-      ?source[key].trim().slice(0,max):defaults[key];
+      ?source[key].trim().slice(0,max):(defaults[key]||'');
     const rawIds=Array.isArray(source.programmIds)?source.programmIds:[];
     const programmIds=[...new Set(rawIds.map(Number).filter(n=>Number.isSafeInteger(n)&&n>0))].slice(0,250);
     const punkte=Array.isArray(source.punkte)
       ?source.punkte.filter(v=>typeof v==='string'&&v.trim()).slice(0,3).map(v=>v.trim().slice(0,100))
-      :defaults.punkte;
+      :(defaults.punkte||[]);
     return {
-      id:defaults.id,titel:text('titel',55),beschreibung:text('beschreibung',350),
-      punkte,icon:defaults.icon,farbe:defaults.farbe,
-      bild:sichereBesucherBildUrl(source.bild)||defaults.bild,
-      programmIds,aktiv:source.aktiv!==false
+      id:source.id,
+      titel:text('titel',55),
+      beschreibung:text('beschreibung',650),
+      punkte,
+      icon:typeof source.icon==='string'&&source.icon.length<=24?source.icon:(defaults.icon||'👥'),
+      farbe:typeof source.farbe==='string'&&/^#[a-f0-9]{6}$/i.test(source.farbe)?source.farbe:(defaults.farbe||'#599f47'),
+      bild:sichereBesucherBildUrl(source.bild)||defaults.bild||'',
+      programmIds,
+      aktiv:source.aktiv!==false
     };
   });
 }
-
 function validateVisitorGroups(input) {
-  if(!Array.isArray(input)||input.length!==DEFAULT_VISITOR_GROUPS.length||
-     new Set(input.map(g=>g?.id)).size!==DEFAULT_VISITOR_GROUPS.length||
-     !DEFAULT_VISITOR_GROUPS.every(d=>input.some(g=>g?.id===d.id)))
-    return {error:'Bitte alle sechs Besuchergruppen unverändert in der Auswahl übermitteln.'};
+  if(!Array.isArray(input)||input.length>40||
+     new Set(input.map(g=>sichereId(g?.id))).size!==input.length||
+     input.some(g=>!sichereId(g?.id)))
+    return {error:'Ungültige Gruppenliste: Gruppen müssen eindeutige Kennungen haben (maximal 40 Gruppen).'};
   for(const g of input){
     if(typeof g.titel!=='string'||!g.titel.trim()||g.titel.length>55||
-       typeof g.beschreibung!=='string'||!g.beschreibung.trim()||g.beschreibung.length>350||
+       typeof g.beschreibung!=='string'||g.beschreibung.length>650||
        !Array.isArray(g.punkte)||g.punkte.length>3||
-       g.punkte.some(s=>typeof s!=='string'||s.length>100)||
+       g.punkte.some(v=>typeof v!=='string'||v.length>100)||
        (g.bild&&!sichereBesucherBildUrl(g.bild))||
        !Array.isArray(g.programmIds)||g.programmIds.length>250||
        g.programmIds.some(id=>!Number.isSafeInteger(Number(id))||Number(id)<1)||
-       typeof g.aktiv!=='boolean')
-      return {error:'Ungültige Felder in der Besuchergruppe '+String(g.id)+'.'};
+       typeof g.aktiv!=='boolean'||
+       (g.icon!==undefined&&(typeof g.icon!=='string'||g.icon.length>24))||
+       (g.farbe!==undefined&&(typeof g.farbe!=='string'||!/^#[a-f0-9]{6}$/i.test(g.farbe))))
+      return {error:'Ungültige Felder in der Besuchergruppe '+String(g.titel||g.id)+'.'};
   }
   return {gruppen:prepareVisitorGroups(input)};
 }
