@@ -37,14 +37,35 @@
       preview.style.width='100%';
       preview.style.maxWidth='280px';
       preview.style.aspectRatio='4 / 3';
-      preview.style.objectFit='cover';
+      preview.style.objectFit='contain';
       preview.style.borderRadius='8px';
       const title=el('strong',image.name||'Gespeichertes Bild');
       const open=el('a','Bild in neuem Tab ansehen');
       open.href=image.url;
       open.target='_blank';
       open.rel='noopener noreferrer';
-      card.append(preview,title,open);
+      const actions=el('div');actions.className='button-row';
+      if(image.pfad&&image.pfad.startsWith('medien/')){
+        const rename=el('button','Umbenennen');rename.type='button';rename.className='btn secondary';
+        rename.onclick=async()=>{
+          const name=prompt('Neuer Bildname:',image.name.replace(/\\.[^.]+$/,''));
+          if(name===null)return;
+          try{
+            await window.api('/api/admin/medien',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({pfad:image.pfad,name})});
+            await fetchImages();status.textContent='Bild umbenannt.';
+          }catch(error){status.textContent='Umbenennen fehlgeschlagen: '+error.message;}
+        };
+        const remove=el('button','Dauerhaft löschen');remove.type='button';remove.className='btn secondary';
+        remove.onclick=async()=>{
+          if(!confirm('Dieses Bild dauerhaft löschen?'))return;
+          try{
+            await window.api('/api/admin/medien',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({pfad:image.pfad})});
+            await fetchImages();status.textContent='Bild dauerhaft gelöscht.';
+          }catch(error){status.textContent='Löschen fehlgeschlagen: '+error.message;}
+        };
+        actions.append(rename,remove);
+      }
+      card.append(preview,title,open,actions);
       list.append(card);
     }
   }
@@ -67,13 +88,13 @@
     const file=input.files?.[0];
     if(!file){status.textContent='Bitte zuerst eine Bilddatei auswählen.';return;}
     if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)){
-      status.textContent='Erlaubt sind JPG/JPEG, PNG, WebP und GIF.';
+      status.textContent='Erlaubt sind JPG/JPEG, PNG, WebP und unbewegte GIFs.';
       return;
     }
     const maxBytes=file.type==='image/gif'?3*1024*1024:5*1024*1024;
     if(file.size>maxBytes){
       status.textContent=file.type==='image/gif'
-        ?'GIF-Animationen dürfen maximal 3 MB groß sein.'
+        ?'Statische GIFs dürfen maximal 3 MB groß sein.'
         :'Das Bild darf maximal 5 MB groß sein.';
       return;
     }
@@ -87,7 +108,7 @@
       });
       input.value='';
       await fetchImages();
-      status.textContent='Bild gespeichert und steht ab sofort zur Auswahl.';
+      status.textContent='Bild gespeichert und steht ab sofort zur Auswahl (statische GIFs werden als PNG gespeichert).';
     }catch(error){
       status.textContent='Bild konnte nicht gespeichert werden: '+error.message;
     }finally{
@@ -133,7 +154,7 @@
       preview.style.width='100%';
       preview.style.maxWidth='260px';
       preview.style.aspectRatio='4 / 3';
-      preview.style.objectFit='cover';
+      preview.style.objectFit='contain';
       preview.style.borderRadius='8px';
       const title=el('strong',image.name||'Gespeichertes Bild');
       const choose=el('button','Dieses Bild verwenden');
