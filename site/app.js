@@ -84,14 +84,13 @@ function angebotslinkAnwenden(){
 function dauerFuer(teilnehmer,angebotName){
   const programm=angeboteCache.find(a=>a.name===angebotName);
   const anzahl=Number(teilnehmer),basis=Number(programm?.dauer);
-  if(!Number.isInteger(anzahl)||anzahl<1||!Number.isFinite(basis)||basis<15)return 150;
-  if(programm?.dauer_modus==='fest')return basis;
-  if(Array.isArray(programm?.gruppenstufen)&&programm.gruppenstufen.length){
+  if(!programm||!Number.isInteger(anzahl)||anzahl<1||!Number.isFinite(basis)||basis<15)return null;
+  if(Array.isArray(programm.gruppenstufen)&&programm.gruppenstufen.length){
     const stufe=programm.gruppenstufen.find(item=>anzahl>=Number(item.min)&&anzahl<=Number(item.max));
-    return stufe?Number(stufe.dauer):null;
+    const gruppenDauer=Number(stufe?.dauer);
+    return Number.isFinite(gruppenDauer)&&gruppenDauer>=15?gruppenDauer:null;
   }
-  const faktor=anzahl<=4?0.6:anzahl<=10?1:anzahl<=15?1.2:anzahl<=20?1.4:1.6;
-  return Math.max(15,Math.round((basis*faktor)/5)*5);
+  return basis;
 }
 
 const buchbareUhrzeiten = [
@@ -248,8 +247,17 @@ function buchungsdauerBerechnen() {
   if (!teilnehmerEingabe || !dauerAnzeige) return;
 
   const anzahl = Number(teilnehmerEingabe.value);
-  const dauer=dauerFuer(anzahl,angebotAuswahl?.value);
-  if(!Number.isInteger(dauer)||dauer<15){dauerAnzeige.textContent='Für diese Gruppengröße ist keine Dauerstufe hinterlegt.';if(endzeitAnzeige)endzeitAnzeige.textContent='';return;}
+  const programmAusgewaehlt=Boolean(angebotAuswahl?.value&&
+    angeboteCache.some(angebot=>angebot.name===angebotAuswahl.value));
+  if(!programmAusgewaehlt){
+    dauerAnzeige.textContent=angeboteCache.length
+      ?'Bitte zuerst ein verfügbares Programm auswählen.'
+      :'Aktuell sind keine Programme hinterlegt.';
+    if(endzeitAnzeige)endzeitAnzeige.textContent='';
+    return;
+  }
+  const dauer=dauerFuer(anzahl,angebotAuswahl.value);
+  if(!Number.isInteger(dauer)||dauer<15){dauerAnzeige.textContent='Für diese Gruppengröße ist keine Dauer hinterlegt.';if(endzeitAnzeige)endzeitAnzeige.textContent='';return;}
 
   const dauerMinuten = dauer % 60;
   const stunden = Math.floor(dauer / 60);
