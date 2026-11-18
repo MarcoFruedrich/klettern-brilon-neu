@@ -3277,6 +3277,18 @@ if(archivRoute&&req.method==='PATCH'){
   return reply(res,200,q.rows[0]);
 }
   
+function pruefeProgrammstufen(raw,kapazitaet,modus,basisdauer,dauerModus){
+  if(modus==='einzelplatz')return {stufen:[]};
+  if(!Array.isArray(raw)||!raw.length||raw.length>100)return {error:'Bitte mindestens eine vollständige Teilnehmerstufe angeben.'};
+  const stufen=raw.map(v=>({min:Number(v.min),max:Number(v.max),preis:v.preis==null||v.preis===''?NaN:Number(v.preis),
+    dauer:dauerModus==='fest'?basisdauer:Number(v.dauer)})).sort((a,b)=>a.min-b.min);
+  if(stufen.some((v,i)=>!Number.isInteger(v.min)||!Number.isInteger(v.max)||v.min<1||v.max<v.min||
+    v.max>kapazitaet||!Number.isFinite(v.preis)||v.preis<0||!Number.isInteger(v.dauer)||v.dauer<15||v.dauer>1440||
+    (i>0&&v.min<=stufen[i-1].max)))
+    return {error:'Bitte Teilnehmerzahlen ohne Überschneidungen, einen gültigen Gruppenpreis und eine Dauer zwischen 15 und 1440 Minuten eingeben.'};
+  return {stufen};
+}
+const preiseAusStufen=stufen=>Object.fromEntries(stufen.map(v=>[v.min+'-'+v.max,v.preis]));
 if (route === '/api/admin/angebote' && req.method === 'POST') {
   const d = await body(req);
 
@@ -3335,18 +3347,6 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
 }
 
      
-function pruefeProgrammstufen(raw,kapazitaet,modus,basisdauer,dauerModus){
-  if(modus==='einzelplatz')return {stufen:[]};
-  if(!Array.isArray(raw)||!raw.length||raw.length>100)return {error:'Bitte mindestens eine vollständige Teilnehmerstufe angeben.'};
-  const stufen=raw.map(v=>({min:Number(v.min),max:Number(v.max),preis:v.preis==null||v.preis===''?NaN:Number(v.preis),
-    dauer:dauerModus==='fest'?basisdauer:Number(v.dauer)})).sort((a,b)=>a.min-b.min);
-  if(stufen.some((v,i)=>!Number.isInteger(v.min)||!Number.isInteger(v.max)||v.min<1||v.max<v.min||
-    v.max>kapazitaet||!Number.isFinite(v.preis)||v.preis<0||!Number.isInteger(v.dauer)||v.dauer<15||v.dauer>1440||
-    (i>0&&v.min<=stufen[i-1].max)))
-    return {error:'Bitte Teilnehmerzahlen ohne Überschneidungen, einen gültigen Gruppenpreis und eine Dauer zwischen 15 und 1440 Minuten eingeben.'};
-  return {stufen};
-}
-const preiseAusStufen=stufen=>Object.fromEntries(stufen.map(v=>[v.min+'-'+v.max,v.preis]));
 const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
 
 if (preisRoute && req.method === 'PATCH') {
