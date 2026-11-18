@@ -11,6 +11,15 @@
   <link rel="stylesheet" href="/admin-forest.css?v=20261110-demo-owner-profile">
   <link rel="stylesheet" href="/besuchergruppen.css?v=20261110-program-groups-v2">
   <script src="/contextual-hilfe.js?v=20261117-fields2" defer></script>
+<style>
+#spontan-preis-editor{display:grid;gap:10px;max-width:850px}
+#spontan-preis-editor label{font-weight:700;margin-top:10px}
+#spontan-preis-editor select,#spontan-preis-editor input{width:100%;min-height:44px}
+#spontan-preis-status{border-radius:9px;background:#f0f5ef;padding:13px;min-height:44px}
+#spontan-preis-status.error{color:#8b2525}
+#spontan-preis-save{justify-self:start}
+@media(max-width:700px){#spontan-preis-editor{max-width:100%}#spontan-preis-save{width:100%}}
+</style>
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
@@ -68,7 +77,7 @@
             <a href="#angebote-verwaltung" class="admin-nav-main-group" data-admin-view-link>Programme</a>
             <a href="#calendar-view" data-admin-view-link>Kalender</a>
             <a href="/spontangruppen-monitor.html" target="_blank" rel="noopener">Spontangruppen-Monitor</a>
-            <a href="/spontangruppen-preise.html" target="_blank" rel="noopener">Spontangruppen-Preis</a>
+            <a href="#spontangruppen-preis-section" data-admin-view-link>Spontangruppen-Preis</a>
             <a href="#standorte-section" data-admin-view-link>Standorte</a>
             <a href="#mitarbeiter-einladen-section" class="admin-nav-main-group employee-area-link" data-admin-view-link>Kontaktverwaltung</a>
             <a href="#whatsapp-admin-section" class="admin-nav-main-group" data-admin-view-link>Öffentlichkeitsarbeit</a>
@@ -568,6 +577,30 @@
 
 </section>
 
+<section id="spontangruppen-preis-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="spontangruppen-preis-heading">
+  <h2 id="spontangruppen-preis-heading">Preis spontane Gruppenangebote</h2>
+  <p>Lege den Preis pro Person für spontane Klettergruppen am jeweiligen Standort fest. Auf der Gästeseite wird nur dieser Einzelpreis angezeigt. Die Gruppenbestätigung per E-Mail nennt zusätzlich den Betrag anhand der angemeldeten Personenzahl.</p>
+  <div id="spontan-preis-editor" class="spontan-preis-editor">
+    <label for="spontan-preis-place">Standort</label>
+    <select id="spontan-preis-place"><option value="">Standort auswählen …</option></select>
+    <label for="spontan-preis-price">Preis je Person (€)</label>
+    <input id="spontan-preis-price" type="text" inputmode="decimal" placeholder="z. B. 18,00">
+    <label for="spontan-preis-partner">Freigegebener Netzwerkpartner</label>
+    <select id="spontan-preis-partner"><option value="">Partner auswählen …</option></select>
+    <label for="spontan-preis-deduction-type">Vereinbarter Partnerabzug</label>
+    <select id="spontan-preis-deduction-type">
+      <option value="prozent">Prozent vom Rechnungsbetrag</option>
+      <option value="pro_person">Fester Betrag je anwesender Person</option>
+      <option value="pauschal">Pauschalbetrag je Termin</option>
+    </select>
+    <label for="spontan-preis-deduction-value">Abzugshöhe</label>
+    <input id="spontan-preis-deduction-value" type="text" inputmode="decimal" placeholder="z. B. 15 oder 3,00">
+    <p class="hint">Die Abrechnung wird nach dem Termin mit den tatsächlichen Anwesenheitszahlen erstellt und in der Buchhaltung gespeichert.</p>
+    <button class="btn" id="spontan-preis-save" type="button" disabled>Einstellungen dauerhaft speichern</button>
+    <p id="spontan-preis-status" role="status" aria-live="polite">Einstellungen werden geladen …</p>
+  </div>
+</section>
+
 <section id="besuchergruppen-admin-section" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="besuchergruppen-admin-heading">
   <h2 id="besuchergruppen-admin-heading">Für wen? – Besuchergruppen verwalten</h2>
   <p>Erstelle und bearbeite Besuchergruppen wie Familien, Schulen oder Vereine. Du kannst Gruppen hinzufügen, umbenennen, sortieren und entfernen sowie passende Programme zuordnen.</p>
@@ -905,6 +938,7 @@
   <script src="/admin.js?v=20261118-calendar-live-confirm"></script>
   <script src="/medienpool-admin.js?v=20261118-media-replace"></script>
   <script src="/besuchergruppen-admin.js?v=20261118-group-save-counter"></script>
+  <script src="/spontangruppen-preise.js?v=20261118-inline-csrf"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
   <script src="/website-effekte-admin.js?v=20261118-api-repair"></script>
   <script src="/pruefung-admin.js?v=20261115-partner-location-save"></script>
