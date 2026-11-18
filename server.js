@@ -341,12 +341,14 @@ async function pruefeBuchungskonflikt(client,datum,fenster,ausnahmeId=null,gleic
     `SELECT id,data FROM brilon_buchungen
      WHERE data->>'datum'=$1
      AND COALESCE(status,'offen') IN ('offen','bestaetigt')
-     AND ($2::uuid IS NULL OR id<>$2::uuid)`,
-    [datum,ausnahmeId]
+     AND ($2::uuid IS NULL OR id<>$2::uuid)
+     AND ($3::text IS NULL OR data->>'veranstaltungsort'=$3 OR data->>'veranstaltungsort' IS NULL)`,
+    [datum,ausnahmeId,standort]
   );
   if(q.rows.some(r=>{
     const same=gleicheSitzung&&r.data?.buchungsmodus==='einzelplatz'&&
-      r.data?.angebot===gleicheSitzung.angebot&&r.data?.uhrzeit===gleicheSitzung.uhrzeit;
+      r.data?.angebot===gleicheSitzung.angebot&&r.data?.uhrzeit===gleicheSitzung.uhrzeit&&
+      (!standort||r.data?.veranstaltungsort===standort);
     return !same&&ueberschneidung(fenster,buchungsfenster(r.data));
   }))
     return 'Dieser Zeitraum ist bereits reserviert. Bitte wähle eine andere Anfangszeit oder ein anderes Datum.';
@@ -637,19 +639,22 @@ async function main(req,res){
       let gesamtpreis = null;
       const preisAbfrage = await pool.query(
         `SELECT id,preise,kapazitaet,verfuegbare_termine,buchbar,veroeffentlicht,
-                veranstaltungsort,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer,gruppenstufen,dauer_modus
+                veranstaltungsort,veranstaltungsorte,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer,gruppenstufen,dauer_modus
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
          LIMIT 1`,[angebot]
       );
       if(!preisAbfrage.rows.length)return reply(res,409,{error:'Dieses Programm ist derzeit nicht buchbar.'});
       const programm=preisAbfrage.rows[0];
-      if(angefragterStandort&&angefragterStandort!==programm.veranstaltungsort)
-        return reply(res,409,{error:'Das ausgewählte Angebot gehört nicht zum gewählten Veranstaltungsort.'});
+      const erlaubteProgrammStandorte=Array.isArray(programm.veranstaltungsorte)&&programm.veranstaltungsorte.length
+        ?programm.veranstaltungsorte:[programm.veranstaltungsort].filter(Boolean);
       const bookingSite=angefragterStandort||programm.veranstaltungsort;
+      if(!erlaubteProgrammStandorte.includes(bookingSite))
+        return reply(res,409,{error:'Dieses Programm ist für den ausgewählten Standort nicht freigegeben.'});
       const locationSettings=await pool.query(`SELECT partnerhaus,partnerkontakt_name,partnerkontakt_email
         FROM brilon_orte WHERE name=$1 AND aktiv=true LIMIT 1`,[bookingSite]);
-      const partnerhausEinstellung=locationSettings.rows[0]||{partnerhaus:false,partnerkontakt_name:'',partnerkontakt_email:''};
+      if(!locationSettings.rowCount)return reply(res,409,{error:'Dieser Standort ist derzeit nicht aktiv.'});
+      const partnerhausEinstellung=locationSettings.rows[0];
       const einzelplatz=programm.buchungsmodus==='einzelplatz';
       if(einzelplatz&&teilnehmer!==1)return reply(res,400,{error:'Für dieses Angebot kannst du nur einen Einzelplatz pro Anmeldung reservieren.'});
       const dauerWunsch=d.programmdauer===undefined||d.programmdauer===null||d.programmdauer===''?
@@ -764,8 +769,9 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
           `SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS gebucht
            FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2
              AND ($3::text IS NULL OR data->>'uhrzeit'=$3)
+             AND ($4::text IS NULL OR data->>'veranstaltungsort'=$4 OR data->>'veranstaltungsort' IS NULL)
              AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,
-          [datum,angebot,einzelplatz?data.uhrzeit:null]
+          [datum,angebot,einzelplatz?data.uhrzeit:null,bookingSite]
         );
         if(Number(kapazitaet.rows[0].gebucht)+teilnehmer>Number(programm.kapazitaet))
           return {konflikt:'Die Kapazität für dieses Programm ist am gewählten Tag ausgeschöpft.'};
@@ -897,12 +903,15 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         error:'Bitte ein gültiges Datum angeben.'
       });
 
+      const standort=safeText(u.searchParams.get('standort'),80);
+      if(!standort)return reply(res,400,{error:'Bitte zuerst den Veranstaltungsort auswählen.'});
       const q=await pool.query(
         `SELECT data
          FROM brilon_buchungen
          WHERE data->>'datum'=$1
+         AND (data->>'veranstaltungsort'=$2 OR data->>'veranstaltungsort' IS NULL)
          AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,
-        [datum]
+        [datum,standort]
       );
 
       const buchungen=q.rows.map(r=>({data:r.data,fenster:buchungsfenster(r.data)}));
@@ -919,9 +928,13 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
       const angebot=safeText(u.searchParams.get('angebot'),120);
       const programm=await pool.query(
-        `SELECT dauer,buchungsmodus,mindestteilnehmer,kapazitaet,gruppenstufen,dauer_modus FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
+        `SELECT dauer,buchungsmodus,mindestteilnehmer,kapazitaet,gruppenstufen,dauer_modus,veranstaltungsort,veranstaltungsorte
+          FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
       );
       if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
+      const erlaubte=Array.isArray(programm.rows[0].veranstaltungsorte)&&programm.rows[0].veranstaltungsorte.length
+        ?programm.rows[0].veranstaltungsorte:[programm.rows[0].veranstaltungsort].filter(Boolean);
+      if(!erlaubte.includes(standort))return reply(res,409,{error:'Das Programm wird an diesem Standort nicht angeboten.'});
       const einzelplatz=programm.rows[0].buchungsmodus==='einzelplatz';
       const dauerWunschRaw=u.searchParams.get('programmdauer');
       const dauerWunsch=dauerWunschRaw===null||dauerWunschRaw===''?null:Number(dauerWunschRaw);
@@ -938,7 +951,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           dauer===null ? null : [start,start+dauer];
 
         const sameSession=b=>b.data?.buchungsmodus==='einzelplatz'&&
-          b.data?.angebot===angebot&&b.data?.uhrzeit===uhrzeit;
+          b.data?.angebot===angebot&&b.data?.uhrzeit===uhrzeit&&b.data?.veranstaltungsort===standort;
         const belegt=buchungen.some(b=>
           !(einzelplatz&&sameSession(b))&&ueberschneidung(neuesFenster,b.fenster)
         );
