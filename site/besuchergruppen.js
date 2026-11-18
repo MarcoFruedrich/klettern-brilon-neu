@@ -22,16 +22,28 @@
   window.aktiveBesuchergruppe=null;
   window.besuchergruppeName=()=>gruppen.find(g=>g.id===window.aktiveBesuchergruppe)?.titel||'';
   window.besuchergruppenListe=()=>gruppen;
+  // Einheitliche Zuordnung fuer Besuchergruppen-Filter und Programm-Karten.
+  // Manuell hinterlegte Zuordnungen haben Vorrang. Neue Gruppen koennen bei
+  // fehlender manueller Zuordnung zusaetzlich ueber ihren Titel gefunden werden.
+  window.besuchergruppeProgrammPasst=(group,angebot)=>{
+    if(!group||!angebot||group.aktiv===false)return false;
+    const offerGroups=Array.isArray(angebot.besuchergruppen)?angebot.besuchergruppen:[];
+    const ids=Array.isArray(group.programmIds)?group.programmIds:[];
+    if(ids.length||offerGroups.length)
+      return ids.some(id=>String(id)===String(angebot.id))||offerGroups.includes(group.id);
+    const ziel=[angebot.zielgruppe,angebot.name,angebot.kategorie].filter(Boolean).join(' ');
+    if(synonyms[group.id]?.test(ziel))return true;
+    const normalize=value=>String(value||'').toLocaleLowerCase('de-DE').normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+    const text=normalize(ziel),title=normalize(group.titel);
+    if(!title||!text)return false;
+    if(text.includes(title))return true;
+    return title.split(' ').some(word=>word.length>=5&&text.split(' ').includes(word));
+  };
   window.besuchergruppePasst=(angebot)=>{
     if(!window.aktiveBesuchergruppe)return true;
     const group=gruppen.find(g=>g.id===window.aktiveBesuchergruppe);
-    if(!group)return true;
-    const offerGroups=Array.isArray(angebot.besuchergruppen)?angebot.besuchergruppen:[];
-    if(offerGroups.includes(group.id))return true;
-    if(group.programmIds?.length)return group.programmIds.some(id=>String(id)===String(angebot.id));
-    if(offerGroups.length)return false;
-    const text=[angebot.zielgruppe,angebot.name,angebot.kategorie].filter(Boolean).join(' ');
-    return Boolean(synonyms[group.id]?.test(text));
+    return !group||window.besuchergruppeProgrammPasst(group,angebot);
   };
   window.besuchergruppeZuruecksetzen=()=>{
     window.aktiveBesuchergruppe=null;
