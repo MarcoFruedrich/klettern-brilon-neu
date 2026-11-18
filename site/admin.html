@@ -447,7 +447,7 @@
       <button type="button" class="btn secondary" id="medienpool-neuladen">Bilder aktualisieren</button>
     </div>
     <p id="medienpool-status" role="status" aria-live="polite">Bilder werden nach der Anmeldung geladen.</p>
-    <div id="medienpool-bilder" class="admin-grid"></div>
+    <div id="medienpool-bilder" class="admin-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:16px"></div>
   </section>
 </section>
 
@@ -903,7 +903,7 @@
   <script src="/vendor/qrcode-generator.js"></script>
   <script src="/qr-etiketten.js"></script>
   <script src="/admin.js?v=20261118-calendar-live-confirm"></script>
-  <script src="/medienpool-admin.js?v=20261118-media-repair"></script>
+  <script src="/medienpool-admin.js?v=20261118-media-delete-all"></script>
   <script src="/besuchergruppen-admin.js?v=20261110-custom-groups-gif-icons-v3"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
   <script src="/website-effekte-admin.js?v=20261118-api-repair"></script>
