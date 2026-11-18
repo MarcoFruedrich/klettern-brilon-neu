@@ -1611,7 +1611,7 @@ if (eigeneTermine.length) {
         // Aktuelle Bewerbungen und zugewiesene Mitarbeiter befinden sich
         // im zentralen Einsatzplanungsbereich desselben Verwaltungskalenders.
         kalenderInfo.append(el('p','Mitarbeiterzuweisung und Stundenkontrolle siehe zentrale Einsatzplanung oben.'));
-        if(b.status==='offen'&&b.source!=='teamerbase'){
+        if((!b.status||b.status==='offen')&&b.source!=='teamerbase'){
           const bestaetigen=document.createElement('button');
           bestaetigen.type='button';
           bestaetigen.className='btn secondary';
