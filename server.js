@@ -509,6 +509,15 @@ async function main(req,res){
       return await kundenfeedbackApi(req,res,u,route,ip);
     if(route==='/api/anschlussangebote/vorschau'||route==='/api/anschlussangebote/buchen')
       return await anschlussApi(req,res,u,route,ip);
+    if(route==='/api/website-effekte'&&req.method==='GET'){
+      if(!pool)return reply(res,200,{aktiv:false,aktiveId:null,eintraege:[]});
+      try{
+        if((await pool.query("SELECT to_regclass('public.brilon_website_effekte') AS vorhanden")).rows[0]?.vorhanden===null)
+          return reply(res,200,{aktiv:false,aktiveId:null,eintraege:[]});
+        const q=await pool.query('SELECT daten FROM brilon_website_effekte WHERE id=1');
+        return reply(res,200,q.rows[0]?.daten||{aktiv:false,aktiveId:null,eintraege:[]});
+      }catch(error){console.error('Öffentliche Website-Effekte:',error.message);return reply(res,200,{aktiv:false,aktiveId:null,eintraege:[]});}
+    }
     if(route==='/api/feedback/statistik'&&req.method==='GET'){
       if(!pool)return reply(res,503,{error:'Feedback ist derzeit nicht verfügbar.'});
       const q=await pool.query(`SELECT COUNT(*)::int AS anzahl,
@@ -2923,6 +2932,100 @@ if(staffArea&&req.method==='DELETE'){
   const q=await pool.query('DELETE FROM brilon_mitarbeiterbereiche WHERE id=$1 RETURNING id',[staffArea[1]]);
   if(!q.rowCount)return reply(res,404,{error:'Mitarbeiterbereich nicht gefunden.'});
   return reply(res,200,{success:true});
+}
+
+
+/* Medienbibliothek: authentifizierte Verwaltung, persistente Supabase-Dateien. */
+if(route==='/api/admin/medien'){
+  if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
+  const bucket=supabase.storage.from('angebotsbilder');
+  if(req.method==='GET'){
+    const bilder=[];
+    async function einlesen(ordner='',tiefe=0){
+      if(tiefe>3||bilder.length>=500)return;
+      const {data,error}=await bucket.list(ordner,{limit:500,sortBy:{column:'created_at',order:'desc'}});
+      if(error)throw error;
+      for(const item of data||[]){
+        const pfad=ordner?ordner+'/'+item.name:item.name;
+        if(item.id===null&&!item.metadata){await einlesen(pfad,tiefe+1);continue;}
+        if(!/\.(png|jpe?g|webp|gif)$/i.test(item.name))continue;
+        bilder.push({name:item.name,pfad,url:bucket.getPublicUrl(pfad).data.publicUrl,groesse:item.metadata?.size||0});
+      }
+    }
+    try{await einlesen();return reply(res,200,{bilder:bilder.slice(0,500)});}
+    catch(err){console.error('Medienliste:',err.message);return reply(res,502,{error:'Bilder konnten nicht geladen werden: '+err.message});}
+  }
+  if(req.method==='POST'){
+    if(!limit('medien-upload:'+ip,20,600000))return reply(res,429,{error:'Zu viele Uploads. Bitte später erneut versuchen.'});
+    const typ=String(req.headers['content-type']||'').split(';')[0].toLowerCase();
+    if(!['image/jpeg','image/png','image/webp','image/gif'].includes(typ))
+      return reply(res,400,{error:'Nur JPEG, PNG, WebP oder statische GIF-Dateien erlaubt.'});
+    const chunks=[];let groesse=0;
+    for await(const chunk of req){groesse+=chunk.length;if(groesse>5*1024*1024)return reply(res,413,{error:'Maximal 5 MB pro Bild.'});chunks.push(chunk);}
+    if(!groesse)return reply(res,400,{error:'Keine Bilddatei empfangen.'});
+    let bild,format=typ,ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'png'}[typ];
+    try{
+      const input=Buffer.concat(chunks);
+      if(typ==='image/gif'){
+        const sharp=require('sharp'),metadata=await sharp(input,{animated:true,limitInputPixels:40_000_000}).metadata();
+        if(metadata.format!=='gif'||metadata.pages!==1)throw Error('Nur unbewegte GIF-Dateien sind erlaubt.');
+        bild=await sharp(input,{animated:false,limitInputPixels:40_000_000}).png().toBuffer();
+        format='image/png';
+        bild=await bereinigeBild(bild,format);
+      }else bild=await bereinigeBild(input,typ);
+    }catch(error){return reply(res,400,{error:'Bilddatei konnte nicht verarbeitet werden: '+error.message});}
+    try{
+      const scan=await scanForMalware(bild);
+      if(scan?.sauber!==true)throw Object.assign(new Error('Ungültige Scannerantwort'),{code:'MALWARE_SCAN_ERROR'});
+    }catch(error){return malwareScanReply(res,error);}
+    const dateiname='medien/'+crypto.randomUUID()+'.'+ext;
+    const {error}=await bucket.upload(dateiname,bild,{contentType:format,upsert:false});
+    if(error){console.error('Medien-Upload:',error.message);return reply(res,502,{error:'Datei konnte nicht im Bildspeicher gespeichert werden: '+error.message});}
+    return reply(res,201,{success:true,bild:{name:dateiname.split('/').at(-1),pfad:dateiname,url:bucket.getPublicUrl(dateiname).data.publicUrl}});
+  }
+  if(req.method==='PATCH'||req.method==='DELETE'){
+    const daten=await body(req,2048),pfad=safeText(daten?.pfad,240);
+    if(!/^medien\/[a-z0-9._-]+\.(png|jpg|jpeg|webp)$/i.test(pfad)||pfad.includes('..'))return reply(res,400,{error:'Ungültiger Medienpfad.'});
+    const url=bucket.getPublicUrl(pfad).data.publicUrl;
+    const verwendet=await pool.query(`SELECT
+      EXISTS(SELECT 1 FROM brilon_angebote WHERE bild_url=$1) AS programme,
+      EXISTS(SELECT 1 FROM brilon_aktionen WHERE data->>'bild_url'=$1) AS aktionen`,[url]);
+    if(verwendet.rows[0]?.programme||verwendet.rows[0]?.aktionen)
+      return reply(res,409,{error:'Das Bild wird noch verwendet. Bitte zuerst die Programm- bzw. Aktionszuordnung ändern.'});
+    if(req.method==='DELETE'){
+      const {error}=await bucket.remove([pfad]);
+      if(error)return reply(res,502,{error:'Löschen fehlgeschlagen: '+error.message});
+      return reply(res,200,{success:true});
+    }
+    const basename=safeText(daten?.name,80).replace(/[^a-zA-Z0-9_-]/g,'-').replace(/^-+|-+$/g,'');
+    if(!basename)return reply(res,400,{error:'Bitte einen gültigen Namen eingeben.'});
+    const neuerPfad='medien/'+basename+'-'+crypto.randomUUID().slice(0,8)+'.'+pfad.split('.').at(-1);
+    const {error}=await bucket.move(pfad,neuerPfad);
+    if(error)return reply(res,502,{error:'Umbenennen fehlgeschlagen: '+error.message});
+    return reply(res,200,{success:true,pfad:neuerPfad,url:bucket.getPublicUrl(neuerPfad).data.publicUrl});
+  }
+}
+if(route==='/api/admin/website-effekte'&&(req.method==='GET'||req.method==='PUT')){
+  await pool.query('CREATE TABLE IF NOT EXISTS brilon_website_effekte (id INTEGER PRIMARY KEY, daten JSONB NOT NULL)');
+  const standard={aktiv:false,aktiveId:null,eintraege:[]};
+  if(req.method==='GET'){
+    const result=await pool.query('SELECT daten FROM brilon_website_effekte WHERE id=1');
+    return reply(res,200,result.rows[0]?.daten||standard);
+  }
+  const daten=await body(req,16000);
+  if(!daten||typeof daten!=='object'||!Array.isArray(daten.eintraege)||daten.eintraege.length>30)return reply(res,400,{error:'Ungültige Effekteinstellungen.'});
+  const eintraege=daten.eintraege.map(e=>({
+    id:safeText(e.id,80),name:safeText(e.name,80),symbol:safeText(e.symbol,20),
+    anzahl:Number(e.anzahl),dauerSekunden:Number(e.dauerSekunden)
+  }));
+  if(eintraege.some(e=>!e.id||!e.name||!e.symbol||!Number.isInteger(e.anzahl)||e.anzahl<1||e.anzahl>20||
+     !Number.isInteger(e.dauerSekunden)||e.dauerSekunden<8||e.dauerSekunden>90))
+    return reply(res,400,{error:'Bitte die Effektangaben überprüfen.'});
+  const aktiveId=safeText(daten.aktiveId,80)||null;
+  if(aktiveId&&!eintraege.some(e=>e.id===aktiveId))return reply(res,400,{error:'Der ausgewählte Effekt existiert nicht.'});
+  const gespeichert={aktiv:daten.aktiv===true,aktiveId,eintraege};
+  await pool.query('INSERT INTO brilon_website_effekte(id,daten) VALUES (1,$1::jsonb) ON CONFLICT(id) DO UPDATE SET daten=EXCLUDED.daten',[JSON.stringify(gespeichert)]);
+  return reply(res,200,gespeichert);
 }
 
 if(route==='/api/admin/angebote/bilder'&&req.method==='GET'){
