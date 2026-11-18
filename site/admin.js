@@ -2110,7 +2110,7 @@ function programmStufenEditor(container, initial=[], presets=[[1,10,"",180],[11,
       const label=document.createElement('label');label.textContent=labelText;label.dataset.tierField=name;
       const input=document.createElement('input');input.type=type;input.name=name;input.value=value??'';
       input.min=name==='min'||name==='max'?'1':name==='preis'?'0':'15';
-      input.max=name==='min'||name==='max'?'1000':'1440';input.step=name==='preis'?'0.01':'1';input.required=true;
+      input.max=name==='min'||name==='max'?'500':'1440';input.step=name==='preis'?'0.01':'1';input.required=true;
       label.append(input);row.append(label);return input;
     };
     field('Von Teilnehmenden','min',data.min);
@@ -2131,6 +2131,52 @@ function programmStufenAuslesen(container){
     preis:row.querySelector('[name="preis"]').value===''?null:Number(row.querySelector('[name="preis"]').value),
     dauer:Number(row.querySelector('[name="dauer"]').value)
   }));
+}
+
+// Fehler in einer einzelnen Teilnehmerstufe sichtbar machen, bevor ein
+// Gesamtprogramm an die API gesendet wird. Leer gelassene Preise werden
+// ausdrücklich NICHT stillschweigend als 0 Euro gespeichert.
+function programmStufenValidieren(container, kapazitaet, dauerModus, basisdauer){
+  const rows=[...(container?.querySelectorAll('.angebot-stufen-zeile')||[])];
+  if(!rows.length){
+    alert('Bitte mindestens eine Teilnehmerstufe mit Gruppenpreis und Dauer eintragen.');
+    return null;
+  }
+  const ausgabe=[];
+  for(let index=0;index<rows.length;index++){
+    const row=rows[index];
+    const input=name=>row.querySelector('[name="'+name+'"]');
+    const minFeld=input('min'),maxFeld=input('max'),
+      preisFeld=input('preis'),dauerFeld=input('dauer');
+    const fehler=(feld,hinweis)=>{
+      alert('Teilnehmerstufe '+(index+1)+': '+hinweis);
+      row.scrollIntoView?.({block:'center',behavior:'smooth'});
+      feld?.focus();
+      return null;
+    };
+    const min=Number(minFeld.value),max=Number(maxFeld.value);
+    if(!minFeld.value.trim()||!Number.isInteger(min)||min<1)
+      return fehler(minFeld,'Bitte eine gültige Mindestteilnehmerzahl eingeben.');
+    if(!maxFeld.value.trim()||!Number.isInteger(max)||max<min)
+      return fehler(maxFeld,'Die Höchstteilnehmerzahl muss mindestens der Mindestteilnehmerzahl entsprechen.');
+    if(max>kapazitaet)
+      return fehler(maxFeld,'Die Höchstteilnehmerzahl '+max+' überschreitet die Programmkapazität '+kapazitaet+'.');
+    if(!preisFeld.value.trim())
+      return fehler(preisFeld,'Der Gruppenpreis fehlt. Bitte einen Preis in Euro eingeben.');
+    const preis=Number(preisFeld.value);
+    if(!Number.isFinite(preis)||preis<0)
+      return fehler(preisFeld,'Bitte einen gültigen Gruppenpreis ab 0 Euro eingeben.');
+    const dauer=dauerModus==='fest'?Number(basisdauer):Number(dauerFeld.value);
+    if(dauerModus!=='fest'&&!dauerFeld.value.trim())
+      return fehler(dauerFeld,'Bitte die Dauer der Teilnehmerstufe eingeben.');
+    if(!Number.isInteger(dauer)||dauer<15||dauer>1440)
+      return fehler(dauerModus==='fest'?null:dauerFeld,'Die Dauer muss zwischen 15 und 1440 Minuten liegen.');
+    const konflikt=ausgabe.find(e=>min<=e.max&&e.min<=max);
+    if(konflikt)
+      return fehler(minFeld,'Der Bereich '+min+'–'+max+' überschneidet sich mit '+konflikt.min+'–'+konflikt.max+'.');
+    ausgabe.push({min,max,preis,dauer});
+  }
+  return ausgabe;
 }
 
 const neuesAngebotForm =
@@ -2187,8 +2233,9 @@ if (neuesAngebotForm) {
     daten.mitarbeiterbeschreibung=neuesAngebotForm.elements.mitarbeiterbeschreibung.value;
     daten.mindestteilnehmer=Number(daten.mindestteilnehmer||5);
     daten.preis_pro_person=Number(daten.preis_pro_person||0);
-    daten.gruppenstufen=angebotsModus.value==='einzelplatz'?[]:programmStufenAuslesen(createTierEditor);
-    if(daten.dauer_modus==='fest')daten.gruppenstufen.forEach(stufe=>stufe.dauer=Number(daten.dauer));
+    daten.gruppenstufen=angebotsModus.value==='einzelplatz'?[]:
+      programmStufenValidieren(createTierEditor,Number(daten.kapazitaet),daten.dauer_modus,Number(daten.dauer));
+    if(daten.gruppenstufen===null)return;
 
     try {
       const erstellt=await api('/api/admin/angebote', {
@@ -2826,17 +2873,9 @@ preisButton.className = 'btn';
 preisButton.textContent = 'Programm speichern';
 
 preisButton.addEventListener('click', async () => {
-  let gruppenstufen=programmStufenAuslesen(tierEditor);
-  if(dauerModus.value==='fest')gruppenstufen=gruppenstufen.map(stufe=>({...stufe,dauer:Number(dauer.value)}));
-  if(modus.value!=='einzelplatz'&&(!gruppenstufen.length||gruppenstufen.some((t,i)=>t.min<1||t.max<t.min||
-      t.max>Number(kapazitaet.value)||t.dauer<15||t.dauer>1440||t.preis<0||
-      gruppenstufen.some((other,j)=>i!==j&&t.min<=other.max&&other.min<=t.max)))){
-    alert('Bitte gültige, überschneidungsfreie Teilnehmerstufen mit Preis und Dauer eingeben.');return;
-  }
-  if(modus.value!=='einzelplatz'&&gruppenstufen.some(stufe=>!Number.isInteger(stufe.min)||!Number.isInteger(stufe.max)||
-      !Number.isFinite(stufe.preis)||!Number.isInteger(stufe.dauer))){
-    alert('Bitte für jede Teilnehmerstufe von/bis, Gruppenpreis und Dauer vollständig eintragen.');return;
-  }
+  const gruppenstufen=modus.value==='einzelplatz'?[]:
+    programmStufenValidieren(tierEditor,Number(kapazitaet.value),dauerModus.value,Number(dauer.value));
+  if(gruppenstufen===null)return;
 
   preisButton.disabled = true;
 
