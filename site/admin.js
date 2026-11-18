@@ -844,6 +844,22 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
 
       const bildBereich = document.createElement('div');
 
+let programBildUrl=angebot.bild_url||'';
+const bildStatus=document.createElement('p');
+bildStatus.className='hint';bildStatus.setAttribute('role','status');bildStatus.setAttribute('aria-live','polite');
+bildStatus.textContent=programBildUrl?'Programmbild hinterlegt.':'Noch kein Programmbild hinterlegt.';
+async function programmBildSpeichern(url){
+  const result=await api('/api/admin/angebote/'+angebot.id,{
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({bild_url:url})
+  });
+  if(result.bild_url!==url)throw new Error('Die Bildadresse konnte nicht bestätigt werden.');
+  programBildUrl=url;
+  bildVorschau.src=url;
+  if(!bildVorschau.parentNode)bildBereich.insertBefore(bildVorschau,bildAuswahl);
+  bildStatus.textContent='Bild dauerhaft gespeichert und dem Programm zugeordnet.';
+  return result;
+}
 const bildVorschau = document.createElement('img');
 bildVorschau.alt = 'Foto zu ' + a.titel;
 bildVorschau.style.width = '100%';
@@ -905,7 +921,9 @@ bildButton.onclick = async () => {
       throw new Error(ergebnis.error || 'Upload fehlgeschlagen.');
     }
 
+    programBildUrl=ergebnis.bild_url;
     bildVorschau.src = ergebnis.bild_url;
+    bildStatus.textContent='Bild hochgeladen und dauerhaft dem Programm zugeordnet.';
 
     if (!bildVorschau.parentNode) {
       bildBereich.prepend(bildVorschau);
@@ -919,6 +937,16 @@ bildButton.onclick = async () => {
   }
 };
 
+const bildSpeichernButton=document.createElement('button');
+bildSpeichernButton.type='button';bildSpeichernButton.className='btn secondary';
+bildSpeichernButton.textContent='Bild dauerhaft speichern';
+bildSpeichernButton.addEventListener('click',async()=>{
+  if(!programBildUrl){bildStatus.textContent='Bitte erst ein Bild hochladen oder aus der Medienbibliothek wählen.';return;}
+  bildSpeichernButton.disabled=true;
+  try{await programmBildSpeichern(programBildUrl);}
+  catch(error){bildStatus.textContent='Bildspeicherung fehlgeschlagen: '+error.message;}
+  finally{bildSpeichernButton.disabled=false;}
+});
 const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
 bildFormatHinweis.className='hint';
 bildBereich.append(bildAuswahl,bildButton,bildFormatHinweis);
@@ -2660,17 +2688,13 @@ bildAusBibliothekButton.addEventListener('click',async()=>{
   if(typeof window.medienpoolBildAuswaehlen!=='function'){alert('Die Medienbibliothek ist noch nicht verfügbar.');return;}
   try{
     await window.medienpoolBildAuswaehlen(async url=>{
-      await api('/api/admin/angebote/'+angebot.id,{method:'PATCH',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({bild_url:url})});
-      bildVorschau.src=url;
-      if(!bildVorschau.parentNode)bildBereich.insertBefore(bildVorschau,bildAuswahl);
-      alert('Programmbild aus der Medienbibliothek übernommen.');
+      await programmBildSpeichern(url);
     });
   }catch(error){alert('Bild konnte nicht übernommen werden: '+error.message);}
 });
 const bildFormatHinweis=el('p','Erlaubt: JPG/JPEG, PNG und WebP · maximal 5 MB pro Bild.');
 bildFormatHinweis.className='hint';
-bildBereich.append(bildAuswahl,bildButton,bildAusBibliothekButton,bildFormatHinweis);
+bildBereich.append(bildAuswahl,bildButton,bildAusBibliothekButton,bildSpeichernButton,bildStatus,bildFormatHinweis);
 eintrag.appendChild(bildBereich);
 
 const preisButton = document.createElement('button');
@@ -2701,7 +2725,7 @@ preisButton.addEventListener('click', async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-  preise,gruppenstufen,dauer_modus:dauerModus.value,
+  preise,gruppenstufen,dauer_modus:dauerModus.value,bild_url:programBildUrl,
   aktiv: aktivSchalter.checked,
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
