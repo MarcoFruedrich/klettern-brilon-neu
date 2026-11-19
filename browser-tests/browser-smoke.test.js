@@ -215,7 +215,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.route('**/api/aktionen',route=>route.fulfill({status:200,
       contentType:'application/json',body:JSON.stringify([
         {id:'aktion-1',titel:'Spezial-Kletteraktion',datum:'2027-03-15',
-          beschreibung:'Angebot zum Klettern',preis:'80',programm_id:1},
+          beschreibung:'Angebot zum Klettern',preis:'80',programm_id:1,veranstaltungsorte:['Brilon']},
         {id:'aktion-2',titel:'Familien-Spezial',datum:'2027-04-20',
           beschreibung:'Unabhängiges Sonderangebot',preis:'50'}
       ])}));
