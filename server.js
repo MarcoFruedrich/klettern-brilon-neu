@@ -45,6 +45,21 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');
 const dbConfig=datenbankKonfiguration(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT,process.env.DATABASE_SSL_MODE);
 const pool=dbConfig?new Pool(dbConfig):null;
+if(pool&&typeof pool.on==='function'){
+  // Unterbrochene Leerlaufverbindungen werden über den Pool gemeldet.
+  pool.on('error',error=>{
+    console.error('PostgreSQL-Verbindung im Pool unerwartet beendet:',error?.message||String(error));
+  });
+  // Bei gerade ausgeliehenen pg-Clients wird dagegen ein 'error'-Event direkt auf
+  // der Client-Instanz ausgelöst. Ohne eigenen Listener stürzt Node.js vollständig ab.
+  // Fehler bei laufenden SQL-Abfragen werden weiterhin an die aufrufende Funktion
+  // gemeldet; dieser Listener verhindert nur den unbehandelten Event-Abbruch.
+  pool.on('connect',client=>{
+    client.on('error',error=>{
+      console.error('PostgreSQL-Clientverbindung unerwartet beendet:',error?.message||String(error));
+    });
+  });
+}
 const sessions=new Map(),rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.json':'application/manifest+json'};
 const securityHeaders={
   'X-Content-Type-Options':'nosniff',
@@ -653,7 +668,9 @@ async function main(req,res){
                 veranstaltungsort,veranstaltungsorte,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer,gruppenstufen,dauer_modus
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
-         LIMIT 1`,[angebot]
+           AND ($2::text='' OR veranstaltungsort=$2 OR COALESCE(veranstaltungsorte,'[]'::jsonb) ? $2)
+         ORDER BY CASE WHEN veranstaltungsort=$2 THEN 0 ELSE 1 END,id ASC
+         LIMIT 1`,[angebot,angefragterStandort]
       );
       if(!preisAbfrage.rows.length)return reply(res,409,{error:'Dieses Programm ist derzeit nicht buchbar.'});
       const programm=preisAbfrage.rows[0];
@@ -953,7 +970,9 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const angebot=safeText(u.searchParams.get('angebot'),120);
       const programm=await pool.query(
         `SELECT dauer,buchungsmodus,mindestteilnehmer,kapazitaet,gruppenstufen,dauer_modus,veranstaltungsort,veranstaltungsorte
-          FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
+          FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
+            AND (veranstaltungsort=$2 OR COALESCE(veranstaltungsorte,'[]'::jsonb) ? $2)
+          ORDER BY CASE WHEN veranstaltungsort=$2 THEN 0 ELSE 1 END,id ASC LIMIT 1`,[angebot,standort]
       );
       if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
       const erlaubte=Array.isArray(programm.rows[0].veranstaltungsorte)&&programm.rows[0].veranstaltungsorte.length
@@ -3309,14 +3328,15 @@ if(route==='/api/admin/website-effekte'&&(req.method==='GET'||req.method==='PUT'
     id:safeText(e.id,80),name:safeText(e.name,80),symbol:safeText(e.symbol,20),
     anzahl:Number(e.anzahl),dauerSekunden:Number(e.dauerSekunden)
   }));
-  if(eintraege.some(e=>!e.id||!e.name||!e.symbol||!Number.isInteger(e.anzahl)||e.anzahl<1||e.anzahl>20||
+  if(eintraege.some(e=>!e.id||!e.name||!e.symbol||/[<>&]/.test(e.symbol)||
+     !Number.isInteger(e.anzahl)||e.anzahl<1||e.anzahl>20||
      !Number.isInteger(e.dauerSekunden)||e.dauerSekunden<8||e.dauerSekunden>90))
     return reply(res,400,{error:'Bitte die Effektangaben überprüfen.'});
   const aktiveId=safeText(daten.aktiveId,80)||null;
   if(aktiveId&&!eintraege.some(e=>e.id===aktiveId))return reply(res,400,{error:'Der ausgewählte Effekt existiert nicht.'});
   const gespeichert={aktiv:daten.aktiv===true,aktiveId,eintraege};
   await pool.query('INSERT INTO brilon_website_effekte(id,daten) VALUES (1,$1::jsonb) ON CONFLICT(id) DO UPDATE SET daten=EXCLUDED.daten',[JSON.stringify(gespeichert)]);
-  return reply(res,200,gespeichert);
+  return reply(res,200,{success:true,...gespeichert});
 }
 
 if(route==='/api/admin/angebote/bilder'&&req.method==='GET'){
@@ -3550,6 +3570,16 @@ const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
 
 if (preisRoute && req.method === 'PATCH') {
   const d = await body(req);
+  // Die Aktivierung darf keine veralteten Programmdaten, Preise oder Standorte überschreiben.
+  // Ein gezieltes UPDATE verhindert verlorene Änderungen bei paralleler Standortpflege.
+  if(d && !Array.isArray(d) && Object.keys(d).length===1 && typeof d.aktiv==='boolean'){
+    const aktualisiert=await pool.query(
+      'UPDATE brilon_angebote SET aktiv=$1 WHERE id=$2 RETURNING id,aktiv',
+      [d.aktiv,preisRoute[1]]
+    );
+    if(!aktualisiert.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+    return reply(res,200,{...aktualisiert.rows[0],success:true});
+  }
   const bisher=await pool.query(
     `SELECT * FROM brilon_angebote WHERE id=$1`,[preisRoute[1]]
   );
@@ -3576,6 +3606,7 @@ if (preisRoute && req.method === 'PATCH') {
     if(!safe||candidate.length>1000)return reply(res,400,{error:'Das Bild muss aus der Medienbibliothek oder aus den freigegebenen Website-Bildern stammen.'});
     if(Object.keys(d).length===1){
       const updated=await pool.query('UPDATE brilon_angebote SET bild_url=$1 WHERE id=$2 RETURNING id,bild_url',[candidate||null,preisRoute[1]]);
+      if(!updated.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
       return reply(res,200,{...updated.rows[0],success:true});
     }
   }
@@ -4241,10 +4272,15 @@ async function start(){
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_aktiv_idx ON brilon_pruef_tablets(aktiv)');
     // Letztes Lebenszeichen dient ausschließlich der aktuellen Verbindungserkennung.
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS zuletzt_gesehen_am TIMESTAMPTZ');
-    // Pro Prüfstandort ist genau ein Administrations-Tablet als Codeanzeige ausgewählt.
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
+    // Jedes Tablet ist genau einem Standort zugeordnet; pro Standort höchstens ein Prüfdisplay.
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
-    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets((1)) WHERE pruefdisplay=true');
+    // Die bisherige globale Display-Sperre wird durch eine standortbezogene ersetzt.
+    await pool.query('DROP INDEX IF EXISTS brilon_pruef_tablets_ein_display_idx');
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets(ort_id) WHERE pruefdisplay=true AND ort_id IS NOT NULL');
     await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
+    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
       console.log('Mitarbeiter- und Stationsschema geprüft (RUN_PRUEF_SCHEMA_MIGRATION=true)');
     }
@@ -4672,10 +4708,15 @@ await pool.query(`
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_aktiv_idx ON brilon_pruef_tablets(aktiv)');
     // Letztes Lebenszeichen dient ausschließlich der aktuellen Verbindungserkennung.
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS zuletzt_gesehen_am TIMESTAMPTZ');
-    // Pro Prüfstandort ist genau ein Administrations-Tablet als Codeanzeige ausgewählt.
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
+    // Jedes Tablet ist genau einem Standort zugeordnet; pro Standort höchstens ein Prüfdisplay.
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
-    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets((1)) WHERE pruefdisplay=true');
+    // Die bisherige globale Display-Sperre wird durch eine standortbezogene ersetzt.
+    await pool.query('DROP INDEX IF EXISTS brilon_pruef_tablets_ein_display_idx');
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets(ort_id) WHERE pruefdisplay=true AND ort_id IS NOT NULL');
     await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
+    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     } else {
       console.log('Schemaänderungen übersprungen (RUN_SCHEMA_MIGRATIONS ist nicht true)');
     }

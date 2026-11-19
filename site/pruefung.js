@@ -161,7 +161,7 @@ async function loadStations(){
   $('pruefung-person').textContent=data.mitarbeiter;
   selector.replaceChildren(new Option('Bitte Standort auswählen',''));
   for(const place of data.standorte||[])selector.add(new Option(place.name,String(place.id)));
-  const selected=data.ortId?String(data.ortId):chosen;
+  const selected=data.ortId?String(data.ortId):chosen||(data.standorte?.length===1?String(data.standorte[0].id):'');
   if(selected&&Array.from(selector.options).some(option=>option.value===selected))selector.value=selected;
   $('request-tablet-code').disabled=!selector.value;
   const target=$('pruefung-stationen');target.replaceChildren();

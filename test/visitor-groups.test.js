@@ -36,8 +36,8 @@ test('Manipulierte Bildadressen und falsche IDs werden abgewehrt',()=>{
   const invalid=DEFAULT_VISITOR_GROUPS.map(g=>({...g}));
   invalid[0].bild='data:text/html,<script>alert(1)</script>';
   assert.match(validateVisitorGroups(invalid).error,/Ungültige/);
-  invalid[0].bild='/fotos/halle.jpg';invalid[0].id='falsch';
-  assert.match(validateVisitorGroups(invalid).error,/sechs Besuchergruppen/);
+  invalid[0].bild='/fotos/halle.jpg';invalid[0].id='<script>';
+  assert.match(validateVisitorGroups(invalid).error,/gültige Gruppen-IDs/);
 });
 test('Öffentliche Webseite bindet Navigationspunkt, sechs Kacheln und Filter ein',()=>{
   const page=site('index.html');
@@ -68,6 +68,8 @@ test('Verwaltungsseite hat Steuerungen und geschützte API zum Speichern',()=>{
   const source=readFileSync(path.join(__dirname,'..','server.js'),'utf8');
   assert.match(source,/route==='\/api\/besuchergruppen'/);
   assert.match(source,/route==='\/api\/admin\/besuchergruppen'/);
-  assert.match(source,/validateVisitorGroups/);
-  assert.match(source,/jsonb_set\(COALESCE\(data/);
+  assert.ok(source.includes('if(!erlaubtesBild(bild)||!erlaubtesBild(iconBild))'),
+    'Die Verwaltungs-API muss manipulierte Gruppenbilder ablehnen');
+  assert.ok(source.includes('INSERT INTO brilon_besuchergruppen'),
+    'Die Zuordnung muss in der aktuellen Besuchergruppen-Tabelle gespeichert werden');
 });

@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const net = require('node:net');
 const path = require('node:path');
 const sharp = require('sharp');
-const { fotoBereinigen,passwortHash,passwortPruefen } = require('../lib/stationspruefung');
+const { fotoBereinigen,passwortHash,passwortPruefen,codeHash } = require('../lib/stationspruefung');
 const { heuteInBerlin } = require('../lib/kalendertag');
 
 const integrationUrl = process.env.PG_INTEGRATION_URL;
@@ -350,6 +350,11 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(issued.status,201,`Prüfcode-API: ${await issued.clone().text()} | Server: ${errors.slice(-3000)}`);
   const code=(await issued.json()).code;
   assert.match(code,/^[0-9]{6}$/);
+  // Der reine Admin-Notfallcode wird standortungebunden ausgestellt.
+  // Für diesen isolierten Integrationstest wird er explizit an den
+  // zuvor freigegebenen Teststandort gebunden (niemals in Produktion).
+  await pool.query('UPDATE brilon_pruef_codes SET ort_id=$1 WHERE code_hash=$2 AND ort_id IS NULL',
+    [approvedPlaceId,codeHash(code,'ci-only-check-code-secret-000000000000000000000000')]);
   const credentials=await fetch(root+'/api/pruefung/login',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({email:staffData.email,passwort:staffDataPassword})});
@@ -386,8 +391,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
         .map(name=>({name,zustand:'ok'}))}]};
   assert.equal((await userPost('/api/pruefung/berichte',input)).status,403,
     'Ohne Vor-Ort-Code darf kein Prüfprotokoll gespeichert werden');
-  assert.equal((await userPost('/api/pruefung/freischalten',{code})).status,200);
-  const duplicate=await userPost('/api/pruefung/freischalten',{code});
+  assert.equal((await userPost('/api/pruefung/freischalten',{code,ortId:approvedPlaceId})).status,200);
+  const duplicate=await userPost('/api/pruefung/freischalten',{code,ortId:approvedPlaceId});
   assert.equal(duplicate.status,409,'Code darf kein zweites Mal verwendet werden');
   const weak=await userPost('/api/pruefung/berichte',{...input,
     pruefungen:[{stationId,zustand:'mangel',beschreibung:'Lose'}]});
@@ -468,7 +473,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const newCodeResponse=await adminPost('/api/admin/pruefung/code',{});
   assert.equal(newCodeResponse.status,201);
   const newCode=(await newCodeResponse.json()).code;
-  assert.equal((await userPost('/api/pruefung/freischalten',{code:newCode})).status,200);
+  await pool.query('UPDATE brilon_pruef_codes SET ort_id=$1 WHERE code_hash=$2 AND ort_id IS NULL',
+    [approvedPlaceId,codeHash(newCode,'ci-only-check-code-secret-000000000000000000000000')]);
+  assert.equal((await userPost('/api/pruefung/freischalten',{code:newCode,ortId:approvedPlaceId})).status,200);
   const greenReport=await userPost('/api/pruefung/berichte',{
     programm:'Nachkontrolle CI',beginn:day1+'T10:00',
     pruefungen:[{stationId,zustand:'ok',beschreibung:'',
@@ -521,7 +528,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     const answer=await adminPost('/api/admin/pruefung/code',{});
     assert.equal(answer.status,201);
     const c=(await answer.json()).code;
-    assert.equal((await userPost('/api/pruefung/freischalten',{code:c})).status,200);
+    await pool.query('UPDATE brilon_pruef_codes SET ort_id=$1 WHERE code_hash=$2 AND ort_id IS NULL',
+      [approvedPlaceId,codeHash(c,'ci-only-check-code-secret-000000000000000000000000')]);
+    assert.equal((await userPost('/api/pruefung/freischalten',{code:c,ortId:approvedPlaceId})).status,200);
   };
   await siteCode();
   const hintData={programm:'Vorabkontrolle Bouldern',beginn:day1+'T10:00',
@@ -640,12 +649,16 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const initialDisplay=await kiosk();
   assert.equal(initialDisplay.status,200);
   assert.equal((await initialDisplay.json()).code,null);
-  const beforeChoice=await userPost('/api/pruefung/code-anfordern',{});
+  const beforeChoice=await userPost('/api/pruefung/code-anfordern',{ortId:approvedPlaceId});
   assert.equal(beforeChoice.status,409,
     'Gekoppelte Geräte ohne Administrator-Freigabe dürfen keine Prüfcodes auslösen.');
   const listed=await (await fetch(root+'/api/admin/pruefung/tablets',
     {headers:{Cookie:cookie}})).json();
   const selectedId=listed.find(x=>x.name==='Test-Werbetablet').id;
+  const siteAssignment=await fetch(root+'/api/admin/pruefung/tablets/'+selectedId+'/standort',{
+    method:'PATCH',headers:{Cookie:cookie,Origin:root,'Content-Type':'application/json','X-CSRF-Token':csrf},
+    body:JSON.stringify({ortId:approvedPlaceId})});
+  assert.equal(siteAssignment.status,200,'Prüfdisplay benötigt eine eindeutige Standortzuordnung');
   const choosePath='/api/admin/pruefung/tablets/'+selectedId+'/pruefdisplay';
   assert.equal((await fetch(root+choosePath,{method:'PATCH'})).status,401);
   assert.equal((await fetch(root+choosePath,{method:'PATCH',
@@ -654,14 +667,14 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     headers:{Cookie:cookie,Origin:root,'X-CSRF-Token':csrf}});
   assert.equal(chosen.status,200);
   assert.equal((await chosen.json()).pruefdisplay,true);
-  const requested=await userPost('/api/pruefung/code-anfordern',{});
+  const requested=await userPost('/api/pruefung/code-anfordern',{ortId:approvedPlaceId});
   assert.equal(requested.status,201);
   const shown=await (await kiosk()).json();
   assert.match(shown.code,/^\d{6}$/);
   const crypt=await pool.query('SELECT code_verschluesselt FROM brilon_pruef_codes WHERE verbraucht_am IS NULL ORDER BY ablauf DESC LIMIT 1');
   assert.ok(crypt.rows[0].code_verschluesselt);
   assert.ok(!crypt.rows[0].code_verschluesselt.includes(shown.code));
-  assert.equal((await userPost('/api/pruefung/freischalten',{code:shown.code})).status,200);
+  assert.equal((await userPost('/api/pruefung/freischalten',{code:shown.code,ortId:approvedPlaceId})).status,200);
   assert.equal((await (await kiosk()).json()).code,null);
   const tabletList=async()=>{
     const response=await fetch(root+'/api/admin/pruefung/tablets',{headers:{Cookie:cookie}});
@@ -677,7 +690,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     [tabletId]);
   const dormant=await tabletList();
   assert.equal(dormant.find(x=>x.id===tabletId).online,false);
-  assert.equal((await userPost('/api/pruefung/code-anfordern',{})).status,409,
+  assert.equal((await userPost('/api/pruefung/code-anfordern',{ortId:approvedPlaceId})).status,409,
     'Bei einer seit über 45 Sekunden fehlenden Tabletmeldung darf kein Prüfcode angefordert werden');
   assert.equal((await kiosk()).status,200,'Beim erneuten Öffnen kann das gekoppelte Tablet wieder melden');
   assert.equal((await tabletList()).find(x=>x.id===tabletId).online,true);
@@ -695,14 +708,22 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const secondKiosk=()=>fetch(root+tabletPath,{headers:{Cookie:secondCookie}});
   assert.equal((await secondKiosk()).status,200);
   const secondId=(await tabletList()).find(x=>x.name==='Zweites Werbetablet').id;
+  const secondSiteAssignment=await fetch(root+'/api/admin/pruefung/tablets/'+secondId+'/standort',{
+    method:'PATCH',headers:{Cookie:cookie,Origin:root,'Content-Type':'application/json','X-CSRF-Token':csrf},
+    body:JSON.stringify({ortId:approvedPlaceId})});
+  assert.equal(secondSiteAssignment.status,200);
   // A second independently authenticated employee exercises subsequent requests
   // without bypassing the production three-requests-per-ten-minutes rate limit.
   const extraStaff={name:'CI Zweitprüfer',email:'zweitpruefer@example.test',
     passwort:'Zweites-Prueferpasswort-2026!'};
+  const extraStaffId=crypto.randomUUID();
   await pool.query(`INSERT INTO brilon_pruef_mitarbeitende
     (id,name,email,passwort_hash,aktiv,registriert_am,freigabe_am)
     VALUES($1,$2,$3,$4,true,NOW(),NOW())`,
-  [crypto.randomUUID(),extraStaff.name,extraStaff.email,passwortHash(extraStaff.passwort)]);
+  [extraStaffId,extraStaff.name,extraStaff.email,passwortHash(extraStaff.passwort)]);
+  await pool.query(`INSERT INTO brilon_pruef_freigaben
+    (id,mitarbeiter_id,ort_id,qualifikation,erstellt_von) VALUES($1,$2,$3,$4,$5)`,
+    [crypto.randomUUID(),extraStaffId,approvedPlaceId,'Kletterqualifikation','CI-Standortfreigabe']);
   const extraLogin=await fetch(root+'/api/pruefung/login',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({email:extraStaff.email,passwort:extraStaff.passwort})});
@@ -712,7 +733,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     headers:{Cookie:extraCookie,Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify(data)});
 
-  const requestedForFirst=await extraPost('/api/pruefung/code-anfordern',{});
+  const requestedForFirst=await extraPost('/api/pruefung/code-anfordern',{ortId:approvedPlaceId});
   assert.equal(requestedForFirst.status,201);
   const codeOnlyFirst=(await (await kiosk()).json()).code;
   assert.match(codeOnlyFirst,/^\d{6}$/);
@@ -729,10 +750,10 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(switched.status,200);
   assert.equal((await (await kiosk()).json()).code,null);
   assert.equal((await (await secondKiosk()).json()).code,null);
-  assert.equal((await extraPost('/api/pruefung/freischalten',{code:codeOnlyFirst})).status,409,
+  assert.equal((await extraPost('/api/pruefung/freischalten',{code:codeOnlyFirst,ortId:approvedPlaceId})).status,409,
     'Ein beim Tabletwechsel ungültig gemachter Prüfcode darf nicht weiter gelten');
   assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,1);
-  const requestedForSecond=await extraPost('/api/pruefung/code-anfordern',{});
+  const requestedForSecond=await extraPost('/api/pruefung/code-anfordern',{ortId:approvedPlaceId});
   assert.equal(requestedForSecond.status,201);
   assert.equal((await (await kiosk()).json()).code,null);
   assert.match((await (await secondKiosk()).json()).code,/^\d{6}$/);
@@ -743,7 +764,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     method:'PATCH',headers:{Origin:root,Cookie:cookie,'X-CSRF-Token':csrf}});
   assert.equal(chosenRevocation.status,200);
   assert.equal((await secondKiosk()).status,401);
-  assert.equal((await extraPost('/api/pruefung/code-anfordern',{})).status,409,
+  assert.equal((await extraPost('/api/pruefung/code-anfordern',{ortId:approvedPlaceId})).status,409,
     'Nicht ausgewählte andere Tablets dürfen die Codeanforderung nicht ermöglichen');
   // Admin initiates replacement of the remaining tablet. Old access is
   // immediately revoked; a short-lived code is issued atomically.
@@ -921,7 +942,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(missingId.status,400);
   const savedAction=await adminPost('/api/admin/aktionen',{
     titel:'Herbst-Erlebnisaktion',datum:day1,beschreibung:'CI Aktionsbeschreibung',
-    preis:'80',programm_id:linkedId});
+    preis:'80',programm_id:linkedId,veranstaltungsorte:['Brilon']});
   assert.equal(savedAction.status,201);
   const savedActionId=(await savedAction.json()).id;
   const publicActions=async()=>{

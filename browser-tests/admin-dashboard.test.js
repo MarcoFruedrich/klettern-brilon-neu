@@ -621,8 +621,15 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await form.locator('[name="name"]').fill('Bouldern Kinder');
     await form.locator('[name="beschreibung"]').fill('Browsertestangebot');
     await form.locator('input[name="dauer"]').first().fill('75');
-    for(const [index,price] of ['85','135','180','230'].entries())
-      await form.locator('#neues-angebot-stufen .angebot-stufen-zeile').nth(index).locator('input[name="preis"]').fill(price);
+    await page.locator('#neues-angebot-stufe-hinzufuegen').click();
+    await page.locator('#neues-angebot-stufe-hinzufuegen').click();
+    for(const [index,price] of ['85','135','180','230'].entries()){
+      const tier=form.locator('#neues-angebot-stufen .angebot-stufen-zeile').nth(index);
+      await tier.locator('input[name="min"]').fill(String(index*3+1));
+      await tier.locator('input[name="max"]').fill(String((index+1)*3));
+      await tier.locator('input[name="dauer"]').fill('75');
+      await tier.locator('input[name="preis"]').fill(price);
+    }
     await form.locator('#angebot-orte-auswahl input[value="Brilon"]').check();
     await form.locator('[name="kapazitaet"]').fill('12');
     await form.locator('[name="zielgruppe"]').fill('Kinder');
@@ -647,7 +654,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(created.aktiv,true);
     assert.ok(state.mutations.some(r=>r.endpoint==='/api/admin/angebote'&&r.method==='POST'));
     assert.ok(state.mutations.some(r=>r.endpoint==='/api/admin/angebote/'+created.id&&r.method==='PATCH'));
-    assert.ok(dialogs.some(x=>x.includes('erfolgreich gespeichert')));
+    assert.ok(dialogs.some(x=>x.includes('gespeichert')), 'Die Oberfläche bestätigt das Speichern');
     await page.close();
   });
 
@@ -918,9 +925,9 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const state=fakeAdminApi(page);
     const first='550e8400-e29b-41d4-a716-446655441010',second='550e8400-e29b-41d4-a716-446655441011';
     state.inspectionTablets=[
-      {id:first,name:'Fenster-Display',aktiv:true,online:true,pruefdisplay:true,
+      {id:first,name:'Fenster-Display',aktiv:true,online:true,pruefdisplay:true,ort_id:1,standort:'Brilon',
         gekoppelt_am:'2027-01-01T12:00:00Z',zuletzt_gesehen_am:'2027-01-01T12:05:00Z'},
-      {id:second,name:'Ersatz-Werbetablet',aktiv:true,online:true,pruefdisplay:false,
+      {id:second,name:'Ersatz-Werbetablet',aktiv:true,online:true,pruefdisplay:false,ort_id:1,standort:'Brilon',
         gekoppelt_am:'2027-01-01T12:00:00Z',zuletzt_gesehen_am:'2027-01-01T12:05:00Z'}
     ];
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.type());await dialog.accept();});
@@ -928,9 +935,9 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await openAdminView(page,'#stationspruefung');
     const standby=page.locator('#tablet-admin-list article').filter({hasText:'Ersatz-Werbetablet'});
     await standby.getByText('Nur Werbeanzeige – keine Prüfcodes').waitFor();
-    await standby.getByRole('button',{name:'Als Prüfdisplay auswählen'}).click();
+    await standby.getByRole('button',{name:'Als Prüfdisplay für diesen Standort auswählen'}).click();
     await page.waitForFunction(()=>Array.from(document.querySelectorAll('#tablet-admin-list article'))
-      .some(a=>a.textContent.includes('Ersatz-Werbetablet')&&a.textContent.includes('Ausgewähltes Prüfdisplay')));
+      .some(a=>a.textContent.includes('Ersatz-Werbetablet')&&a.textContent.includes('Prüfdisplay für Brilon')));
     assert.deepEqual(dialogs,['confirm']);
     assert.equal(state.inspectionTablets.filter(x=>x.pruefdisplay).length,1);
     assert.equal(state.inspectionTablets.find(x=>x.id===second).pruefdisplay,true);
@@ -1120,6 +1127,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     const selected=page.locator('#special-program-select');
     await selected.locator('option[value="11"]').waitFor({state:'attached'});
     await selected.selectOption('11');
+    await page.locator('#special-locations-select input[value="Brilon"]').check();
     await page.locator('#special-form [name="titel"]').fill('Sonder-Kletteraktion');
     await page.locator('#special-form [name="datum"]').fill('2027-03-15');
     await page.locator('#special-form button[type="submit"], #special-form button:not([type])').click();

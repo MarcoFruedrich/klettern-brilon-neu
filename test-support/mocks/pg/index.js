@@ -18,6 +18,7 @@ class Pool {
     this.rechnungsdaten = {agbText:'Test-AGB', agbAktiv:true, agbVersion:1,
       empfehlungAktiv:false, empfehlungRabattArt:'prozent', empfehlungRabattWert:''};
     this.visitorGroups = null;
+    this.websiteEffects = null;
     this.advisoryLockOwner = null;
     this.advisoryLockWaiters = [];
   }
@@ -65,6 +66,8 @@ class Pool {
     const visitorSql=sql.trim();
     if(visitorSql.startsWith('CREATE TABLE IF NOT EXISTS brilon_besuchergruppen'))
       return {rows:[],rowCount:0};
+    if(visitorSql.startsWith("SELECT to_regclass('public.brilon_website_effekte') AS vorhanden"))
+      return {rows:[{vorhanden:this.websiteEffects===null?null:'brilon_website_effekte'}],rowCount:1};
     if(visitorSql.startsWith("SELECT to_regclass('public.brilon_besuchergruppen') AS tabelle"))
       return {rows:[{tabelle:'brilon_besuchergruppen'}],rowCount:1};
     if(visitorSql.startsWith('INSERT INTO brilon_besuchergruppen')){
@@ -76,6 +79,15 @@ class Pool {
       return {rows:this.visitorGroups===null?[]:[{daten:this.visitorGroups}],rowCount:this.visitorGroups===null?0:1};
     if(visitorSql.startsWith('UPDATE brilon_besuchergruppen SET daten=')){
       this.visitorGroups=JSON.parse(params[0]);return {rows:[],rowCount:1};
+    }
+    if(/^\s*CREATE TABLE IF NOT EXISTS brilon_website_effekte\b/i.test(sql))
+      return {rows:[],rowCount:0};
+    if(/^\s*SELECT daten FROM brilon_website_effekte\b/i.test(sql))
+      return {rows:this.websiteEffects===null?[]:[{daten:this.websiteEffects}],
+        rowCount:this.websiteEffects===null?0:1};
+    if(/^\s*INSERT INTO brilon_website_effekte\b/i.test(sql)){
+      this.websiteEffects=JSON.parse(params[0]);
+      return {rows:[],rowCount:1};
     }
     if(/^\s*BEGIN\b/i.test(sql))return {rows:[],rowCount:0};
     if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql)){
@@ -399,10 +411,11 @@ class Pool {
           einwilligung_version:game.einwilligung_version}));
       return {rows,rowCount:rows.length};
     }
-    // Zahlungen dürfen ohne bestätigten Trainereinsatz keine Buchung automatisch bestätigen.
+    // Standard: keine automatische Bestätigung ohne Trainereinsatz.
+    // Der Buchungs-HTTP-Test kann gezielt eine bereits dokumentierte Zusage simulieren.
     if (sql.includes("COUNT(*) FILTER (WHERE status='bestaetigt')") &&
         sql.includes('FROM brilon_einsaetze WHERE buchung_id=$1'))
-      return {rows:[{zugesagt:0,ausstehend:0}],rowCount:1};
+      return {rows:[{zugesagt:process.env.MOCK_BOOKING_TRAINER_BESTAETIGT==='1'?1:0,ausstehend:0}],rowCount:1};
     if (sql.includes('SELECT 1 FROM brilon_buchungen')) {
       const found=this.bookings.some(item=>item.data.anschlussElternId===params[0]&&item.data.angebot===params[1]&&
         item.data.uhrzeit===params[2]&&!['abgelehnt','storniert'].includes(item.status));
