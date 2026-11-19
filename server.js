@@ -668,7 +668,9 @@ async function main(req,res){
                 veranstaltungsort,veranstaltungsorte,buchungsmodus,mindestteilnehmer,preis_pro_person,dauer,gruppenstufen,dauer_modus
          FROM brilon_angebote
          WHERE name = $1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
-         LIMIT 1`,[angebot]
+           AND ($2::text='' OR veranstaltungsort=$2 OR COALESCE(veranstaltungsorte,'[]'::jsonb) ? $2)
+         ORDER BY CASE WHEN veranstaltungsort=$2 THEN 0 ELSE 1 END,id ASC
+         LIMIT 1`,[angebot,angefragterStandort]
       );
       if(!preisAbfrage.rows.length)return reply(res,409,{error:'Dieses Programm ist derzeit nicht buchbar.'});
       const programm=preisAbfrage.rows[0];
@@ -968,7 +970,9 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const angebot=safeText(u.searchParams.get('angebot'),120);
       const programm=await pool.query(
         `SELECT dauer,buchungsmodus,mindestteilnehmer,kapazitaet,gruppenstufen,dauer_modus,veranstaltungsort,veranstaltungsorte
-          FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true LIMIT 1`,[angebot]
+          FROM brilon_angebote WHERE name=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
+            AND (veranstaltungsort=$2 OR COALESCE(veranstaltungsorte,'[]'::jsonb) ? $2)
+          ORDER BY CASE WHEN veranstaltungsort=$2 THEN 0 ELSE 1 END,id ASC LIMIT 1`,[angebot,standort]
       );
       if(!programm.rowCount)return reply(res,409,{error:'Programm ist nicht verfügbar.'});
       const erlaubte=Array.isArray(programm.rows[0].veranstaltungsorte)&&programm.rows[0].veranstaltungsorte.length
