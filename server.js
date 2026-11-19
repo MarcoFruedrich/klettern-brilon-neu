@@ -327,16 +327,21 @@ function ueberschneidung(a,b){
   return !a||!b||a[0]<b[1]&&b[0]<a[1];
 }
 async function pruefeBuchungskonflikt(client,datum,fenster,ausnahmeId=null,gleicheSitzung=null,standort=null){
+  const formatMinuten=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+  const beginn=Array.isArray(fenster)?formatMinuten(fenster[0]):'00:00';
+  const ende=Array.isArray(fenster)?formatMinuten(fenster[1]):'24:00';
   const sperrung=await client.query(
     `SELECT id FROM brilon_kalender
      WHERE typ='sperrzeit'
      AND datum <= $1::date
      AND COALESCE(enddatum,datum) >= $1::date
      AND (COALESCE(cardinality(standorte),0)=0 OR ($2::text IS NOT NULL AND $2=ANY(standorte)))
-     LIMIT 1`,[datum,standort]
+     AND (uhrzeit IS NULL OR endzeit IS NULL
+       OR (uhrzeit < $4::time AND endzeit > $3::time))
+     LIMIT 1`,[datum,standort,beginn,ende]
   );
   if(sperrung.rowCount)
-    return 'Dieser Tag ist leider gesperrt. Bitte wähle ein anderes Datum.';
+    return 'Dieses Zeitfenster ist gesperrt. Bitte wähle eine andere Uhrzeit oder ein anderes Datum.';
 
   const q=await client.query(
     `SELECT id,data FROM brilon_buchungen
@@ -970,6 +975,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const q=await pool.query(
         `SELECT datum::text AS datum,
                 COALESCE(enddatum,datum)::text AS enddatum,
+                uhrzeit::text AS uhrzeit,endzeit::text AS endzeit,
                 COALESCE(standorte,'{}'::text[]) AS standorte
          FROM brilon_kalender
          WHERE typ='sperrzeit'
