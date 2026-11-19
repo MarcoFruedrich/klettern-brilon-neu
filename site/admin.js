@@ -2698,9 +2698,18 @@ beschreibung.style.width = '100%';
               gespeichert.veranstaltungsorte.length!==ausgewaehlt.length||
               ausgewaehlt.some(v=>!gespeichert.veranstaltungsorte.includes(v)))
             throw new Error('Der Server hat nicht alle gewählten Standorte bestätigt.');
-          angebot.veranstaltungsort=gespeichert.veranstaltungsort;
-          angebot.veranstaltungsorte=gespeichert.veranstaltungsorte;
-          standortStatus.textContent='Dauerhaft gespeichert: '+gespeichert.veranstaltungsorte.join(', ')+'. Die öffentliche Programmübersicht verwendet diese Zuordnung.';
+          // Re-read the database-backed list: a successful PATCH alone is not proof
+          // that the assignment will survive the next page load.
+          const neuGeladen=await api('/api/admin/angebote');
+          const kontrolliert=Array.isArray(neuGeladen)
+            ?neuGeladen.find(item=>String(item.id)===String(angebot.id)):null;
+          if(!kontrolliert||!Array.isArray(kontrolliert.veranstaltungsorte)||
+              kontrolliert.veranstaltungsorte.length!==ausgewaehlt.length||
+              ausgewaehlt.some(v=>!kontrolliert.veranstaltungsorte.includes(v)))
+            throw new Error('Die Standorte wurden vom Server bestätigt, sind beim erneuten Laden aber nicht vollständig vorhanden.');
+          angebot.veranstaltungsort=kontrolliert.veranstaltungsort;
+          angebot.veranstaltungsorte=kontrolliert.veranstaltungsorte;
+          standortStatus.textContent='Speicherung und erneutes Laden geprüft: '+kontrolliert.veranstaltungsorte.join(', ')+'.';
         }catch(error){
           standortStatus.textContent='Speichern fehlgeschlagen: '+error.message;
         }finally{standortSpeichern.disabled=false;}
