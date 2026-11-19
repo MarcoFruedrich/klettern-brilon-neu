@@ -1686,6 +1686,8 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         );
         if(!q.rowCount)return {fehlt:true};
         const data=q.rows[0].data;
+        if(data.partnerhausAbwicklung===true)return {partnerhaus:true};
+        if(['abgelehnt','storniert'].includes(q.rows[0].status))return {buchungInaktiv:true};
         if(typeof data.gesamtpreis!=='number'||!Number.isFinite(data.gesamtpreis)||data.gesamtpreis<0)
           return {keinPreis:true};
         const zahlungen=Array.isArray(data.zahlungen)?data.zahlungen:[];
@@ -1708,7 +1710,12 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         };
         data.zahlungen=[...zahlungen,zahlung];
         const neuerStand=zahlungsstand(Math.round(Number(data.gesamtpreis)*100),data.zahlungen);
-        const neuerStatus=neuerStand.anzahlungErreicht&&q.rows[0].status==='offen'
+        // Eine Zahlung allein bestätigt keinen Termin ohne verfügbare Trainer.
+        const einsatz=await client.query(`SELECT COUNT(*) FILTER (WHERE status='bestaetigt')::int AS zugesagt,
+          COUNT(*) FILTER (WHERE status='eingeteilt')::int AS ausstehend
+          FROM brilon_einsaetze WHERE buchung_id=$1`,[q.rows[0].id]);
+        const trainerBereit=Number(einsatz.rows[0]?.zugesagt||0)>0&&Number(einsatz.rows[0]?.ausstehend||0)===0;
+        const neuerStatus=neuerStand.anzahlungErreicht&&trainerBereit&&q.rows[0].status==='offen'
           ?'bestaetigt':q.rows[0].status;
         const elternRabatt=neuerStatus==='bestaetigt'
           ?await anschlussRabattElternAnwenden(client,data,q.rows[0].id):{angewendet:false};
@@ -1725,6 +1732,8 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       });
       if(ergebnis.anschlussElternUngueltig)return reply(res,409,{error:'Die Ursprungsbuchung ist nicht mehr bestätigt.'});
       if(ergebnis.fehlt)return reply(res,404,{error:'Buchung nicht gefunden.'});
+      if(ergebnis.partnerhaus)return reply(res,409,{error:'Diese Buchung wird direkt vom Partnerhaus abgerechnet. Keine eigene Zahlung erfassen.'});
+      if(ergebnis.buchungInaktiv)return reply(res,409,{error:'Für abgelehnte oder stornierte Buchungen dürfen keine neuen Zahlungen erfasst werden.'});
       if(ergebnis.keinPreis)return reply(res,409,{error:'Für diese Buchung ist kein Gesamtpreis hinterlegt.'});
       if(ergebnis.ueberzahlung)return reply(res,409,{
         error:'Der Betrag übersteigt den noch offenen Betrag.',
@@ -1806,6 +1815,19 @@ const alterStatus = alt.rows[0].status;
 
         if(status==='bestaetigt'&&buchungsdaten.empfehlung&&!buchungsdaten.empfehlung.bestaetigtAm)
           return {empfehlungWartetAufBestaetigung:true};
+        if(status==='bestaetigt'&&alterStatus!=='bestaetigt'&&buchungsdaten.partnerhausAbwicklung!==true){
+          if(buchungsdaten.buchungsmodus!=='einzelplatz'){
+            const gesamt=Math.round(Number(buchungsdaten.gesamtpreis)*100);
+            if(!Number.isSafeInteger(gesamt)||gesamt<=0||
+               !zahlungsstand(gesamt,Array.isArray(buchungsdaten.zahlungen)?buchungsdaten.zahlungen:[]).anzahlungErreicht)
+              return {anzahlungFehlt:true};
+          }
+          const einsatz=await client.query(`SELECT COUNT(*) FILTER (WHERE status='bestaetigt')::int AS zugesagt,
+            COUNT(*) FILTER (WHERE status='eingeteilt')::int AS ausstehend
+            FROM brilon_einsaetze WHERE buchung_id=$1`,[id]);
+          if(Number(einsatz.rows[0]?.zugesagt||0)<1||Number(einsatz.rows[0]?.ausstehend||0)>0)
+            return {trainerZusageFehlt:true};
+        }
 
         if(programmStattgefunden!==undefined){
           if(typeof programmStattgefunden!=='boolean')return {ungueltigeDurchfuehrung:true};
@@ -1883,6 +1905,10 @@ return {
         return reply(res,409,{error:'Nur bestätigte Programme mit einem vergangenen Veranstaltungstag können als stattgefunden dokumentiert werden.'});
       if(ergebnis.empfehlungWartetAufBestaetigung)
         return reply(res,409,{error:'Die Empfehlung muss zuerst über den Bestätigungslink in der E-Mail bestätigt werden.'});
+      if(ergebnis.anzahlungFehlt)
+        return reply(res,409,{error:'Eine verbindliche Gruppenbuchung erfordert zuerst die verbuchte 25-%-Anzahlung. Eine Partnerhaus-Anfrage wird separat geprüft.'});
+      if(ergebnis.trainerZusageFehlt)
+        return reply(res,409,{error:'Vor der verbindlichen Bestätigung muss mindestens ein eingeteilter Mitarbeiter zugesagt haben und alle offenen Einteilungen müssen geklärt sein.'});
 
       
 if (
@@ -1964,6 +1990,8 @@ if (!buchungAbfrage.rows.length) {
 
 const buchung = buchungAbfrage.rows[0];
 const kunde = buchung.data;
+if(kunde.partnerhausAbwicklung===true)
+  return reply(res,409,{error:'Das Partnerhaus stellt dem Gast Rechnung. Eigene Zahlungsaufforderungen sind gesperrt.'});
 if(kunde.buchungsmodus==='einzelplatz')
   return reply(res,409,{error:'Für Einzelplatzreservierungen werden keine Anzahlungsinformationen versendet.'});
 
