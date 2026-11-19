@@ -97,7 +97,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   await pool.query(`INSERT INTO brilon_buchungen(id,data,status,buchungsnummer)
     SELECT gen_random_uuid(),jsonb_build_object('vorname','CISeed'||i,'nachname','Postgres',
       'email','seed'||i||'@example.test','datum',$2::text,'angebot',$1::text,'teilnehmer',1,
-      'uhrzeit','14:00','buchungsmodus','einzelplatz','gesamtpreis',18),
+      'uhrzeit','14:00','buchungsmodus','einzelplatz','veranstaltungsort','Brilon','gesamtpreis',18),
       'offen','CI-INDIVIDUAL-SEED-'||i
     FROM generate_series(1,10) AS i`,[individualName,day1]);
   const individualBook=index=>fetch(root+'/api/buchungen',{method:'POST',
