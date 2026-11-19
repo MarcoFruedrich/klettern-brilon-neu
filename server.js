@@ -4383,6 +4383,39 @@ async function start(){
       await pool.query('CREATE INDEX IF NOT EXISTS brilon_kundenfeedback_erstellt_idx ON brilon_kundenfeedback(erstellt_am DESC)');
       console.log('Kundenfeedbackschema geprüft (RUN_CUSTOMER_FEEDBACK_MIGRATION=true)');
     }
+    // Independent GPS-only migration. Enable only for an explicitly approved database update.
+    // This deliberately does not run the broad RUN_SCHEMA_MIGRATIONS block.
+    if(process.env.RUN_GPS_MIGRATION==='true'){
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_gps_touren (
+        id UUID PRIMARY KEY,
+        angebot_id BIGINT REFERENCES brilon_angebote(id),
+        data JSONB NOT NULL,
+        aktiv BOOLEAN NOT NULL DEFAULT false,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await pool.query('ALTER TABLE brilon_gps_touren ADD COLUMN IF NOT EXISTS angebot_id BIGINT REFERENCES brilon_angebote(id)');
+      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_gps_spiele (
+        id UUID PRIMARY KEY,
+        token_hash TEXT NOT NULL UNIQUE,
+        tour_id UUID NOT NULL REFERENCES brilon_gps_touren(id),
+        buchung_id UUID NOT NULL REFERENCES brilon_buchungen(id),
+        station_index INTEGER NOT NULL DEFAULT 0,
+        gestartet_am TIMESTAMPTZ,
+        abgeschlossen_am TIMESTAMPTZ,
+        spielzeit_sekunden INTEGER,
+        gast_name TEXT,
+        gast_einwilligung BOOLEAN NOT NULL DEFAULT false,
+        gast_einwilligung_am TIMESTAMPTZ,
+        gast_einwilligung_version TEXT,
+        gesperrt_am TIMESTAMPTZ,
+        erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_am TIMESTAMPTZ');
+      await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_version TEXT');
+      await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
+      console.log('GPS-Schema geprüft (RUN_GPS_MIGRATION=true)');
+    }
     // Schema changes are opt-in. A normal server start must not alter a live database.
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){
     await pool.query(
