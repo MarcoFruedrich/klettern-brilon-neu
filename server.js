@@ -26,6 +26,7 @@ const { createKundenfeedbackApi } = require('./lib/kundenfeedback-api');
 const { createSpontanGruppenApi } = require('./lib/spontangruppen-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { createWissensportalApi } = require('./lib/wissensportal-api');
+const { createSocialLinksApi } = require('./lib/social-links-api');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild, analysiereBild } = require('./lib/bilddatei');
 const { createClamScanner } = require('./lib/malware-scanner');
@@ -485,11 +486,13 @@ const spontangruppenApi=createSpontanGruppenApi({pool,admin,staffSession:pruefun
 
 const marketingCampaignApi=createMarketingCampaignApi({pool,admin,reply,body});
 const wissensportalApi=createWissensportalApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation});
+const socialLinksApi=createSocialLinksApi({pool,admin,reply,body});
 async function main(req,res){
   const u=new URL(req.url,'http://localhost'),
         route=decodeURIComponent(u.pathname),
         ip=req.socket.remoteAddress||'unknown';
   try{
+    if(await socialLinksApi(req,res,route))return;
     if(route==='/api/empfehlung/bestaetigen'&&req.method==='GET'){
       const token=String(u.searchParams.get('token')||'');
       if(!/^[a-f0-9]{64}$/.test(token))return reply(res,400,{error:'Der Bestätigungslink ist ungültig.'});
