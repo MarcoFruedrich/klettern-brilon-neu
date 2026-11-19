@@ -68,6 +68,8 @@ test('Verwaltungsseite hat Steuerungen und geschützte API zum Speichern',()=>{
   const source=readFileSync(path.join(__dirname,'..','server.js'),'utf8');
   assert.match(source,/route==='\/api\/besuchergruppen'/);
   assert.match(source,/route==='\/api\/admin\/besuchergruppen'/);
-  assert.match(source,/validateVisitorGroups/);
-  assert.match(source,/jsonb_set\(COALESCE\(data/);
+  assert.ok(source.includes('if(!erlaubtesBild(bild)||!erlaubtesBild(iconBild))'),
+    'Die Verwaltungs-API muss manipulierte Gruppenbilder ablehnen');
+  assert.ok(source.includes('INSERT INTO brilon_besuchergruppen'),
+    'Die Zuordnung muss in der aktuellen Besuchergruppen-Tabelle gespeichert werden');
 });
