@@ -347,7 +347,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const unauthorizedCode=await fetch(root+'/api/admin/pruefung/code',{method:'POST'});
   assert.equal(unauthorizedCode.status,401,'Codeanzeige ist nur dem Administrator erlaubt');
   const issued=await adminPost('/api/admin/pruefung/code',{});
-  assert.equal(issued.status,201);
+  assert.equal(issued.status,201,`Prüfcode-API: ${await issued.clone().text()} | Server: ${errors.slice(-3000)}`);
   const code=(await issued.json()).code;
   assert.match(code,/^[0-9]{6}$/);
   const credentials=await fetch(root+'/api/pruefung/login',{method:'POST',
