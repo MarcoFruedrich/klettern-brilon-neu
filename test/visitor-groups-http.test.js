@@ -23,7 +23,10 @@ const run=(routeName,method,pool,authorized=true,data)=>route(
 const fakeDb=()=>({
   calls:[],async query(sql,params=[]){
     this.calls.push({sql,params});
-    if(sql.startsWith('SELECT'))return {rowCount:1,rows:[{gruppen:null}]};
+    if(sql.startsWith('CREATE TABLE'))return {rowCount:0,rows:[]};
+    if(sql.startsWith('SELECT to_regclass'))return {rowCount:1,rows:[{tabelle:'brilon_besuchergruppen'}]};
+    if(sql.startsWith('SELECT daten'))return {rowCount:1,rows:[{daten:null}]};
+    if(sql.startsWith('INSERT INTO brilon_besuchergruppen'))return {rowCount:1,rows:[{id:1}]};
     if(sql.startsWith('UPDATE'))return {rowCount:1,rows:[{id:1}]};
     throw Error('Unexpected query');
   }
@@ -52,8 +55,8 @@ test('Admin-API speichert nur validierte Gruppen in vorhandene JSONB-Einstellung
   assert.equal(result.status,200);
   assert.equal(result.payload.gruppen[0].id,'unternehmen');
   assert.deepEqual(result.payload.gruppen[0].programmIds,[7,11]);
-  assert.match(db.calls[0].sql,/jsonb_set/);
-  assert.deepEqual(JSON.parse(db.calls[0].params[0])[0].programmIds,[7,11]);
+  assert.match(db.calls.at(-1).sql,/INSERT INTO brilon_besuchergruppen/);
+  assert.deepEqual(JSON.parse(db.calls.at(-1).params[0])[0].programmIds,[7,11]);
 });
 test('Admin-API lehnt ungültige Bildadresse ohne DB-Mutation ab',async()=>{
   const db=fakeDb(),groups=DEFAULT_VISITOR_GROUPS.map(g=>({...g}));
