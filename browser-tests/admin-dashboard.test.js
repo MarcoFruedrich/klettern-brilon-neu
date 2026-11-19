@@ -22,7 +22,7 @@ function fakeAdminApi(page) {
     inspectionStations: [{id:'550e8400-e29b-41d4-a716-446655440099',
       name:'Kletterwand Test',aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
       sperrgrund:'Defekte Sicherheitsverbindung an der Wand'}],
-    places: [{ id: 1, name: 'Brilon', aktiv: true }, { id: 2, name: 'Olpe', aktiv: true }],
+    places: [{ id: 1, name: 'Brilon', aktiv: true }],
     programs: [{ id: 11, name: 'Klettertest', beschreibung: 'Testprogramm', dauer: 90,
       preise: {'1-4':100, '5-10':160}, aktiv: false, bild_url: null, kategorie: 'Klettern',
       zielgruppe:'Familien', veranstaltungsort:'Brilon', kapazitaet: 15,
@@ -394,6 +394,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
   await t.test('Programm erstellen, editieren und aktivieren mit CSRF-Token',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
     const state=fakeAdminApi(page);
+    state.places.push({id:2,name:'Olpe',aktiv:true});
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.accept();});
     await login(page,root);
     await openAdminView(page,'#angebote-verwaltung');
