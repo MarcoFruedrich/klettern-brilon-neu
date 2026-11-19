@@ -45,7 +45,7 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');
 const dbConfig=datenbankKonfiguration(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT,process.env.DATABASE_SSL_MODE);
 const pool=dbConfig?new Pool(dbConfig):null;
-if(pool){
+if(pool&&typeof pool.on==='function'){
   // Unterbrochene Leerlaufverbindungen werden über den Pool gemeldet.
   pool.on('error',error=>{
     console.error('PostgreSQL-Verbindung im Pool unerwartet beendet:',error?.message||String(error));
