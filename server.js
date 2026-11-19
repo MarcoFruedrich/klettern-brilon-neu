@@ -27,6 +27,7 @@ const { createSpontanGruppenApi } = require('./lib/spontangruppen-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { createWissensportalApi } = require('./lib/wissensportal-api');
 const { createSocialLinksApi } = require('./lib/social-links-api');
+const { aktionAmStandortFreigegeben } = require('./lib/aktionsstandorte');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild, analysiereBild } = require('./lib/bilddatei');
 const { createClamScanner } = require('./lib/malware-scanner');
@@ -681,9 +682,7 @@ async function main(req,res){
       if(sonderaktionId){
         const action=await pool.query('SELECT data FROM brilon_aktionen WHERE id=$1',[sonderaktionId]);
         const special=action.rows[0]?.data||{};
-        const erlaubteStandorte=Array.isArray(special.veranstaltungsorte)&&special.veranstaltungsorte.length
-          ?special.veranstaltungsorte:[special.veranstaltungsort].filter(Boolean);
-        if(erlaubteStandorte.length&&!erlaubteStandorte.includes(bookingSite))
+        if(!aktionAmStandortFreigegeben(special,bookingSite))
           return reply(res,409,{error:'Diese Sonderaktion ist für den ausgewählten Standort nicht freigegeben.'});
         const fixed=Boolean(special.uhrzeit&&special.endzeit&&special.veranstaltungsort&&special.programm_id);
         if(fixed)exactAction=special;
@@ -1035,6 +1034,9 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
              OR jsonb_array_length(COALESCE(p.verfuegbare_termine,'[]'::jsonb))=0
              OR p.verfuegbare_termine ? (a.data->>'datum'))
          WHERE COALESCE(a.data->>'status','veroeffentlicht')='veroeffentlicht'
+           AND (COALESCE(jsonb_array_length(CASE WHEN jsonb_typeof(a.data->'veranstaltungsorte')='array'
+             THEN a.data->'veranstaltungsorte' ELSE '[]'::jsonb END),0)>0
+             OR NULLIF(TRIM(a.data->>'veranstaltungsort'),'') IS NOT NULL)
          ORDER BY a.data->>'datum' ASC NULLS LAST,a.id DESC LIMIT 100`
       );
       return reply(res,200,q.rows);
