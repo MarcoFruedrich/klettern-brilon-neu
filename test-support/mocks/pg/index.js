@@ -62,18 +62,19 @@ class Pool {
       return {rows:[],rowCount:0};
     if(/^\s*SELECT 1 FROM brilon_pruef_admin_sessions\b/i.test(sql))
       return {rows:[],rowCount:0};
-    if(/^\\s*CREATE TABLE IF NOT EXISTS brilon_besuchergruppen\\b/i.test(sql))
+    const visitorSql=sql.trim();
+    if(visitorSql.startsWith('CREATE TABLE IF NOT EXISTS brilon_besuchergruppen'))
       return {rows:[],rowCount:0};
-    if(/^\\s*SELECT to_regclass\\('public\\.brilon_besuchergruppen'\\) AS tabelle/i.test(sql))
+    if(visitorSql.startsWith("SELECT to_regclass('public.brilon_besuchergruppen') AS tabelle"))
       return {rows:[{tabelle:'brilon_besuchergruppen'}],rowCount:1};
-    if(/^\\s*INSERT INTO brilon_besuchergruppen/i.test(sql)){
-      if(this.visitorGroups===null||/DO UPDATE SET daten=EXCLUDED\\.daten/i.test(sql))
+    if(visitorSql.startsWith('INSERT INTO brilon_besuchergruppen')){
+      if(this.visitorGroups===null||visitorSql.includes('DO UPDATE SET daten=EXCLUDED.daten'))
         this.visitorGroups=JSON.parse(params[0]);
       return {rows:[],rowCount:1};
     }
-    if(/^\\s*SELECT daten FROM brilon_besuchergruppen/i.test(sql))
+    if(visitorSql.startsWith('SELECT daten FROM brilon_besuchergruppen'))
       return {rows:this.visitorGroups===null?[]:[{daten:this.visitorGroups}],rowCount:this.visitorGroups===null?0:1};
-    if(/^\\s*UPDATE brilon_besuchergruppen SET daten=/i.test(sql)){
+    if(visitorSql.startsWith('UPDATE brilon_besuchergruppen SET daten=')){
       this.visitorGroups=JSON.parse(params[0]);return {rows:[],rowCount:1};
     }
     if(/^\s*BEGIN\b/i.test(sql))return {rows:[],rowCount:0};
