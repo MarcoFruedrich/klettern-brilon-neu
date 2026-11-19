@@ -17,6 +17,7 @@ class Pool {
     this.gpsGames = JSON.parse(process.env.MOCK_GPS_GAMES || '[]');
     this.rechnungsdaten = {agbText:'Test-AGB', agbAktiv:true, agbVersion:1,
       empfehlungAktiv:false, empfehlungRabattArt:'prozent', empfehlungRabattWert:''};
+    this.visitorGroups = null;
     this.advisoryLockOwner = null;
     this.advisoryLockWaiters = [];
   }
@@ -61,6 +62,20 @@ class Pool {
       return {rows:[],rowCount:0};
     if(/^\s*SELECT 1 FROM brilon_pruef_admin_sessions\b/i.test(sql))
       return {rows:[],rowCount:0};
+    if(/^\\s*CREATE TABLE IF NOT EXISTS brilon_besuchergruppen\\b/i.test(sql))
+      return {rows:[],rowCount:0};
+    if(/^\\s*SELECT to_regclass\\('public\\.brilon_besuchergruppen'\\) AS tabelle/i.test(sql))
+      return {rows:[{tabelle:'brilon_besuchergruppen'}],rowCount:1};
+    if(/^\\s*INSERT INTO brilon_besuchergruppen/i.test(sql)){
+      if(this.visitorGroups===null||/DO UPDATE SET daten=EXCLUDED\\.daten/i.test(sql))
+        this.visitorGroups=JSON.parse(params[0]);
+      return {rows:[],rowCount:1};
+    }
+    if(/^\\s*SELECT daten FROM brilon_besuchergruppen/i.test(sql))
+      return {rows:this.visitorGroups===null?[]:[{daten:this.visitorGroups}],rowCount:this.visitorGroups===null?0:1};
+    if(/^\\s*UPDATE brilon_besuchergruppen SET daten=/i.test(sql)){
+      this.visitorGroups=JSON.parse(params[0]);return {rows:[],rowCount:1};
+    }
     if(/^\s*BEGIN\b/i.test(sql))return {rows:[],rowCount:0};
     if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql)){
       if(client)this.advisoryLockFreigeben(client);
