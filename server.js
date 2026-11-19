@@ -914,6 +914,17 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       );
 
       const buchungen=q.rows.map(r=>({data:r.data,fenster:buchungsfenster(r.data)}));
+      const sperrfenster=await pool.query(
+        `SELECT uhrzeit::text AS uhrzeit,endzeit::text AS endzeit
+         FROM brilon_kalender WHERE typ='sperrzeit'
+           AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date
+           AND (COALESCE(cardinality(standorte),0)=0 OR $2=ANY(standorte))`,
+         [datum,standort]
+      );
+      const gesperrt=fenster=>sperrfenster.rows.some(entry=>{
+        const von=minuten(entry.uhrzeit),bis=minuten(entry.endzeit);
+        return von===null||bis===null||!fenster||ueberschneidung(fenster,[von,bis]);
+      });
 
      
       const teilnehmer = Number(u.searchParams.get('teilnehmer'));
@@ -951,7 +962,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
 
         const sameSession=b=>b.data?.buchungsmodus==='einzelplatz'&&
           b.data?.angebot===angebot&&b.data?.uhrzeit===uhrzeit&&b.data?.veranstaltungsort===standort;
-        const belegt=buchungen.some(b=>
+        const belegt=gesperrt(neuesFenster)||buchungen.some(b=>
           !(einzelplatz&&sameSession(b))&&ueberschneidung(neuesFenster,b.fenster)
         );
         const angemeldet=einzelplatz?buchungen.filter(sameSession)
