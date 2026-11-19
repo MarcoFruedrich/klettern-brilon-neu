@@ -88,8 +88,8 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   assert.equal(imageBomb.status,400,'Bilder über 40 Megapixel werden vor dem Speichern abgewiesen');
   const echtesPng=await fetch(bildUrl,{method:'POST',headers:zuGross,
     body:fs.readFileSync(path.join(repo,'site/klettern-brilon-icon.png'))});
-  assert.equal(echtesPng.status,503,'Ohne Malware-Scannerkonfiguration wird das Bild vor dem Speichern abgewiesen');
-  assert.match((await echtesPng.json()).error,/Der Virenscanner ist auf dem Server nicht eingerichtet/);
+  assert.equal(echtesPng.status,503,'Ohne konfigurierten Bildspeicher wird das Bild vor dem Speichern abgewiesen');
+  assert.match((await echtesPng.json()).error,/Bildspeicher ist nicht konfiguriert/);
   for(let attempt=0;attempt<16;attempt++){
     const rejected=await fetch(bildUrl,{method:'POST',headers:zuGross,body:Buffer.alloc(0)});
     assert.equal(rejected.status,400,'Leere Bilder werden innerhalb des Upload-Limits normal validiert');
