@@ -45,6 +45,14 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');
 const dbConfig=datenbankKonfiguration(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT,process.env.DATABASE_SSL_MODE);
 const pool=dbConfig?new Pool(dbConfig):null;
+if(pool){
+  // pg meldet unterbrochene Verbindungen ungenutzter Pool-Clients als 'error'-Event.
+  // Ohne Listener beendet Node.js den gesamten Webserver (auch Buchung und Verwaltung).
+  // Der Pool entfernt die betroffene Verbindung und baut bei Bedarf eine neue auf.
+  pool.on('error',error=>{
+    console.error('PostgreSQL-Verbindung im Pool unerwartet beendet:',error?.message||String(error));
+  });
+}
 const sessions=new Map(),rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.json':'application/manifest+json'};
 const securityHeaders={
   'X-Content-Type-Options':'nosniff',
