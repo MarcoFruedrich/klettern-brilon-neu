@@ -3400,8 +3400,11 @@ if(archivRoute&&req.method==='PATCH'){
   const d=await body(req);
   if(typeof d?.archiviert!=='boolean')return reply(res,400,{error:'Archivstatus fehlt.'});
   if(d.archiviert){
-    const aktiveTour=await pool.query('SELECT id FROM brilon_gps_touren WHERE angebot_id=$1 AND aktiv=true LIMIT 1',[archivRoute[1]]);
-    if(aktiveTour.rowCount)return reply(res,409,{error:'Bitte die verknüpfte GPS-Tour zuerst deaktivieren.'});
+    const gpsTabelle=await pool.query("SELECT to_regclass('brilon_gps_touren') AS name");
+    if(gpsTabelle.rows[0]?.name){
+      const aktiveTour=await pool.query('SELECT id FROM brilon_gps_touren WHERE angebot_id=$1 AND aktiv=true LIMIT 1',[archivRoute[1]]);
+      if(aktiveTour.rowCount)return reply(res,409,{error:'Bitte die verknüpfte GPS-Tour zuerst deaktivieren.'});
+    }
   }
   const q=await pool.query('UPDATE brilon_angebote SET archiviert=$1 WHERE id=$2 RETURNING id,archiviert',[d.archiviert,archivRoute[1]]);
   if(!q.rowCount)return reply(res,404,{error:'Angebot nicht gefunden.'});
