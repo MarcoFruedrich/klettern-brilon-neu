@@ -2989,7 +2989,7 @@ if(placeRoute&&req.method==='DELETE'){
     (SELECT COUNT(*) FROM brilon_angebote WHERE veranstaltungsort=$1 OR (jsonb_typeof(veranstaltungsorte)='array' AND veranstaltungsorte ? $1))+
     (SELECT COUNT(*) FROM brilon_pruef_stationen WHERE ort_id=$2)+
     (SELECT COUNT(*) FROM brilon_pruef_freigaben WHERE ort_id=$2)+
-    (SELECT COUNT(*) FROM brilon_buchungen WHERE data->>'veranstaltungsort'=$1) AS anzahl`,
+    (SELECT COUNT(*) FROM brilon_buchungen WHERE data->>'veranstaltungsort'=$1 OR data->>'ort'=$1 OR data->>'standort'=$1) AS anzahl`,
     [place.rows[0].name,placeRoute[1]]);
   if(Number(usage.rows[0]?.anzahl||0)>0)
     return reply(res,409,{error:'Dieser Standort ist noch mit Programmen, Buchungsanfragen oder Stationsfreigaben verknüpft. Deaktiviere ihn stattdessen; bestehende Daten bleiben erhalten.'});
