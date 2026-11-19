@@ -52,7 +52,7 @@ test('HTTP: Programme anlegen, bearbeiten und kontrolliert veröffentlichen',asy
   // End-to-end-Test mit isoliertem Server: Verwaltung speichert Besuchergruppen,
   // öffentliche Seite sieht die Änderungen, ohne echte Produktionsdaten anzufassen.
   const publicVisitorGroups=await fetch(root+'/api/besuchergruppen');
-  assert.equal(publicVisitorGroups.status,200);
+  assert.equal(publicVisitorGroups.status,200,`Besuchergruppen-API: ${await publicVisitorGroups.clone().text()} | Server: ${serverErrors.slice(-2500)}`);
   const visitorGroups=await publicVisitorGroups.json();
   assert.equal(visitorGroups.length,6,'Sechs Besuchergruppen werden öffentlich angeboten');
   const privateVisitorGroups=await fetch(root+'/api/admin/besuchergruppen');
