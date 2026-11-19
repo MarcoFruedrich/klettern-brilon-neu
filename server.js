@@ -3156,6 +3156,12 @@ if(route==='/api/admin/besuchergruppen'&&(req.method==='GET'||req.method==='PUT'
     const bild=safeText(g?.bild,1000),iconBild=safeText(g?.iconBild,1000);
     const punkte=Array.isArray(g?.punkte)?g.punkte.slice(0,3).map(x=>safeText(x,160)).filter(Boolean):[];
     const programmIds=Array.isArray(g?.programmIds)?[...new Set(g.programmIds.map(Number).filter(x=>Number.isSafeInteger(x)&&x>0))].slice(0,500):[];
+    const erlaubtesBild=url=>!url||(
+      /^\\/(?:fotos|images|bilder|assets)\\/[a-zA-Z0-9_./-]+\\.(?:jpe?g|png|webp|gif)$/i.test(url)&&!url.includes('..')
+    )||(
+      /^https:\\/\\/[a-z0-9.-]+\\.supabase\\.co\\/storage\\/v1\\/object\\/public\\/angebotsbilder\\/[a-zA-Z0-9_./-]+\\.(?:jpe?g|png|webp|gif)$/i.test(url)&&!url.includes('..')
+    );
+    if(!erlaubtesBild(bild)||!erlaubtesBild(iconBild))return null;
     if(!/^[a-zA-Z0-9_-]{1,80}$/.test(id)||ids.has(id)||!titel||[...icon].length<1||[...icon].length>8||beschreibung.length>650)
       return null;
     ids.add(id);
