@@ -147,14 +147,14 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const pages=[];
   for(let pageNumber=1;pageNumber<=3;pageNumber++){
     const result=await query({seite:String(pageNumber)});
-    assert.equal(result.anzahl,139);
+    assert.equal(result.anzahl,140);
     assert.equal(result.proSeite,50);
     pages.push(result.buchungen);
   }
-  assert.deepEqual(pages.map(rows=>rows.length),[50,50,39],
-    '139 echte Testbuchungen müssen auf drei Seiten verteilt sein');
+  assert.deepEqual(pages.map(rows=>rows.length),[50,50,40],
+    '140 echte Testbuchungen müssen auf drei Seiten verteilt sein');
   const ids=pages.flat().map(row=>row.id);
-  assert.equal(new Set(ids).size,139,
+  assert.equal(new Set(ids).size,140,
     'Bei identischen Erstellungszeiten darf keine Buchung mehrfach erscheinen');
   const firstPageAgain=await query({seite:'1'});
   assert.deepEqual(firstPageAgain.buchungen.map(row=>row.id),pages[0].map(row=>row.id),
@@ -169,8 +169,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     {headers:{Cookie:cookie}});
   assert.equal(payments.status,200);
   const paymentPage=await payments.json();
-  assert.equal(paymentPage.anzahl,139);
-  assert.equal(paymentPage.eintraege.length,39);
+  assert.equal(paymentPage.anzahl,140);
+  assert.equal(paymentPage.eintraege.length,40);
 
   // Mehr als 250 GPS-relevante Buchungen in einer echten isolierten Datenbank.
   const gpsTourId=crypto.randomUUID();
