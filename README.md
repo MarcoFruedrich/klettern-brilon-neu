@@ -17,6 +17,24 @@ Die Netzwerkpartnerkonten werden mit `RUN_NETWORK_PARTNER_MIGRATION=true` angele
 
 Rechnungsdaten, AGB-Fassungen, ausgestellte PDF-Rechnungen und bestätigte Kundenwiderrufe liegen in separaten Tabellen. Die einmalige, additive Einrichtung läuft ausschließlich mit `RUN_INVOICE_MIGRATION=true` nach Prüfung zuerst in einer isolierten Datenbank; danach den Schalter wieder entfernen. SQL: `db/migrations/2026-11-06-rechnungen-agb.sql`. Vollständige Zahlungseinträge lösen eine PDF-Rechnung aus; die E-Mail wird mit PDF-Anhang an die Buchungsadresse versandt. Der Zahlungseingangstag wird pro Zahlung erfasst. Fehlende Rechnungen für bereits vollständig bezahlte Buchungen lassen sich aus der Verwaltung nachziehen. Rechnungsstellerdaten, der Werbetext sowie eine prozentuale oder feste Empfehlungsrabatt-Höhe sind in der Verwaltung editierbar. Empfehlungsrabatt wird nur gewährt, wenn die angegebene Kontakt-E-Mail zu einer früheren bestätigten Buchung gehört, deren Programm von der Verwaltung als tatsächlich stattgefunden dokumentiert wurde. Der Empfehlungsgeber muss die per E-Mail versandte Bestätigung anklicken, bevor die neue Buchung bestätigt werden kann. Empfehlungs- und Anschlussrabatte werden nicht addiert: Es gilt der jeweils höhere Preisvorteil. Auf der Rechnung ist die Rabattzeile mit ihrem Anlass gekennzeichnet, etwa Freunde-werben-Freunde oder Anschlussbuchung. Der Widerrufslink wird nach Buchungsnummer, Namen und passender hinterlegter E-Mail an den Kunden gesendet und storniert erst nach dessen Bestätigung. Eine Wiederkehrer-Begrüßung erscheint nur, wenn dieselbe E-Mail-Adresse bereits zu einer bestätigten Buchung mit vergangenem Veranstaltungstag gehört; offene Anfragen zählen nicht. `PUBLIC_BASE_URL` muss für Bestätigungslinks auf eine HTTPS-Adresse der Website zeigen.
 
+## Mehrere Standorte pro Programm (19.11.2026)
+
+Die Programmverwaltung erlaubt Mehrfachauswahl für bereits angelegte und neue Programme.
+Die öffentliche Standortfilterung und das Buchungsformular verwenden die gespeicherten Standorte;
+eine Buchung speichert weiterhin **einen konkret gewählten Veranstaltungsort**.
+Die bestehende Spalte `veranstaltungsort` bleibt als erster/primärer Standort für ältere Funktionen erhalten.
+
+Die neue Spalte `brilon_angebote.standorte` wird **nicht automatisch im Livebetrieb angelegt**.
+Die additive Migration `db/migrations/2026-11-19-programm-standorte.sql` zuerst in einer
+isolierten Testdatenbank prüfen, die bestehende Datenbank sichern und dann einmalig über
+`RUN_PROGRAM_LOCATIONS_MIGRATION=true` beim Serverstart ausführen. Die Migration
+übernimmt für jedes bestehende Programm seinen bisherigen Veranstaltungsort in ein Array;
+Buchungen, Preise, Bilder und bestehende Programmdaten werden nicht überschrieben.
+Nach erfolgreicher Ausführung den Schalter wieder entfernen und mit Admin- und
+öffentlichem Buchungstest für Brilon sowie einen zweiten Standort verifizieren.
+Bis dahin können Programme weiterhin nur einem Standort zugeordnet werden;
+versuchte Mehrfachzuordnungen liefern einen klaren Fehler statt einer falschen Erfolgsmeldung.
+
 ## Konfiguration
 
 - Buchungsdatenbank: `DATABASE_URL`
