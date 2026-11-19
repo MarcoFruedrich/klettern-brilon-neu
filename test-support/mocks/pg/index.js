@@ -173,7 +173,7 @@ class Pool {
       return {rows:[offer],rowCount:1};
     }
     if (sql.includes('FROM brilon_angebote')) {
-      let offers=/WHERE id\s*=\s*\$1/.test(sql)
+      let offers=/WHERE (?:p\.)?id\s*=\s*\$1/.test(sql)
         ?this.offers.filter(item=>String(item.id)===String(params[0]))
         :params[0]?this.offers.filter(item=>item.name===params[0]):this.offers;
       if(/(?:[ap]\.)?aktiv=true AND (?:[ap]\.)?buchbar=true AND (?:[ap]\.)?veroeffentlicht=true/.test(sql))
