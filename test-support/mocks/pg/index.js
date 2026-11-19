@@ -211,8 +211,9 @@ class Pool {
     }
     if (/^\s*SELECT 1\s*;?\s*$/i.test(sql)) return { rows:[{ '?column?':1 }], rowCount:1 };
     if (/UPDATE brilon_angebote\s+SET preise/.test(sql)) {
-      const [prices,id,active,name,description,category,audience,place,rawSites,capacity,dates,
-        notes,bookable,published,duration,mode,minPeople,personPrice,durationMode,rawTiers]=params;
+      const [prices,id,active,name,description,category,audience,place,capacity,dates,
+        notes,bookable,published,duration,mode,minPeople,personPrice,rawTiers,durationMode,
+        imageUrl,staffDescription,rawSites]=params;
       const offer=this.offers.find(item=>String(item.id)===String(id));
       if(!offer)return {rows:[],rowCount:0};
       Object.assign(offer,{preise:JSON.parse(prices),aktiv:active===null?offer.aktiv:active,name,
@@ -220,7 +221,8 @@ class Pool {
         veranstaltungsorte:JSON.parse(rawSites),kapazitaet:capacity,
         verfuegbare_termine:JSON.parse(dates),hinweise:notes,buchbar:bookable,
         veroeffentlicht:published,dauer:duration,buchungsmodus:mode,mindestteilnehmer:minPeople,
-        preis_pro_person:personPrice,dauer_modus:durationMode,gruppenstufen:JSON.parse(rawTiers)});
+        preis_pro_person:personPrice,dauer_modus:durationMode,gruppenstufen:JSON.parse(rawTiers),
+        mitarbeiterbeschreibung:staffDescription,bild_url:imageUrl??offer.bild_url});
       return {rows:[offer],rowCount:1};
     }
     if (sql.includes('FROM brilon_angebote')) {
