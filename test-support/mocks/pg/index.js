@@ -28,6 +28,11 @@ class Pool {
   }
 
   async run(sql, params, client=null) {
+    // Optional network-partner migrations are no-ops in this mock: their tables
+    // are intentionally absent unless a dedicated partner fixture provides them.
+    if(/^\s*DO \$migration\$/i.test(sql) &&
+       /to_regclass\('public\.brilon_(?:netzwerkpartner|partner_terminanfragen)'\)/i.test(sql))
+      return {rows:[],rowCount:0};
     if(process.env.RUN_PROGRAM_FIELDS_MIGRATION==='true'&&
        /^\s*ALTER TABLE brilon_angebote\b/i.test(sql))
       return {rows:[],rowCount:0};
