@@ -15,7 +15,7 @@ assert.ok(adminStart>=0&&adminEnd>adminStart,'Verwaltungs-API für Besuchergrupp
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
 const route=new AsyncFunction('route','req','res','pool','body','reply','admin',
   'DEFAULT_VISITOR_GROUPS','prepareVisitorGroups','validateVisitorGroups','safeText',
-  server.slice(start,end)+'\\n'+server.slice(adminStart,adminEnd));
+  server.slice(start,end)+'\n'+server.slice(adminStart,adminEnd));
 const reply=(_res,status,payload)=>({status,payload});
 const run=(routeName,method,pool,authorized=true,data)=>route(
   routeName,{method},{},pool,async()=>data,reply,async()=>authorized,
