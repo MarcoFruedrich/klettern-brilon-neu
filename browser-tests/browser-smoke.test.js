@@ -217,7 +217,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
         {id:'aktion-1',titel:'Spezial-Kletteraktion',datum:'2027-03-15',
           beschreibung:'Angebot zum Klettern',preis:'80',programm_id:1,veranstaltungsorte:['Brilon']},
         {id:'aktion-2',titel:'Familien-Spezial',datum:'2027-04-20',
-          beschreibung:'Unabhängiges Sonderangebot',preis:'50'}
+          beschreibung:'Unabhängiges Sonderangebot',preis:'50',veranstaltungsorte:['Brilon']}
       ])}));
     await page.goto(root+'/');
     await page.locator('#buchungs-standort').selectOption('Brilon');
@@ -243,7 +243,7 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.route('**/api/aktionen',route=>route.fulfill({status:200,
       contentType:'application/json',body:JSON.stringify([
         {id:'aktion-3',titel:'Klettertest',datum:'2027-03-15',
-          beschreibung:'Gleicher Titel, aber explizit nicht verknüpft',preis:'80'}
+          beschreibung:'Gleicher Titel, aber explizit nicht verknüpft',preis:'80',veranstaltungsorte:['Brilon']}
       ])}));
     await page.evaluate(()=>specials());
     await page.locator('#specials article').first().getByText('Diese Aktion anfragen').click();
