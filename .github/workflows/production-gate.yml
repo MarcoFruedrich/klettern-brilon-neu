@@ -1,0 +1,33 @@
+name: Produktivfreigabe – Buchung, Zahlungen und Abrechnung
+
+on:
+  pull_request:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
+  push:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  critical-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Buchungs- und Abrechnungs-Code auf Syntax prüfen
+        run: |
+          node --check server.js
+          node --check lib/spontangruppen-api.js
+          node --check lib/sonderangebot-vorschlaege.js
+          node --check lib/kundenbestaetigung-service.js
+          node --check site/contextual-hilfe.js
+      - name: Kritische Geschäftsabläufe, Buchungsvarianten und öffentliche Standorte testen
+        run: |
+          node --test test/production-gate-regression.test.js test/kundenbestaetigung-service.test.js test/program-duration-variants.test.js test/program-locations.test.js test/anschlussrabatt.test.js test/anschlussangebote.test.js
