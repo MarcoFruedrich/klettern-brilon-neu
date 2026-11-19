@@ -4169,6 +4169,7 @@ async function start(){
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_sessions (
       token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id),
       ablauf TIMESTAMPTZ NOT NULL,entsperrt_bis TIMESTAMPTZ)`);
+    await pool.query('ALTER TABLE brilon_pruef_sessions ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_sessions_ablauf_idx ON brilon_pruef_sessions(ablauf)');
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_pruef_admin_sessions (
       token_hash CHAR(64) PRIMARY KEY,mitarbeiter_id UUID NOT NULL REFERENCES brilon_pruef_mitarbeitende(id) ON DELETE CASCADE,
