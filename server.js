@@ -4386,7 +4386,10 @@ async function start(){
     // Independent GPS-only migration. Enable only for an explicitly approved database update.
     // This deliberately does not run the broad RUN_SCHEMA_MIGRATIONS block.
     if(process.env.RUN_GPS_MIGRATION==='true'){
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_gps_touren (
+      const gpsMigrationClient=await pool.connect();
+      try{
+        await gpsMigrationClient.query('BEGIN');
+      await gpsMigrationClient.query(`CREATE TABLE IF NOT EXISTS brilon_gps_touren (
         id UUID PRIMARY KEY,
         angebot_id BIGINT REFERENCES brilon_angebote(id),
         data JSONB NOT NULL,
@@ -4394,8 +4397,8 @@ async function start(){
         erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         aktualisiert_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )`);
-      await pool.query('ALTER TABLE brilon_gps_touren ADD COLUMN IF NOT EXISTS angebot_id BIGINT REFERENCES brilon_angebote(id)');
-      await pool.query(`CREATE TABLE IF NOT EXISTS brilon_gps_spiele (
+      await gpsMigrationClient.query('ALTER TABLE brilon_gps_touren ADD COLUMN IF NOT EXISTS angebot_id BIGINT REFERENCES brilon_angebote(id)');
+      await gpsMigrationClient.query(`CREATE TABLE IF NOT EXISTS brilon_gps_spiele (
         id UUID PRIMARY KEY,
         token_hash TEXT NOT NULL UNIQUE,
         tour_id UUID NOT NULL REFERENCES brilon_gps_touren(id),
@@ -4411,10 +4414,15 @@ async function start(){
         gesperrt_am TIMESTAMPTZ,
         erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )`);
-      await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_am TIMESTAMPTZ');
-      await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_version TEXT');
-      await pool.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
-      console.log('GPS-Schema geprüft (RUN_GPS_MIGRATION=true)');
+      await gpsMigrationClient.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_am TIMESTAMPTZ');
+      await gpsMigrationClient.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gast_einwilligung_version TEXT');
+      await gpsMigrationClient.query('ALTER TABLE brilon_gps_spiele ADD COLUMN IF NOT EXISTS gesperrt_am TIMESTAMPTZ');
+        await gpsMigrationClient.query('COMMIT');
+        console.log('GPS-Schema geprüft (RUN_GPS_MIGRATION=true)');
+      }catch(error){
+        try{await gpsMigrationClient.query('ROLLBACK');}catch(rollbackError){console.error('GPS-Migration Rollback fehlgeschlagen:',rollbackError.message);}
+        throw error;
+      }finally{gpsMigrationClient.release();}
     }
     // Schema changes are opt-in. A normal server start must not alter a live database.
     if(process.env.RUN_SCHEMA_MIGRATIONS==='true'){
