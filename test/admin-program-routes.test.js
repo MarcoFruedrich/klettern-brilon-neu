@@ -18,7 +18,7 @@ function fakeDb(options = {}) {
     if (/^(BEGIN|ROLLBACK|COMMIT)$/.test(sql)) return { rowCount: 0, rows: [] };
     if (sql.includes('SELECT id,name FROM brilon_angebote')) return { rowCount: 1, rows: [{ id: 7, name: 'Testprogramm' }] };
     if (sql.includes('SELECT 1 FROM brilon_buchungen')) return { rowCount: options.booked ? 1 : 0, rows: [] };
-    if (sql.includes("to_regclass('brilon_gps_touren')")) return { rowCount: 1, rows: [{ tabellenname: options.gpsTable ? 'brilon_gps_touren' : null }] };
+    if (sql.includes("to_regclass('brilon_gps_touren')")) return { rowCount: 1, rows: [{ name: options.gpsTable ? 'brilon_gps_touren' : null }] };
     if (sql.includes('SELECT 1 FROM brilon_gps_touren')) return { rowCount: options.gpsLinked ? 1 : 0, rows: [] };
     if (sql.includes('SELECT id FROM brilon_gps_touren')) return { rowCount: options.activeTour ? 1 : 0, rows: [] };
     if (sql.includes('DELETE FROM brilon_angebote')) return { rowCount: 1, rows: [] };
