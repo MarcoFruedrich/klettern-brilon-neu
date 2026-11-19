@@ -873,7 +873,7 @@ zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
       const placePicker=aktionsStandortAuswahl(linkedLocations);
       const placeSave=el('button','Standortzuordnung speichern');placeSave.type='button';placeSave.className='btn secondary';
       const placeStatus=el('p',linkedLocations.length?'Aktuell zugeordnet: '+linkedLocations.join(', '):
-        'Noch keine Standortzuordnung (älteres Angebot – bisher an allen Standorten sichtbar).');
+        'Noch keinem Standort zugeordnet – dieses Angebot wird öffentlich erst nach der Standortzuordnung angezeigt.');
       placeStatus.setAttribute('role','status');
       placeSave.addEventListener('click',async()=>{
         const selected=[...placePicker.querySelectorAll('input:checked')].map(x=>x.value);
