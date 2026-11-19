@@ -922,7 +922,8 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
          [datum,standort]
       );
       const gesperrt=fenster=>sperrfenster.rows.some(entry=>{
-        const von=minuten(entry.uhrzeit),bis=minuten(entry.endzeit);
+        const von=minuten(String(entry.uhrzeit||'').slice(0,5)),
+          bis=minuten(String(entry.endzeit||'').slice(0,5));
         return von===null||bis===null||!fenster||ueberschneidung(fenster,[von,bis]);
       });
 
