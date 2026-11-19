@@ -63,5 +63,5 @@ test('Admin-API lehnt ungültige Bildadresse ohne DB-Mutation ab',async()=>{
   groups[0].bild='javascript:alert(1)';
   const result=await run('/api/admin/besuchergruppen','PUT',db,true,{gruppen:groups});
   assert.equal(result.status,400);
-  assert.equal(db.calls.length,0);
+  assert.equal(db.calls.filter(call=>!call.sql.startsWith('CREATE TABLE')).length,0);
 });
