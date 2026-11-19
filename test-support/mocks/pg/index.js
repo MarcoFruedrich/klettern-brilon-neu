@@ -66,6 +66,8 @@ class Pool {
     const visitorSql=sql.trim();
     if(visitorSql.startsWith('CREATE TABLE IF NOT EXISTS brilon_besuchergruppen'))
       return {rows:[],rowCount:0};
+    if(visitorSql.startsWith("SELECT to_regclass('public.brilon_website_effekte') AS vorhanden"))
+      return {rows:[{vorhanden:this.websiteEffects===null?null:'brilon_website_effekte'}],rowCount:1};
     if(visitorSql.startsWith("SELECT to_regclass('public.brilon_besuchergruppen') AS tabelle"))
       return {rows:[{tabelle:'brilon_besuchergruppen'}],rowCount:1};
     if(visitorSql.startsWith('INSERT INTO brilon_besuchergruppen')){
