@@ -772,13 +772,23 @@ mindestteilnehmer: einzelplatz?Number(programm.mindestteilnehmer)||5:null,
         const wiederkehrenderKunde=vergangeneBuchung.rowCount>0;
         data.wiederkehrenderKundeHinweis=wiederkehrenderKunde;
         if(wiederkehrenderKunde)data.wiedererkanntAm=new Date().toISOString();
-        // Gruppenangebote können an einem Tag mehrfach hintereinander stattfinden.
-        // Nur bei Einzelplätzen werden mehrere Kunden in derselben Sitzung zusammengezählt.
+        // Gruppenangebote können zeitlich nacheinander ohne Tageslimit gebucht werden.
+        // Bei Einzelplatzbuchungen zählt nur dieselbe konkrete Sitzung am selben Standort.
         if(einzelplatz){
           const kapazitaet=await client.query(
-            `SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+
+            `SELECT COALESCE(SUM(CASE WHEN jsonb_typeof(data->'teilnehmer')='number' THEN
+              (data->>'teilnehmer')::integer ELSE 0 END),0) AS gebucht
+             FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2
+               AND data->>'uhrzeit'=$3 AND data->>'veranstaltungsort'=$4
+               AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,
+            [datum,angebot,data.uhrzeit,bookingSite]
+          );
+          if(Number(kapazitaet.rows[0].gebucht)+teilnehmer>Number(programm.kapazitaet))
+            return {konflikt:'Die Kapazität für diesen Einzelplatztermin ist ausgeschöpft.'};
+        }
+        const konflikt=await pruefeBuchungskonflikt(client,datum,fenster,null,
+          einzelplatz?{angebot,uhrzeit:data.uhrzeit}:null,bookingSite);
         if(konflikt)return {konflikt};
-
         const id=crypto.randomUUID();
         const basis=buchungsreferenz(nachname,vorname,datum);
         const vorhanden=await client.query(
