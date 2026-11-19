@@ -2031,14 +2031,17 @@ if (
     error: 'Für diese Buchung ist kein gültiger Gesamtpreis hinterlegt.'
   });
 }  
-     if (!process.env.BANK_NAME || !process.env.BANK_IBAN) {
-  return reply(res, 503, {
-    error: 'Bankverbindung ist noch nicht vollständig eingerichtet.'
-  });
-} 
+     let rechnungsEinstellungen={};
+     try{
+       const x=await pool.query('SELECT data FROM brilon_rechnungsdaten WHERE id=1');
+       rechnungsEinstellungen=x.rows[0]?.data||{};
+     }catch(error){console.error('Zahlungsdaten nicht abrufbar:',error.message);}
+     const bankName=safeText(rechnungsEinstellungen.bankname,120)||process.env.BANK_NAME||'';
+     const bankIban=safeText(rechnungsEinstellungen.iban,60)||process.env.BANK_IBAN||'';
+     if(!bankName||!bankIban)
+       return reply(res,503,{error:'Bankverbindung in Rechnungen & AGB ist noch nicht vollständig eingerichtet.'});
      const zahlungstext=zahlungsinformationenText(kunde,{
-       bankName:process.env.BANK_NAME,iban:process.env.BANK_IBAN,
-       bookingId:buchung.buchungsnummer||buchungsId
+       bankName,iban:bankIban,bookingId:buchung.buchungsnummer||buchungsId
      });
   if (!kunde.email) {
   return reply(res, 400, {
