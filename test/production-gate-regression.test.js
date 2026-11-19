@@ -114,7 +114,7 @@ test('Automatische Folgeangebote erscheinen erst nach verbindlich bestätigter H
 
 test('Zeitfenster- und Kapazitätsprüfung ist standortbezogen statt ganztags',()=>{
   assert.match(server,/einzelplatz\?\{angebot,uhrzeit:data\.uhrzeit\}:null,bookingSite/);
-  assert.match(server,/Gruppenangebote können an einem Tag mehrfach hintereinander stattfinden/);
+  assert.match(server,/Gruppenangebote können zeitlich nacheinander ohne Tageslimit gebucht werden/);
   assert.match(server,/uhrzeit < \$4::time AND endzeit > \$3::time/);
   assert.match(server,/SELECT uhrzeit::text AS uhrzeit,endzeit::text AS endzeit/);
 });
