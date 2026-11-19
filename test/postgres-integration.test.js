@@ -473,7 +473,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const newCodeResponse=await adminPost('/api/admin/pruefung/code',{});
   assert.equal(newCodeResponse.status,201);
   const newCode=(await newCodeResponse.json()).code;
-  assert.equal((await userPost('/api/pruefung/freischalten',{code:newCode})).status,200);
+  await pool.query('UPDATE brilon_pruef_codes SET ort_id=$1 WHERE code_hash=$2 AND ort_id IS NULL',
+    [approvedPlaceId,codeHash(newCode,'ci-only-check-code-secret-000000000000000000000000')]);
+  assert.equal((await userPost('/api/pruefung/freischalten',{code:newCode,ortId:approvedPlaceId})).status,200);
   const greenReport=await userPost('/api/pruefung/berichte',{
     programm:'Nachkontrolle CI',beginn:day1+'T10:00',
     pruefungen:[{stationId,zustand:'ok',beschreibung:'',
@@ -526,7 +528,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     const answer=await adminPost('/api/admin/pruefung/code',{});
     assert.equal(answer.status,201);
     const c=(await answer.json()).code;
-    assert.equal((await userPost('/api/pruefung/freischalten',{code:c})).status,200);
+    await pool.query('UPDATE brilon_pruef_codes SET ort_id=$1 WHERE code_hash=$2 AND ort_id IS NULL',
+      [approvedPlaceId,codeHash(c,'ci-only-check-code-secret-000000000000000000000000')]);
+    assert.equal((await userPost('/api/pruefung/freischalten',{code:c,ortId:approvedPlaceId})).status,200);
   };
   await siteCode();
   const hintData={programm:'Vorabkontrolle Bouldern',beginn:day1+'T10:00',
@@ -666,7 +670,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const crypt=await pool.query('SELECT code_verschluesselt FROM brilon_pruef_codes WHERE verbraucht_am IS NULL ORDER BY ablauf DESC LIMIT 1');
   assert.ok(crypt.rows[0].code_verschluesselt);
   assert.ok(!crypt.rows[0].code_verschluesselt.includes(shown.code));
-  assert.equal((await userPost('/api/pruefung/freischalten',{code:shown.code})).status,200);
+  assert.equal((await userPost('/api/pruefung/freischalten',{code:shown.code,ortId:approvedPlaceId})).status,200);
   assert.equal((await (await kiosk()).json()).code,null);
   const tabletList=async()=>{
     const response=await fetch(root+'/api/admin/pruefung/tablets',{headers:{Cookie:cookie}});
@@ -734,7 +738,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(switched.status,200);
   assert.equal((await (await kiosk()).json()).code,null);
   assert.equal((await (await secondKiosk()).json()).code,null);
-  assert.equal((await extraPost('/api/pruefung/freischalten',{code:codeOnlyFirst})).status,409,
+  assert.equal((await extraPost('/api/pruefung/freischalten',{code:codeOnlyFirst,ortId:approvedPlaceId})).status,409,
     'Ein beim Tabletwechsel ungültig gemachter Prüfcode darf nicht weiter gelten');
   assert.equal((await tabletList()).filter(x=>x.pruefdisplay).length,1);
   const requestedForSecond=await extraPost('/api/pruefung/code-anfordern',{});
