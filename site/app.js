@@ -825,7 +825,7 @@ async function specials() {
   const displayed=items.filter(item=>{
     const locations=Array.isArray(item.veranstaltungsorte)&&item.veranstaltungsorte.length
       ?item.veranstaltungsorte:[item.veranstaltungsort].filter(Boolean);
-    return activeLocation==='alle'||!locations.length||locations.includes(activeLocation);
+    return locations.length>0&&(activeLocation==='alle'||locations.includes(activeLocation));
   });
   if (!displayed.length) {
       const p = document.createElement('p');
