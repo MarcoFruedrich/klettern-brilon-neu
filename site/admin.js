@@ -2700,7 +2700,7 @@ beschreibung.style.width = '100%';
             throw new Error('Der Server hat nicht alle gewählten Standorte bestätigt.');
           // Re-read the database-backed list: a successful PATCH alone is not proof
           // that the assignment will survive the next page load.
-          const neuGeladen=await api('/api/admin/angebote');
+          const neuGeladen=await api('/api/admin/angebote',{cache:'no-store'});
           const kontrolliert=Array.isArray(neuGeladen)
             ?neuGeladen.find(item=>String(item.id)===String(angebot.id)):null;
           if(!kontrolliert||!Array.isArray(kontrolliert.veranstaltungsorte)||
