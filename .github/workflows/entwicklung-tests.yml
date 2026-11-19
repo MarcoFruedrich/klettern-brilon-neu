@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - entwicklung/phase-1-buchungen-sonderangebote-gps
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
