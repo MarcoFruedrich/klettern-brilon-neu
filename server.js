@@ -4272,6 +4272,7 @@ async function start(){
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_aktiv_idx ON brilon_pruef_tablets(aktiv)');
     // Letztes Lebenszeichen dient ausschließlich der aktuellen Verbindungserkennung.
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS zuletzt_gesehen_am TIMESTAMPTZ');
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
     // Jedes Tablet ist genau einem Standort zugeordnet; pro Standort höchstens ein Prüfdisplay.
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
@@ -4707,6 +4708,7 @@ await pool.query(`
     await pool.query('CREATE INDEX IF NOT EXISTS brilon_pruef_tablets_aktiv_idx ON brilon_pruef_tablets(aktiv)');
     // Letztes Lebenszeichen dient ausschließlich der aktuellen Verbindungserkennung.
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS zuletzt_gesehen_am TIMESTAMPTZ');
+    await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS geloescht_am TIMESTAMPTZ');
     // Jedes Tablet ist genau einem Standort zugeordnet; pro Standort höchstens ein Prüfdisplay.
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
