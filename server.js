@@ -3336,7 +3336,7 @@ if(route==='/api/admin/website-effekte'&&(req.method==='GET'||req.method==='PUT'
   if(aktiveId&&!eintraege.some(e=>e.id===aktiveId))return reply(res,400,{error:'Der ausgewählte Effekt existiert nicht.'});
   const gespeichert={aktiv:daten.aktiv===true,aktiveId,eintraege};
   await pool.query('INSERT INTO brilon_website_effekte(id,daten) VALUES (1,$1::jsonb) ON CONFLICT(id) DO UPDATE SET daten=EXCLUDED.daten',[JSON.stringify(gespeichert)]);
-  return reply(res,200,gespeichert);
+  return reply(res,200,{success:true,...gespeichert});
 }
 
 if(route==='/api/admin/angebote/bilder'&&req.method==='GET'){
