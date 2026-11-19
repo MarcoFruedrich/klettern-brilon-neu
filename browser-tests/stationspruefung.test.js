@@ -78,7 +78,7 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
       assert.ok(dimensions.doc<=dimensions.viewport+2,JSON.stringify(dimensions));
       await page.locator('#staff-login input[name="email"]').fill('test@example.test');
       await page.locator('#staff-login input[name="passwort"]').fill('Personal-Geheimnis-2026');
-      await page.locator('#staff-login button').click();
+      await page.locator('#staff-login button.btn').click();
       await page.locator('#onsite-unlock input[name="code"]').waitFor({state:'visible'});
       await page.locator('#onsite-unlock input[name="code"]').fill('123456');
       await page.locator('#onsite-unlock button[type="submit"], #onsite-unlock button:not([type])').click();
@@ -148,7 +148,7 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
     await page.goto(root+'/pruefung.html');
     await page.locator('#staff-login input[name="email"]').fill('test@example.test');
     await page.locator('#staff-login input[name="passwort"]').fill('Personal-Geheimnis-2026');
-    await page.locator('#staff-login button').click();
+    await page.locator('#staff-login button.btn').click();
     await page.locator('#onsite-unlock input[name="code"]').waitFor({state:'visible'});
     await page.locator('#onsite-unlock input[name="code"]').fill('123456');
     await page.locator('#onsite-unlock button[type="submit"], #onsite-unlock button:not([type])').click();
