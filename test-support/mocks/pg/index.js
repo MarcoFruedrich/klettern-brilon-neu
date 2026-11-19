@@ -39,6 +39,14 @@ class Pool {
       return {rows:[],rowCount:0};
     if(/^\s*SELECT to_regclass\('public\.brilon_netzwerkpartner'\) AS t/i.test(sql))
       return {rows:[{t:null}],rowCount:1};
+    // Backfill multi-location JSONB fields when upgrading legacy offers.
+    if(/^\s*UPDATE brilon_angebote SET veranstaltungsorte=jsonb_build_array\(veranstaltungsort\)/i.test(sql)){
+      for(const offer of this.offers){
+        if(!Array.isArray(offer.veranstaltungsorte)&&offer.veranstaltungsort)
+          offer.veranstaltungsorte=[offer.veranstaltungsort];
+      }
+      return {rows:[],rowCount:0};
+    }
     if(process.env.RUN_PROGRAM_FIELDS_MIGRATION==='true'&&
        /^\s*ALTER TABLE brilon_angebote\b/i.test(sql))
       return {rows:[],rowCount:0};
