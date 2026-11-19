@@ -359,7 +359,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const profileUpdate=await fetch(root+'/api/pruefung/profil',{method:'PATCH',
     headers:{Cookie:staffCookie,Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({name:'CI Fachkraft Aktualisiert',telefon:'+49 987 654'})});
-  assert.equal(profileUpdate.status,200,'Aktive Mitarbeitende können ihre Kontaktdaten aktualisieren');
+  assert.equal(profileUpdate.status,200,`Aktive Mitarbeitende können ihre Kontaktdaten aktualisieren: ${await profileUpdate.clone().text()} | Server: ${errors.slice(-3000)}`);
   const profileData=await profileUpdate.json();
   assert.equal(profileData.email,staffData.email,'Login-Adresse bleibt an die Einladung gebunden');
   const employeePortal=await fetch(root+'/api/pruefung/mitarbeiterbereiche',{headers:{Cookie:staffCookie}});
