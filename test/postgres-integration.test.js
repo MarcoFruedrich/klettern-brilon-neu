@@ -386,8 +386,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
         .map(name=>({name,zustand:'ok'}))}]};
   assert.equal((await userPost('/api/pruefung/berichte',input)).status,403,
     'Ohne Vor-Ort-Code darf kein Prüfprotokoll gespeichert werden');
-  assert.equal((await userPost('/api/pruefung/freischalten',{code})).status,200);
-  const duplicate=await userPost('/api/pruefung/freischalten',{code});
+  assert.equal((await userPost('/api/pruefung/freischalten',{code,ortId:approvedPlaceId})).status,200);
+  const duplicate=await userPost('/api/pruefung/freischalten',{code,ortId:approvedPlaceId});
   assert.equal(duplicate.status,409,'Code darf kein zweites Mal verwendet werden');
   const weak=await userPost('/api/pruefung/berichte',{...input,
     pruefungen:[{stationId,zustand:'mangel',beschreibung:'Lose'}]});
