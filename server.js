@@ -13,6 +13,7 @@ const { stationFuerSpiel, stationPruefen, gpsSpieldauer } = require('./lib/gpssp
 const { gpsTourSpeichern, gpsTourAdminAnsicht } = require('./lib/gpstour');
 const { sameOriginMutation } = require('./lib/sicherheit');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben } = require('./lib/sicherheitszustand');
+const { programmOrte, normalisiereProgrammOrte } = require('./lib/programm-orte');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createPdf: erstelleRechnungsPdf, formatDate: rechnungsDatumFormatieren } = require('./lib/rechnung');
@@ -41,6 +42,11 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
 const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');
 const dbConfig=datenbankKonfiguration(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT,process.env.DATABASE_SSL_MODE);
 const pool=dbConfig?new Pool(dbConfig):null;
+async function programmOrteSpalteVorhanden(client=pool){
+  const q=await client.query(`SELECT EXISTS(SELECT 1 FROM information_schema.columns
+    WHERE table_schema=current_schema() AND table_name='brilon_angebote' AND column_name='standorte') AS bereit`);
+  return q.rows[0]?.bereit===true;
+}
 const sessions=new Map(),rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.json':'application/manifest+json'};
 const securityHeaders={
   'X-Content-Type-Options':'nosniff',
@@ -2777,11 +2783,12 @@ if(route==='/api/admin/angebote/bilder'&&req.method==='GET'){
 
 if (route === '/api/admin/angebote' && req.method === 'GET') {
   const q = await pool.query(
-    `SELECT id,name,beschreibung,dauer,preise,aktiv,bild_url,kategorie,zielgruppe,
-            veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
-            buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert
-     FROM brilon_angebote
-     ORDER BY archiviert ASC,sortierung ASC,id DESC`
+    `SELECT a.id,a.name,a.beschreibung,a.dauer,a.preise,a.aktiv,a.bild_url,a.kategorie,a.zielgruppe,
+             a.veranstaltungsort,COALESCE(NULLIF(to_jsonb(a)->'standorte','[]'::jsonb),to_jsonb(ARRAY[a.veranstaltungsort])) AS standorte,
+             a.kapazitaet,a.verfuegbare_termine,a.hinweise,a.buchbar,a.veroeffentlicht,
+             a.buchungsmodus,a.mindestteilnehmer,a.preis_pro_person,a.sortierung,a.archiviert
+     FROM brilon_angebote a
+     ORDER BY a.archiviert ASC,a.sortierung ASC,a.id DESC`
   );
 
   return reply(res, 200, q.rows);
@@ -3207,12 +3214,13 @@ if (route === '/api/angebote' && req.method === 'GET') {
   }
 
   const q = await pool.query(
- `SELECT id,name,beschreibung,dauer,preise,bild_url,kategorie,zielgruppe,
-        veranstaltungsort,kapazitaet,verfuegbare_termine,hinweise,
-        buchungsmodus,mindestteilnehmer,preis_pro_person,sortierung,archiviert
-     FROM brilon_angebote
-     WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true
-     ORDER BY sortierung ASC,name ASC`
+ `SELECT a.id,a.name,a.beschreibung,a.dauer,a.preise,a.bild_url,a.kategorie,a.zielgruppe,
+         a.veranstaltungsort,COALESCE(NULLIF(to_jsonb(a)->'standorte','[]'::jsonb),to_jsonb(ARRAY[a.veranstaltungsort])) AS standorte,
+         a.kapazitaet,a.verfuegbare_termine,a.hinweise,
+         a.buchungsmodus,a.mindestteilnehmer,a.preis_pro_person,a.sortierung,a.archiviert
+     FROM brilon_angebote a
+     WHERE a.archiviert=false AND a.aktiv=true AND a.buchbar=true AND a.veroeffentlicht=true
+     ORDER BY a.sortierung ASC,a.name ASC`
   );
 
   return reply(res, 200, q.rows);
@@ -3349,6 +3357,12 @@ async function start(){
         erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
       await pool.query(`INSERT INTO brilon_orte(name) VALUES('Brilon') ON CONFLICT(name) DO NOTHING`);
       console.log('Veranstaltungsort-Tabelle geprüft (RUN_PLACES_MIGRATION=true)');
+    }
+    // Separate, additive migration. Existing offers keep their previous venue.
+    if(process.env.RUN_PROGRAM_LOCATIONS_MIGRATION==='true'){
+      const sql=fs.readFileSync(path.join(__dirname,'db/migrations/2026-11-19-programm-standorte.sql'),'utf8');
+      await pool.query(sql);
+      console.log('Programm-Mehrfachstandorte geprüft (RUN_PROGRAM_LOCATIONS_MIGRATION=true)');
     }
     // Targeted opt-in: only columns needed by the admin dashboard's first queries.
     if(process.env.RUN_ADMIN_DASHBOARD_MIGRATION==='true'){
