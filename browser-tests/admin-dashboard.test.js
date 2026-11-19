@@ -307,7 +307,7 @@ async function login(page,root){
   await page.goto(root+'/admin.html');
   await page.locator('#username').fill('test-admin');
   await page.locator('#password').fill('Nur-Test-Passwort');
-  await page.locator('#login button').click();
+  await page.locator('#login button.btn').click();
   await page.locator('#workspace').waitFor({state:'visible',timeout:15000});
   await page.locator('#angebote-admin-liste').getByText('Klettertest').first().waitFor({state:'attached'});
 }
