@@ -86,7 +86,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const saved = await pool.query(`SELECT id,buchungsnummer FROM brilon_buchungen
     WHERE data->>'angebot'=$1`, [programName]);
   assert.equal(saved.rowCount, 3, 'In der echten Datenbank müssen drei zulässige Testbuchungen gespeichert sein');
-  assert.equal(new Set(saved.rows.map(row => row.buchungsnummer)).size, 2,
+  assert.equal(new Set(saved.rows.map(row => row.buchungsnummer)).size, saved.rowCount,
     'Buchungsnummern bleiben eindeutig');
   const individualName='CI-Individualklettern-'+crypto.randomUUID();
   await pool.query(`INSERT INTO brilon_angebote
