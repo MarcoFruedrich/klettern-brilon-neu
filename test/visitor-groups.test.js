@@ -36,8 +36,8 @@ test('Manipulierte Bildadressen und falsche IDs werden abgewehrt',()=>{
   const invalid=DEFAULT_VISITOR_GROUPS.map(g=>({...g}));
   invalid[0].bild='data:text/html,<script>alert(1)</script>';
   assert.match(validateVisitorGroups(invalid).error,/Ungültige/);
-  invalid[0].bild='/fotos/halle.jpg';invalid[0].id='falsch';
-  assert.match(validateVisitorGroups(invalid).error,/sechs Besuchergruppen/);
+  invalid[0].bild='/fotos/halle.jpg';invalid[0].id='<script>';
+  assert.match(validateVisitorGroups(invalid).error,/gültige Gruppen-IDs/);
 });
 test('Öffentliche Webseite bindet Navigationspunkt, sechs Kacheln und Filter ein',()=>{
   const page=site('index.html');
