@@ -22,7 +22,7 @@ function fakeAdminApi(page) {
     inspectionStations: [{id:'550e8400-e29b-41d4-a716-446655440099',
       name:'Kletterwand Test',aktiv:true,gesperrt_am:'2027-01-01T12:00:00Z',
       sperrgrund:'Defekte Sicherheitsverbindung an der Wand'}],
-    places: [{ id: 1, name: 'Brilon', aktiv: true }],
+    places: [{ id: 1, name: 'Brilon', aktiv: true }, { id: 2, name: 'Olpe', aktiv: true }],
     programs: [{ id: 11, name: 'Klettertest', beschreibung: 'Testprogramm', dauer: 90,
       preise: {'1-4':100, '5-10':160}, aktiv: false, bild_url: null, kategorie: 'Klettern',
       zielgruppe:'Familien', veranstaltungsort:'Brilon', kapazitaet: 15,
@@ -405,18 +405,22 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await form.locator('[name="zielgruppe"]').fill('Kinder');
     await form.locator('[name="verfuegbare_termine"]').fill('2027-03-15');
     await form.locator('[name="veroeffentlicht"]').check();
+    await form.locator('#angebot-ort').selectOption(['Brilon','Olpe']);
     await form.locator('button[type="submit"]').click();
     await page.locator('#angebote-admin-liste').getByText('Bouldern Kinder').first().waitFor();
     const created=state.programs.find(p=>p.name==='Bouldern Kinder');
     assert.ok(created);
     assert.equal(created.aktiv,false,'Neue Programme dürfen nicht ungeprüft aktiviert werden');
     assert.deepEqual(created.verfuegbare_termine,['2027-03-15']);
+    assert.deepEqual(created.standorte,['Brilon','Olpe'],'Die Mehrfachauswahl wird übertragen');
     const entry=page.locator('#angebote-admin-liste .card').filter({has:page.getByRole('heading',{name:'Bouldern Kinder'})});
     await entry.locator('[name="dauer"]').fill('120');
+    await entry.locator('[name="standorte"]').selectOption(['Olpe']);
     await entry.locator('[data-gruppe="1-4"]').fill('85');
     await entry.getByRole('button',{name:'Programm speichern'}).click();
     await page.waitForFunction(()=>document.querySelector('#angebote-admin-liste')?.textContent.includes('Bouldern Kinder'));
     assert.equal(created.dauer,120);
+    assert.deepEqual(created.standorte,['Olpe'],'Die geänderte Standortauswahl wird gespeichert');
     assert.equal(created.preise['1-4'],'85');
     const reactivateEntry=page.locator('#angebote-admin-liste .card').filter({has:page.getByRole('heading',{name:'Bouldern Kinder'})});
     await reactivateEntry.getByRole('button',{name:/Deaktiviert/}).click();
