@@ -376,7 +376,9 @@ async function anschlussApi(req,res,url,route,ip){
   }
   if(route==='/api/anschlussangebote/vorschau'&&req.method==='POST'){
     const [programs,bookings,blocked]=await Promise.all([
-      pool.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine,veranstaltungsort FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
+      pool.query(`SELECT p.id,p.name,p.beschreibung,p.dauer,p.preise,p.kapazitaet,p.verfuegbare_termine,p.veranstaltungsort,
+           COALESCE(NULLIF(to_jsonb(p)->'standorte','[]'::jsonb),to_jsonb(ARRAY[p.veranstaltungsort])) AS standorte
+           FROM brilon_angebote p WHERE p.archiviert=false AND p.aktiv=true AND p.buchbar=true AND p.veroeffentlicht=true ORDER BY p.sortierung,p.name`),
       pool.query(`SELECT id,data FROM brilon_buchungen WHERE data->>'datum'=$1 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum]),
       pool.query(`SELECT COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender WHERE typ='sperrzeit' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date`,[base.datum])
     ]);
@@ -386,7 +388,8 @@ async function anschlussApi(req,res,url,route,ip){
     const occupied=bookings.rows.filter(b=>b.id!==parentId).map(b=>buchungsfenster(b.data));
     const suggestions=[];
     for(const p of programs.rows){
-      if(blocked.rows.some(entry=>!entry.standorte.length||entry.standorte.includes(p.veranstaltungsort)))continue;
+      if(!programmOrte(p).includes(base.veranstaltungsort))continue;
+      if(blocked.rows.some(entry=>!entry.standorte.length||entry.standorte.includes(base.veranstaltungsort)))continue;
       if(p.name===base.angebot)continue;
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
       const price=preisFuerTeilnehmer(p.preise,participants),duration=buchungsdauerBerechnen(participants,Number(p.dauer));
@@ -408,9 +411,12 @@ async function anschlussApi(req,res,url,route,ip){
       const q=await client.query('SELECT id,status,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[parentId]);
       if(!q.rowCount||q.rows[0].status!=='bestaetigt')return {ungueltig:true};
       const original=q.rows[0].data,oldWindow=buchungsfenster(original),participants=Number(original.teilnehmer);
-      const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
+      const pQuery=await client.query(`SELECT p.id,p.name,p.beschreibung,p.dauer,p.preise,p.kapazitaet,p.verfuegbare_termine,
+        COALESCE(NULLIF(to_jsonb(p)->'standorte','[]'::jsonb),to_jsonb(ARRAY[p.veranstaltungsort])) AS standorte
+        FROM brilon_angebote p WHERE p.id=$1 AND p.archiviert=false AND p.aktiv=true AND p.buchbar=true AND p.veroeffentlicht=true`,[programId]);
       if(!pQuery.rowCount)return {programm:false};
       const p=pQuery.rows[0],duration=Number(p.dauer),start=Number(time.slice(0,2))*60;
+      if(!programmOrte(p).includes(original.veranstaltungsort))return {programm:false};
       if(!oldWindow||!gueltigesDatum(original.datum)||original.datum<heuteInBerlin()||!Number.isInteger(participants)||participants<1||participants>150||p.name===original.angebot||!Number.isInteger(duration)||participants>Number(p.kapazitaet)||
          !zugelasseneAnschlusszeiten(oldWindow[0],oldWindow[1],duration).some(t=>t.beginnMinuten===start&&t.endeMinuten<=1440))return {zeit:false};
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
@@ -420,7 +426,7 @@ async function anschlussApi(req,res,url,route,ip){
         AND data->>'angebot'=$2 AND data->>'uhrzeit'=$3 AND COALESCE(status,'offen') NOT IN ('abgelehnt','storniert') LIMIT 1`,
         [parentId,p.name,time]);
       if(duplicate.rowCount)return {duplikat:true};
-      const cap=await client.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[original.datum,p.name]);
+      const cap=await client.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(data->>'veranstaltungsort','Brilon')=$3 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[original.datum,p.name,original.veranstaltungsort]);
       if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))return {kapazität:false};
       const conflict=await pruefeBuchungskonflikt(client,original.datum,[start,start+duration],parentId,null,original.veranstaltungsort);if(conflict)return {konflikt:conflict};
       const quote=anschlussPreis(price),id=crypto.randomUUID(),first=safeText(original.vorname,80),last=safeText(original.nachname,80);
@@ -618,7 +624,8 @@ async function main(req,res){
                 p.buchungsmodus,p.mindestteilnehmer,p.preis_pro_person,p.dauer
          FROM brilon_angebote p
          WHERE p.name = $1 AND p.archiviert=false AND p.aktiv=true AND p.buchbar=true AND p.veroeffentlicht=true
-         LIMIT 1`,[angebot]
+           AND COALESCE(NULLIF(to_jsonb(p)->'standorte','[]'::jsonb),to_jsonb(ARRAY[p.veranstaltungsort])) ? $2
+         LIMIT 1`,[angebot,angefragterStandort]
       );
       if(!preisAbfrage.rows.length)return reply(res,409,{error:'Dieses Programm ist derzeit nicht buchbar.'});
       const programm=preisAbfrage.rows[0];
@@ -866,7 +873,9 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const programm=await pool.query(
         `SELECT p.dauer,p.buchungsmodus,p.mindestteilnehmer,p.kapazitaet,
           COALESCE(NULLIF(to_jsonb(p)->'standorte','[]'::jsonb),to_jsonb(ARRAY[p.veranstaltungsort])) AS standorte
-          FROM brilon_angebote p WHERE p.name=$1 AND p.archiviert=false AND p.aktiv=true AND p.buchbar=true AND p.veroeffentlicht=true LIMIT 1`,[angebot]
+          FROM brilon_angebote p WHERE p.name=$1 AND p.archiviert=false AND p.aktiv=true AND p.buchbar=true AND p.veroeffentlicht=true
+            AND ($2::text='' OR COALESCE(NULLIF(to_jsonb(p)->'standorte','[]'::jsonb),to_jsonb(ARRAY[p.veranstaltungsort])) ? $2)
+          LIMIT 1`,[angebot,standort]
       );
       if(!programm.rowCount||standort&&!programmOrte(programm.rows[0]).includes(standort))
         return reply(res,409,{error:'Programm ist an diesem Standort nicht verfügbar.'});
