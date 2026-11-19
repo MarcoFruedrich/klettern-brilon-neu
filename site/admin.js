@@ -1578,6 +1578,8 @@ if (neuesAngebotForm) {
     const daten = Object.fromEntries(
       new FormData(neuesAngebotForm).entries()
     );
+    daten.standorte=[...neuesAngebotForm.elements.standorte.selectedOptions].map(option=>option.value);
+    delete daten.veranstaltungsort;
     const bildDatei=neuesAngebotForm.elements.bildDatei.files[0];
     delete daten.bildDatei;
     daten.verfuegbare_termine=(daten.verfuegbare_termine||'').split('\n').map(x=>x.trim()).filter(Boolean);
@@ -1884,7 +1886,7 @@ async function erlebnisangeboteLaden() {
   if (!liste) return;
 
   try {
-    const angebote = await api('/api/admin/angebote');
+    const [angebote,standortOptionen] = await Promise.all([api('/api/admin/angebote'),api('/api/admin/orte')]);
     adminBuchbareProgramme=angebote.filter(a=>!a.archiviert&&a.aktiv&&a.buchbar&&a.veroeffentlicht);
     const specialSelect=document.getElementById('special-program-select');
     if(specialSelect){
@@ -1977,7 +1979,19 @@ beschreibung.style.width = '100%';
       const programmName=feld('Programmname',angebot.name,'name');
       const kategorie=feld('Kategorie',angebot.kategorie,'kategorie');
       const zielgruppe=feld('Zielgruppe',angebot.zielgruppe,'zielgruppe');
-      const veranstaltungsort=feld('Veranstaltungsort',angebot.veranstaltungsort,'veranstaltungsort');
+      const veranstaltungsortLabel=el('label','Standorte (Mehrfachauswahl möglich)');
+      const veranstaltungsort=document.createElement('select');
+      veranstaltungsort.multiple=true;veranstaltungsort.size=5;
+      veranstaltungsort.name='standorte';veranstaltungsort.required=true;
+      const bisherigeStandorte=Array.isArray(angebot.standorte)&&angebot.standorte.length?
+        angebot.standorte:[angebot.veranstaltungsort];
+      for(const ort of standortOptionen){
+        if(!ort.aktiv&&!bisherigeStandorte.includes(ort.name))continue;
+        const option=el('option',ort.name+(ort.aktiv?'':' · inaktiv'));
+        option.value=ort.name;option.selected=bisherigeStandorte.includes(ort.name);
+        veranstaltungsort.append(option);
+      }
+      veranstaltungsortLabel.append(veranstaltungsort);metadaten.append(veranstaltungsortLabel);
       const dauer=feld('Dauer bei 5–10 Personen (Minuten)',angebot.dauer,'dauer','number');
       dauer.min='15';dauer.max='1440';dauer.step='1';
       const dauerHinweis=el('p','Die angegebene Dauer gilt für 5–10 Personen. Für andere Gruppengrößen wird die voraussichtliche Dauer automatisch angepasst.');
@@ -2003,6 +2017,7 @@ beschreibung.style.width = '100%';
 
       const details = document.createElement('p');
       details.textContent =
+        'Standorte: '+(angebot.standorte?.join(', ')||angebot.veranstaltungsort)+' · '+
         'Richtdauer für 5–10 Personen: ' + angebot.dauer + ' Minuten | ' +
         (angebot.aktiv ? 'Aktiv' : 'Deaktiviert') + ' · ' +
         (angebot.buchbar ? 'buchbar' : 'nicht buchbar') + ' · ' +
@@ -2155,14 +2170,14 @@ preisButton.addEventListener('click', async () => {
   aktiv: aktivSchalter.checked,
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
-        veranstaltungsort:veranstaltungsort.value,dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
+        standorte:[...veranstaltungsort.selectedOptions].map(option=>option.value),dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
         verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),
         hinweise:hinweise.value,buchbar:bookable.checked,veroeffentlicht:publish.checked
         ,buchungsmodus:modus.value,mindestteilnehmer:Number(mindest.value),preis_pro_person:Number(einzelpreis.value||0)
 })
     });
 
-    alert('Gruppenpreise erfolgreich gespeichert.');
+    alert('Programm einschließlich Standortzuordnung erfolgreich gespeichert.');
     await erlebnisangeboteLaden();
   } catch (fehler) {
     alert('Speichern fehlgeschlagen: ' + fehler.message);

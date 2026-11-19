@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - entwicklung/phase-1-buchungen-sonderangebote-gps
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -56,7 +59,8 @@ jobs:
 
   browser:
     name: Chromium – Smartphone, Tablet, Desktop und Buchungsformular
-    runs-on: ubuntu-latest
+    # Playwright 1.56 unterstützt den neuen ubuntu-latest Runner (26.04) noch nicht.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       DATABASE_URL: ''

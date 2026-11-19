@@ -307,7 +307,7 @@ async function login(page,root){
   await page.goto(root+'/admin.html');
   await page.locator('#username').fill('test-admin');
   await page.locator('#password').fill('Nur-Test-Passwort');
-  await page.locator('#login button').click();
+  await page.locator('#login button.btn').click();
   await page.locator('#workspace').waitFor({state:'visible',timeout:15000});
   await page.locator('#angebote-admin-liste').getByText('Klettertest').first().waitFor({state:'attached'});
 }
@@ -394,6 +394,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
   await t.test('Programm erstellen, editieren und aktivieren mit CSRF-Token',async()=>{
     const page=await browser.newPage({viewport:{width:390,height:844},locale:'de-DE'});
     const state=fakeAdminApi(page);
+    state.places.push({id:2,name:'Olpe',aktiv:true});
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.accept();});
     await login(page,root);
     await openAdminView(page,'#angebote-verwaltung');
@@ -405,18 +406,22 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await form.locator('[name="zielgruppe"]').fill('Kinder');
     await form.locator('[name="verfuegbare_termine"]').fill('2027-03-15');
     await form.locator('[name="veroeffentlicht"]').check();
+    await form.locator('#angebot-ort').selectOption(['Brilon','Olpe']);
     await form.locator('button[type="submit"]').click();
     await page.locator('#angebote-admin-liste').getByText('Bouldern Kinder').first().waitFor();
     const created=state.programs.find(p=>p.name==='Bouldern Kinder');
     assert.ok(created);
     assert.equal(created.aktiv,false,'Neue Programme dürfen nicht ungeprüft aktiviert werden');
     assert.deepEqual(created.verfuegbare_termine,['2027-03-15']);
+    assert.deepEqual(created.standorte,['Brilon','Olpe'],'Die Mehrfachauswahl wird übertragen');
     const entry=page.locator('#angebote-admin-liste .card').filter({has:page.getByRole('heading',{name:'Bouldern Kinder'})});
     await entry.locator('[name="dauer"]').fill('120');
+    await entry.locator('[name="standorte"]').selectOption(['Olpe']);
     await entry.locator('[data-gruppe="1-4"]').fill('85');
     await entry.getByRole('button',{name:'Programm speichern'}).click();
     await page.waitForFunction(()=>document.querySelector('#angebote-admin-liste')?.textContent.includes('Bouldern Kinder'));
     assert.equal(created.dauer,120);
+    assert.deepEqual(created.standorte,['Olpe'],'Die geänderte Standortauswahl wird gespeichert');
     assert.equal(created.preise['1-4'],'85');
     const reactivateEntry=page.locator('#angebote-admin-liste .card').filter({has:page.getByRole('heading',{name:'Bouldern Kinder'})});
     await reactivateEntry.getByRole('button',{name:/Deaktiviert/}).click();

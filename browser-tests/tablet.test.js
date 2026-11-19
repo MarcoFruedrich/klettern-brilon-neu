@@ -47,7 +47,7 @@ test('Gekoppeltes Werbetablet: Werbung, Kurzzeitcode und Widerruf ohne Adminanme
       await page.goto(root+'/tablet.html');
       assert.equal(await page.locator('#tablet-pairing').isVisible(),true);
       await page.locator('#tablet-pair-form [name="code"]').fill('12345678');
-      await page.locator('#tablet-pair-form button').click();
+      await page.locator('#tablet-pair-form button[type=submit]').click();
       await page.locator('#tablet-marketing').waitFor({state:'visible'});
       await page.waitForFunction(()=>document.getElementById('tablet-offer-title')?.textContent==='Klettern & Abenteuer');
       assert.equal(await page.locator('#tablet-digits').textContent(),'');
