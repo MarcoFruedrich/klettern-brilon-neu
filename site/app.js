@@ -108,7 +108,8 @@ async function belegteUhrzeitenLaden() {
     const antwort = await fetch(
       '/api/belegte-zeiten?datum=' + encodeURIComponent(datum) +
       '&teilnehmer=' + encodeURIComponent(teilnehmer) +
-      '&angebot=' + encodeURIComponent(angebot)
+      '&angebot=' + encodeURIComponent(angebot) +
+       '&standort=' + encodeURIComponent(standortAuswahl.value)
     );
 
     if (!antwort.ok) throw new Error('Verfügbarkeit nicht abrufbar');
@@ -529,7 +530,7 @@ function sonderaktionAnfragen(aktion){
   // A special action can be independent of the programme catalogue. Avoid
   // silently retaining a programme selected for an earlier special.
   if(standortAuswahl){
-    standortAuswahl.value=programm?.veranstaltungsort||'';
+    standortAuswahl.value=programm?programmStandorte(programm)[0]||'':'';
     standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
   }
   angebotAuswahl.value=programm?.name||'';
@@ -627,10 +628,18 @@ a.append(anfrageButton);
 
 specials();
 
+function programmStandorte(angebot){
+  return Array.isArray(angebot.standorte)&&angebot.standorte.length?
+    angebot.standorte:[angebot.veranstaltungsort];
+}
+function programmAmStandort(angebot,standort){
+  return programmStandorte(angebot).includes(standort);
+}
+
 function angeboteUebersichtAnzeigen(standortFilter=''){
   const ausgabe=document.getElementById('angebote-uebersicht');
   if(!ausgabe)return;
-  const passend=angeboteCache.filter(angebot=>!standortFilter||angebot.veranstaltungsort===standortFilter);
+  const passend=angeboteCache.filter(angebot=>!standortFilter||programmAmStandort(angebot,standortFilter));
   ausgabe.replaceChildren();
   if(!passend.length){
     const hinweis=document.createElement('p');
@@ -665,7 +674,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
       beschreibung.textContent=angebot.beschreibung;
       karte.append(beschreibung);
     }
-    const meta=angebot.veranstaltungsort?`Standort: ${angebot.veranstaltungsort}`:'';
+    const meta=programmStandorte(angebot).length?'Standorte: '+programmStandorte(angebot).join(', '):'';
     if(meta){
       const details=document.createElement('p');
       details.className='angebote-karte-meta';
@@ -681,7 +690,7 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     const anfrage=document.createElement('a');
     anfrage.className='angebote-anfragen-link';
     anfrage.href='#buchung';
-    anfrage.dataset.location=angebot.veranstaltungsort||'';
+    anfrage.dataset.location=standortFilter||programmStandorte(angebot)[0]||'';
     anfrage.dataset.program=angebot.name;
     anfrage.textContent='Dieses Angebot anfragen →';
     karte.append(anfrage);
@@ -695,7 +704,7 @@ async function angeboteLaden() {
 
   function angeboteFuerStandortAnzeigen(){
     const standort=standortAuswahl.value;
-    const passend=angeboteCache.filter(angebot=>angebot.veranstaltungsort===standort);
+    const passend=angeboteCache.filter(angebot=>programmAmStandort(angebot,standort));
     auswahl.replaceChildren();
     const platzhalter=document.createElement('option');
     platzhalter.value='';
@@ -818,7 +827,7 @@ async function preisanzeigeStarten() {
         bildAnzeige.appendChild(beschreibung);
       }
 
-      const meta=angebot.veranstaltungsort?'Standort: '+angebot.veranstaltungsort:'';
+      const meta=standortAuswahl.value?'Standort: '+standortAuswahl.value:'';
       if(meta){const p=document.createElement('p');p.textContent=meta;bildAnzeige.appendChild(p);}
       if(angebot.hinweise){const p=document.createElement('p');p.textContent='Hinweis: '+angebot.hinweise;bildAnzeige.appendChild(p);}
       teilnehmer.max=String(Math.min(150,Number(angebot.kapazitaet)||150));
