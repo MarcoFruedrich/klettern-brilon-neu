@@ -105,8 +105,9 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
       nachname:'Postgres',email:`individual${index}@example.test`,datum:day1,uhrzeit:'14:00',
       teilnehmer:1,angebot:individualName,datenschutz:'on',agbBestaetigt:'on',agbVersion:1})});
   const individualResults=await Promise.all(Array.from({length:2},(_,i)=>individualBook(i+1)));
-  assert.ok(individualResults.every(response=>response.status===201),
-    'Gleichzeitige Einzelanmeldungen dürfen denselben Termin teilen und je einen Platz reservieren');
+  const individualResponses=await Promise.all(individualResults.map(async response=>({status:response.status,body:await response.text()})));
+  assert.ok(individualResponses.every(response=>response.status===201),
+    'Gleichzeitige Einzelanmeldungen dürfen denselben Termin teilen und je einen Platz reservieren: '+JSON.stringify(individualResponses));
   const individualAvailability=await fetch(root+'/api/belegte-zeiten?'+new URLSearchParams({
     datum:day1,teilnehmer:'1',angebot:individualName
   }));
