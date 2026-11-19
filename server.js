@@ -1010,12 +1010,12 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     }
 
     if(route==='/api/besuchergruppen'&&req.method==='GET'){
-      const {DEFAULT_VISITOR_GROUPS}=require('./visitor-groups');
-      if(!pool)return reply(res,200,DEFAULT_VISITOR_GROUPS);
+      const standardBesuchergruppen=typeof DEFAULT_VISITOR_GROUPS!=='undefined'?DEFAULT_VISITOR_GROUPS:require('./visitor-groups').DEFAULT_VISITOR_GROUPS;
+      if(!pool)return reply(res,200,standardBesuchergruppen);
       const vorhanden=(await pool.query("SELECT to_regclass('public.brilon_besuchergruppen') AS tabelle")).rows[0]?.tabelle;
-      if(!vorhanden)return reply(res,200,DEFAULT_VISITOR_GROUPS);
+      if(!vorhanden)return reply(res,200,standardBesuchergruppen);
       const q=await pool.query('SELECT daten FROM brilon_besuchergruppen WHERE id=1');
-      return reply(res,200,Array.isArray(q.rows[0]?.daten)?q.rows[0].daten:DEFAULT_VISITOR_GROUPS);
+      return reply(res,200,Array.isArray(q.rows[0]?.daten)?q.rows[0].daten:standardBesuchergruppen);
     }
 
     if(route==='/api/aktionen'&&req.method==='GET'){
