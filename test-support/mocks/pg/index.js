@@ -35,9 +35,9 @@ class Pool {
       return {rows:[],rowCount:0};
     // The spontaneous-group schema is initialized on every server start.
     // Isolated HTTP tests do not exercise these tables; emulate its DDL only.
-    if(/^\\s*(?:CREATE TABLE IF NOT EXISTS|CREATE UNIQUE INDEX IF NOT EXISTS|ALTER TABLE)\\s+brilon_spontan_/i.test(sql))
+    if(/^\s*(?:CREATE TABLE IF NOT EXISTS|CREATE UNIQUE INDEX IF NOT EXISTS|ALTER TABLE)\s+brilon_spontan_/i.test(sql))
       return {rows:[],rowCount:0};
-    if(/^\\s*SELECT to_regclass\\('public\\.brilon_netzwerkpartner'\\) AS t/i.test(sql))
+    if(/^\s*SELECT to_regclass\('public\.brilon_netzwerkpartner'\) AS t/i.test(sql))
       return {rows:[{t:null}],rowCount:1};
     if(process.env.RUN_PROGRAM_FIELDS_MIGRATION==='true'&&
        /^\s*ALTER TABLE brilon_angebote\b/i.test(sql))
