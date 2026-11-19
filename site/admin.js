@@ -2923,6 +2923,11 @@ preisButton.addEventListener('click', async () => {
   const gruppenstufen=modus.value==='einzelplatz'?[]:
     programmStufenValidieren(tierEditor,Number(kapazitaet.value),dauerModus.value,Number(dauer.value));
   if(gruppenstufen===null)return;
+  const ausgewaehlteStandorte=[...standortAuswahl.querySelectorAll('input:checked')].map(input=>input.value);
+  if(!ausgewaehlteStandorte.length){
+    alert('Bitte mindestens einen aktiven Standort für das Programm auswählen.');
+    return;
+  }
 
   preisButton.disabled = true;
 
@@ -2940,15 +2945,29 @@ preisButton.addEventListener('click', async () => {
         beschreibung: beschreibung.value,
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
         besuchergruppen:[...besuchergruppenFeld.querySelectorAll('input:checked')].map(input=>input.value),
-        veranstaltungsorte:[...standortAuswahl.querySelectorAll('input:checked')].map(input=>input.value),
-        veranstaltungsort:standortAuswahl.querySelector('input:checked')?.value||'',dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
+        veranstaltungsorte:ausgewaehlteStandorte,
+        veranstaltungsort:ausgewaehlteStandorte.includes(angebot.veranstaltungsort)
+          ?angebot.veranstaltungsort:ausgewaehlteStandorte[0],dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
         verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),
         hinweise:hinweise.value,buchbar:bookable.checked,veroeffentlicht:publish.checked
         ,buchungsmodus:modus.value,mindestteilnehmer:Number(mindest.value),preis_pro_person:Number(einzelpreis.value||0)
 })
     });
 
-    alert(gespeichertesProgramm.gruppenZuordnungGespeichert===false?'Programm gespeichert, aber Besuchergruppen-Zuordnung nicht übernommen. Bitte Gruppenpflege prüfen.':'Gruppenpreise und Besuchergruppen-Zuordnung erfolgreich gespeichert.');
+    const stimmenStandorte=(werte)=>Array.isArray(werte)&&
+      werte.length===ausgewaehlteStandorte.length&&
+      ausgewaehlteStandorte.every(standort=>werte.includes(standort));
+    if(!stimmenStandorte(gespeichertesProgramm.veranstaltungsorte))
+      throw new Error('Der Server hat die ausgewählten Standorte nicht vollständig gespeichert.');
+    const nochmalGeladen=await api('/api/admin/angebote',{cache:'no-store'});
+    const kontrolliert=nochmalGeladen.find(item=>String(item.id)===String(angebot.id));
+    if(!kontrolliert||!stimmenStandorte(kontrolliert.veranstaltungsorte))
+      throw new Error('Die Standortzuordnung ist nach erneutem Laden nicht vollständig. Bitte die Auswahl prüfen.');
+    angebot.veranstaltungsort=kontrolliert.veranstaltungsort;
+    angebot.veranstaltungsorte=kontrolliert.veranstaltungsorte;
+    alert(gespeichertesProgramm.gruppenZuordnungGespeichert===false
+      ?'Programm und Standorte gespeichert, aber Besuchergruppen-Zuordnung nicht übernommen. Bitte Gruppenpflege prüfen.'
+      :'Programm und Standortzuordnung gespeichert und nach erneutem Laden geprüft.');
     await erlebnisangeboteLaden();
   } catch (fehler) {
     alert('Speichern fehlgeschlagen: ' + fehler.message);
@@ -2989,12 +3008,6 @@ aktivButtonAktualisieren();
 
 aktivButton.addEventListener('click', async () => {
   const neuerStatus = !aktivSchalter.checked;
-  const preise = {};
-
-  for (const eingabe of preisbereich.querySelectorAll('input')) {
-    preise[eingabe.dataset.gruppe] = eingabe.value;
-  }
-
   aktivButton.disabled = true;
   aktivButton.textContent = 'Wird gespeichert ...';
 
@@ -3005,8 +3018,7 @@ aktivButton.addEventListener('click', async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        aktiv: neuerStatus,
-        beschreibung: beschreibung.value
+        aktiv: neuerStatus
       })
     });
 
