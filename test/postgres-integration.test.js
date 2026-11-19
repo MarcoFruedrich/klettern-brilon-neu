@@ -76,8 +76,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   let capacity;
   try { capacity=await Promise.all([book('CIAlpha', day1, '10:00'), book('CIBeta', day1, '11:00')]); }
   catch(error){throw new Error('Parallele Buchungsanfragen fehlgeschlagen: '+error.message+'; Serverausgabe: '+errors);}
-  assert.deepEqual(capacity.map(response => response.status).sort(), [201, 409],
-    'Zwei parallele, nicht überlappende Dreiergruppen dürfen die Tageskapazität von fünf nicht überschreiten');
+  assert.deepEqual(capacity.map(response => response.status).sort(), [201, 201],
+    'Zwei nicht überlappende Dreiergruppen dürfen nacheinander buchen; Kapazität gilt pro Termin');
   let overlap;
   try { overlap=await Promise.all([book('CIGamma', day2, '10:00'), book('CIDelta', day2, '10:00')]); }
   catch(error){throw new Error('Überlappende Buchungsanfragen fehlgeschlagen: '+error.message+'; Serverausgabe: '+errors);}
@@ -85,7 +85,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     'Parallele Zugriffe dürfen dasselbe Zeitfenster nicht doppelt reservieren');
   const saved = await pool.query(`SELECT id,buchungsnummer FROM brilon_buchungen
     WHERE data->>'angebot'=$1`, [programName]);
-  assert.equal(saved.rowCount, 2, 'In der echten Datenbank dürfen nur zwei Testbuchungen gespeichert sein');
+  assert.equal(saved.rowCount, 3, 'In der echten Datenbank müssen drei zulässige Testbuchungen gespeichert sein');
   assert.equal(new Set(saved.rows.map(row => row.buchungsnummer)).size, 2,
     'Buchungsnummern bleiben eindeutig');
   const individualName='CI-Individualklettern-'+crypto.randomUUID();
