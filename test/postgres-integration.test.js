@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const net = require('node:net');
 const path = require('node:path');
 const sharp = require('sharp');
-const { fotoBereinigen,passwortHash,passwortPruefen } = require('../lib/stationspruefung');
+const { fotoBereinigen,passwortHash,passwortPruefen,codeHash } = require('../lib/stationspruefung');
 const { heuteInBerlin } = require('../lib/kalendertag');
 
 const integrationUrl = process.env.PG_INTEGRATION_URL;
@@ -350,6 +350,11 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(issued.status,201,`Prüfcode-API: ${await issued.clone().text()} | Server: ${errors.slice(-3000)}`);
   const code=(await issued.json()).code;
   assert.match(code,/^[0-9]{6}$/);
+  // Der reine Admin-Notfallcode wird standortungebunden ausgestellt.
+  // Für diesen isolierten Integrationstest wird er explizit an den
+  // zuvor freigegebenen Teststandort gebunden (niemals in Produktion).
+  await pool.query('UPDATE brilon_pruef_codes SET ort_id=$1 WHERE code_hash=$2 AND ort_id IS NULL',
+    [approvedPlaceId,codeHash(code,'ci-only-check-code-secret-000000000000000000000000')]);
   const credentials=await fetch(root+'/api/pruefung/login',{method:'POST',
     headers:{Origin:root,'Content-Type':'application/json'},
     body:JSON.stringify({email:staffData.email,passwort:staffDataPassword})});
