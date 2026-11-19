@@ -621,8 +621,15 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await form.locator('[name="name"]').fill('Bouldern Kinder');
     await form.locator('[name="beschreibung"]').fill('Browsertestangebot');
     await form.locator('input[name="dauer"]').first().fill('75');
-    for(const [index,price] of ['85','135','180','230'].entries())
-      await form.locator('#neues-angebot-stufen .angebot-stufen-zeile').nth(index).locator('input[name="preis"]').fill(price);
+    await page.locator('#neues-angebot-stufe-hinzufuegen').click();
+    await page.locator('#neues-angebot-stufe-hinzufuegen').click();
+    for(const [index,price] of ['85','135','180','230'].entries()){
+      const tier=form.locator('#neues-angebot-stufen .angebot-stufen-zeile').nth(index);
+      await tier.locator('input[name="min"]').fill(String(index*3+1));
+      await tier.locator('input[name="max"]').fill(String((index+1)*3));
+      await tier.locator('input[name="dauer"]').fill('75');
+      await tier.locator('input[name="preis"]').fill(price);
+    }
     await form.locator('#angebot-orte-auswahl input[value="Brilon"]').check();
     await form.locator('[name="kapazitaet"]').fill('12');
     await form.locator('[name="zielgruppe"]').fill('Kinder');
