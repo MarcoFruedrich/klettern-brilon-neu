@@ -9,13 +9,17 @@ const server=fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
 const start=server.indexOf("if(route==='/api/besuchergruppen'");
 const end=server.indexOf("if(route==='/api/admin/rechnungsdaten'&&req.method==='GET')",start);
 assert.ok(start>=0&&end>start,'Besuchergruppen-API muss im Server vorhanden sein');
+const adminStart=server.indexOf("if(route==='/api/admin/besuchergruppen'");
+const adminEnd=server.indexOf("/* Medienbibliothek:",adminStart);
+assert.ok(adminStart>=0&&adminEnd>adminStart,'Verwaltungs-API für Besuchergruppen muss vorhanden sein');
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
 const route=new AsyncFunction('route','req','res','pool','body','reply','admin',
-  'DEFAULT_VISITOR_GROUPS','prepareVisitorGroups','validateVisitorGroups',server.slice(start,end));
+  'DEFAULT_VISITOR_GROUPS','prepareVisitorGroups','validateVisitorGroups','safeText',
+  server.slice(start,end)+'\\n'+server.slice(adminStart,adminEnd));
 const reply=(_res,status,payload)=>({status,payload});
 const run=(routeName,method,pool,authorized=true,data)=>route(
   routeName,{method},{},pool,async()=>data,reply,async()=>authorized,
-  DEFAULT_VISITOR_GROUPS,prepareVisitorGroups,validateVisitorGroups);
+  DEFAULT_VISITOR_GROUPS,prepareVisitorGroups,validateVisitorGroups,(value,max)=>String(value??'').slice(0,max));
 const fakeDb=()=>({
   calls:[],async query(sql,params=[]){
     this.calls.push({sql,params});
