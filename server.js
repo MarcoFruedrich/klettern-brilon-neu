@@ -2961,6 +2961,15 @@ if(placeRoute&&req.method==='PATCH'){
       [newName,aktiv,partnerhaus,partnerkontaktName,partnerkontaktEmail,placeRoute[1]]);
     if(newName!==oldName){
       await client.query('UPDATE brilon_angebote SET veranstaltungsort=$1 WHERE veranstaltungsort=$2',[newName,oldName]);
+      // Keep the multi-location selection in sync when a location is renamed.
+      // Otherwise the booking validation continues to reference the old name.
+      await client.query(`UPDATE brilon_angebote
+        SET veranstaltungsorte=(
+          SELECT jsonb_agg(CASE WHEN ort.value=$2 THEN to_jsonb($1::text) ELSE to_jsonb(ort.value) END ORDER BY ort.ordinality)
+          FROM jsonb_array_elements_text(veranstaltungsorte) WITH ORDINALITY AS ort(value,ordinality)
+        )
+        WHERE jsonb_typeof(veranstaltungsorte)='array'
+          AND veranstaltungsorte ? $2`,[newName,oldName]);
       for(const key of ['veranstaltungsort','ort','standort']){
         await client.query(`UPDATE brilon_buchungen SET data=jsonb_set(data,'{${key}}',to_jsonb($1::text),true) WHERE data->>'${key}'=$2`,[newName,oldName]);
       }
