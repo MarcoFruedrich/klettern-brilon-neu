@@ -3550,6 +3550,16 @@ const preisRoute = route.match(/^\/api\/admin\/angebote\/([0-9]+)$/);
 
 if (preisRoute && req.method === 'PATCH') {
   const d = await body(req);
+  // Die Aktivierung darf keine veralteten Programmdaten, Preise oder Standorte überschreiben.
+  // Ein gezieltes UPDATE verhindert verlorene Änderungen bei paralleler Standortpflege.
+  if(d && !Array.isArray(d) && Object.keys(d).length===1 && typeof d.aktiv==='boolean'){
+    const aktualisiert=await pool.query(
+      'UPDATE brilon_angebote SET aktiv=$1 WHERE id=$2 RETURNING id,aktiv',
+      [d.aktiv,preisRoute[1]]
+    );
+    if(!aktualisiert.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
+    return reply(res,200,{...aktualisiert.rows[0],success:true});
+  }
   const bisher=await pool.query(
     `SELECT * FROM brilon_angebote WHERE id=$1`,[preisRoute[1]]
   );
@@ -3576,6 +3586,7 @@ if (preisRoute && req.method === 'PATCH') {
     if(!safe||candidate.length>1000)return reply(res,400,{error:'Das Bild muss aus der Medienbibliothek oder aus den freigegebenen Website-Bildern stammen.'});
     if(Object.keys(d).length===1){
       const updated=await pool.query('UPDATE brilon_angebote SET bild_url=$1 WHERE id=$2 RETURNING id,bild_url',[candidate||null,preisRoute[1]]);
+      if(!updated.rowCount)return reply(res,404,{error:'Programm nicht gefunden.'});
       return reply(res,200,{...updated.rows[0],success:true});
     }
   }
