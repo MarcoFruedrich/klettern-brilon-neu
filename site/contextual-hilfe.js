@@ -98,7 +98,7 @@
     root.querySelectorAll?.('label').forEach(label=>{
       // Die Anmeldung braucht keine zusätzlichen Schaltflächen; diese stören
       // sonst Passwortmanager und eindeutige Login-Button-Navigation.
-      if(label.closest('#login'))return;
+      if(label.closest('#login, #staff-login, #partner-login-form, #tablet-pair-form, #pruef-login, form[id$="login"], form[id*="login-"]'))return;
       const txt=label.textContent||'';
       attach(label,txt.replace(/[＊*]/g,'').trim());
     });
@@ -111,7 +111,15 @@
       });
     }
   }
-  document.addEventListener('click',event=>{if(!event.target.closest('.context-help'))document.querySelectorAll('.context-help-button[aria-expanded="true"]').forEach(b=>{b.setAttribute('aria-expanded','false');const t=b.parentElement?.querySelector('.context-help-tip');if(t)t.hidden=true;});});
+  const hilfenSchliessen=()=>{
+    document.querySelectorAll('.context-help-button[aria-expanded="true"]').forEach(b=>{
+      b.setAttribute('aria-expanded','false');
+      const t=b.parentElement?.querySelector('.context-help-tip');
+      if(t)t.hidden=true;
+    });
+  };
+  document.addEventListener('click',event=>{if(!event.target.closest('.context-help'))hilfenSchliessen();});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')hilfenSchliessen();});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>scan());else scan();
   new MutationObserver(records=>records.forEach(r=>r.addedNodes.forEach(n=>{if(n.nodeType===1)scan(n);}))).observe(document.documentElement,{childList:true,subtree:true});
 })();

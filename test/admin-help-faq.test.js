@@ -33,7 +33,7 @@ test('Fragezeichen sind zugänglich, per Tastatur schließbar und stören den Lo
   assert.match(js,/button\.setAttribute\('aria-label'/);
   assert.match(js,/button\.setAttribute\('aria-expanded'/);
   assert.match(js,/event\.key==='Escape'/);
-  assert.match(js,/label\.closest\('#login'\)/);
+  assert.match(js,/label\.closest\('#login, #staff-login, #partner-login-form/);
   assert.match(js,/new MutationObserver/);
   assert.match(html,/contextual-hilfe\.js\?v=20261118-admin-help-full/);
 });
