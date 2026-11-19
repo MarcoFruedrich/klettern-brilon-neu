@@ -96,6 +96,10 @@ class Pool {
       throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
     if (process.env.MOCK_ADMIN_TOTP_FAIL==='1'&&sql.includes('brilon_admin_totp_steps'))
       throw new Error('Test-double: TOTP-Zählertabelle fehlt');
+    // Optional partner-house columns are added during the location migration.
+    // They do not require persisted DDL state in the isolated SQL double.
+    if(/^\s*ALTER TABLE brilon_orte\s+ADD COLUMN IF NOT EXISTS partnerhaus\b/i.test(sql))
+      return {rows:[],rowCount:0};
     if(/CREATE TABLE IF NOT EXISTS brilon_orte/i.test(sql)){
       this.placesTableReady=true;
       return {rows:[],rowCount:0};
