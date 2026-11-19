@@ -339,7 +339,8 @@
   </label>
   <label>Kategorie<input name="kategorie" maxlength="60" placeholder="Klettern"></label>
   <label>Zielgruppe<input name="zielgruppe" maxlength="120" placeholder="Familien, Schulklassen"></label>
-  <label>Veranstaltungsort<select name="veranstaltungsort" id="angebot-ort" required></select></label>
+  <label>Standorte (Mehrfachauswahl möglich)<select name="standorte" id="angebot-ort" multiple size="5" required></select></label>
+  <p class="hint">Wähle mindestens einen Standort. Für mehrere Orte mit Strg bzw. Cmd klicken; alle ausgewählten Standorte werden gemeinsam gespeichert.</p>
   <label>Kapazität (Teilnehmende)<input name="kapazitaet" type="number" min="1" max="500" value="20" required></label>
   <label>Buchungsart<select name="buchungsmodus"><option value="gruppe">Gruppenanfrage</option><option value="einzelplatz">Einzelplätze reservieren</option></select></label>
   <div class="two"><label>Mindestanmeldungen für Durchführung<input name="mindestteilnehmer" type="number" min="5" max="12" value="5"></label>
