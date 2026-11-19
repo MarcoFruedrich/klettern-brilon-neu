@@ -46,11 +46,18 @@ const PORT=Number(process.env.PORT||3000),ROOT=path.join(__dirname,'site');
 const dbConfig=datenbankKonfiguration(process.env.DATABASE_URL,process.env.DATABASE_CA_CERT,process.env.DATABASE_SSL_MODE);
 const pool=dbConfig?new Pool(dbConfig):null;
 if(pool){
-  // pg meldet unterbrochene Verbindungen ungenutzter Pool-Clients als 'error'-Event.
-  // Ohne Listener beendet Node.js den gesamten Webserver (auch Buchung und Verwaltung).
-  // Der Pool entfernt die betroffene Verbindung und baut bei Bedarf eine neue auf.
+  // Unterbrochene Leerlaufverbindungen werden über den Pool gemeldet.
   pool.on('error',error=>{
     console.error('PostgreSQL-Verbindung im Pool unerwartet beendet:',error?.message||String(error));
+  });
+  // Bei gerade ausgeliehenen pg-Clients wird dagegen ein 'error'-Event direkt auf
+  // der Client-Instanz ausgelöst. Ohne eigenen Listener stürzt Node.js vollständig ab.
+  // Fehler bei laufenden SQL-Abfragen werden weiterhin an die aufrufende Funktion
+  // gemeldet; dieser Listener verhindert nur den unbehandelten Event-Abbruch.
+  pool.on('connect',client=>{
+    client.on('error',error=>{
+      console.error('PostgreSQL-Clientverbindung unerwartet beendet:',error?.message||String(error));
+    });
   });
 }
 const sessions=new Map(),rateLimiter=erstelleRateLimiter();let sessionChecks=0,persistentSessionChecks=0;const cookieName='brilon_session';const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon','.json':'application/manifest+json'};
