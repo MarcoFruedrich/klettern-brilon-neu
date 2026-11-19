@@ -399,6 +399,10 @@ class Pool {
           einwilligung_version:game.einwilligung_version}));
       return {rows,rowCount:rows.length};
     }
+    // Zahlungen dürfen ohne bestätigten Trainereinsatz keine Buchung automatisch bestätigen.
+    if (sql.includes("COUNT(*) FILTER (WHERE status='bestaetigt')") &&
+        sql.includes('FROM brilon_einsaetze WHERE buchung_id=$1'))
+      return {rows:[{zugesagt:0,ausstehend:0}],rowCount:1};
     if (sql.includes('SELECT 1 FROM brilon_buchungen')) {
       const found=this.bookings.some(item=>item.data.anschlussElternId===params[0]&&item.data.angebot===params[1]&&
         item.data.uhrzeit===params[2]&&!['abgelehnt','storniert'].includes(item.status));
