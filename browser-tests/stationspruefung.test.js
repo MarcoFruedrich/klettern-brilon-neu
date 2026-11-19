@@ -50,7 +50,7 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
             hat_hinweis:false,pruefungen:state.saved.pruefungen.map(p=>({...p,station:'Kletterwand',foto:undefined}))}]:[]);
         if(endpoint==='/api/pruefung/stationen'){
           return respond(200,{mitarbeiter:'Testmitarbeiterin',
-            entsperrtBis:null,stationen:[{id:station,name:'Kletterwand'}]});
+            entsperrtBis:null,ortId:1,standorte:[{id:1,name:'Brilon'}],stationen:[{id:station,name:'Kletterwand'}]});
         }
         if(endpoint==='/api/pruefung/freischalten'&&req.method()==='POST'){
           if(JSON.parse(req.postData()).code!=='123456')
@@ -132,7 +132,7 @@ test('Stationsprüfung: mobile Mitarbeiteranmeldung, Code und Mängeldokumentati
           beginn:state.saved.beginn,erstellt_am:'2026-11-03T10:00:00.000Z',hat_mangel:false,
           hat_hinweis:true,pruefungen:state.saved.pruefungen.map(p=>({...p,station:'Boulderbereich'}))}]:[]);
       if(endpoint==='/api/pruefung/stationen')
-        return respond(200,{mitarbeiter:'Testmitarbeiterin',entsperrtBis:null,
+        return respond(200,{mitarbeiter:'Testmitarbeiterin',entsperrtBis:null,ortId:1,standorte:[{id:1,name:'Brilon'}],
           stationen:[{id:station,name:'Boulderbereich'}]});
       if(endpoint==='/api/pruefung/freischalten'){
         state.unlocked=true;return respond(200,{success:true,gueltigMinuten:15});
