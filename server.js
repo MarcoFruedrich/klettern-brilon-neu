@@ -4244,6 +4244,7 @@ async function start(){
     await pool.query('ALTER TABLE brilon_pruef_tablets ADD COLUMN IF NOT EXISTS pruefdisplay BOOLEAN NOT NULL DEFAULT false');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS brilon_pruef_tablets_ein_display_idx ON brilon_pruef_tablets((1)) WHERE pruefdisplay=true');
     await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS tablet_id UUID REFERENCES brilon_pruef_tablets(id)');
+    await pool.query('ALTER TABLE brilon_pruef_codes ADD COLUMN IF NOT EXISTS ort_id BIGINT REFERENCES brilon_orte(id)');
       console.log('Mitarbeiter- und Stationsschema geprüft (RUN_PRUEF_SCHEMA_MIGRATION=true)');
     }
     // Optional employee portal content; independent from staff and inspection tables.
