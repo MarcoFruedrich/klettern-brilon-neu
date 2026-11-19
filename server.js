@@ -596,7 +596,7 @@ async function main(req,res){
             email=safeText(d.email,180),
             datum=safeText(d.datum,10),
             angebot=safeText(d.angebot,120),
-            angefragterStandort=safeText(d.veranstaltungsort,80),
+            angefragterStandort=safeText(d.veranstaltungsort,80)||'Brilon',
             teilnehmer=Number(d.teilnehmer);
       const vorhandeneRechnungsadresse=['rechnungsFirma','rechnungsStrasse','rechnungsPlz','rechnungsOrt']
         .some(key=>Boolean(safeText(d[key],key==='rechnungsStrasse'?180:key==='rechnungsPlz'?12:key==='rechnungsOrt'?120:160)));
@@ -3623,7 +3623,8 @@ async function start(){
     }
     // Assign each network partner to an existing venue. This idempotent upgrade
     // preserves existing partner accounts and leaves assignment optional until admin review.
-    await pool.query(`DO $migration$
+    // The lightweight DB test double does not implement PostgreSQL anonymous blocks.
+    if(process.env.MOCK_PG!=='1')await pool.query(`DO $migration$
     BEGIN
       IF to_regclass('public.brilon_netzwerkpartner') IS NOT NULL
          AND to_regclass('public.brilon_orte') IS NOT NULL THEN
