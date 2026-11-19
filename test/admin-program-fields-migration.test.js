@@ -33,9 +33,9 @@ test('HTTP: Angebotsfelder und Mitarbeiterportal-Tabelle lassen sich gezielt ein
     catch{await new Promise(resolve=>setTimeout(resolve,50));}
   }
   assert.equal(ready,true,`Testserver startet nicht: ${errors}`);
-  for(let i=0;i<40&&!output.includes('Angebotsfelder geprüft');i++)
+  for(let i=0;i<40&&!output.includes('Angebotsfelder und Programmstandorte geprüft');i++)
     await new Promise(resolve=>setTimeout(resolve,25));
-  assert.match(output,/Angebotsfelder geprüft \(RUN_PROGRAM_FIELDS_MIGRATION=true\)/);
+  assert.match(output,/Angebotsfelder und Programmstandorte geprüft \(RUN_PROGRAM_FIELDS_MIGRATION=true\)/);
   assert.match(output,/Mitarbeiterbereiche-Tabelle geprüft \(RUN_EMPLOYEE_AREAS_MIGRATION=true\)/);
   assert.match(output,/Schemaänderungen übersprungen/);
   assert.doesNotMatch(errors,/SQL im Test-Double nicht implementiert/);
