@@ -2830,7 +2830,8 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const dauer = Number(d.dauer);
   const kategorie=safeText(d.kategorie,60)||'Klettern';
   const zielgruppe=safeText(d.zielgruppe,120);
-  const veranstaltungsort=safeText(d.veranstaltungsort,80)||'Brilon';
+  const standorte=normalisiereProgrammOrte(d.standorte,d.veranstaltungsort||'Brilon');
+  const veranstaltungsort=standorte?.[0]||'';
   const kapazitaet=Number(d.kapazitaet||20);
   const hinweise=safeText(d.hinweise,1000);
   const termine=Array.isArray(d.verfuegbare_termine)?d.verfuegbare_termine:[];
@@ -2840,6 +2841,7 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
   const bildUrl=safeText(d.bild_url,1000);
 
   if(!name)return reply(res,400,{error:'Bitte einen Namen für das Angebot eingeben.'});
+  if(!standorte)return reply(res,400,{error:'Bitte mindestens einen gültigen Standort auswählen.'});
   if(!Number.isInteger(dauer)||dauer<15||dauer>1440)
     return reply(res,400,{error:'Bitte eine Dauer zwischen 15 und 1440 Minuten eingeben.'});
   if(!Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500)
@@ -2851,20 +2853,22 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
      !Number.isFinite(preisProPerson)||preisProPerson<=0))
     return reply(res,400,{error:'Bei Einzelplätzen müssen Kapazität und Mindestanmeldungen zwischen 5 und 12 liegen. Der Preis pro Person muss größer als 0 € sein.'});
 
-  const place=await pool.query('SELECT id FROM brilon_orte WHERE name=$1 AND aktiv=true',[veranstaltungsort]);
-  if(!place.rowCount)return reply(res,400,{error:'Veranstaltungsort ist nicht angelegt.'});
+  const place=await pool.query('SELECT name FROM brilon_orte WHERE name=ANY($1::text[]) AND aktiv=true',[standorte]);
+  if(place.rowCount!==standorte.length)return reply(res,400,{error:'Mindestens ein ausgewählter Standort ist nicht aktiv oder nicht vorhanden.'});
+  const mehrStandorte=await programmOrteSpalteVorhanden();
+  if(!mehrStandorte&&standorte.length>1)return reply(res,503,{error:'Die Datenbankerweiterung für mehrere Programmstandorte muss noch aktiviert werden.'});
 
   const q = await pool.query(
     `INSERT INTO brilon_angebote
       (name,beschreibung,dauer,preise,aktiv,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
-       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,bild_url,sortierung,archiviert)
+       verfuegbare_termine,hinweise,buchbar,veroeffentlicht,buchungsmodus,mindestteilnehmer,preis_pro_person,bild_url,sortierung,archiviert${mehrStandorte?',standorte':''})
      VALUES ($1,$2,$3,'{}',false,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,
-       (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false)
+       (SELECT COALESCE(MAX(sortierung),0)+1 FROM brilon_angebote),false${mehrStandorte?',$16::text[]':''})
      RETURNING id`,
     [name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
       JSON.stringify(termine),hinweise,d.buchbar===true,d.veroeffentlicht===true,
       buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-      buchungsmodus==='einzelplatz'?preisProPerson:0,bildUrl||null]
+      buchungsmodus==='einzelplatz'?preisProPerson:0,bildUrl||null,...(mehrStandorte?[standorte]:[])]
   );
 
   return reply(res, 201, {
@@ -2918,7 +2922,9 @@ const name=d.name===undefined?alt.name:safeText(d.name,120);
 const beschreibung = d.beschreibung===undefined?alt.beschreibung:safeText(d.beschreibung,1000);
 const kategorie=d.kategorie===undefined?alt.kategorie:safeText(d.kategorie,60);
 const zielgruppe=d.zielgruppe===undefined?alt.zielgruppe:safeText(d.zielgruppe,120);
-const veranstaltungsort=d.veranstaltungsort===undefined?alt.veranstaltungsort:safeText(d.veranstaltungsort,80);
+const standorte=normalisiereProgrammOrte(d.standorte===undefined&&d.veranstaltungsort===undefined?
+  programmOrte(alt):d.standorte,d.veranstaltungsort===undefined?alt.veranstaltungsort:d.veranstaltungsort);
+const veranstaltungsort=standorte?.[0]||'';
 const dauer=Number(d.dauer??alt.dauer);
 const kapazitaet=Number(d.kapazitaet??alt.kapazitaet);
 const hinweise=d.hinweise===undefined?alt.hinweise:safeText(d.hinweise,1000);
@@ -2929,14 +2935,16 @@ const buchungsmodus=d.buchungsmodus===undefined?(alt.buchungsmodus||'gruppe'):
   d.buchungsmodus==='einzelplatz'?'einzelplatz':'gruppe';
 const mindestteilnehmer=Number(d.mindestteilnehmer??alt.mindestteilnehmer??5);
 const preisProPerson=Number(d.preis_pro_person??alt.preis_pro_person??0);
-if(!name||!kategorie||!veranstaltungsort||!Number.isInteger(dauer)||dauer<15||dauer>1440||
+if(!name||!kategorie||!standorte||!Number.isInteger(dauer)||dauer<15||dauer>1440||
    !Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500||termine.some(t=>!gueltigesDatum(t))||
    (buchungsmodus==='einzelplatz'&&(!Number.isInteger(kapazitaet)||kapazitaet<5||kapazitaet>12||
      !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<5||mindestteilnehmer>kapazitaet||
      !Number.isFinite(preisProPerson)||preisProPerson<=0)))
   return reply(res,400,{error:'Dauer, Kapazität oder verfügbare Termine sind ungültig.'});
-const place=await pool.query('SELECT id FROM brilon_orte WHERE name=$1 AND aktiv=true',[veranstaltungsort]);
-if(!place.rowCount)return reply(res,400,{error:'Veranstaltungsort ist nicht angelegt.'});
+const place=await pool.query('SELECT name FROM brilon_orte WHERE name=ANY($1::text[]) AND aktiv=true',[standorte]);
+if(place.rowCount!==standorte.length)return reply(res,400,{error:'Mindestens ein ausgewählter Standort ist nicht aktiv oder nicht vorhanden.'});
+const mehrStandorte=await programmOrteSpalteVorhanden();
+if(!mehrStandorte&&standorte.length>1)return reply(res,503,{error:'Die Datenbankerweiterung für mehrere Programmstandorte muss noch aktiviert werden.'});
 
 const q = await pool.query(
   `UPDATE brilon_angebote
@@ -2945,7 +2953,7 @@ const q = await pool.query(
        name=$4,beschreibung = $5,
        kategorie=$6,zielgruppe=$7,veranstaltungsort=$8,kapazitaet=$9,
        verfuegbare_termine=$10::jsonb,hinweise=$11,buchbar=$12,veroeffentlicht=$13,dauer=$14,
-       buchungsmodus=$15,mindestteilnehmer=$16,preis_pro_person=$17
+       buchungsmodus=$15,mindestteilnehmer=$16,preis_pro_person=$17${mehrStandorte?',standorte=$18::text[]':''}
    WHERE id = $2
    RETURNING id,preise,aktiv,name,beschreibung,dauer,kategorie,zielgruppe,veranstaltungsort,
              kapazitaet,verfuegbare_termine,hinweise,buchbar,veroeffentlicht,
@@ -2957,7 +2965,7 @@ const q = await pool.query(
     name,beschreibung,kategorie,zielgruppe,veranstaltungsort,kapazitaet,
     JSON.stringify(termine),hinweise,buchbar,veroeffentlicht,dauer,
     buchungsmodus,buchungsmodus==='einzelplatz'?mindestteilnehmer:1,
-    buchungsmodus==='einzelplatz'?preisProPerson:0
+    buchungsmodus==='einzelplatz'?preisProPerson:0,...(mehrStandorte?[standorte]:[])
   ]
 );
 
