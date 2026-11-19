@@ -36,8 +36,8 @@ test('HTTP: parallele Anfragen überschreiten weder Zeitfenster noch Tageskapazi
     body:JSON.stringify({vorname:name,nachname:'Team',email:name.toLowerCase()+'@example.test',datum:date,uhrzeit:time,
       teilnehmer:participants,angebot:'Klettern',datenschutz:'on',agbBestaetigt:'on',agbVersion:1})});
   const capacityResults=await Promise.all([request('Alpha','2027-03-15','10:00'),request('Beta','2027-03-15','11:00')]);
-  assert.deepEqual(capacityResults.map(response=>response.status).sort(),[201,409],
-    'Bei gleichzeitigen, nicht überlappenden Anfragen darf die Kapazität von fünf Personen nicht überschritten werden');
+  assert.deepEqual(capacityResults.map(response=>response.status).sort(),[201,201],
+    'Zwei nicht überlappende Gruppen dürfen nacheinander buchen; die Kapazität gilt pro Termin');
 
   const overlapResults=await Promise.all([request('Gamma','2027-03-16','10:00'),request('Delta','2027-03-16','10:00')]);
   assert.deepEqual(overlapResults.map(response=>response.status).sort(),[201,409],
