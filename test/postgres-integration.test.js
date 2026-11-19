@@ -942,7 +942,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(missingId.status,400);
   const savedAction=await adminPost('/api/admin/aktionen',{
     titel:'Herbst-Erlebnisaktion',datum:day1,beschreibung:'CI Aktionsbeschreibung',
-    preis:'80',programm_id:linkedId});
+    preis:'80',programm_id:linkedId,veranstaltungsorte:['Brilon']});
   assert.equal(savedAction.status,201);
   const savedActionId=(await savedAction.json()).id;
   const publicActions=async()=>{
