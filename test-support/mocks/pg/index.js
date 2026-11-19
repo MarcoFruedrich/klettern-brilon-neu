@@ -18,6 +18,7 @@ class Pool {
     this.rechnungsdaten = {agbText:'Test-AGB', agbAktiv:true, agbVersion:1,
       empfehlungAktiv:false, empfehlungRabattArt:'prozent', empfehlungRabattWert:''};
     this.visitorGroups = null;
+    this.websiteEffects = null;
     this.advisoryLockOwner = null;
     this.advisoryLockWaiters = [];
   }
@@ -76,6 +77,15 @@ class Pool {
       return {rows:this.visitorGroups===null?[]:[{daten:this.visitorGroups}],rowCount:this.visitorGroups===null?0:1};
     if(visitorSql.startsWith('UPDATE brilon_besuchergruppen SET daten=')){
       this.visitorGroups=JSON.parse(params[0]);return {rows:[],rowCount:1};
+    }
+    if(/^\s*CREATE TABLE IF NOT EXISTS brilon_website_effekte\b/i.test(sql))
+      return {rows:[],rowCount:0};
+    if(/^\s*SELECT daten FROM brilon_website_effekte\b/i.test(sql))
+      return {rows:this.websiteEffects===null?[]:[{daten:this.websiteEffects}],
+        rowCount:this.websiteEffects===null?0:1};
+    if(/^\s*INSERT INTO brilon_website_effekte\b/i.test(sql)){
+      this.websiteEffects=JSON.parse(params[0]);
+      return {rows:[],rowCount:1};
     }
     if(/^\s*BEGIN\b/i.test(sql))return {rows:[],rowCount:0};
     if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql)){
