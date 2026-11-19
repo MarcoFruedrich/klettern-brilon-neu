@@ -2986,7 +2986,7 @@ if(placeRoute&&req.method==='DELETE'){
   const place=await pool.query('SELECT id,name FROM brilon_orte WHERE id=$1',[placeRoute[1]]);
   if(!place.rowCount)return reply(res,404,{error:'Standort nicht gefunden.'});
   const usage=await pool.query(`SELECT
-    (SELECT COUNT(*) FROM brilon_angebote WHERE veranstaltungsort=$1)+
+    (SELECT COUNT(*) FROM brilon_angebote WHERE veranstaltungsort=$1 OR (jsonb_typeof(veranstaltungsorte)='array' AND veranstaltungsorte ? $1))+
     (SELECT COUNT(*) FROM brilon_pruef_stationen WHERE ort_id=$2)+
     (SELECT COUNT(*) FROM brilon_pruef_freigaben WHERE ort_id=$2)+
     (SELECT COUNT(*) FROM brilon_buchungen WHERE data->>'veranstaltungsort'=$1) AS anzahl`,
