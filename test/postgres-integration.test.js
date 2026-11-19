@@ -392,6 +392,19 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal((await userPost('/api/pruefung/berichte',input)).status,403,
     'Ohne Vor-Ort-Code darf kein Prüfprotokoll gespeichert werden');
   assert.equal((await userPost('/api/pruefung/freischalten',{code,ortId:approvedPlaceId})).status,200);
+  // A second login of the same employee has no inspection unlock of its own.
+  // Invalid data must not bypass this session check and get as far as validation.
+  // Simulate an independently issued valid session directly in the isolated CI database,
+  // so this regression does not exhaust the unrelated eight-attempt login throttle.
+  const parallelToken=crypto.randomBytes(32).toString('hex');
+  await pool.query("INSERT INTO brilon_pruef_sessions(token_hash,mitarbeiter_id,ablauf) VALUES($1,$2,NOW()+INTERVAL '4 hours')",
+    [crypto.createHash('sha256').update(parallelToken).digest('hex'),pendingStaff.id]);
+  const parallelCookie='brilon_pruef_session='+parallelToken;
+  const parallelReport=await fetch(root+'/api/pruefung/berichte',{method:'POST',
+    headers:{Cookie:parallelCookie,Origin:root,'Content-Type':'application/json'},
+    body:JSON.stringify({programm:'Unberechtigte Zweitsitzung',pruefungen:[]})});
+  assert.equal(parallelReport.status,403,
+    'Nur die mit dem Vor-Ort-Code freigeschaltete Sitzung darf Prüfungen beginnen');
   const duplicate=await userPost('/api/pruefung/freischalten',{code,ortId:approvedPlaceId});
   assert.equal(duplicate.status,409,'Code darf kein zweites Mal verwendet werden');
   const weak=await userPost('/api/pruefung/berichte',{...input,
