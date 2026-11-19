@@ -3328,7 +3328,8 @@ if(route==='/api/admin/website-effekte'&&(req.method==='GET'||req.method==='PUT'
     id:safeText(e.id,80),name:safeText(e.name,80),symbol:safeText(e.symbol,20),
     anzahl:Number(e.anzahl),dauerSekunden:Number(e.dauerSekunden)
   }));
-  if(eintraege.some(e=>!e.id||!e.name||!e.symbol||!Number.isInteger(e.anzahl)||e.anzahl<1||e.anzahl>20||
+  if(eintraege.some(e=>!e.id||!e.name||!e.symbol||/[<>&]/.test(e.symbol)||
+     !Number.isInteger(e.anzahl)||e.anzahl<1||e.anzahl>20||
      !Number.isInteger(e.dauerSekunden)||e.dauerSekunden<8||e.dauerSekunden>90))
     return reply(res,400,{error:'Bitte die Effektangaben überprüfen.'});
   const aktiveId=safeText(daten.aktiveId,80)||null;
