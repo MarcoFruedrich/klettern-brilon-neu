@@ -20,6 +20,7 @@ const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigun
 const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { createEinsatzplanungApi } = require('./lib/einsatzplanung-api');
 const { createKundenbestaetigungService } = require('./lib/kundenbestaetigung-service');
+const { sonderangebotVorschlaege } = require('./lib/sonderangebot-vorschlaege');
 const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
 const { createKundenfeedbackApi } = require('./lib/kundenfeedback-api');
 const { createSpontanGruppenApi } = require('./lib/spontangruppen-api');
@@ -706,7 +707,7 @@ async function main(req,res){
          partnerhausKontaktEmail:partnerhausEinstellung.partnerkontakt_email}:{}),
        istGast,gastEinrichtung:istGast==='ja'?gastEinrichtung:null,
        gaesteRabattStatus:istGast==='ja'?'pruefung_offen':'nicht_beantragt',
-       name,vorname,nachname,email,datum,angebot,veranstaltungsort:bookingSite,teilnehmer,rechnungsadresse,
+       name,vorname,nachname,email,datum,angebot,programmId:String(programm.id),veranstaltungsort:bookingSite,teilnehmer,rechnungsadresse,
 gesamtpreis,
 anzahlung: einzelplatz ? 0 : Math.round(gesamtpreis * 25) / 100,
 restbetrag: einzelplatz ? gesamtpreis : Math.round(gesamtpreis * 75) / 100,
@@ -1767,7 +1768,10 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           `Termin: ${data.datum} um ${data.uhrzeit} Uhr`+
           (ergebnis.elternRabatt?.angewendet?'\nDer 10-%-Anschlussrabatt wurde auch auf deine ursprüngliche Buchung angewendet.':
             ergebnis.elternRabatt?.hoehererRabattBestand?'\nDein bereits bestehender höherer Rabatt bleibt erhalten. Empfehlungs- und Anschlussrabatte werden nicht addiert.':'');
-        const offerLink=anschlussLink(ergebnis.buchung.id);
+        let followups=null;
+        try{followups=await sonderangebotVorschlaege(pool,ergebnis.buchung.id);}
+        catch(error){console.error('Anschlussangebote nach Zahlung konnten nicht vorbereitet werden:',error.message);}
+        const offerLink=followups?.ok?anschlussLink(ergebnis.buchung.id):null;
         const angeboteText=offerLink?`\n\nPassende Anschlussprogramme mit 10 % Rabatt findest du hier:\n${offerLink}`:'';
         ergebnis.buchung.data.bestaetigungsEmail=await buchungsbestaetigungsEmail({
           buchungId:ergebnis.buchung.id,email:data.email,
@@ -1933,6 +1937,11 @@ if (
   ergebnis.alterStatus !== status && status !== 'offen'
 ) {
   const kunde = ergebnis.kundenDaten;
+  let followups=null;
+  if(status==='bestaetigt'&&kunde?.partnerhausAbwicklung!==true){
+    try{followups=await sonderangebotVorschlaege(pool,ergebnis.buchung.id);}
+    catch(error){console.error('Anschlussangebote nach Bestätigung konnten nicht vorbereitet werden:',error.message);}
+  }
   const empfaenger = kunde?.email;
   const gesamtCent = Number.isFinite(Number(kunde.gesamtpreis))
     ? Math.round(Number(kunde.gesamtpreis) * 100) : null;
@@ -1952,7 +1961,7 @@ if (
       `Datum: ${kunde.datum || 'Nicht angegeben'}\n` +
       `Beginn: ${kunde.uhrzeit || 'Nach Absprache'} Uhr\n` +
       `Teilnehmer: ${kunde.teilnehmer || 'Nicht angegeben'}\n\n` +
-      (kunde.partnerhausAbwicklung!==true&&status==='bestaetigt'&&anschlussLink(ergebnis.buchung.id)
+      (kunde.partnerhausAbwicklung!==true&&status==='bestaetigt'&&followups?.ok&&anschlussLink(ergebnis.buchung.id)
         ?`Passende Anschlussprogramme mit 10 % Rabatt: ${anschlussLink(ergebnis.buchung.id)}\n\n`:'' )+
       (kunde.partnerhausAbwicklung===true&&status==='bestaetigt'
         ?`Anfrage geprüft und an den Standortkontakt weitergeleitet: ${kunde.partnerhausKontaktEmail||''}\nStandortkontakt anschreiben: mailto:${kunde.partnerhausKontaktEmail||''}?subject=${encodeURIComponent('Rückfrage zu '+(kunde.angebot||'deiner Buchung')+' · '+(kunde.buchungsnummer||''))}\n\n`:'' )+
