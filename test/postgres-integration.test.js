@@ -109,7 +109,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.ok(individualResponses.every(response=>response.status===201),
     'Gleichzeitige Einzelanmeldungen dürfen denselben Termin teilen und je einen Platz reservieren: '+JSON.stringify(individualResponses));
   const individualAvailability=await fetch(root+'/api/belegte-zeiten?'+new URLSearchParams({
-    datum:day1,teilnehmer:'1',angebot:individualName
+    datum:day1,teilnehmer:'1',angebot:individualName,veranstaltungsort:'Brilon'
   }));
   assert.equal(individualAvailability.status,200);
   const fullSlot=(await individualAvailability.json()).zeiten.find(item=>item.uhrzeit==='14:00');
