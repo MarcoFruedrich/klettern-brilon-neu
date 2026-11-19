@@ -66,7 +66,7 @@ class Pool {
     if (sql.includes('UPDATE brilon_rechnungsdaten')) {
       const patch=typeof params[0]==='string'?JSON.parse(params[0]):(params[0]||{});
       this.rechnungsdaten={...this.rechnungsdaten,...patch};
-      return {rows:[],rowCount:1};
+      return {rows:[{data:this.rechnungsdaten}],rowCount:1};
     }
     if (process.env.MOCK_ADMIN_SESSION_FAIL==='1'&&sql.includes('brilon_admin_sessions'))
       throw new Error('Test-double: Admin-Sitzungstabelle fehlt');
