@@ -4345,10 +4345,14 @@ async function start(){
       standort_id BIGINT PRIMARY KEY REFERENCES brilon_orte(id) ON DELETE CASCADE,
       preis_pro_person_cent INTEGER CHECK(preis_pro_person_cent>=0),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+    // Partner-specific foreign keys require the opt-in partner schema.
+    // A fresh database without that schema must still start successfully.
+    if((await pool.query("SELECT to_regclass('public.brilon_netzwerkpartner') AS t")).rows[0].t){
     await pool.query(`ALTER TABLE brilon_spontan_einstellungen
       ADD COLUMN IF NOT EXISTS netzwerkpartner_id UUID REFERENCES brilon_netzwerkpartner(id) ON DELETE SET NULL,
       ADD COLUMN IF NOT EXISTS abzug_typ TEXT,
       ADD COLUMN IF NOT EXISTS abzug_wert NUMERIC(10,2) NOT NULL DEFAULT 0`);
+    }
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_spontan_teilnahmen(
       session_id UUID NOT NULL REFERENCES brilon_spontan_sessions(id) ON DELETE CASCADE,
       teilnahme_id UUID NOT NULL,interesse BOOLEAN NOT NULL,personen INTEGER NOT NULL DEFAULT 0,
@@ -4374,12 +4378,14 @@ async function start(){
     await pool.query(`ALTER TABLE brilon_spontan_zeiten
       ADD COLUMN IF NOT EXISTS abgeschlossen_am TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS abgeschlossen_von UUID`);
+    if((await pool.query("SELECT to_regclass('public.brilon_netzwerkpartner') AS t")).rows[0].t){
     await pool.query(`CREATE TABLE IF NOT EXISTS brilon_netzwerkpartner_abrechnungen(
       id UUID PRIMARY KEY,zeit_id UUID NOT NULL UNIQUE REFERENCES brilon_spontan_zeiten(id) ON DELETE CASCADE,
       netzwerkpartner_id UUID NOT NULL REFERENCES brilon_netzwerkpartner(id),
       rechnungsnummer TEXT NOT NULL UNIQUE,data JSONB NOT NULL,pdf BYTEA NOT NULL,
       email_status TEXT NOT NULL DEFAULT 'ausstehend',email_fehler TEXT,
       erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),versandt_am TIMESTAMPTZ)`);
+    }
     // Customer feedback is private to the admin API and linked to one existing booking.
     if(process.env.RUN_CUSTOMER_FEEDBACK_MIGRATION==='true'){
       await pool.query(`CREATE TABLE IF NOT EXISTS brilon_kundenfeedback(
