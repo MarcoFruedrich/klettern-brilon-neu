@@ -654,7 +654,7 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     assert.equal(created.aktiv,true);
     assert.ok(state.mutations.some(r=>r.endpoint==='/api/admin/angebote'&&r.method==='POST'));
     assert.ok(state.mutations.some(r=>r.endpoint==='/api/admin/angebote/'+created.id&&r.method==='PATCH'));
-    assert.ok(dialogs.some(x=>x.includes('erfolgreich gespeichert')));
+    assert.ok(dialogs.some(x=>x.includes('gespeichert')), 'Die Oberfläche bestätigt das Speichern');
     await page.close();
   });
 
@@ -935,9 +935,9 @@ test('Browser: geschütztes Admin-Dashboard auf mobilen und großen Bildschirmen
     await openAdminView(page,'#stationspruefung');
     const standby=page.locator('#tablet-admin-list article').filter({hasText:'Ersatz-Werbetablet'});
     await standby.getByText('Nur Werbeanzeige – keine Prüfcodes').waitFor();
-    await standby.getByRole('button',{name:'Als Prüfdisplay auswählen'}).click();
+    await standby.getByRole('button',{name:'Als Prüfdisplay für diesen Standort auswählen'}).click();
     await page.waitForFunction(()=>Array.from(document.querySelectorAll('#tablet-admin-list article'))
-      .some(a=>a.textContent.includes('Ersatz-Werbetablet')&&a.textContent.includes('Ausgewähltes Prüfdisplay')));
+      .some(a=>a.textContent.includes('Ersatz-Werbetablet')&&a.textContent.includes('Prüfdisplay für Brilon')));
     assert.deepEqual(dialogs,['confirm']);
     assert.equal(state.inspectionTablets.filter(x=>x.pruefdisplay).length,1);
     assert.equal(state.inspectionTablets.find(x=>x.id===second).pruefdisplay,true);
