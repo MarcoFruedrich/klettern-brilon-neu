@@ -16,3 +16,10 @@ test('Anschlussangebote benötigen Freigabe am Standort der ursprünglichen Buch
   assert.match(src,/if\(!programmAmStandort\(p,original\.veranstaltungsort\)\)return \{standort:false\}/);
   assert.match(src,/if\(result\.standort===false\)/);
 });
+
+test('Kapazitätsprüfung bei Umbuchung und Verwaltung trennt alle Standorte',()=>{
+  assert.equal((src.match(/AND data->>'veranstaltungsort'=\$5/g)||[]).length,2);
+  assert.equal((src.match(/SELECT kapazitaet FROM brilon_angebote WHERE name=\$1 AND \(veranstaltungsort=\$2/g)||[]).length,2);
+  assert.match(src,/\[id,data\.datum,data\.angebot,data\.uhrzeit,data\.veranstaltungsort\]/);
+  assert.match(src,/\[row\.buchung_id,shifted\.datum,shifted\.angebot,shifted\.uhrzeit,shifted\.veranstaltungsort\]/);
+});

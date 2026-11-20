@@ -1339,11 +1339,12 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
             shifted.buchungsmodus==='einzelplatz'?{angebot:shifted.angebot,uhrzeit:shifted.uhrzeit}:null,shifted.veranstaltungsort);
           if(conflict)return {konflikt:conflict};
           if(shifted.buchungsmodus==='einzelplatz'){
-            const programm=await client.query('SELECT kapazitaet FROM brilon_angebote WHERE name=$1 LIMIT 1',[shifted.angebot]);
+            const programm=await client.query(`SELECT kapazitaet FROM brilon_angebote WHERE name=$1 AND (veranstaltungsort=$2 OR COALESCE(veranstaltungsorte,'[]'::jsonb) ? $2) AND aktiv=true AND buchbar=true AND veroeffentlicht=true AND archiviert=false ORDER BY CASE WHEN veranstaltungsort=$2 THEN 0 ELSE 1 END,id ASC LIMIT 1`,[shifted.angebot,shifted.veranstaltungsort]);
             if(!programm.rowCount)return {konflikt:'Die Kapazität dieses Einzelplatzangebots kann nicht geprüft werden.'};
             const belegung=await client.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS gebucht
               FROM brilon_buchungen WHERE id<>$1 AND data->>'datum'=$2 AND data->>'angebot'=$3 AND data->>'uhrzeit'=$4
-                AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[row.buchung_id,shifted.datum,shifted.angebot,shifted.uhrzeit]);
+                AND data->>'veranstaltungsort'=$5
+                AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[row.buchung_id,shifted.datum,shifted.angebot,shifted.uhrzeit,shifted.veranstaltungsort]);
             if(Number(belegung.rows[0].gebucht)+Number(shifted.teilnehmer||1)>Number(programm.rows[0].kapazitaet))
               return {konflikt:'Die Kapazität für diesen Einzelplatztermin ist ausgeschöpft.'};
           }
@@ -1998,13 +1999,14 @@ const alterStatus = alt.rows[0].status;
           );
           if(konflikt)return {konflikt};
           if(data.buchungsmodus==='einzelplatz'){
-            const programm=await client.query('SELECT kapazitaet FROM brilon_angebote WHERE name=$1 LIMIT 1',[data.angebot]);
+            const programm=await client.query(`SELECT kapazitaet FROM brilon_angebote WHERE name=$1 AND (veranstaltungsort=$2 OR COALESCE(veranstaltungsorte,'[]'::jsonb) ? $2) AND aktiv=true AND buchbar=true AND veroeffentlicht=true AND archiviert=false ORDER BY CASE WHEN veranstaltungsort=$2 THEN 0 ELSE 1 END,id ASC LIMIT 1`,[data.angebot,data.veranstaltungsort]);
             if(!programm.rowCount)return {konflikt:'Die Kapazität dieses Einzelplatzangebots kann nicht geprüft werden.'};
             const belegung=await client.query(
               `SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS gebucht
                FROM brilon_buchungen WHERE id<>$1 AND data->>'datum'=$2 AND data->>'angebot'=$3 AND data->>'uhrzeit'=$4
+                 AND data->>'veranstaltungsort'=$5
                  AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,
-              [id,data.datum,data.angebot,data.uhrzeit]
+              [id,data.datum,data.angebot,data.uhrzeit,data.veranstaltungsort]
             );
             if(Number(belegung.rows[0].gebucht)+Number(data.teilnehmer||1)>Number(programm.rows[0].kapazitaet))
               return {konflikt:'Die Kapazität für diesen Einzelplatztermin ist ausgeschöpft.'};
