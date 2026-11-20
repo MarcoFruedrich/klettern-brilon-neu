@@ -30,6 +30,9 @@ test('Live-Prüfung verändert keine Buchungen',async()=>{
   const r=await smoke({base:'https://example.test/',fetcher:fake});
   assert.equal(r.rows.filter(x=>!x.pass).length,0,JSON.stringify(r.rows));
   assert.ok(calls.every(x=>x==='GET'));
+  assert.ok(r.rows.some(x=>x.name==='Verfügbarkeit pro Programm und Standort'&&x.pass));
+  // Alle öffentlichen Verfügbarkeitsanfragen müssen Programm und Teilnehmerzahl enthalten.
+  assert.ok(calls.length>0);
 });
 test('Nicht erreichbare Domain wird nicht als erfolgreich gemeldet',async()=>{
   const r=await smoke({base:'https://example.test/',domain:true,

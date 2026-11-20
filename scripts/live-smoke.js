@@ -88,19 +88,42 @@ async function smoke({base,domain=false,fetcher=fetch,timeout=18000}={}){
         return 'Alle öffentlichen Standortreferenzen gültig';
       });
     }
-    if(orte?.length){
+    if(orte?.length&&angebote?.length){
       const date=new Date(Date.now()+14*86400000).toISOString().slice(0,10);
-      await check('Unverbindliche Kalenderabfragen je Standort',async()=>{
-        const broken=[];
-        for(const ort of orte.slice(0,20)){
-          try{
-            const r=await get('/api/belegte-zeiten?datum='+date+
-              '&standort='+encodeURIComponent(ort.name),true);
-            if(!Array.isArray(r?.zeiten))throw Error('Zeitfenster fehlen');
-          }catch{broken.push(ort.name);}
+      await check('Verfügbarkeit pro Programm und Standort',async()=>{
+        let success=0;
+        const broken=[],covered=new Set();
+        for(const programm of angebote){
+          const sites=Array.isArray(programm.veranstaltungsorte)&&programm.veranstaltungsorte.length?
+            programm.veranstaltungsorte:[programm.veranstaltungsort].filter(Boolean);
+          const tiers=Array.isArray(programm.gruppenstufen)?
+            programm.gruppenstufen.filter(x=>Number.isInteger(Number(x.min))&&Number(x.min)>=1):[];
+          const stage=tiers[0];
+          const participants=programm.buchungsmodus==='einzelplatz'?1:(stage?Number(stage.min):6);
+          for(const name of sites){
+            if(!orte.some(x=>x.name===name))continue;
+            let query='/api/belegte-zeiten?datum='+date+
+              '&standort='+encodeURIComponent(name)+
+              '&angebot='+encodeURIComponent(programm.name)+
+              '&teilnehmer='+encodeURIComponent(participants);
+            const duration=programm.dauer_modus==='gruppenstufe'?Number(stage?.dauer):Number(programm.dauer);
+            if(Number.isInteger(duration)&&duration>0)
+              query+='&programmdauer='+duration;
+            try{
+              const response=await get(query,true);
+              if(!Array.isArray(response?.zeiten))throw Error('Zeitfenster fehlen');
+              success++;covered.add(name);
+            }catch(error){
+              broken.push('Programm '+String(programm.id||'?')+': '+String(error.message||error).slice(0,50));
+            }
+          }
         }
-        if(broken.length)throw Error(String(broken.length)+' von '+Math.min(orte.length,20)+' Standortkalendern nicht verfügbar.');
-        return String(Math.min(orte.length,20))+' Kalenderabfragen erfolgreich';
+        for(const place of orte){
+          if(!covered.has(place.name))broken.push('Kein funktionierendes Programm am Standort');
+        }
+        if(broken.length)
+          throw Error(broken.length+' Kalenderprüfungen fehlgeschlagen: '+[...new Set(broken)].slice(0,3).join('; '));
+        return success+' Programm-/Standortkombinationen erfolgreich geprüft';
       });
     }
   }
