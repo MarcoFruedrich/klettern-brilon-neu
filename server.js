@@ -24,6 +24,7 @@ const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { createEinsatzplanungApi } = require('./lib/einsatzplanung-api');
 const { createMitarbeiterStornoMail } = require('./lib/mitarbeiter-storno-mail');
 const { terminGeaendert, direkterTerminwechselGrund } = require('./lib/terminwechsel-sicherheit');
+const { statuswechselGrund } = require('./lib/buchungsstatus-schutz');
 const { createKundenbestaetigungService } = require('./lib/kundenbestaetigung-service');
 const { sonderangebotVorschlaege } = require('./lib/sonderangebot-vorschlaege');
 const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
@@ -1932,13 +1933,15 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       const ergebnis=await reservierungsTransaktion(async client=>{
         
 const alt=await client.query(
-  'SELECT id,data,status FROM brilon_buchungen WHERE id=$1',
+  'SELECT id,data,status FROM brilon_buchungen WHERE id=$1 FOR UPDATE',
   [id]
 );
 
         if(!alt.rowCount)return {fehlt:true};
         
 const alterStatus = alt.rows[0].status;
+    const gesperrterStatuswechsel=statuswechselGrund(alterStatus,status);
+    if(gesperrterStatuswechsel)return {statuswechselGesperrt:gesperrterStatuswechsel};
     const buchungsdaten = alt.rows[0].data;
         if(terminGeaendert(buchungsdaten,aenderungen)){
           const direkterGrund=direkterTerminwechselGrund(alterStatus,0);
@@ -2033,6 +2036,8 @@ return {
 
       if(ergebnis.fehlt)
         return reply(res,404,{error:'Buchung nicht gefunden.'});
+      if(ergebnis.statuswechselGesperrt)
+        return reply(res,409,{error:ergebnis.statuswechselGesperrt});
       if(ergebnis.terminwechselGesperrt)
         return reply(res,409,{error:ergebnis.terminwechselGesperrt});
       if(ergebnis.konflikt)
