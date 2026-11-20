@@ -22,6 +22,7 @@ const { createPdf: erstelleRechnungsPdf, formatDate: rechnungsDatumFormatieren }
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { createEinsatzplanungApi } = require('./lib/einsatzplanung-api');
+const { createMitarbeiterStornoMail } = require('./lib/mitarbeiter-storno-mail');
 const { terminGeaendert, direkterTerminwechselGrund } = require('./lib/terminwechsel-sicherheit');
 const { createKundenbestaetigungService } = require('./lib/kundenbestaetigung-service');
 const { sonderangebotVorschlaege } = require('./lib/sonderangebot-vorschlaege');
@@ -76,6 +77,7 @@ const brevoMail=createBrevoMailer();
 const kundenrechnungVersenden=pool?createKundenrechnungsversand({pool,brevoMail}):null;
 const partnerhausWeiterleiten=pool?createPartnerhausWeiterleitung({pool,brevoMail}):null;
 const zahlungsinfoVersenden=pool?createZahlungsinfoVersand({pool,brevoMail}):null;
+const mitarbeiterAbsageInformieren=pool?createMitarbeiterStornoMail({pool,brevoMail}):null;
 const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
@@ -1279,13 +1281,16 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           `Eine Umbuchungsanfrage wurde vom Kunden bestätigt und wartet auf die Freigabe durch die Verwaltung.\n\nBuchung: ${bookingNumber}\nKunde: ${data.name||''} · ${customerEmail}\nBisheriger Termin: ${data.datum||''} um ${data.uhrzeit||'—'} Uhr\nWunschtermin: ${result.wunschdatum} um ${result.wunschzeit} Uhr\nAngebot: ${data.angebot||''}\nBuchungs-ID: ${result.buchung.id}`).catch(error=>console.error('Verwaltungsbenachrichtigung zur Umbuchungsanfrage fehlgeschlagen:',error.code||'unbekannter Fehler'));
         return reply(res,200,{success:true,buchungsnummer:bookingNumber,message:'Deine Umbuchungsanfrage wurde bestätigt und an die Verwaltung weitergeleitet. Die bestehende Buchung bleibt unverändert, bis die Verwaltung die Umbuchung freigibt.'});
       }
+      let mitarbeiterStornierung={anzahl:0,ergebnisse:[]};
+      try{mitarbeiterStornierung=await mitarbeiterAbsageInformieren(result.buchung.id);}
+      catch(error){console.error('Stornierung: Mitarbeiter-Mails konnten nicht geprüft werden:',error.code||'DB_ERROR');}
       const cancellationText=`Die Buchung ${bookingNumber} wurde nach Bestätigung des Widerrufs / der Stornierung am ${new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin'})} auf storniert gesetzt.\n\nProgramm: ${data.angebot||''}\nTermin: ${data.datum||''} um ${data.uhrzeit||''} Uhr\n\nBereits geleistete Zahlungen werden nicht automatisch ausgezahlt. Die Abrechnung erfolgt nach den bei der Buchung bestätigten Geschäftsbedingungen. Bei einer Stornierung innerhalb des kostenfreien Zeitraums wird eine etwaige Erstattung separat bearbeitet.\n\nViele Grüße\nKlettern & Abenteuer Brilon`;
       const customerEmail=safeText(data.email,180).toLowerCase();
       if(/^\S+@\S+\.\S+$/.test(customerEmail))brevoMail(customerEmail,'Widerruf / Stornierung bestätigt – Klettern & Abenteuer',
         `Guten Tag ${data.name||''},\n\n${cancellationText}`,{idempotencyKey:result.requestId}).catch(error=>console.error('Stornierungsbestätigung konnte nicht versandt werden:',error.code||'unbekannter Fehler'));
       if(process.env.BOOKING_NOTIFY_EMAIL)brevoMail(process.env.BOOKING_NOTIFY_EMAIL,'Kundenwiderruf / Stornierung bestätigt',
         `${cancellationText}\n\nKunde: ${data.name||''} · ${customerEmail}\nBuchungs-ID: ${result.buchung.id}`).catch(error=>console.error('Verwaltungsbenachrichtigung zum Widerruf fehlgeschlagen:',error.code||'unbekannter Fehler'));
-      return reply(res,200,{success:true,buchungsnummer:bookingNumber,message:'Der Widerruf / die Stornierung wurde bestätigt. Eine Bestätigungs-E-Mail wurde veranlasst.'});
+      return reply(res,200,{success:true,buchungsnummer:bookingNumber,mitarbeiterStornierung,message:'Der Widerruf / die Stornierung wurde bestätigt. Eine Bestätigungs-E-Mail wurde veranlasst.'});
     }
 
     if(route==='/api/admin/umbuchungsanfragen'&&req.method==='GET'){
@@ -2055,6 +2060,12 @@ if(ergebnis.alterStatus!==status&&status==='bestaetigt'&&
   }
 }
 
+if(ergebnis.alterStatus!==status&&['storniert','abgelehnt'].includes(status)){
+  try{ergebnis.mitarbeiterStornierung=await mitarbeiterAbsageInformieren(ergebnis.buchung.id);}
+  catch(error){console.error('Mitarbeiter-Stornohinweise fehlgeschlagen:',error.code||'DB_ERROR');
+    ergebnis.mitarbeiterStornierung={status:'unklar'};}
+}
+
 if (
   ergebnis.alterStatus !== status && status !== 'offen'
 ) {
@@ -2104,7 +2115,7 @@ if (
   }
 }
 
-      return reply(res,200,ergebnis.buchung);
+      return reply(res,200,{...ergebnis.buchung,...(ergebnis.mitarbeiterStornierung?{mitarbeiterStornierung:ergebnis.mitarbeiterStornierung}:{})});
     }
 
     if (route.match(/^\/api\/admin\/buchungen\/[0-9a-f-]{36}\/zahlung$/)

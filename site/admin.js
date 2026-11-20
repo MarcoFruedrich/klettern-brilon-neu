@@ -447,6 +447,15 @@ async function refresh() {
         const info=b.data.umbuchung.mitarbeiterHinweis;
         if(info)c.append(el('p','Hinweise an ehemals eingeteilte Mitarbeiter: '+(info.status||'unbekannt')+' · '+Number(info.angenommen||0)+' von '+Number(info.anzahl||0)+' beim Mailanbieter angenommen.'));
       }
+      if(['storniert','abgelehnt'].includes(b.status)){
+        const mitarbeiterStornoMails=b.data.mitarbeiterStornoMails;
+        if(mitarbeiterStornoMails&&typeof mitarbeiterStornoMails==='object'&&!Array.isArray(mitarbeiterStornoMails)){
+          const eintraege=Object.values(mitarbeiterStornoMails).filter(x=>x&&typeof x==='object');
+          if(eintraege.length)c.append(el('p','Stornohinweise an Mitarbeitende: '+
+            eintraege.filter(x=>x.status==='angenommen').length+' von '+eintraege.length+
+            ' vom E-Mail-Anbieter angenommen. Unklare Zustände bitte prüfen.'));
+        }
+      }
       const gesamtpreis = Number(b.data.gesamtpreis);
 
 if (b.data.partnerhausAbwicklung===true) {
