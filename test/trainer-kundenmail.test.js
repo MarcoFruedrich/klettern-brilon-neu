@@ -37,7 +37,7 @@ test('Bei Teilzahlung unter 25 Prozent darf keine verbindliche Buchung bestätig
 });
 
 test('Partnerhausbuchung wird ohne eigene Zahlungsaufforderung an den Gast bestätigt',()=>{
-  const mail=kundenmailNachTrainerzusage({...base,partnerhausAbwicklung:true},{bookingId:'PARTNER-123'});
+  const mail=kundenmailNachTrainerzusage({...base,gesamtpreis:null,partnerhausAbwicklung:true},{bookingId:'PARTNER-123'});
   assert.equal(mail.verbindlich,true);
   assert.match(mail.text,/Abrechnung erfolgt über das Partnerhaus/);
   assert.match(mail.text,/keine eigene Anzahlung/);
