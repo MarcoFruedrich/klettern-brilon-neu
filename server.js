@@ -418,7 +418,9 @@ async function anschlussApi(req,res,url,route,ip){
     const participants=Number(base.teilnehmer);
     if(!Number.isInteger(participants)||participants<1||participants>150)
       return reply(res,409,{error:'Die Gruppengröße der bestätigten Buchung ist ungültig.'});
-    const occupied=bookings.rows.filter(b=>b.id!==parentId).map(b=>buchungsfenster(b.data));
+    const occupied=bookings.rows.filter(b=>b.id!==parentId&&
+      (!b.data?.veranstaltungsort||b.data.veranstaltungsort===base.veranstaltungsort))
+      .map(b=>buchungsfenster(b.data));
     const suggestions=[];
     for(const p of programs.rows){
       if(!programmAmStandort(p,base.veranstaltungsort))continue;
@@ -427,11 +429,17 @@ async function anschlussApi(req,res,url,route,ip){
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
       const price=preisFuerTeilnehmer(p.preise,participants,p.gruppenstufen),duration=buchungsdauerFuerProgramm(participants,p);
       if((dates.length&&!dates.includes(base.datum))||participants>Number(p.kapazitaet)||price===null||!Number.isInteger(duration)||duration<1)continue;
-      const cap=await pool.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum,p.name]);
-      if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))continue;
+      // Die Kapazität zählt pro Sitzung und am jeweiligen Standort.
       const times=zugelasseneAnschlusszeiten(window[0],window[1],duration)
         .filter(t=>!occupied.some(w=>ueberschneidung([t.beginnMinuten,t.endeMinuten],w)))
-        .map(t=>({...t,uhrzeit:String(Math.floor(t.beginnMinuten/60)).padStart(2,'0')+':00'}));
+        .map(t=>({...t,uhrzeit:String(Math.floor(t.beginnMinuten/60)).padStart(2,'0')+':00'}))
+        .filter(t=>{
+          const angemeldet=bookings.rows.filter(b=>b.id!==parentId&&
+            b.data?.veranstaltungsort===base.veranstaltungsort&&
+            b.data?.angebot===p.name&&b.data?.uhrzeit===t.uhrzeit)
+            .reduce((sum,b)=>sum+(Number(b.data?.teilnehmer)||0),0);
+          return angemeldet+participants<=Number(p.kapazitaet);
+        });
       if(times.length){const quote=anschlussPreis(price);suggestions.push({id:p.id,name:p.name,beschreibung:p.beschreibung,dauer:duration,
         originalCent:quote.originalCent,rabattCent:quote.rabattCent,endpreisCent:quote.endpreisCent,zeiten:times});}
     }
@@ -457,7 +465,11 @@ async function anschlussApi(req,res,url,route,ip){
         AND data->>'angebot'=$2 AND data->>'uhrzeit'=$3 AND COALESCE(status,'offen') NOT IN ('abgelehnt','storniert') LIMIT 1`,
         [parentId,p.name,time]);
       if(duplicate.rowCount)return {duplikat:true};
-      const cap=await client.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[original.datum,p.name]);
+      const cap=await client.query(`SELECT COALESCE(SUM(CASE WHEN data->>'teilnehmer' ~ '^[0-9]+$' THEN (data->>'teilnehmer')::integer ELSE 0 END),0) AS n
+        FROM brilon_buchungen WHERE data->>'datum'=$1 AND data->>'angebot'=$2
+          AND data->>'uhrzeit'=$3 AND data->>'veranstaltungsort'=$4
+          AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,
+          [original.datum,p.name,time,original.veranstaltungsort]);
       if(Number(cap.rows[0].n)+participants>Number(p.kapazitaet))return {kapazität:false};
       const conflict=await pruefeBuchungskonflikt(client,original.datum,[start,start+duration],parentId,null,original.veranstaltungsort);if(conflict)return {konflikt:conflict};
       const quote=anschlussPreis(price),id=crypto.randomUUID(),first=safeText(original.vorname,80),last=safeText(original.nachname,80);

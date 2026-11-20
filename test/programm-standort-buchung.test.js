@@ -23,3 +23,10 @@ test('Kapazitätsprüfung bei Umbuchung und Verwaltung trennt alle Standorte',()
   assert.match(src,/\[id,data\.datum,data\.angebot,data\.uhrzeit,data\.veranstaltungsort\]/);
   assert.match(src,/\[row\.buchung_id,shifted\.datum,shifted\.angebot,shifted\.uhrzeit,shifted\.veranstaltungsort\]/);
 });
+
+test('Anschlussprogramme zählen freie Kapazität je tatsächlicher Sitzung und Standort',()=>{
+  assert.match(src,/b\.data\.veranstaltungsort===base\.veranstaltungsort/);
+  assert.match(src,/angemeldet\+participants<=Number\(p\.kapazitaet\)/);
+  assert.match(src,/data->>'uhrzeit'=\$3 AND data->>'veranstaltungsort'=\$4/);
+  assert.match(src,/\[original\.datum,p\.name,time,original\.veranstaltungsort\]/);
+});
