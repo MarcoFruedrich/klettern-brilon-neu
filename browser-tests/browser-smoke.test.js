@@ -130,12 +130,13 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.route('**/api/social-links',route=>route.fulfill({
       status:200,contentType:'application/json',
       body:JSON.stringify({kanäle:enabled
-        ?[{id:'whatsapp',name:'WhatsApp Business',url:'https://wa.me/message/JXO6HLT34O37B1'}]
+        ?[{id:'whatsapp',name:'WhatsApp Business',url:'https://wa.me/message/JXO6HLT34O37B1',aktiv:true}]
         :[]})
     }));
     await page.goto(root+'/');
     await page.locator('#social-whatsapp-button').waitFor({state:'visible'});
     assert.equal(await page.locator('#social-contact-links a[data-social-channel="whatsapp"]').count(),1);
+    await page.locator('#angebote-uebersicht .whatsapp-share-link').first().waitFor({state:'visible'});
     enabled=false;
     const hiddenReply=page.waitForResponse(response=>response.url().includes('/api/social-links'));
     await page.reload();
@@ -143,10 +144,13 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     await page.waitForFunction(()=>document.readyState==='complete');
     assert.equal(await page.locator('#social-whatsapp-button').count(),0);
     assert.equal(await page.locator('#social-contact-links a[data-social-channel="whatsapp"]').count(),0);
+    assert.equal(await page.locator('#angebote-uebersicht .whatsapp-share-link').first().isVisible(),false,
+      'Deaktivierte Social-Media-Kanäle müssen auch Programm-Teilen ausblenden');
     enabled=true;
     await page.reload();
     await page.locator('#social-whatsapp-button').waitFor({state:'visible'});
     assert.equal(await page.locator('#social-contact-links a[data-social-channel="whatsapp"]').count(),1);
+    assert.equal(await page.locator('#angebote-uebersicht .whatsapp-share-link').first().isVisible(),true);
     await page.close();
   });
 

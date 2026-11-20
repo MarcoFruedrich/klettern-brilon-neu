@@ -32,7 +32,7 @@
       card.className='booking';
       card.style.cssText='min-width:0;max-width:100%;overflow-wrap:anywhere';
       const preview=document.createElement('img');
-      preview.src=image.url+(image.url.includes('?')?'&':'?')+'v='+encodeURIComponent(String(image.groesse||0));
+      preview.src=image.url+(image.url.includes('?')?'&':'?')+'v='+encodeURIComponent(String(image.aktualisiertAm||image.groesse||0));
       preview.alt=image.name||'Gespeichertes Bild';
       preview.loading='lazy';
       preview.style.width='100%';
@@ -174,7 +174,7 @@
       const card=el('article');
       card.className='booking';
       const preview=document.createElement('img');
-      preview.src=image.url+(image.url.includes('?')?'&':'?')+'v='+encodeURIComponent(String(image.groesse||0));
+      preview.src=image.url+(image.url.includes('?')?'&':'?')+'v='+encodeURIComponent(String(image.aktualisiertAm||image.groesse||0));
       preview.alt=image.name||'Gespeichertes Bild';
       preview.loading='lazy';
       preview.style.width='100%';

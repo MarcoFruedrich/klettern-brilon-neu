@@ -802,6 +802,10 @@ function whatsappTeilButton(titel,hinweise,ziel){
   link.href=whatsappTeilLink(titel,hinweise,ziel);
   link.target='_blank';link.rel='noopener noreferrer';
   link.className='whatsapp-share-link';
+  link.dataset.socialChannelAction='whatsapp';
+  // Die Freigabe aus Öffentlichkeitsarbeit gilt auch für Teilen-Buttons
+  // auf Programmen und Tagesaktionen. Standard: vollständig unsichtbar.
+  link.hidden=window.kletternSocialKanalAktiv?.('whatsapp')!==true;
   link.textContent='Über WhatsApp teilen';
   link.setAttribute('aria-label',titel+' über WhatsApp teilen');
   return link;

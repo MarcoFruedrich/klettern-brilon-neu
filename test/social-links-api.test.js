@@ -29,16 +29,19 @@ function fixture({ stored = null, missingTable = false, authorized = true, reque
 
 test('Öffentliche Social-Links liefern nur aktivierte und geprüfte Kanäle', async () => {
   const stored = standard().map(item => item.id === 'instagram'
-    ? { ...item, url: 'https://instagram.com/klettern', aktiv: true } : item);
+    ? { ...item, url: 'https://instagram.com/klettern', aktiv: true } :
+    item.id === 'whatsapp' ? {...item,aktiv:true} : item);
   const x = fixture({ stored });
   assert.equal(await x.api({ method: 'GET' }, {}, '/api/social-links'), true);
   assert.deepEqual(x.replies[0].payload.kanäle.map(item => item.id), ['whatsapp','instagram']);
+  assert.ok(x.replies[0].payload.kanäle.every(item=>item.aktiv===true));
 });
 
 test('Fehlende Social-Link-Tabelle unterbricht keine öffentliche Seite', async () => {
   const x = fixture({ missingTable: true });
   assert.equal(await x.api({ method: 'GET' }, {}, '/api/social-links'), true);
-  assert.deepEqual(x.replies[0].payload.kanäle.map(item => item.id), ['whatsapp']);
+  assert.deepEqual(x.replies[0].payload.kanäle,[],
+    'Ohne Speichertabelle darf keine Social-Media-Schaltfläche standardmäßig erscheinen');
 });
 
 test('Verwaltung lädt sichere Standardwerte und speichert validierte Kanäle', async () => {
