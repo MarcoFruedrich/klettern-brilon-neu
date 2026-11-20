@@ -2427,7 +2427,8 @@ preis=safeText(d.preis,50);
              jsonb_build_object(
                'buchungsnummer',data->'buchungsnummer','name',data->'name','angebot',data->'angebot',
                'datum',data->'datum','gesamtpreis',data->'gesamtpreis','zahlungen',data->'zahlungen',
-               'zahlungsgutschriftCent',data->'zahlungsgutschriftCent'
+               'zahlungsgutschriftCent',data->'zahlungsgutschriftCent',
+               'partnerhausAbwicklung',data->'partnerhausAbwicklung'
              ) AS data
            FROM brilon_buchungen ORDER BY created_at DESC,id DESC`
         );
@@ -2435,7 +2436,7 @@ preis=safeText(d.preis,50);
         const gefiltert=totals.eintraege.filter(e=>{
           if(filter==='offen')return e.offenCent>0;
           if(filter==='teilzahlung')return e.eingegangenCent>0&&e.offenCent>0;
-          if(filter==='vollstaendig')return e.gesamtpreisCent!==null&&e.gesamtpreisCent>0&&e.eingegangenCent>=e.gesamtpreisCent;
+          if(filter==='vollstaendig')return !e.externAbgerechnet&&e.gesamtpreisCent!==null&&e.gesamtpreisCent>0&&e.eingegangenCent>=e.gesamtpreisCent;
           if(filter==='gutschrift')return e.gutschriftCent>0;
           return true;
         });
