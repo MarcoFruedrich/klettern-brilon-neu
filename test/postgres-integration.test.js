@@ -138,6 +138,23 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   assert.equal(login.status,200,'Der Admin-Zugang muss mit isoliertem PostgreSQL funktionieren');
   const cookie=login.headers.get('set-cookie')?.split(';',1)[0];
   assert.ok(cookie,'Geschützte Testabfragen benötigen das Session-Cookie');
+  const diagnosticsPath=root+'/api/admin/pruefung/schema-status';
+  const unauthorizedDiagnostics=await fetch(diagnosticsPath);
+  assert.equal(unauthorizedDiagnostics.status,401,
+    'Datenbank- und E-Mail-Konfigurationsstatus dürfen nicht ohne Admin-Anmeldung abrufbar sein');
+  const diagnosticsResponse=await fetch(diagnosticsPath,{headers:{Cookie:cookie}});
+  assert.equal(diagnosticsResponse.status,200,'Autorisierte Verwaltung muss die Stationsschema-Diagnose abrufen können');
+  const diagnostics=await diagnosticsResponse.json();
+  assert.equal(diagnostics.bereit,true,
+    'Stationsprüfung benötigt nach gezielter CI-Migration alle Tabellen und Felder: '+JSON.stringify(diagnostics));
+  assert.deepEqual(diagnostics.fehlendeTabellen,[]);
+  assert.deepEqual(diagnostics.fehlendeFelder,[]);
+  assert.equal(diagnostics.konfiguration.pruefcodeKonfiguriert,true);
+  assert.equal(diagnostics.konfiguration.mailKonfiguriert,false,
+    'Isolierte Tests dürfen keinen produktiven Mailanbieter verwenden');
+  assert.equal(diagnostics.konfiguration.pruefMigrationBeimStartAktiv,true);
+  assert.ok(!JSON.stringify(diagnostics).includes('ci-only-check-code-secret'),
+    'Diagnose darf niemals Sicherheitsgeheimnisse ausgeben');
   const query=async params=>{
     const response=await fetch(root+'/api/admin/buchungen?'+new URLSearchParams(params),
       {headers:{Cookie:cookie}});

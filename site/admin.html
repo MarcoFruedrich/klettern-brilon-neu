@@ -849,6 +849,13 @@
     <section id="stationspruefung" class="booking admin-anchor admin-view" data-admin-view aria-labelledby="inspection-heading">
       <h2 id="inspection-heading">Stationsprüfungen – Verwaltung</h2>
       <p>Für die dokumentierte Kontrolle vor jedem Programm. <a href="/pruefung.html">Prüfformular für Mitarbeitende öffnen</a>.</p>
+      <section id="pruef-schema-diagnose" aria-labelledby="pruef-schema-heading">
+        <h3 id="pruef-schema-heading">Technischer Bereitschaftscheck (nur Verwaltung)</h3>
+        <p class="hint">Prüft lesend, ob die erforderlichen Datenbanktabellen, Standortfelder und Grundkonfigurationen vorhanden sind. Diese Prüfung führt keine Migration aus und ersetzt weder eine praktische Stationskontrolle noch einen E-Mail-Zustelltest.</p>
+        <button id="pruef-schema-refresh" type="button" class="btn secondary">Stationsprüfung: Datenbankstatus prüfen</button>
+        <p id="pruef-schema-status" role="status" aria-live="polite">Datenbankstatus noch nicht geprüft.</p>
+        <div id="pruef-schema-details"></div>
+      </section>
       <section id="pruef-uebersicht" aria-label="Sicherheitsübersicht der Kletterstationen">
         <h3>Aktuelle Sicherheitsübersicht</h3>
         <p class="hint">Sicherheitsmängel und stillgelegte Stationen haben Vorrang. Kleinere Hinweise werden separat zur Nachprüfung angezeigt. Die Übersicht ersetzt keine vorgeschriebene Kontrolle vor jeder Nutzung.</p>
@@ -982,7 +989,7 @@
   <script src="/spontangruppen-preise.js?v=20261118-inline-csrf"></script>
   <script src="/whatsapp-admin.js?v=20261108-social-link-visibility"></script>
   <script src="/website-effekte-admin.js?v=20261118-api-repair"></script>
-  <script src="/pruefung-admin.js?v=20261115-partner-location-save"></script>
+  <script src="/pruefung-admin.js?v=20261120-schema-diagnostics"></script>
   <script src="/feedback-admin.js"></script>
   <script src="/einsatzplanung-admin.js?v=20261109-staff-application-roster"></script>
   <script src="/wissensportal-admin.js?v=20261106-hierarchical-categories"></script>
