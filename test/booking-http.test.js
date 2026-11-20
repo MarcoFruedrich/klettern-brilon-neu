@@ -18,7 +18,7 @@ test('HTTP: Buchungsanfrage prüft Konflikte und vergibt kollisionssichere Refer
       verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:100,
       kategorie:'Klettern',zielgruppe:'Alle',veranstaltungsort:'Brilon',hinweise:''},
     {id:2,name:'Bouldern',preise:{'1-4':150,'5-10':200},kapazitaet:20,aktiv:true,
-      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60}
+      verfuegbare_termine:['2027-03-15','2027-03-16','2027-03-17'],buchbar:true,veroeffentlicht:true,dauer:60,veranstaltungsort:'Brilon'}
     ,{id:3,name:'Individualklettern',preise:{},kapazitaet:5,aktiv:true,
       verfuegbare_termine:['2027-03-18'],buchbar:true,veroeffentlicht:true,dauer:90,
       buchungsmodus:'einzelplatz',mindestteilnehmer:5,preis_pro_person:18}

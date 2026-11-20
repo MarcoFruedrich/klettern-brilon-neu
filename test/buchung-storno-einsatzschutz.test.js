@@ -18,8 +18,8 @@ test('Stornierte Buchungen können nicht durch normales Status-PATCH erneut akti
 });
 
 test('Buchungsstatus wird unter FOR UPDATE geprüft, bevor Daten geändert werden',()=>{
-  const start=server.indexOf("'SELECT id,data,status FROM brilon_buchungen WHERE id=$1 FOR UPDATE'");
-  const tail=server.slice(start,start+4500);
+  const start=server.indexOf("const alt=await client.query(");
+  const tail=server.slice(start,start+6500);
   assert.ok(start>0);
   assert.match(tail,/SELECT id,data,status FROM brilon_buchungen WHERE id=\$1 FOR UPDATE/);
   assert.match(tail,/statuswechselGrund\(alterStatus,status\)/);
