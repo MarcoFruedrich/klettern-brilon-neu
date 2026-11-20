@@ -16,6 +16,7 @@ const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben }
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createKundenrechnungsversand } = require('./lib/kundenrechnungsversand');
+const { createZahlungsinfoVersand } = require('./lib/zahlungsinfo-versand');
 const { createPdf: erstelleRechnungsPdf, formatDate: rechnungsDatumFormatieren } = require('./lib/rechnung');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
@@ -71,6 +72,7 @@ const securityHeaders={
 };
 const brevoMail=createBrevoMailer();
 const kundenrechnungVersenden=pool?createKundenrechnungsversand({pool,brevoMail}):null;
+const zahlungsinfoVersenden=pool?createZahlungsinfoVersand({pool,brevoMail}):null;
 const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
@@ -2068,34 +2070,22 @@ if (
   });
 }
 
-try {
-  await brevoMail(
-    kunde.email,
-    'Zahlungsinformationen – Klettern & Abenteuer Brilon',
-    zahlungstext
-  );
-  
-const versandProtokoll=await pool.query(
-  `UPDATE brilon_buchungen
-   SET zahlungsinfo_gesendet_am = NOW()
-   WHERE id = $1
-   RETURNING zahlungsinfo_gesendet_am`,
-  [buchungsId]
-);
-if(!versandProtokoll.rowCount)
-  return reply(res,404,{error:'Buchungsanfrage nicht gefunden.'});
-
-  return reply(res, 200, {
-    success: true,
-    message: 'Zahlungsinformationen wurden versendet und der Versandzeitpunkt gespeichert.',
-    zahlungsinfoGesendetAm:versandProtokoll.rows[0].zahlungsinfo_gesendet_am
+try{
+  const ergebnis=await zahlungsinfoVersenden({buchungId:buchungsId,email:kunde.email,text:zahlungstext});
+  if(ergebnis.status==='angenommen')return reply(res,200,{
+    success:true,status:ergebnis.status,
+    message:ergebnis.hinweis,zahlungsinfoGesendetAm:ergebnis.gesendetAm
   });
-} catch (fehler) {
-  console.error('Zahlungs-E-Mail fehlgeschlagen:', fehler);
-
-  return reply(res, 502, {
-    error: 'Die Zahlungs-E-Mail konnte nicht versendet werden.'
-  });
+  const status=ergebnis.status==='fehlgeschlagen'?502:
+    ergebnis.status==='nicht_gefunden'?404:409;
+  return reply(res,status,{success:false,status:ergebnis.status,
+    error:ergebnis.hinweis||(
+      ergebnis.status==='bereits_angenommen'?'Die Zahlungsinformationen wurden bereits versendet.':
+      ergebnis.status==='fehlgeschlagen'?'Der E-Mail-Anbieter hat die Nachricht abgelehnt.':
+      'Versand derzeit nicht möglich.')});
+}catch(error){
+  console.error('Zahlungsinformationen: Reservierung oder Statusabfrage fehlgeschlagen:',error.code||'DB_ERROR');
+  return reply(res,503,{error:'Der Versandstatus konnte nicht sicher geprüft werden. Kein weiterer Versand ausgelöst.'});
 }
 }
     const connectionOptionsRoute=route.match(/^\/api\/admin\/kalender\/([0-9a-f-]{36})\/anschluss-optionen$/i);
