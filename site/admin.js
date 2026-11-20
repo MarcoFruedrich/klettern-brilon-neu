@@ -459,7 +459,7 @@ async function refresh() {
       const gesamtpreis = Number(b.data.gesamtpreis);
 
 if (b.data.partnerhausAbwicklung===true) {
-  const handoff=el('p',`Partnerhaus-Abwicklung: Der Preis dient nur zur Orientierung. Buchung und Abrechnung erfolgen über ${b.data.veranstaltungsort||'den Standortpartner'}.`);
+  const handoff=el('p',`Partnerhaus-Abwicklung: Nach vollständiger Mitarbeiterzusage erhält ${b.data.veranstaltungsort||'der Netzwerkpartner'} automatisch eine Benachrichtigung. Er übernimmt Kundeninformation, Zahlungsaufforderung und Rechnung selbst; die Buchung bleibt bis zu seiner verbindlichen Bestätigung unverbindlich.`);
   handoff.className='booking-partnerhouse-note';c.append(handoff);
   const uebergabe=b.data.partnerhausWeiterleitung;
   const label={angenommen:'E-Mail vom Anbieter angenommen (Zustellung nicht bestätigt)',
@@ -783,7 +783,12 @@ zahlungsButtonAktualisieren();
 
 zahlungSenden.type = 'button';
 zahlungSenden.disabled = false;
-if(b.data.buchungsmodus==='einzelplatz'){
+if(b.data.partnerhausAbwicklung===true){
+  zahlungSenden.disabled=true;
+  zahlungSenden.textContent='Zahlungsinformationen über Netzwerkpartner';
+  zahlungSenden.title='Nach Mitarbeiterzusage erhält der Partner eine Benachrichtigung und informiert den Kunden über eigene Zahlungsbedingungen.';
+}
+if(b.data.buchungsmodus==='einzelplatz'&&b.data.partnerhausAbwicklung!==true){
   zahlungSenden.disabled=true;
   zahlungSenden.textContent='Keine Anzahlung erforderlich';
   zahlungSenden.title='Für diese Einzelplatzreservierung wird keine Anzahlung angefordert.';
@@ -811,10 +816,12 @@ if(b.data.buchungsmodus==='einzelplatz'){
   } catch (fehler) {
     meldung.textContent = 'Fehler beim Zahlungsversand: ' + fehler.message;
   } finally {
-    zahlungSenden.disabled = false;
+    zahlungSenden.disabled = b.data.partnerhausAbwicklung===true||
+      b.data.buchungsmodus==='einzelplatz';
   }
 };
-zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
+if(b.data.partnerhausAbwicklung!==true)
+  zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
       const exportLink=el('a','Alle Buchungen dieser Kontakt-E-Mail exportieren (JSON)');
       exportLink.href='/api/admin/buchungen/'+encodeURIComponent(b.id)+'/export';
       exportLink.className='btn secondary';
