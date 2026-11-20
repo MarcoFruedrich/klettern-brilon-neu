@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const {createKundenbestaetigungService}=require('../lib/kundenbestaetigung-service');
 
 function mockFall({angezahlt=false,partner=false,zahlungsinfoStatus=null,manuellGesendetAm=null,
-  laufenderManuellerVersand=false}={}){
+  laufenderManuellerVersand=false,bestaetigungStatus=null}={}){
   const mails=[],updates=[];let available=true;
   const data={email:'kunde@example.test',name:'Max Muster',vorname:'Max',
     angebot:'Kistenklettern',datum:'2026-11-08',uhrzeit:'12:00',buchungsnummer:'MUSTER-MAX-081126',
@@ -16,6 +16,8 @@ function mockFall({angezahlt=false,partner=false,zahlungsinfoStatus=null,manuell
     async query(sql,params=[]){
       if(sql.includes('SELECT data FROM brilon_rechnungsdaten'))
         return {rows:[{data:{bankname:'Testbank',iban:'DE00123456780000000000'}}],rowCount:1};
+      if(sql.includes("SELECT data #>> '{bestaetigungsEmail,status}'"))
+        return {rows:[{status:bestaetigungStatus}],rowCount:1};
       if(sql.includes('SELECT zahlungsinfo_gesendet_am')){
         return {rows:[{zahlungsinfo_gesendet_am:manuellGesendetAm,
           status:laufenderManuellerVersand?'unklar':zahlungsinfoStatus}],rowCount:1};
@@ -25,6 +27,9 @@ function mockFall({angezahlt=false,partner=false,zahlungsinfoStatus=null,manuell
       }
       if(sql.includes('UPDATE brilon_buchungen')){
         updates.push({kind:'booking',params,sql});
+        if(sql.includes("NOT IN ('wird_versendet'")&&
+          ['angenommen','ungeklaert','wird_versendet'].includes(bestaetigungStatus))
+          return {rows:[],rowCount:0};
         if(sql.includes('zahlungsinfo_gesendet_am IS NULL')&&laufenderManuellerVersand)
           return {rows:[],rowCount:0};
         if(sql.includes('zahlungsinfo_gesendet_am IS NULL')&&manuellGesendetAm)
@@ -100,4 +105,24 @@ test('Früher versandte Zahlungsinformationen bleiben auch nach Queue-Neustart g
   const x=mockFall({manuellGesendetAm:'2026-11-20T10:00:00Z'});
   await x.service.processQueue();
   assert.equal(x.mails.length,0);
+});
+
+test('Automatische Bestätigung verwendet dieselbe Reservierung wie die Verwaltung',async()=>{
+  const x=mockFall({angezahlt:true});await x.service.processQueue();
+  assert.equal(x.mails.length,1);
+  assert.ok(x.updates.some(row=>row.sql.includes("NOT IN ('wird_versendet'")));
+  assert.ok(x.updates.some(row=>row.sql.includes("'{bestaetigungsEmail,versuch}'=$3")));
+});
+test('Manuell angenommene Bestätigung wird automatisch nicht erneut gesendet',async()=>{
+  const x=mockFall({angezahlt:true,bestaetigungStatus:'angenommen'});
+  await x.service.processQueue();
+  assert.equal(x.mails.length,0);
+  assert.ok(x.updates.some(row=>row.kind==='queue'&&row.sql.includes("status='gesendet'")));
+});
+test('Unklarer Status verhindert automatische Bestätigung des Termins',async()=>{
+  const x=mockFall({angezahlt:true,bestaetigungStatus:'ungeklaert'});
+  await x.service.processQueue();
+  assert.equal(x.mails.length,0);
+  assert.ok(!x.updates.some(row=>row.kind==='booking'&&row.sql.includes("status='bestaetigt'")));
+  assert.ok(x.updates.some(row=>row.kind==='queue'&&row.sql.includes("status='abgebrochen'")));
 });
