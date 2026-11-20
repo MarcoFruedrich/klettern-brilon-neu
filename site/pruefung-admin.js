@@ -5,8 +5,36 @@
   const elt=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n;};
   let initialized=false;
   let activePlaces=[];
+  async function refreshPruefSchema(){
+    const status=find('pruef-schema-status'),details=find('pruef-schema-details');
+    if(!status||!details)return;
+    status.textContent='Technische Bereitschaft wird lesend geprüft …';
+    details.replaceChildren();
+    try{
+      const result=await api('/api/admin/pruefung/schema-status');
+      status.textContent=result.bereit
+        ?'Erforderliche Datenbanktabellen und Standortfelder sind vorhanden.'
+        :'Achtung: Erforderliche Stationsprüfungs-Tabellen oder Felder fehlen.';
+      if(result.fehlendeTabellen?.length)
+        details.append(elt('p','Fehlende Tabellen: '+result.fehlendeTabellen.join(', ')));
+      if(result.fehlendeFelder?.length)
+        details.append(elt('p','Fehlende Felder: '+result.fehlendeFelder.join(', ')));
+      const config=result.konfiguration||{};
+      for(const [label,ok] of [
+        ['Prüfcode-Geheimnis konfiguriert',config.pruefcodeKonfiguriert],
+        ['Brevo-E-Mail-Versand konfiguriert',config.mailKonfiguriert],
+        ['Virenscanner für Stationsfotos konfiguriert',config.fotoVirenscannerKonfiguriert]
+      ])details.append(elt('p',label+': '+(ok?'Ja':'Nein')));
+      if(!result.bereit)details.append(elt('p',
+        'Die gezielte Datenbankmigration RUN_PRUEF_SCHEMA_MIGRATION muss nach Datensicherung und Prüfung in Render ausgeführt werden. Hier wird nichts automatisch verändert.'));
+      details.append(elt('p','Der Status bestätigt weder reale E-Mail-Zustellung noch erfolgreiche Vor-Ort-Kontrollen.'));
+    }catch(error){
+      status.textContent='Technische Bereitschaft konnte nicht geprüft werden: '+error.message;
+    }
+  }
   async function refresh(){
     if(!initialized||find('workspace')?.hidden)return;
+    await refreshPruefSchema();
     try{activePlaces=(await api('/api/admin/orte')).filter(place=>place.aktiv);}
     catch{activePlaces=[];}
     const stationPlace=find('pruef-station-ort');
@@ -1019,6 +1047,7 @@
       target.textContent=response.code+' (120 Sekunden gültig, einmalig)';
     }catch(err){target.textContent='Fehler: '+err.message;}
   });
+  find('pruef-schema-refresh')?.addEventListener('click',refreshPruefSchema);
   find('pruef-uebersicht-refresh')?.addEventListener('click',refresh);
   find('pruef-report-refresh')?.addEventListener('click',refresh);
   find('pruef-hinweis-refresh')?.addEventListener('click',refresh);
