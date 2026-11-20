@@ -4,18 +4,23 @@
   if(!contacts)return;
   const allowed=new Set(['whatsapp','instagram','facebook','youtube','tiktok','x']);
   const display={whatsapp:'WhatsApp für Fragen',instagram:'Instagram',facebook:'Facebook',youtube:'YouTube',tiktok:'TikTok',x:'X / Twitter'};
+  let letzteAnfrage=0;
+  function ausblenden(){
+    contacts.replaceChildren();
+    document.querySelector('#social-whatsapp-button')?.remove();
+  }
   async function aktualisieren(){
-    // Die Seite enthält keine festen Social-Media-Links: nichts erscheint bis zur
-    // erfolgreichen Freigabe aus der serverseitigen Website-Konfiguration.
+    // Nichts anzeigen, solange eine neue Freigabe geprüft wird.
+    // Gleichzeitige Antworten dürfen niemals eine ältere Aktivierung zurückholen.
+    const anfrage=++letzteAnfrage;
+    ausblenden();
     try{
       const response=await fetch('/api/social-links',{cache:'no-store'});
       if(!response.ok)throw Error('Einstellungen nicht abrufbar');
       const data=await response.json();
-      if(!data||!Array.isArray(data.kanäle))return;
-      const freigegeben=data.kanäle.filter(item=>allowed.has(item.id)&&
-        typeof item.url==='string'&&item.url.startsWith('https://'));
-      contacts.replaceChildren();
-      document.querySelector('#social-whatsapp-button')?.remove();
+      if(anfrage!==letzteAnfrage||!data||!Array.isArray(data.kanäle))return;
+      const freigegeben=data.kanäle.filter(item=>item&&item.aktiv===true&&
+        allowed.has(item.id)&&typeof item.url==='string'&&item.url.startsWith('https://'));
       for(const channel of freigegeben){
         const link=document.createElement('a');
         link.href=channel.url;
@@ -38,11 +43,16 @@
       }
     }catch(error){
       // Ohne gültige Antwort dürfen deaktivierte Kanäle nicht versehentlich sichtbar werden.
-      contacts.replaceChildren();
-      document.querySelector('#social-whatsapp-button')?.remove();
+      if(anfrage===letzteAnfrage)ausblenden();
       console.warn('Social-Media-Kontaktbuttons konnten nicht geladen werden:',error.message);
     }
   }
   aktualisieren();
   window.addEventListener('pageshow',event=>{if(event.persisted)aktualisieren();});
+  // Wird die Website nach einer Änderung im Verwaltungs-Tab wieder aktiv,
+  // sollen deaktivierte Kontaktbuttons auch ohne manuelles Neuladen verschwinden.
+  window.addEventListener('focus',aktualisieren);
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden)aktualisieren();
+  });
 })();
