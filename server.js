@@ -16,6 +16,7 @@ const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben }
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
 const { createKundenrechnungsversand } = require('./lib/kundenrechnungsversand');
+const { createPartnerhausWeiterleitung } = require('./lib/partnerhaus-weiterleitung');
 const { createZahlungsinfoVersand } = require('./lib/zahlungsinfo-versand');
 const { createPdf: erstelleRechnungsPdf, formatDate: rechnungsDatumFormatieren } = require('./lib/rechnung');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
@@ -72,6 +73,7 @@ const securityHeaders={
 };
 const brevoMail=createBrevoMailer();
 const kundenrechnungVersenden=pool?createKundenrechnungsversand({pool,brevoMail}):null;
+const partnerhausWeiterleiten=pool?createPartnerhausWeiterleitung({pool,brevoMail}):null;
 const zahlungsinfoVersenden=pool?createZahlungsinfoVersand({pool,brevoMail}):null;
 const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
@@ -1954,6 +1956,19 @@ return {
         return reply(res,409,{error:'Vor der verbindlichen Bestätigung muss mindestens ein eingeteilter Mitarbeiter zugesagt haben und alle offenen Einteilungen müssen geklärt sein.'});
 
       
+// Partnerhaus-Anfragen werden unabhängig von der Kunden-E-Mail weitergeleitet.
+if(ergebnis.alterStatus!==status&&status==='bestaetigt'&&
+   ergebnis.kundenDaten?.partnerhausAbwicklung===true){
+  try{
+    const partnerStatus=await partnerhausWeiterleiten(ergebnis.buchung.id);
+    ergebnis.buchung.data.partnerhausWeiterleitung=partnerStatus;
+  }catch(error){
+    console.error('Partnerhaus-Weiterleitung konnte nicht verarbeitet werden:',error.code||'DB_ERROR');
+    ergebnis.buchung.data.partnerhausWeiterleitung={status:'unklar',
+      hinweis:'Partnerhaus-Weiterleitung muss in der Verwaltung geprüft werden.'};
+  }
+}
+
 if (
   ergebnis.alterStatus !== status && status !== 'offen'
 ) {
@@ -1985,7 +2000,7 @@ if (
       (kunde.partnerhausAbwicklung!==true&&status==='bestaetigt'&&followups?.ok&&anschlussLink(ergebnis.buchung.id)
         ?`Passende Anschlussprogramme mit 10 % Rabatt: ${anschlussLink(ergebnis.buchung.id)}\n\n`:'' )+
       (kunde.partnerhausAbwicklung===true&&status==='bestaetigt'
-        ?`Anfrage geprüft und an den Standortkontakt weitergeleitet: ${kunde.partnerhausKontaktEmail||''}\nStandortkontakt anschreiben: mailto:${kunde.partnerhausKontaktEmail||''}?subject=${encodeURIComponent('Rückfrage zu '+(kunde.angebot||'deiner Buchung')+' · '+(kunde.buchungsnummer||''))}\n\n`:'' )+
+        ?`Anfrage geprüft; die Weiterleitung an den Standortkontakt wird in der Verwaltung dokumentiert: ${kunde.partnerhausKontaktEmail||''}\nStandortkontakt anschreiben: mailto:${kunde.partnerhausKontaktEmail||''}?subject=${encodeURIComponent('Rückfrage zu '+(kunde.angebot||'deiner Buchung')+' · '+(kunde.buchungsnummer||''))}\n\n`:'' )+
       (ergebnis.elternRabatt?.angewendet?'Der Anschlussrabatt wurde auch auf die ursprüngliche Buchung angewendet.\n\n':
         ergebnis.elternRabatt?.hoehererRabattBestand?'Der bereits bestehende höhere Rabatt bleibt erhalten. Empfehlungs- und Anschlussrabatte werden nicht addiert.\n\n':'')+
       (ergebnis.elternRabattZurueck?.zurueckgenommen
@@ -1996,11 +2011,6 @@ if (
     if(status==='bestaetigt'){
       ergebnis.buchung.data.bestaetigungsEmail=await buchungsbestaetigungsEmail({
         buchungId:ergebnis.buchung.id,email:empfaenger,betreff:nachricht.betreff,text:inhalt});
-      if(kunde.partnerhausAbwicklung===true&&/^\S+@\S+\.\S+$/.test(kunde.partnerhausKontaktEmail||'')){
-        const partnerText=`Guten Tag${kunde.partnerhausKontaktName?' '+kunde.partnerhausKontaktName:''},\n\ndie Verwaltung hat die Verfügbarkeit der folgenden Anfrage geprüft. Der Termin ist am Standort möglich. Bitte übernehmen Sie die verbindliche Buchung und Abrechnung direkt mit dem Anfragenden.\n\nProgramm: ${kunde.angebot||'—'}\nTermin: ${kunde.datum||'—'}${kunde.uhrzeit?' um '+kunde.uhrzeit+' Uhr':''}\nTeilnehmende: ${kunde.teilnehmer||'—'}\nAnfragende Person: ${kunde.name||'—'}\nE-Mail: ${kunde.email||'—'}\nBuchungsnummer: ${kunde.buchungsnummer||'—'}\n\nBitte stimmen Sie die Buchung und Zahlungsfragen direkt mit dem Gast ab. Die Website führt keine Abrechnung für dieses Partnerhaus durch.\nAnfragenden anschreiben: mailto:${kunde.email||''}?subject=${encodeURIComponent('Buchung '+(kunde.buchungsnummer||''))}\n\nViele Grüße\nKlettern & Abenteuer Brilon`;
-        brevoMail(kunde.partnerhausKontaktEmail,`Verfügbarkeit geprüft: ${kunde.angebot||'Programm'} am ${kunde.datum||'Termin'}`,partnerText)
-          .catch(error=>console.error('Partnerhaus-Hinweis fehlgeschlagen:',error.message));
-      }
     }else{
       brevoMail(empfaenger,nachricht.betreff,inhalt)
         .catch(fehler=>console.error('Status-E-Mail fehlgeschlagen:',fehler.message));

@@ -426,6 +426,20 @@ async function refresh() {
 if (b.data.partnerhausAbwicklung===true) {
   const handoff=el('p',`Partnerhaus-Abwicklung: Der Preis dient nur zur Orientierung. Buchung und Abrechnung erfolgen über ${b.data.veranstaltungsort||'den Standortpartner'}.`);
   handoff.className='booking-partnerhouse-note';c.append(handoff);
+  const uebergabe=b.data.partnerhausWeiterleitung;
+  const label={angenommen:'E-Mail vom Anbieter angenommen (Zustellung nicht bestätigt)',
+    bereits_angenommen:'E-Mail bereits vom Anbieter angenommen',
+    wird_versendet:'Weiterleitung läuft; Versandstatus noch offen',
+    unklar:'Versand ungeklärt – Anbieterprotokoll vor erneutem Versand prüfen',
+    fehlgeschlagen:'Weiterleitung fehlgeschlagen – Kontakt und Anbieter prüfen',
+    ohne_empfaenger:'Partnerhaus-Kontaktadresse fehlt oder ist ungültig',
+    nicht_anwendbar:'Weiterleitung für diese Buchung nicht möglich'};
+  const partnerStatus=el('p','Weiterleitung an Partnerhaus: '+(
+    label[uebergabe?.status]||'Noch kein bestätigter Versandstatus vorhanden.')+
+    (uebergabe?.angenommenAm?' · '+new Date(uebergabe.angenommenAm).toLocaleString('de-DE'):'')+
+    (uebergabe?.fehler?' · '+uebergabe.fehler:''));
+  partnerStatus.className='booking-email-status';
+  c.append(partnerStatus);
 } else if (Number.isFinite(gesamtpreis) && gesamtpreis >= 0) {
   const zahlungen = Array.isArray(b.data.zahlungen) ? b.data.zahlungen : [];
   if (b.data.zahlungsstatus && zahlungen.length === 0) {
