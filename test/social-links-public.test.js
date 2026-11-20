@@ -122,7 +122,7 @@ test('WhatsApp-Teilen auf Programm- und Tagesangebotskarten folgt demselben Verw
   const end=publicApp.indexOf('// Tages- und Sonderangebote',start);
   assert.ok(start>0&&end>start,'WhatsApp-Teilfunktion auf Angeboten ist vorhanden');
   const createShare=new Function('document','window','whatsappTeilLink',
-    publicApp.slice(start,end)+'\\nreturn whatsappTeilButton;')(
+    publicApp.slice(start,end)+String.fromCharCode(10)+'return whatsappTeilButton;')(
     view.document,view.window,()=>'https://api.whatsapp.com/send?text=probe');
 
   const programShare=createShare('Klettern','Information','/#buchung');
