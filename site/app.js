@@ -54,9 +54,10 @@ let angeboteFertig=false;
 let geladeneAktionen=null;
 let angebotslinkAngewendet=false;
 // Angebote aus WhatsApp führen in dasselbe reguläre Buchungsformular.
-function angebotBuchungslink(typ,id){
+function angebotBuchungslink(typ,id,standort=''){
   const url=new URL('/',window.location.origin);
   url.searchParams.set(typ,String(id));
+  if(typeof standort==='string'&&standort)url.searchParams.set('standort',standort);
   url.hash='buchung';
   return url.pathname+url.search+url.hash;
 }
@@ -64,19 +65,21 @@ function angebotslinkAnwenden(){
   if(!angeboteFertig||angebotslinkAngewendet)return;
   const query=new URLSearchParams(window.location.search);
   const id=query.get('programm'),aktionId=query.get('aktion');
+  const linkStandort=query.get('standort');
   if(!id&&!aktionId)return;
   if(aktionId&&geladeneAktionen===null)return;
   angebotslinkAngewendet=true;
   if(aktionId){
     const aktion=geladeneAktionen.find(item=>String(item.id||item.sonderaktion_id)===aktionId);
-    if(aktion)sonderaktionAnfragen(aktion);
+    if(aktion)sonderaktionAnfragen(aktion,linkStandort||'');
     return;
   }
   const programm=angeboteCache.find(item=>String(item.id)===id);
   if(!programm)return;
   const orte=Array.isArray(programm.veranstaltungsorte)&&programm.veranstaltungsorte.length?
     programm.veranstaltungsorte:[programm.veranstaltungsort].filter(Boolean);
-  const ort=orte.find(name=>Array.from(standortAuswahl.options).some(option=>option.value===name));
+  const verfuegbareOrte=orte.filter(name=>Array.from(standortAuswahl.options).some(option=>option.value===name));
+  const ort=linkStandort&&verfuegbareOrte.includes(linkStandort)?linkStandort:verfuegbareOrte[0];
   if(!ort)return;
   standortAuswahl.value=ort;
   standortAuswahl.dispatchEvent(new Event('change',{bubbles:true}));
@@ -724,7 +727,7 @@ form.addEventListener('submit', async e => {
 
 // Öffentliche Tagesaktion: Nur eine unverbindliche Anfrage vorbereiten.
 // Es gibt keine automatische Rabatt-/Preis-Zusage oder verbindliche Reservierung.
-function sonderaktionAnfragen(aktion){
+function sonderaktionAnfragen(aktion,linkStandort=''){
   const nachricht=form.querySelector('textarea[name="nachricht"]');
   const hinweis=document.getElementById('selected-special');
   if(!nachricht||!hinweis)return;
@@ -755,7 +758,8 @@ function sonderaktionAnfragen(aktion){
   const gueltigeOrte=Array.isArray(aktion.veranstaltungsorte)&&aktion.veranstaltungsorte.length
     ?aktion.veranstaltungsorte:[aktion.veranstaltungsort].filter(Boolean);
   const gewaehlterOrt=window.ausgewaehlterAngebotsStandort;
-  const buchungsort=gueltigeOrte.includes(gewaehlterOrt)?gewaehlterOrt:
+  const buchungsort=gueltigeOrte.includes(linkStandort)&&[...standortAuswahl.options].some(option=>option.value===linkStandort)
+    ?linkStandort:gueltigeOrte.includes(gewaehlterOrt)?gewaehlterOrt:
     gueltigeOrte.find(ort=>[...standortAuswahl.options].some(option=>option.value===ort))||
     programm?.veranstaltungsort||'';
   if(standortAuswahl){
@@ -892,7 +896,8 @@ anfrageButton.style.marginTop = '12px';
 
 a.append(anfrageButton);
       const shareInfo=[d.textContent,t.textContent].filter(Boolean).join(' · ');
-      a.append(whatsappTeilButton(item.titel,shareInfo,item.id!=null?angebotBuchungslink('aktion',item.id):'/#buchung'));
+      a.append(whatsappTeilButton(item.titel,shareInfo,item.id!=null?angebotBuchungslink('aktion',item.id,
+        window.ausgewaehlterAngebotsStandort==='alle'?'':window.ausgewaehlterAngebotsStandort):'/#buchung'));
       root.append(a);
     }
   } catch {
@@ -1044,7 +1049,8 @@ function angeboteUebersichtAnzeigen(standortFilter=''){
     anfrage.dataset.program=angebot.name;
     anfrage.textContent='Angebot anfragen →';
     aktionen.append(anfrage);
-    aktionen.append(whatsappTeilButton(angebot.name,meta,angebot.id!=null?angebotBuchungslink('programm',angebot.id):'/#buchung'));
+    aktionen.append(whatsappTeilButton(angebot.name,meta,angebot.id!=null?angebotBuchungslink('programm',angebot.id,
+      alleStandorte?'':standortFilter):'/#buchung'));
     inhalt.append(aktionen);
     karte.append(inhalt);
     ausgabe.append(karte);
