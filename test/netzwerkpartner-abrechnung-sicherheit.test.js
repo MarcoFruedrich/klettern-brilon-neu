@@ -116,3 +116,43 @@ test('Doppelte Anwesenheitseinträge werden vor einer Änderung abgelehnt',async
   assert.equal(x.updates.length,0);
   assert.ok(!x.sqlCalls.includes('BEGIN'));
 });
+
+function voteGuardCase({alreadyRegistered=false,selectedConfirmed=false}={}){
+  const queries=[];
+  const pool={async query(sql){
+    queries.push(sql);
+    if(sql.includes('SELECT id FROM brilon_spontan_sessions'))
+      return {rowCount:1,rows:[{id:bookingUuid}]};
+    if(sql.includes('SELECT preis_pro_person_cent,netzwerkpartner_id,abzug_typ,abzug_wert'))
+      return {rowCount:1,rows:[{preis_pro_person_cent:2000,netzwerkpartner_id:invoiceId,abzug_typ:'prozent',abzug_wert:10}]};
+    if(sql.includes('SELECT 1 FROM brilon_spontan_zeitstimmen v'))
+      return alreadyRegistered?{rowCount:1,rows:[{}]}:{rowCount:0,rows:[]};
+    if(sql.includes('SELECT id FROM brilon_spontan_zeiten')&&sql.includes('id=ANY'))
+      return selectedConfirmed?{rowCount:1,rows:[{id:zeitId}]}:{rowCount:0,rows:[]};
+    throw Error('Unerwartete Abstimmungsabfrage: '+sql);
+  }};
+  const handler=createSpontanGruppenApi({...baseDeps,pool,body:async()=>({
+    ortId:5,code:'123456',teilnahmeId:participant1,
+    interesse:true,personen:2,name:'Testgast',email:'gast@example.test',
+    zeitenIds:[zeitId],neueZeiten:[]
+  })});
+  const route='/api/spontangruppen/abstimmung';
+  const call=()=>handler(fakeReq,{},new URL('https://example.test'+route),route,'127.0.0.1');
+  return {call,queries};
+}
+
+test('Abstimmung darf bereits bestätigte Teilnahme nicht mehr verändern',async()=>{
+  const x=voteGuardCase({alreadyRegistered:true});
+  const result=await x.call();
+  assert.equal(result.status,409);
+  assert.match(result.data.error,/bestätigten Gruppe/);
+  assert.ok(!x.queries.some(sql=>/^\\s*(UPDATE|DELETE|INSERT)/i.test(sql)));
+});
+
+test('Abstimmung darf keine weiteren Personen in bereits bestätigte Zeitfenster eintragen',async()=>{
+  const x=voteGuardCase({selectedConfirmed:true});
+  const result=await x.call();
+  assert.equal(result.status,409);
+  assert.match(result.data.error,/bereits als Gruppe bestätigt/);
+  assert.ok(!x.queries.some(sql=>/^\\s*(UPDATE|DELETE|INSERT)/i.test(sql)));
+});
