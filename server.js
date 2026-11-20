@@ -28,6 +28,7 @@ const { createSpontanGruppenApi } = require('./lib/spontangruppen-api');
 const { createMarketingCampaignApi } = require('./lib/marketing-kampagnen-api');
 const { createWissensportalApi } = require('./lib/wissensportal-api');
 const { createSocialLinksApi } = require('./lib/social-links-api');
+const { bilderDerBesuchergruppen } = require('./lib/medien-referenzen');
 const { aktionAmStandortFreigegeben } = require('./lib/aktionsstandorte');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild, analysiereBild } = require('./lib/bilddatei');
@@ -3191,15 +3192,7 @@ if(route==='/api/admin/medien'){
       if(error?.code==='42P01')return new Set(); // Gruppenverwaltung noch nicht eingerichtet
       throw error;
     }
-    const urls=new Set();
-    for(const row of rows){
-      if(!Array.isArray(row.daten))continue;
-      for(const gruppe of row.daten){
-        if(typeof gruppe?.bild==='string'&&gruppe.bild)urls.add(gruppe.bild);
-        if(typeof gruppe?.iconBild==='string'&&gruppe.iconBild)urls.add(gruppe.iconBild);
-      }
-    }
-    return urls;
+    return bilderDerBesuchergruppen(rows);
   }
   if(req.method==='GET'){
     const bilder=[];
