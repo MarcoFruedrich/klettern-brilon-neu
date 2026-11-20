@@ -23,7 +23,14 @@ test('Partnerrechnung verwendet einen gültigen, stabilen UUID-Idempotenzschlüs
     if(sql.includes('SELECT * FROM brilon_netzwerkpartner_abrechnungen')){
       return {rowCount:1,rows:[{...invoice,email_status:state}]};
     }
-    if(sql.includes("UPDATE brilon_netzwerkpartner_abrechnungen SET email_status='angenommen'")){
+    if(sql.includes("SET email_status='wird_versendet'")){
+      if(!['ausstehend','fehlgeschlagen','ohne_empfaenger'].includes(state))
+        return {rowCount:0,rows:[]};
+      state='wird_versendet';return {rowCount:1,rows:[{id:invoiceId}]};
+    }
+    if(sql.includes('SELECT email_status FROM brilon_netzwerkpartner_abrechnungen'))
+      return {rowCount:1,rows:[{email_status:state}]};
+    if(sql.includes("SET email_status='angenommen'")){
       state='angenommen';return {rowCount:1,rows:[]};
     }
     throw new Error('Unerwartetes SQL: '+sql);
@@ -155,4 +162,69 @@ test('Abstimmung darf keine weiteren Personen in bereits bestätigte Zeitfenster
   assert.equal(result.status,409);
   assert.match(result.data.error,/bereits als Gruppe bestätigt/);
   assert.ok(!x.queries.some(sql=>/^\\s*(UPDATE|DELETE|INSERT)/i.test(sql)));
+});
+
+function partnerMailCase({initial='ausstehend',rejectUncertain=false,hold=false}={}){
+  let state=initial,sendCount=0;
+  const invoice={id:invoiceId,rechnungsnummer:'KA-2026-NP-0099',
+    data:{partner:{unternehmen:'Test-Jugendherberge',email:'rechnungen@example.test'},
+      aussteller:{firma:'Klettern & Abenteuer'}},pdf:Buffer.from('%PDF-1.4\\nTest')};
+  let openMail,signalMail;
+  const mailStarted=new Promise(resolve=>{signalMail=resolve;});
+  const mailRelease=new Promise(resolve=>{openMail=resolve;});
+  const pool={async query(sql,params=[]){
+    if(sql.includes('SELECT * FROM brilon_netzwerkpartner_abrechnungen'))
+      return {rowCount:1,rows:[{...invoice,email_status:state}]};
+    if(sql.includes("SET email_status='wird_versendet'")){
+      if(!['ausstehend','fehlgeschlagen','ohne_empfaenger'].includes(state))
+        return {rowCount:0,rows:[]};
+      state='wird_versendet';return {rowCount:1,rows:[{id:invoiceId}]};
+    }
+    if(sql.includes('SELECT email_status FROM brilon_netzwerkpartner_abrechnungen'))
+      return {rowCount:1,rows:[{email_status:state}]};
+    if(sql.includes("SET email_status='angenommen'")){
+      state='angenommen';return {rowCount:1,rows:[]};
+    }
+    if(sql.includes('SET email_status=$1')){
+      state=params[0];return {rowCount:1,rows:[]};
+    }
+    throw Error('Nicht erwartete E-Mail-SQL-Anfrage: '+sql);
+  }};
+  const handler=createSpontanGruppenApi({...baseDeps,pool,
+    brevoMail:async()=>{
+      sendCount++;
+      signalMail();
+      if(hold)await mailRelease;
+      if(rejectUncertain){const error=new Error('Verbindungsstatus unbekannt');error.uncertain=true;throw error;}
+    }});
+  const route='/api/spontangruppen/buchhaltung/'+invoiceId+'/versenden';
+  const call=()=>handler(fakeReq,{},new URL('https://example.test'+route),route,'127.0.0.1');
+  return {call,mailStarted,release:()=>openMail(),getStatus:()=>state,getSendCount:()=>sendCount};
+}
+
+test('Gleichzeitige Partner-Rechnungsversuche dürfen nur eine Mail übergeben',async()=>{
+  const x=partnerMailCase({hold:true});
+  const first=x.call();
+  await x.mailStarted;
+  const overlapping=await x.call();
+  assert.equal(overlapping.status,409);
+  assert.equal(overlapping.data.status,'wird_versendet');
+  assert.equal(x.getSendCount(),1);
+  x.release();
+  const done=await first;
+  assert.equal(done.status,200);
+  assert.equal(x.getStatus(),'angenommen');
+  assert.equal(x.getSendCount(),1);
+});
+
+test('Unklarer Brevo-Status bleibt gesperrt bis zur manuellen Klärung',async()=>{
+  const x=partnerMailCase({rejectUncertain:true});
+  const first=await x.call();
+  assert.equal(first.status,502);
+  assert.equal(first.data.status,'unklar');
+  assert.equal(x.getStatus(),'unklar');
+  const retry=await x.call();
+  assert.equal(retry.status,409);
+  assert.match(retry.data.hinweis,/beim E-Mail-Anbieter prüfen/);
+  assert.equal(x.getSendCount(),1,'Kein zweiter Versand bei unbekanntem Ergebnis');
 });
