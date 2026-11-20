@@ -25,6 +25,7 @@ const { createEinsatzplanungApi } = require('./lib/einsatzplanung-api');
 const { createMitarbeiterStornoMail } = require('./lib/mitarbeiter-storno-mail');
 const { terminGeaendert, direkterTerminwechselGrund } = require('./lib/terminwechsel-sicherheit');
 const { statuswechselGrund } = require('./lib/buchungsstatus-schutz');
+const { programmAmStandort } = require('./lib/programm-standorte-buchung');
 const { createKundenbestaetigungService } = require('./lib/kundenbestaetigung-service');
 const { sonderangebotVorschlaege } = require('./lib/sonderangebot-vorschlaege');
 const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
@@ -410,7 +411,7 @@ async function anschlussApi(req,res,url,route,ip){
   }
   if(route==='/api/anschlussangebote/vorschau'&&req.method==='POST'){
     const [programs,bookings,blocked]=await Promise.all([
-      pool.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine,veranstaltungsort,gruppenstufen,dauer_modus FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
+      pool.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine,veranstaltungsort,veranstaltungsorte,gruppenstufen,dauer_modus FROM brilon_angebote WHERE archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true ORDER BY sortierung,name`),
       pool.query(`SELECT id,data FROM brilon_buchungen WHERE data->>'datum'=$1 AND COALESCE(status,'offen') IN ('offen','bestaetigt')`,[base.datum]),
       pool.query(`SELECT COALESCE(standorte,'{}'::text[]) AS standorte FROM brilon_kalender WHERE typ='sperrzeit' AND datum<=$1::date AND COALESCE(enddatum,datum)>=$1::date`,[base.datum])
     ]);
@@ -420,7 +421,8 @@ async function anschlussApi(req,res,url,route,ip){
     const occupied=bookings.rows.filter(b=>b.id!==parentId).map(b=>buchungsfenster(b.data));
     const suggestions=[];
     for(const p of programs.rows){
-      if(blocked.rows.some(entry=>!entry.standorte.length||entry.standorte.includes(p.veranstaltungsort)))continue;
+      if(!programmAmStandort(p,base.veranstaltungsort))continue;
+      if(blocked.rows.some(entry=>!entry.standorte.length||entry.standorte.includes(base.veranstaltungsort)))continue;
       if(p.name===base.angebot)continue;
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
       const price=preisFuerTeilnehmer(p.preise,participants,p.gruppenstufen),duration=buchungsdauerFuerProgramm(participants,p);
@@ -442,9 +444,10 @@ async function anschlussApi(req,res,url,route,ip){
       const q=await client.query('SELECT id,status,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[parentId]);
       if(!q.rowCount||q.rows[0].status!=='bestaetigt')return {ungueltig:true};
       const original=q.rows[0].data,oldWindow=buchungsfenster(original),participants=Number(original.teilnehmer);
-      const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine,gruppenstufen,dauer_modus FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
+      const pQuery=await client.query(`SELECT id,name,beschreibung,dauer,preise,kapazitaet,verfuegbare_termine,veranstaltungsort,veranstaltungsorte,gruppenstufen,dauer_modus FROM brilon_angebote WHERE id=$1 AND archiviert=false AND aktiv=true AND buchbar=true AND veroeffentlicht=true`,[programId]);
       if(!pQuery.rowCount)return {programm:false};
       const p=pQuery.rows[0],duration=buchungsdauerFuerProgramm(participants,p),start=Number(time.slice(0,2))*60;
+      if(!programmAmStandort(p,original.veranstaltungsort))return {standort:false};
       if(!oldWindow||!gueltigesDatum(original.datum)||original.datum<heuteInBerlin()||!Number.isInteger(participants)||participants<1||participants>150||p.name===original.angebot||!Number.isInteger(duration)||participants>Number(p.kapazitaet)||
          !zugelasseneAnschlusszeiten(oldWindow[0],oldWindow[1],duration).some(t=>t.beginnMinuten===start&&t.endeMinuten<=1440))return {zeit:false};
       const dates=Array.isArray(p.verfuegbare_termine)?p.verfuegbare_termine:[];
@@ -474,6 +477,7 @@ async function anschlussApi(req,res,url,route,ip){
     });
     if(result.ungueltig)return reply(res,409,{error:'Die Buchung ist nicht mehr gültig.'});
     if(result.programm===false)return reply(res,409,{error:'Dieses Programm ist nicht mehr buchbar.'});
+    if(result.standort===false)return reply(res,409,{error:'Dieses Anschlussprogramm wird am gebuchten Standort nicht angeboten.'});
     if(result.zeit===false)return reply(res,409,{error:'Zeit, Kapazität oder Anschluss passen nicht mehr.'});
     if(result.freigabe===false)return reply(res,409,{error:'Das Programm ist an diesem Tag nicht freigegeben.'});
     if(result.preis===false)return reply(res,409,{error:'Für diese Gruppengröße fehlt ein Preis.'});
