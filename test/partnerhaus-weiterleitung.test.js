@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const {createPartnerhausWeiterleitung}=require('../lib/partnerhaus-weiterleitung');
 
 function example({kontakt='partner@example.test',kunde='kunde@example.test',status='bestaetigt',partner=true,
-  initialStatus='',dbFailAfterSend=false,mailImpl=async()=>{}}={}){
+  ready=false,initialStatus='',dbFailAfterSend=false,mailImpl=async()=>{}}={}){
   let state=initialStatus,attempt='',sends=0;
   const data={partnerhausAbwicklung:partner,partnerhausKontaktEmail:kontakt,
     partnerhausKontaktName:'Partner',angebot:'Klettern',datum:'2026-12-10',
@@ -12,10 +12,12 @@ function example({kontakt='partner@example.test',kunde='kunde@example.test',stat
     name:'Muster',email:kunde,buchungsnummer:'KA-001'};
   const pool={async query(sql,params=[]){
     if(sql.includes("NOT IN ('wird_versendet','angenommen','unklar')")){
-      if(status!=='bestaetigt'||!partner||['wird_versendet','angenommen','unklar'].includes(state))
+      if((status!=='bestaetigt'&&!(status==='offen'&&ready))||
+        !partner||['wird_versendet','angenommen','unklar'].includes(state))
         return {rowCount:0,rows:[]};
+      assert.match(sql,/NOT EXISTS\(SELECT 1 FROM brilon_einsaetze e/);
       state='wird_versendet';attempt=params[1];
-      return {rowCount:1,rows:[{data:{...data}}]};
+      return {rowCount:1,rows:[{data:{...data},status}]};
     }
     if(sql.includes("SELECT status,data #>> '{partnerhausWeiterleitung,status}'")){
       return {rowCount:1,rows:[{status,mail_status:state}]};
@@ -94,4 +96,24 @@ test('Direktbuchung und nicht bestätigte Buchung lösen keine Partner-E-Mail au
   assert.equal((await direct.send()).blockiert,true);
   assert.equal((await pending.send()).blockiert,true);
   assert.equal(direct.sends,0);assert.equal(pending.sends,0);
+});
+
+test('Partner erhält nach allen Zusagen eine personalbezogene, noch unverbindliche Freigabe',async()=>{
+  let recipient,subject,message;
+  const x=example({status:'offen',ready:true,mailImpl:async(to,s,t)=>{
+    recipient=to;subject=s;message=t;
+  }});
+  assert.equal((await x.send()).status,'angenommen');
+  assert.equal(recipient,'partner@example.test');
+  assert.match(subject,/Alle Mitarbeiter haben zugesagt/);
+  assert.match(message,/Alle aktuell für diesen Termin zugewiesenen Mitarbeitenden haben zugesagt/);
+  assert.match(message,/noch nicht verbindlich/);
+  assert.match(message,/Die verbindliche Buchung und die Abrechnung erfolgen direkt/);
+  assert.equal((await x.send()).status,'bereits_angenommen');
+  assert.equal(x.sends,1);
+});
+test('Partner-Weiterleitung bleibt bei noch offenen Mitarbeiterzusagen gesperrt',async()=>{
+  const x=example({status:'offen',ready:false});
+  assert.equal((await x.send()).blockiert,true);
+  assert.equal(x.sends,0);
 });

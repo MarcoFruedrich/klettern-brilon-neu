@@ -4,11 +4,13 @@ const assert=require('node:assert/strict');
 const {createKundenbestaetigungService}=require('../lib/kundenbestaetigung-service');
 
 function mockFall({angezahlt=false,partner=false,zahlungsinfoStatus=null,manuellGesendetAm=null,
-  laufenderManuellerVersand=false,bestaetigungStatus=null}={}){
+  laufenderManuellerVersand=false,bestaetigungStatus=null,kundeEmail='kunde@example.test',
+  gesamtpreis=100,offeneEinteilungen=0}={}){
   const mails=[],updates=[];let available=true;
-  const data={email:'kunde@example.test',name:'Max Muster',vorname:'Max',
+  const data={email:kundeEmail,partnerhausKontaktEmail:'partner@example.test',
+    partnerhausKontaktName:'Jugendherberge',name:'Max Muster',vorname:'Max',
     angebot:'Kistenklettern',datum:'2026-11-08',uhrzeit:'12:00',buchungsnummer:'MUSTER-MAX-081126',
-    buchungsmodus:'gruppe',gesamtpreis:100,anzahlung:25,restbetrag:75,
+    buchungsmodus:'gruppe',gesamtpreis,anzahlung:25,restbetrag:75,
     zahlungen:angezahlt?[{betragCent:2500,methode:'ueberweisung'}]:[],
     ...(partner?{partnerhausAbwicklung:true}:{}),
     ...(zahlungsinfoStatus?{zahlungsinfoVersand:{status:zahlungsinfoStatus}}:{})};
@@ -24,6 +26,12 @@ function mockFall({angezahlt=false,partner=false,zahlungsinfoStatus=null,manuell
       }
       if(sql.includes('UPDATE brilon_kundenbestaetigungen')){
         updates.push({kind:'queue',params,sql});return {rows:[],rowCount:1};
+      }
+      if(sql.includes('UPDATE brilon_buchungen')&&sql.includes('partnerhausWeiterleitung')){
+        updates.push({kind:'partner',params,sql});
+        if(sql.includes('RETURNING data,status'))
+          return {rows:[{data,status:'offen'}],rowCount:1};
+        return {rows:[{id:'booking-1'}],rowCount:1};
       }
       if(sql.includes('UPDATE brilon_buchungen')){
         updates.push({kind:'booking',params,sql});
@@ -48,7 +56,7 @@ function mockFall({angezahlt=false,partner=false,zahlungsinfoStatus=null,manuell
           return {rows:[{buchung_id:'booking-1',data,buchungsstatus:'offen',zahlungsinfo_gesendet_am:manuellGesendetAm}],rowCount:1};
         }
         if(sql.includes("COUNT(*) FILTER (WHERE status='eingeteilt')"))
-          return {rows:[{offen:0,bestaetigt:1}],rowCount:1};
+          return {rows:[{offen:offeneEinteilungen,bestaetigt:1}],rowCount:1};
         if(sql.includes('UPDATE brilon_kundenbestaetigungen'))
           return {rows:[],rowCount:1};
         throw new Error('Unerwartetes Transaktions-SQL: '+sql);
@@ -80,11 +88,34 @@ test('Mit erfasster Anzahlung und Trainerfreigabe verbindliche Buchungsbestätig
   assert.ok(x.updates.some(v=>v.sql.includes("status='bestaetigt'")));
 });
 
-test('Partnerhausbuchungen lösen keine direkte Zahlungsaufforderung oder Buchungsbestätigung aus',async()=>{
-  const x=mockFall({partner:true});
+test('Nach letzter Mitarbeiterzusage wird der Netzwerkpartner informiert, nicht der Gast',async()=>{
+  const x=mockFall({partner:true,kundeEmail:'',gesamtpreis:null});
   await x.service.processQueue();
-  assert.equal(x.mails.length,0);
+  assert.equal(x.mails.length,1);
+  assert.equal(x.mails[0][0],'partner@example.test');
+  assert.match(x.mails[0][1],/Alle Mitarbeiter haben zugesagt/);
+  assert.match(x.mails[0][2],/Zahlungsinformationen und Ihre Buchungsbedingungen/);
+  assert.doesNotMatch(x.mails[0][2],/IBAN:|Anzahlung \(25 %\)/);
+  assert.ok(x.updates.some(v=>v.kind==='partner'));
   assert.ok(!x.updates.some(v=>v.kind==='booking'));
+  assert.ok(x.updates.some(v=>v.kind==='queue'&&v.params[1]==='gesendet'));
+});
+
+test('Solange eine zugewiesene Person nicht zugestimmt hat, wird niemand informiert',async()=>{
+  const direkt=mockFall({offeneEinteilungen:1});
+  await direkt.service.processQueue();
+  assert.equal(direkt.mails.length,0);
+  const partner=mockFall({partner:true,offeneEinteilungen:1});
+  await partner.service.processQueue();
+  assert.equal(partner.mails.length,0);
+});
+
+test('Bei Partnerabrechnung werden auch ohne Kundenadresse und Preis niemals eigene Zahlungsdetails verschickt',async()=>{
+  const x=mockFall({partner:true,kundeEmail:null,gesamtpreis:null});
+  await x.service.processQueue();
+  assert.equal(x.mails.length,1);
+  assert.ok(x.mails[0][0]==='partner@example.test');
+  assert.ok(!x.updates.some(x=>x.sql.includes('zahlungsinfo_gesendet_am=NOW()')));
 });
 
 test('Nach manueller Versandreservierung löst die automatische Warteschlange keine zweite E-Mail aus',async()=>{
@@ -125,4 +156,26 @@ test('Unklarer Status verhindert automatische Bestätigung des Termins',async()=
   assert.equal(x.mails.length,0);
   assert.ok(!x.updates.some(row=>row.kind==='booking'&&row.sql.includes("status='bestaetigt'")));
   assert.ok(x.updates.some(row=>row.kind==='queue'&&row.sql.includes("status='abgebrochen'")));
+});
+
+test('Bei allen zugewiesenen Mitarbeiterzusagen wird ohne Sonderfreigabe ein Versand geplant',async()=>{
+  const queries=[];
+  const pool={async query(sql,params=[]){
+    queries.push({sql,params});
+    if(sql.includes('SELECT b.id FROM brilon_buchungen b'))return {rowCount:1,rows:[{id:'booking-1'}]};
+    if(sql.includes('SELECT verzoegerung_minuten AS'))return {rowCount:1,rows:[{
+      verzoegerungMinuten:120,ruhebeginn:'18:00',ruheende:'09:00'
+    }]};
+    if(sql.includes('INSERT INTO brilon_kundenbestaetigungen'))
+      return {rowCount:1,rows:[{faellig_ab:new Date('2026-11-21T08:00:00Z')}]};
+    throw Error('Unerwartetes SQL: '+sql);
+  }};
+  const service=createKundenbestaetigungService({pool,brevoMail:async()=>{}});
+  const result=await service.schedule('booking-1','staff-last');
+  assert.equal(result.geplant,true);
+  const check=queries[0].sql;
+  assert.match(check,/e.status='bestaetigt'/);
+  assert.match(check,/NOT EXISTS\(SELECT 1 FROM brilon_einsaetze e\s+WHERE e.buchung_id=b.id AND e.status='eingeteilt'\)/);
+  assert.doesNotMatch(check,/c.vertrauensperson/);
+  assert.ok(queries.some(x=>x.sql.includes('INSERT INTO brilon_kundenbestaetigungen')));
 });
