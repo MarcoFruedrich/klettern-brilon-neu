@@ -1317,10 +1317,10 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         if(row.data?.programmStattgefunden===true&&d.status==='freigegeben')return {programmAbgeschlossen:true};
         if(['storniert','abgelehnt'].includes(row.buchungsstatus))return {buchungBeendet:true};
         const data=row.data||{},altDatum=data.datum,altUhrzeit=data.uhrzeit||'';
-        let alteEinteilungen=[];
+        let alteEinteilungen=[],freigegebeneDaten=null;
         if(d.status==='freigegeben'){
           if(row.wunschdatum<heuteInBerlin())return {wunschAbgelaufen:true};
-          const shifted={...data,datum:row.wunschdatum,uhrzeit:row.wunschzeit};
+          const shifted={...data,datum:row.wunschdatum,uhrzeit:String(row.wunschzeit||'').slice(0,5)};
           const conflict=await pruefeBuchungskonflikt(client,shifted.datum,buchungsfenster(shifted),row.buchung_id,
             shifted.buchungsmodus==='einzelplatz'?{angebot:shifted.angebot,uhrzeit:shifted.uhrzeit}:null,shifted.veranstaltungsort);
           if(conflict)return {konflikt:conflict};
@@ -1335,6 +1335,8 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           }
           const wirklichAnders=terminGeaendert(data,shifted);
           if(wirklichAnders){
+            const rechnungen=await client.query('SELECT id FROM brilon_rechnungen WHERE buchung_id=$1 LIMIT 1',[row.buchung_id]);
+            if(rechnungen.rowCount)return {rechnungskorrekturNoetig:true};
             // Keine Änderung, solange ein vorheriger Kunden-Mailversand laufen könnte.
             const versand=await client.query(`SELECT status FROM brilon_kundenbestaetigungen
               WHERE buchung_id=$1 FOR UPDATE`,[row.buchung_id]);
@@ -1374,6 +1376,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
           await client.query(`UPDATE brilon_buchungen SET data=$1::jsonb,
             status=CASE WHEN $3::boolean THEN 'offen' ELSE status END,updated_at=NOW()
             WHERE id=$2`,[JSON.stringify(shifted),row.buchung_id,wirklichAnders]);
+          freigegebeneDaten=shifted;
         }else{
           data.umbuchung={status:'abgelehnt',altDatum,altUhrzeit,wunschtermin:row.wunschdatum,
             wunschzeit:row.wunschzeit,abgelehntAm:new Date().toISOString()};
@@ -1382,14 +1385,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         await client.query('UPDATE brilon_buchungswiderrufe SET status=$1,abgeschlossen_am=NOW() WHERE id=$2',
           [d.status,row.anfrage_id]);
         return {status:d.status,buchungId:row.buchung_id,anfrageId:row.anfrage_id,
-          benoetigtNeueMitarbeiterzusage:d.status==='freigegeben'&&
-            (data.datum!==row.wunschdatum||String(data.uhrzeit||'')!==String(row.wunschzeit||'')),
-          alteEinteilungen:typeof alteEinteilungen!=='undefined'?alteEinteilungen:[],
+          benoetigtNeueMitarbeiterzusage:d.status==='freigegeben'&&terminGeaendert(data,freigegebeneDaten||data),
+          alteEinteilungen,altDatum,altUhrzeit,
           buchungsnummer:row.buchungsnummer||data.buchungsnummer,
-          data:d.status==='freigegeben'?{...data,datum:row.wunschdatum,uhrzeit:row.wunschzeit}:data};
+          data:d.status==='freigegeben'?freigegebeneDaten:data};
       });
       if(result.fehlt)return reply(res,404,{error:'Umbuchungsanfrage nicht gefunden.'});
       if(result.programmAbgeschlossen)return reply(res,409,{error:'Ein bereits als durchgeführt dokumentiertes Programm darf nicht umgebucht werden.'});
+      if(result.rechnungskorrekturNoetig)return reply(res,409,{error:'Für diese Buchung wurde bereits eine Rechnung erstellt. Bitte vor der Terminänderung eine Rechnungskorrektur mit der Verwaltung klären.'});
       if(result.bestaetigungsversandLaeuft)return reply(res,409,{error:'Die Kundenbestätigung wird derzeit versendet. Bitte zuerst den Versandstatus klären.'});
       if(result.personalBereitsAbgeschlossen)return reply(res,409,{error:'Zu dieser Buchung sind bereits Arbeitszeiten abgeschlossen. Die Umbuchung benötigt eine gesonderte Klärung.'});
       if(result.erledigt)return reply(res,409,{error:'Diese Umbuchungsanfrage wurde bereits bearbeitet.'});
@@ -1400,7 +1403,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(/^\S+@\S+\.\S+$/.test(email)){
         const approved=result.status==='freigegeben';
         const text=approved
-          ?`Guten Tag ${data.name||''},\n\ndeine Umbuchungsanfrage für die Buchung ${result.buchungsnummer||''} wurde geprüft. Der Termin ist auf ${data.datum} um ${data.uhrzeit||'—'} Uhr vorgemerkt.${result.benoetigtNeueMitarbeiterzusage?' Die bisherigen Mitarbeiterzusagen gelten für den neuen Termin nicht. Erst nach erneuter Mitarbeiterfreigabe und einer neuen verbindlichen Buchungsbestätigung ist der geänderte Termin verbindlich.':''}\n\nViele Grüße\nKlettern & Abenteuer Brilon`
+          ?`Guten Tag ${data.name||''},\n\ndeine Umbuchungsanfrage für die Buchung ${result.buchungsnummer||''} wurde geprüft. ${result.benoetigtNeueMitarbeiterzusage?'Der neue Termin '+data.datum+' um '+(data.uhrzeit||'—')+' Uhr ist vorläufig vorgemerkt. Die bisherigen Mitarbeiterzusagen gelten für den neuen Termin nicht. Erst nach erneuter Mitarbeiterfreigabe und neuer Buchungsbestätigung ist der Termin verbindlich.':'Der vereinbarte Buchungstermin bleibt unverändert: '+data.datum+' um '+(data.uhrzeit||'—')+' Uhr.'}\n\nViele Grüße\nKlettern & Abenteuer Brilon`
           :`Guten Tag ${data.name||''},\n\nleider können wir deine Umbuchungsanfrage für die Buchung ${result.buchungsnummer||''} auf ${data.umbuchung?.wunschtermin||''} um ${data.umbuchung?.wunschzeit||'—'} Uhr nicht freigeben. Deine ursprüngliche Buchung bleibt bestehen: ${data.datum} um ${data.uhrzeit||'—'} Uhr.\n\nViele Grüße\nKlettern & Abenteuer Brilon`;
         brevoMail(email,approved?'Umbuchung freigegeben – Klettern & Abenteuer':'Umbuchungsanfrage – Entscheidung der Verwaltung',text)
           .catch(error=>console.error('Entscheidungs-E-Mail zur Umbuchung fehlgeschlagen:',error.code||'unbekannter Fehler'));
@@ -1412,7 +1415,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         const empfaenger=list.filter(x=>/^\S+@\S+\.\S+$/.test(x.email||''));
         const meldungen=await Promise.allSettled(empfaenger.map(person=>
           brevoMail(person.email,'Terminverschiebung – neue Zusage erforderlich',
-            `Hallo ${person.name||''},\n\nder ursprünglich geplante Einsatz für ${data.angebot||'das Programm'} am ${data.umbuchung?.altDatum||'bisherigen Datum'} wurde auf ${data.datum} um ${data.uhrzeit||'—'} Uhr verschoben. Deine bisherige Zusage wurde deshalb aufgehoben. Eine erneute Einteilung muss durch die Verwaltung erfolgen. Bitte den neuen Termin erst nach erneuter Anfrage im Mitarbeiterbereich zusagen.\n\nKlettern & Abenteuer`,
+            `Hallo ${person.name||''},\n\nder ursprünglich geplante Einsatz für ${data.angebot||'das Programm'} am ${result.altDatum||'bisherigen Datum'} um ${result.altUhrzeit||'—'} Uhr wurde auf ${data.datum} um ${data.uhrzeit||'—'} Uhr verschoben. Deine bisherige Zusage wurde deshalb aufgehoben. Eine erneute Einteilung muss durch die Verwaltung erfolgen. Bitte den neuen Termin erst nach erneuter Anfrage im Mitarbeiterbereich zusagen.\n\nKlettern & Abenteuer`,
             {idempotencyKey:crypto.randomUUID()})
         ));
         const ok=meldungen.filter(x=>x.status==='fulfilled').length;

@@ -275,14 +275,16 @@ async function umbuchungsanfragenLaden(){
         const button=el('button',label);button.type='button';button.className=decision==='freigegeben'?'btn':'btn secondary';
         button.addEventListener('click',async()=>{
           if(!confirm(decision==='freigegeben'
-            ?`Umbuchung auf ${request.wunschdatum} um ${(request.wunschzeit||'').slice(0,5)} Uhr freigeben?`
+            ?`Umbuchung auf ${request.wunschdatum} um ${(request.wunschzeit||'').slice(0,5)} Uhr freigeben? Bei einer Änderung werden alte Mitarbeitereinteilungen aufgehoben. Der neue Termin bleibt bis zur erneuten Mitarbeiterzusage unverbindlich.`
             :'Umbuchungsanfrage ablehnen? Die bisherige Buchung bleibt bestehen.'))return;
           button.disabled=true;feedback.textContent='Entscheidung wird gespeichert …';
           try{
-            await api('/api/admin/umbuchungsanfragen/'+encodeURIComponent(request.anfrage_id),{
+            const antwort=await api('/api/admin/umbuchungsanfragen/'+encodeURIComponent(request.anfrage_id),{
               method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:decision})
             });
-            feedback.textContent=decision==='freigegeben'?'Umbuchung freigegeben.':'Umbuchungsanfrage abgelehnt.';
+            feedback.textContent=decision==='freigegeben'
+              ?(antwort.benoetigtNeueMitarbeiterzusage?'Neuer Termin vorgemerkt. Bitte Mitarbeiter erneut einteilen und neue Kundenbestätigung abwarten.':'Termin unverändert, keine neue Einteilung erforderlich.')
+              :'Umbuchungsanfrage abgelehnt.';
             await refresh();
           }catch(error){feedback.textContent='Entscheidung nicht gespeichert: '+error.message;button.disabled=false;}
         });
@@ -438,6 +440,12 @@ async function refresh() {
           }
           c.append(ueberblick);
         }
+      }
+      if(b.data.umbuchung?.status==='personalpruefung'){
+        const hint=el('p','Umbuchung: neuer Termin ist vorläufig. Alte Zusagen wurden aufgehoben – Mitarbeiter neu einteilen und Bestätigung abwarten.');
+        hint.className='payment-warning';c.append(hint);
+        const info=b.data.umbuchung.mitarbeiterHinweis;
+        if(info)c.append(el('p','Hinweise an ehemals eingeteilte Mitarbeiter: '+(info.status||'unbekannt')+' · '+Number(info.angenommen||0)+' von '+Number(info.anzahl||0)+' beim Mailanbieter angenommen.'));
       }
       const gesamtpreis = Number(b.data.gesamtpreis);
 

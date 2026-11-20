@@ -13,11 +13,12 @@ test('Terminvergleich erkennt Datum, Uhrzeit und Dauer, aber keine reine Notiz',
   assert.equal(terminGeaendert(alt,{uhrzeit:'11:00'}),true);
   assert.equal(terminGeaendert(alt,{dauer:240}),true);
   assert.equal(terminGeaendert(alt,{datum:'2026-12-04',uhrzeit:'10:00',dauer:'180'}),false);
+  assert.equal(terminGeaendert(alt,{uhrzeit:'10:00:00'}),false);
   assert.equal(terminGeaendert(alt,null),false);
 });
 test('Bestätigte Buchung ist gegen direkte Terminänderung geschützt',()=>{
   assert.match(direkterTerminwechselGrund('bestaetigt',0),/bestätigte Buchung/);
-  assert.match(direkterTerminwechselGrund('offen',1),/Einteilungen/);
+  assert.match(direkterTerminwechselGrund('offen',1),/einteilungen/);
   assert.equal(direkterTerminwechselGrund('offen',0),null);
 });
 test('Admin-Terminänderung ist durch Mitarbeiterprüfung abgesichert',()=>{
@@ -41,4 +42,14 @@ test('Aktive Kundenmail und abgeschlossene Arbeitszeiten sperren den Terminwechs
 test('Nach neuer Mitarbeiterzusage darf die Kundenbestätigung erneut eingeplant werden',()=>{
   assert.match(queue,/ON CONFLICT\(buchung_id\) DO UPDATE SET/);
   assert.match(queue,/WHERE brilon_kundenbestaetigungen\.status IN \('abgebrochen','fehler','gesendet'\)/);
+});
+
+test('Ausgestellte Rechnung verhindert unkontrollierte Terminänderungen',()=>{
+  assert.match(server,/SELECT id FROM brilon_rechnungen WHERE buchung_id=\$1 LIMIT 1/);
+  assert.match(server,/if\(result\.rechnungskorrekturNoetig\)/);
+});
+test('Umbuchungsmitteilung enthält den bisherigen Termin und zeigt Personalprüfung',()=>{
+  assert.match(server,/result\.altDatum/);
+  assert.match(server,/result\.altUhrzeit/);
+  assert.match(server,/freigegebeneDaten=shifted/);
 });
