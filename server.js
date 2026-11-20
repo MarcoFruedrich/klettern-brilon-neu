@@ -3801,7 +3801,11 @@ if (bildRoute && req.method === 'POST') {
     bild,contentType:dateityp,
     zuordnen:url=>pool.query(
       'UPDATE brilon_angebote SET bild_url=$1 WHERE id=$2 RETURNING id,bild_url',
-      [url,angebotId])
+      [url,angebotId]),
+    zuordnungPruefen:async()=>{
+      const q=await pool.query('SELECT bild_url FROM brilon_angebote WHERE id=$1',[angebotId]);
+      return q.rows[0]?.bild_url||null;
+    }
   });
   return reply(res,ergebnis.status,ergebnis);
 }
@@ -3901,7 +3905,11 @@ if (aktionsBildRoute && req.method === 'POST') {
     bild,contentType:dateityp,
     zuordnen:url=>pool.query(
       "UPDATE brilon_aktionen SET data=jsonb_set(data,'{bild_url}',to_jsonb($1::text)) WHERE id=$2 RETURNING id",
-      [url,aktionsId])
+      [url,aktionsId]),
+    zuordnungPruefen:async()=>{
+      const q=await pool.query("SELECT data->>'bild_url' AS bild_url FROM brilon_aktionen WHERE id=$1",[aktionsId]);
+      return q.rows[0]?.bild_url||null;
+    }
   });
   return reply(res,ergebnis.status,ergebnis);
 }
