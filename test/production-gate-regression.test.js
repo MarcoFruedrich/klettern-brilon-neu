@@ -6,12 +6,14 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {zahlungsstand}=require('../lib/buchungslogik');
 const {createPdf,formatDate}=require('../lib/rechnung');
+const {createKundenrechnungsversand}=require('../lib/kundenrechnungsversand');
 const {sonderangebotVorschlaege}=require('../lib/sonderangebot-vorschlaege');
 const server=fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
 const spontan=fs.readFileSync(path.join(__dirname,'..','lib','spontangruppen-api.js'),'utf8');
 
 function invoiceFixture(partner=false){
-  const mails=[],queries=[],settings={firma:'Klettern Test',name:'Beispielfirma',strasse:'Testweg 7',
+  const mails=[],queries=[];let gespeicherteRechnung=null,mailStatus='ausstehend';
+  const settings={firma:'Klettern Test',name:'Beispielfirma',strasse:'Testweg 7',
     plz:'59602',ort:'Rüthen',email:'firma@example.test',telefon:'012345678',
     steuerhinweis:'Besteuerung nach geltender Gesetzeslage'};
   const booking={name:'Max Muster',email:'kunde@example.test',angebot:'Klettern',datum:'2026-12-03',
@@ -27,18 +29,40 @@ function invoiceFixture(partner=false){
       return {rows:[],rowCount:0};
     if(sql.includes('SELECT data,naechste_nummer FROM brilon_rechnungsdaten'))
       return {rows:[{data:settings,naechste_nummer:1}],rowCount:1};
+    if(sql.includes('INSERT INTO brilon_rechnungen')){
+      gespeicherteRechnung={
+        id:params[0],buchung_id:params[1],rechnungsnummer:params[2],
+        data:JSON.parse(params[3]),pdf:params[4]
+      };
+      return {rows:[],rowCount:1};
+    }
     if(sql.startsWith('UPDATE ')||sql.startsWith('INSERT INTO '))
       return {rows:[],rowCount:1};
     throw new Error('Unexpected SQL '+sql);
   },release(){}};
-  const pool={connect:async()=>client,async query(sql,params=[]){queries.push({sql,params});return {rows:[],rowCount:1};}};
+  const pool={connect:async()=>client,async query(sql,params=[]){
+    queries.push({sql,params});
+    if(sql.includes("SET email_status='unklar'")&&sql.includes('RETURNING id,buchung_id')){
+      if(!gespeicherteRechnung||mailStatus!=='ausstehend')return {rows:[],rowCount:0};
+      mailStatus='unklar';return {rows:[gespeicherteRechnung],rowCount:1};
+    }
+    if(sql.includes("SELECT data->>'email' AS email"))
+      return {rows:[{email:booking.email,partnerhaus:booking.partnerhausAbwicklung===true}],rowCount:1};
+    if(sql.includes("SET email_status='angenommen'"))mailStatus='angenommen';
+    if(sql.includes('SELECT rechnungsnummer,email_status FROM brilon_rechnungen'))
+      return {rows:[{rechnungsnummer:gespeicherteRechnung?.rechnungsnummer,email_status:mailStatus}],rowCount:1};
+    return {rows:[],rowCount:1};
+  }};
   const start=server.indexOf('async function rechnungSichernUndVersenden(');
   const end=server.indexOf('function gueltigesDatum(',start);
   assert.ok(start>0&&end>start);
-  const func=new Function('pool','brevoMail','crypto','safeText','zahlungsstand',
+  const kundenrechnungVersenden=createKundenrechnungsversand({
+    pool,brevoMail:async(...args)=>mails.push(args)
+  });
+  const func=new Function('pool','kundenrechnungVersenden','crypto','safeText','zahlungsstand',
     'erstelleRechnungsPdf','rechnungsDatumFormatieren','heuteInBerlin','rechnungsdatenVollstaendig',
     server.slice(start,end)+'\nreturn rechnungSichernUndVersenden;')(
-    pool,async(...args)=>mails.push(args),crypto,
+    pool,kundenrechnungVersenden,crypto,
     (value,n=200)=>typeof value==='string'?value.trim().slice(0,n):'',zahlungsstand,
     createPdf,formatDate,()=> '2026-11-19',
     data=>Boolean(data.firma&&data.name&&data.strasse&&data.plz&&data.ort&&data.email&&data.telefon&&data.steuerhinweis));

@@ -220,7 +220,9 @@ function zahlungsuebersichtRendern(ergebnis){
     const card=el('article');card.className='booking payment-record';
     const title=entry.buchungsnummer?`${entry.buchungsnummer} · ${entry.name}`:entry.name;
     card.append(el('strong',title),el('p',`${entry.angebot} · ${entry.datum||'ohne Datum'} · ${statusNamen[entry.status]||entry.status}`));
-    card.append(el('p',`Gesamtpreis: ${entry.gesamtpreisCent===null?'nicht hinterlegt':euroCent(entry.gesamtpreisCent)} · Eingegangen: ${euroCent(entry.eingegangenCent)} · Offen: ${euroCent(entry.offenCent)}`));
+    card.append(el('p',entry.externAbgerechnet
+      ?`Abrechnung durch das Partnerhaus · Preisangabe zur Orientierung: ${entry.gesamtpreisCent===null?'nicht hinterlegt':euroCent(entry.gesamtpreisCent)} · Keine eigene Zahlungsforderung`
+      :`Gesamtpreis: ${entry.gesamtpreisCent===null?'nicht hinterlegt':euroCent(entry.gesamtpreisCent)} · Eingegangen: ${euroCent(entry.eingegangenCent)} · Offen: ${euroCent(entry.offenCent)}`));
     if(entry.gutschriftCent)card.append(el('p',`Gutschrift: ${euroCent(entry.gutschriftCent)} · Auszahlung manuell`));
     if(entry.zahlungen.length){
       const detail=el('details');detail.append(el('summary',`${entry.zahlungen.length} Zahlungseingang/-eingänge anzeigen`));
@@ -3342,6 +3344,20 @@ document.getElementById('invoice-settings-form')?.addEventListener('submit',asyn
   finally{button.disabled=false;}
 });
 
+function rechnungsMailStatusText(status){
+  const namen={
+    ausstehend:'Noch nicht an den Versanddienst übergeben',
+    angenommen:'Vom Versanddienst angenommen – Postfachzustellung nicht bestätigt',
+    fehlgeschlagen:'Versand fehlgeschlagen – erneuter Versuch möglich',
+    unklar:'Versandstatus unklar – zuerst beim Anbieter prüfen, kein erneuter Versand',
+    wird_versendet:'Versand läuft – keine parallele Wiederholung',
+    ohne_empfaenger:'Keine gültige E-Mail-Adresse hinterlegt'
+  };
+  return namen[status]||String(status||'unbekannt');
+}
+function rechnungsMailRetryMoeglich(status){
+  return ['ausstehend','fehlgeschlagen','ohne_empfaenger'].includes(status);
+}
 async function standardRechnungenLaden(){
   const list=document.getElementById('invoice-list'),status=document.getElementById('invoice-list-status');if(!list)return;
   status.textContent='Rechnungen werden geladen …';list.replaceChildren();
@@ -3354,10 +3370,10 @@ async function standardRechnungenLaden(){
       const data=row.data||{};
       card.append(el('strong',`${row.rechnungsnummer} · ${row.kunde||'Kunde'}`));
       card.append(el('p',`${data.buchung?.angebot||'Programm'} · ${data.buchung?.datum||'Termin offen'} · ${data.betragCent?euroCent(data.betragCent):''}`));
-      card.append(el('p',`E-Mail-Status: ${row.email_status}${row.email_fehler?' · '+row.email_fehler:''}`));
+      card.append(el('p',`E-Mail-Status: ${rechnungsMailStatusText(row.email_status)}${row.email_fehler?' · '+row.email_fehler:''}`));
       const link=el('a','PDF herunterladen');link.href='/api/admin/rechnungen/'+encodeURIComponent(row.id)+'.pdf';card.append(link);
-      if(row.email_status!=='angenommen'){
-        const resend=el('button','E-Mail erneut senden');resend.type='button';resend.className='btn secondary';
+      if(rechnungsMailRetryMoeglich(row.email_status)){
+        const resend=el('button',row.email_status==='ausstehend'?'Rechnung jetzt senden':'E-Mail erneut senden');resend.type='button';resend.className='btn secondary';
         resend.addEventListener('click',async()=>{resend.disabled=true;try{await api('/api/admin/rechnungen/'+encodeURIComponent(row.id)+'/versenden',{method:'POST'});await rechnungenLaden();}catch(error){status.textContent='Versand konnte nicht bestätigt werden: '+error.message;resend.disabled=false;}});
         card.append(resend);
       }
@@ -3379,10 +3395,10 @@ async function partnerRechnungenLaden(){
       card.append(el('p',(data.angebot||'Spontane Klettergruppe')+' · '+(data.standort||row.standort||'')+' · '+(data.leistungsdatum||'')+' · '+(data.leistungszeit||'')));
       card.append(el('p','Teilnehmende: '+(data.teilnehmer||[]).reduce((n,item)=>n+Number(item.personen||0),0)+
         ' · Leistung: '+euroCent(data.bruttoCent)+' · Partnerabzug: −'+euroCent(data.abzugCent)+' · Auszahlungsbetrag: '+euroCent(data.nettoCent)));
-      card.append(el('p','E-Mail-Status: '+row.email_status+(row.email_fehler?' · '+row.email_fehler:'')));
+      card.append(el('p','E-Mail-Status: '+rechnungsMailStatusText(row.email_status)+(row.email_fehler?' · '+row.email_fehler:'')));
       const link=el('a','PDF herunterladen');link.href='/api/spontangruppen/buchhaltung/'+encodeURIComponent(row.id)+'.pdf';card.append(link);
-      if(row.email_status!=='angenommen'){
-        const resend=el('button','Rechnung erneut senden');resend.type='button';resend.className='btn secondary';
+      if(rechnungsMailRetryMoeglich(row.email_status)){
+        const resend=el('button',row.email_status==='ausstehend'?'Rechnung jetzt senden':'Rechnung erneut senden');resend.type='button';resend.className='btn secondary';
         resend.addEventListener('click',async()=>{resend.disabled=true;try{await api('/api/spontangruppen/buchhaltung/'+encodeURIComponent(row.id)+'/versenden',{method:'POST'});await partnerRechnungenLaden();}catch(error){status.textContent='Versand fehlgeschlagen: '+error.message;resend.disabled=false;}});
         card.append(resend);
       }

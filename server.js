@@ -15,6 +15,7 @@ const { sameOriginMutation } = require('./lib/sicherheit');
 const { abgelaufeneEintraegeEntfernen, erstelleRateLimiter, adminLoginErlauben } = require('./lib/sicherheitszustand');
 const { summiere: zahlungenSummieren } = require('./site/zahlungsuebersicht');
 const { createBrevoMailer } = require('./lib/brevo-mail');
+const { createKundenrechnungsversand } = require('./lib/kundenrechnungsversand');
 const { createPdf: erstelleRechnungsPdf, formatDate: rechnungsDatumFormatieren } = require('./lib/rechnung');
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
@@ -67,6 +68,7 @@ const securityHeaders={
   'Referrer-Policy':'strict-origin-when-cross-origin'
 };
 const brevoMail=createBrevoMailer();
+const kundenrechnungVersenden=pool?createKundenrechnungsversand({pool,brevoMail}):null;
 const buchungsbestaetigungsEmail=createBuchungsbestaetigungsMailer({pool,sendEmail:brevoMail});
 const scanForMalware=process.env.NODE_ENV==='test'&&process.env.MOCK_MALWARE_SCAN==='1'
   ?async()=>({sauber:true}):createClamScanner();
@@ -174,23 +176,7 @@ async function rechnungSichernUndVersenden(buchungId){
     await client.query('UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW() WHERE id=$2',[JSON.stringify(booking),buchungId]);
     await client.query('COMMIT');
   }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-  if(!email||!/^\S+@\S+\.\S+$/.test(email)){
-    await pool.query("UPDATE brilon_rechnungen SET email_status='ohne_empfaenger' WHERE id=$1",[invoiceId]);
-    return {status:'ohne_empfaenger',id:invoiceId};
-  }
-  try{
-    await brevoMail(email,'Deine Rechnung – Klettern & Abenteuer Brilon',
-      `Guten Tag,\n\nanbei erhältst du deine Rechnung ${invoiceData.nummer} als PDF. Der Zahlungseingang ist vollständig erfasst.\n\nViele Grüße\n${invoiceData.aussteller.firma}`,
-      {idempotencyKey:invoiceId,attachments:[{name:`Rechnung-${invoiceData.nummer}.pdf`,content:pdf.toString('base64')}]});
-    await pool.query("UPDATE brilon_rechnungen SET email_status='angenommen',versandt_am=NOW() WHERE id=$1",[invoiceId]);
-    await pool.query("UPDATE brilon_buchungen SET data=jsonb_set(data,'{rechnung,status}',to_jsonb('angenommen'::text),true) WHERE id=$1",[buchungId]);
-    return {status:'angenommen',id:invoiceId,nummer:invoiceData.nummer};
-  }catch(error){
-    const emailStatus=error?.uncertain?'unklar':'fehlgeschlagen';
-    await pool.query('UPDATE brilon_rechnungen SET email_status=$1,email_fehler=$2 WHERE id=$3',[emailStatus,safeText(error.message,250),invoiceId]);
-    await pool.query("UPDATE brilon_buchungen SET data=jsonb_set(data,'{rechnung,status}',to_jsonb($1::text),true) WHERE id=$2",[emailStatus,buchungId]);
-    return {status:emailStatus,id:invoiceId,nummer:invoiceData.nummer};
-  }
+  return {id:invoiceId,...await kundenrechnungVersenden(invoiceId)};
 }
 function gueltigesDatum(v){
   if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
@@ -1414,6 +1400,7 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
     }
 
     if(route==='/api/admin/rechnungen/ausstehend'&&req.method==='POST'){
+      if(!sameOriginMutation(req))return reply(res,403,{error:'Herkunft der Rechnungsnachverarbeitung nicht zulässig.'});
       if(!await admin(req,res))return;
       if(!pool)return reply(res,503,{error:'Datenbank nicht konfiguriert.'});
       try{
@@ -1455,19 +1442,14 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         return res.end(q.rows[0].pdf);
       }
       if(req.method==='POST'&&rechnungRoute[3]){
-        const row=q.rows[0];
-        if(!row.email)return reply(res,409,{error:'Für die Buchung ist keine Kunden-E-Mail hinterlegt.'});
-        try{
-          await brevoMail(row.email,'Deine Rechnung – Klettern & Abenteuer Brilon',
-            `Guten Tag,\n\nanbei erhältst du deine Rechnung ${row.rechnungsnummer} als PDF.\n\nViele Grüße\nKlettern & Abenteuer Brilon`,
-            {idempotencyKey:id,attachments:[{name:`Rechnung-${row.rechnungsnummer}.pdf`,content:Buffer.from(row.pdf).toString('base64')}]});
-          await pool.query("UPDATE brilon_rechnungen SET email_status='angenommen',email_fehler=NULL,versandt_am=NOW() WHERE id=$1",[id]);
-          return reply(res,200,{success:true,status:'angenommen'});
-        }catch(error){
-          const state=error?.uncertain?'unklar':'fehlgeschlagen';
-          await pool.query('UPDATE brilon_rechnungen SET email_status=$1,email_fehler=$2 WHERE id=$3',[state,safeText(error.message,250),id]);
-          return reply(res,503,{error:'Rechnungs-E-Mail konnte nicht bestätigt werden.',status:state});
-        }
+        if(!sameOriginMutation(req))return reply(res,403,{error:'Herkunft des Rechnungsversands nicht zulässig.'});
+        const ergebnis=await kundenrechnungVersenden(id);
+        if(ergebnis.status==='angenommen')return reply(res,200,{success:true,...ergebnis,
+          hinweis:'Der Versanddienst hat die E-Mail angenommen. Die Postfachzustellung ist damit nicht bestätigt.'});
+        return reply(res,ergebnis.blockiert?409:ergebnis.status==='ohne_empfaenger'?409:503,{
+          success:false,...ergebnis,
+          error:ergebnis.hinweis||'Rechnungs-E-Mail konnte nicht bestätigt werden.'
+        });
       }
     }
 
@@ -2445,7 +2427,8 @@ preis=safeText(d.preis,50);
              jsonb_build_object(
                'buchungsnummer',data->'buchungsnummer','name',data->'name','angebot',data->'angebot',
                'datum',data->'datum','gesamtpreis',data->'gesamtpreis','zahlungen',data->'zahlungen',
-               'zahlungsgutschriftCent',data->'zahlungsgutschriftCent'
+               'zahlungsgutschriftCent',data->'zahlungsgutschriftCent',
+               'partnerhausAbwicklung',data->'partnerhausAbwicklung'
              ) AS data
            FROM brilon_buchungen ORDER BY created_at DESC,id DESC`
         );
@@ -2453,7 +2436,7 @@ preis=safeText(d.preis,50);
         const gefiltert=totals.eintraege.filter(e=>{
           if(filter==='offen')return e.offenCent>0;
           if(filter==='teilzahlung')return e.eingegangenCent>0&&e.offenCent>0;
-          if(filter==='vollstaendig')return e.gesamtpreisCent!==null&&e.gesamtpreisCent>0&&e.eingegangenCent>=e.gesamtpreisCent;
+          if(filter==='vollstaendig')return !e.externAbgerechnet&&e.gesamtpreisCent!==null&&e.gesamtpreisCent>0&&e.eingegangenCent>=e.gesamtpreisCent;
           if(filter==='gutschrift')return e.gutschriftCent>0;
           return true;
         });

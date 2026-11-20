@@ -24,3 +24,15 @@ test('Ungültige Zahlungseinträge erhöhen den Zahlungssaldo nicht',()=>{
   assert.equal(result.offenCent,2000);
   assert.equal(result.zahlungseingaenge,1);
 });
+
+test('Partnerhausangebote erscheinen nicht als eigene offene Forderung',()=>{
+  const result=summiere([
+    {id:'direkt',status:'offen',data:{gesamtpreis:100,zahlungen:[]}},
+    {id:'extern',status:'bestaetigt',data:{gesamtpreis:300,partnerhausAbwicklung:true,zahlungen:[]}}
+  ]);
+  assert.equal(result.offenCent,10000);
+  assert.equal(result.eintraege.find(e=>e.id==='extern').offenCent,0);
+  assert.equal(result.eintraege.find(e=>e.id==='extern').gesamtpreisCent,30000);
+  assert.equal(result.eintraege.find(e=>e.id==='extern').externAbgerechnet,true);
+  assert.equal(result.eintraege.find(e=>e.id==='direkt').externAbgerechnet,false);
+});
