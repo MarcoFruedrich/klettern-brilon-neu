@@ -456,6 +456,31 @@ class Pool {
         .slice(params[3],params[3]+params[2]);
       return { rows, rowCount:rows.length };
     }
+    // Atomare Buchungsbestätigung: Test-Double bildet dieselbe Reservierung,
+    // Versuch-ID-Sperre und Zustandsübergänge wie PostgreSQL ab.
+    if(/UPDATE brilon_buchungen\s+SET data=jsonb_set\(/.test(sql)&&
+       sql.includes("'{bestaetigungsEmail}'")&&
+       sql.includes("NOT IN ('wird_versendet','angenommen','ungeklaert')")){
+      const [raw,id]=params,item=this.bookings.find(entry=>entry.id===id);
+      if(!item||['wird_versendet','angenommen','ungeklaert'].includes(item.data?.bestaetigungsEmail?.status))
+        return {rows:[],rowCount:0};
+      item.data.bestaetigungsEmail=JSON.parse(raw);
+      return {rows:[{id}],rowCount:1};
+    }
+    if(/UPDATE brilon_buchungen\s+SET data=jsonb_set\(/.test(sql)&&
+       sql.includes("'{bestaetigungsEmail}'")&&
+       sql.includes("data #>> '{bestaetigungsEmail,versuch}'=$3")){
+      const [raw,id,versuch]=params,item=this.bookings.find(entry=>entry.id===id);
+      if(!item||item.data?.bestaetigungsEmail?.status!=='wird_versendet'||
+         item.data?.bestaetigungsEmail?.versuch!==versuch)
+        return {rows:[],rowCount:0};
+      item.data.bestaetigungsEmail=JSON.parse(raw);
+      return {rows:[{id}],rowCount:1};
+    }
+    if(sql.includes("SELECT data #>> '{bestaetigungsEmail,status}' AS status")){
+      const item=this.bookings.find(entry=>entry.id===params[0]);
+      return {rows:item?[{status:item.data?.bestaetigungsEmail?.status||null}]:[],rowCount:item?1:0};
+    }
     if (sql.includes('UPDATE brilon_buchungen SET data=$1::jsonb,status=$2')) {
       const [raw,status,id]=params,item=this.bookings.find(entry=>entry.id===id);
       if(!item)return {rows:[],rowCount:0};

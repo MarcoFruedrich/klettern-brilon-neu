@@ -489,8 +489,12 @@ async function anschlussApi(req,res,url,route,ip){
 }
 
 const pruefungApi=createPruefungApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail,scanForMalware});
-const kundenService=createKundenbestaetigungService({pool,brevoMail});
-const einsatzplanungApi=createEinsatzplanungApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,brevoMail,kundenService});
+// Die öffentliche Website und die isolierten Browser-Tests müssen auch ohne
+// Datenbank starten können. Versand und Einsatzplanung bleiben dann gesperrt.
+const kundenService=pool?createKundenbestaetigungService({pool,brevoMail}):null;
+const einsatzplanungApi=pool
+  ?createEinsatzplanungApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,brevoMail,kundenService})
+  :async(_req,res)=>reply(res,503,{error:'Datenbank nicht konfiguriert.'});
 const netzwerkpartnerApi=createNetzwerkpartnerApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 const kundenfeedbackApi=createKundenfeedbackApi({pool,admin,reply,body,sameOriginMutation,limit,brevoMail});
 const spontangruppenApi=createSpontanGruppenApi({pool,admin,staffSession:pruefungApi.staffSession,reply,body,sameOriginMutation,limit,brevoMail});
