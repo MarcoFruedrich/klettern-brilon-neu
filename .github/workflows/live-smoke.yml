@@ -1,0 +1,33 @@
+name: Live-Abnahme – Website und eigene Domain
+on:
+  push:
+    branches:
+      - entwicklung/phase-1-buchungen-sonderangebote-gps
+  workflow_dispatch:
+  schedule:
+    - cron: '18 5 * * *'
+permissions:
+  contents: read
+jobs:
+  render-website:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Render-Website und öffentliche Programm-/Buchungs-APIs prüfen (nur GET)
+        run: node scripts/live-smoke.js
+  eigene-domain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: HTTPS, Startseite und Widerruf unter klettern-abenteuer.de prüfen
+        env:
+          LIVE_MODE: domain
+        run: node scripts/live-smoke.js
