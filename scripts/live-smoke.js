@@ -28,7 +28,7 @@ function standortFehler(orte,angebote,aktionen=[]){
 async function smoke({base,domain=false,fetcher=fetch,timeout=18000}={}){
   const url=new URL(base||'https://klettern-brilon-neu.onrender.com/');
   if(url.protocol!=='https:')throw Error('Die Live-Prüfung setzt HTTPS voraus.');
-  const rows=[],totals={standorte:0,programme:0,aktionen:0};
+  const rows=[],warnings=[],totals={standorte:0,programme:0,aktionen:0};
   async function get(path,json=false){
     const target=new URL(path,url);
     const r=await fetcher(target.toString(),{method:'GET',redirect:'follow',signal:AbortSignal.timeout(timeout)});
@@ -73,7 +73,9 @@ async function smoke({base,domain=false,fetcher=fetch,timeout=18000}={}){
     await check('/api/aktionen',async()=>{
       aktionen=await get('/api/aktionen',true);
       if(!Array.isArray(aktionen))throw Error('Aktionen nicht als Liste verfügbar');
-      totals.aktionen=aktionen.length;return String(aktionen.length)+' Aktionen';
+      totals.aktionen=aktionen.length;
+      if(!aktionen.length)warnings.push('Keine Tages- oder Sonderaktionen veröffentlicht.');
+      return String(aktionen.length)+' Aktionen';
     });
     await check('/api/social-links',async()=>{
       const r=await get('/api/social-links',true);
@@ -119,7 +121,8 @@ async function smoke({base,domain=false,fetcher=fetch,timeout=18000}={}){
           }
         }
         for(const place of orte){
-          if(!covered.has(place.name))broken.push('Kein funktionierendes Programm am Standort');
+          if(!covered.has(place.name))
+            warnings.push('Aktiver Standort ohne geprüftes buchbares Programm: '+place.name);
         }
         if(broken.length)
           throw Error(broken.length+' Kalenderprüfungen fehlgeschlagen: '+[...new Set(broken)].slice(0,3).join('; '));
@@ -127,7 +130,7 @@ async function smoke({base,domain=false,fetcher=fetch,timeout=18000}={}){
       });
     }
   }
-  return {url:url.origin,rows,totals};
+  return {url:url.origin,rows,totals,warnings};
 }
 function bericht(data){
   const good=data.rows.filter(x=>x.pass).length;
@@ -137,6 +140,9 @@ function bericht(data){
       ': '+r.note.replace(/\|/g,'/').replace(/[\r\n]/g,' ')+' |'),'',
     'Aktive Standorte: '+data.totals.standorte+'; Programme: '+data.totals.programme+
       '; Sonderaktionen: '+data.totals.aktionen,'',
+    '### Offene Einrichtung und Inhalte', '',
+    ...(data.warnings?.length?data.warnings.map(x=>'- WARNUNG: '+x.replace(/[\r\n]/g,' ').slice(0,140)):
+      ['Keine inhaltlichen Warnungen bei den geprüften öffentlichen Daten.']), '',
     'Ausschließlich lesende GET-Anfragen, keine Buchungen oder Kundendaten verändert.'
   ].join('\n')+'\n';
 }
