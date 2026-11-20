@@ -32,6 +32,7 @@ const { bilderDerBesuchergruppen } = require('./lib/medien-referenzen');
 const { aktionAmStandortFreigegeben } = require('./lib/aktionsstandorte');
 const { buchungsDetails, buchungsstatusNachricht, zahlungsinformationenText } = require('./lib/buchungs-email');
 const { bereinigeBild, analysiereBild } = require('./lib/bilddatei');
+const { bildHochladenUndZuordnen } = require('./lib/medien-zuordnung');
 const { createClamScanner } = require('./lib/malware-scanner');
 const GPS_GAESTELISTE_EINWILLIGUNG_VERSION='2026-11-02-v1';
 const BUCHUNGS_DATENSCHUTZ_VERSION='2026-11-03-v1';
@@ -3793,44 +3794,16 @@ if (bildRoute && req.method === 'POST') {
     });
   }
 
-  const dateiname =
-    angebotId + '/' + crypto.randomUUID() + '.' + endung;
-
-      if (!supabase) return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
-      const { error } = await supabase.storage
-    .from('angebotsbilder')
-    .upload(dateiname, bild, {
-      contentType: dateityp,
-      upsert: false
-    });
-
-  if (error) {
-    console.error('Bildupload fehlgeschlagen:', error);
-    return reply(res, 502, {
-      error: 'Bild konnte nicht gespeichert werden.'
-    });
-  }
-
-  const { data } = supabase.storage
-    .from('angebotsbilder')
-    .getPublicUrl(dateiname);
-
-  const speicherung = await pool.query(
-  'UPDATE brilon_angebote SET bild_url = $1 WHERE id = $2 RETURNING id, bild_url',
-  [data.publicUrl, angebotId]
-);
-
-if (speicherung.rowCount !== 1) {
-  console.error('Bildadresse nicht gespeichert. Angebots-ID:', angebotId);
-  return reply(res, 500, {
-    error: 'Bild hochgeladen, aber Bildadresse nicht gespeichert.'
+  const dateiname=angebotId+'/'+crypto.randomUUID()+'.'+endung;
+  if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
+  const ergebnis=await bildHochladenUndZuordnen({
+    bucket:supabase.storage.from('angebotsbilder'),pfad:dateiname,
+    bild,contentType:dateityp,
+    zuordnen:url=>pool.query(
+      'UPDATE brilon_angebote SET bild_url=$1 WHERE id=$2 RETURNING id,bild_url',
+      [url,angebotId])
   });
-}
-
-  return reply(res, 200, {
-    success: true,
-    bild_url: data.publicUrl
-  });
+  return reply(res,ergebnis.status,ergebnis);
 }
 const aktionMedienBildRoute=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/medienbild$/);
 if(aktionMedienBildRoute&&req.method==='PATCH'){
@@ -3921,47 +3894,16 @@ if (aktionsBildRoute && req.method === 'POST') {
     });
   }
 
-  const dateiname =
-    'sonderaktionen/' + aktionsId + '/' +
-    crypto.randomUUID() + '.' + endung;
-
-  if (!supabase) return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
-  const { error } = await supabase.storage
-    .from('angebotsbilder')
-    .upload(dateiname, bild, {
-      contentType: dateityp,
-      upsert: false
-    });
-
-  if (error) {
-    console.error('Aktionsbild-Upload fehlgeschlagen:', error);
-    return reply(res, 502, {
-      error: 'Bild konnte nicht gespeichert werden.'
-    });
-  }
-
-  const { data } = supabase.storage
-    .from('angebotsbilder')
-    .getPublicUrl(dateiname);
-
- const speicherung = await pool.query(
-  `UPDATE brilon_aktionen
-   SET data = jsonb_set(data, '{bild_url}', to_jsonb($1::text))
-   WHERE id = $2
-   RETURNING id`,
-  [data.publicUrl, aktionsId]
-);
-
-if (speicherung.rowCount !== 1) {
-  return reply(res, 500, {
-    error: 'Bildadresse konnte nicht gespeichert werden.'
+  const dateiname='sonderaktionen/'+aktionsId+'/'+crypto.randomUUID()+'.'+endung;
+  if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
+  const ergebnis=await bildHochladenUndZuordnen({
+    bucket:supabase.storage.from('angebotsbilder'),pfad:dateiname,
+    bild,contentType:dateityp,
+    zuordnen:url=>pool.query(
+      "UPDATE brilon_aktionen SET data=jsonb_set(data,'{bild_url}',to_jsonb($1::text)) WHERE id=$2 RETURNING id",
+      [url,aktionsId])
   });
-}
-
-  return reply(res, 200, {
-    success: true,
-    bild_url: data.publicUrl
-  });
+  return reply(res,ergebnis.status,ergebnis);
 }
       return reply(res,404,{error:'Nicht gefunden.'});
     }
