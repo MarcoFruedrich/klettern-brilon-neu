@@ -4,10 +4,19 @@
   if(!contacts)return;
   const allowed=new Set(['whatsapp','instagram','facebook','youtube','tiktok','x']);
   const display={whatsapp:'WhatsApp für Fragen',instagram:'Instagram',facebook:'Facebook',youtube:'YouTube',tiktok:'TikTok',x:'X / Twitter'};
+  const freigegebeneKanaele=new Set();
+  window.kletternSocialKanalAktiv=id=>freigegebeneKanaele.has(id);
+  function teilenButtonsAktualisieren(){
+    for(const button of document.querySelectorAll('[data-social-channel-action]')){
+      button.hidden=!freigegebeneKanaele.has(button.dataset.socialChannelAction);
+    }
+  }
   let letzteAnfrage=0;
   function ausblenden(){
+    freigegebeneKanaele.clear();
     contacts.replaceChildren();
     document.querySelector('#social-whatsapp-button')?.remove();
+    teilenButtonsAktualisieren();
   }
   async function aktualisieren(){
     // Nichts anzeigen, solange eine neue Freigabe geprüft wird.
@@ -21,6 +30,8 @@
       if(anfrage!==letzteAnfrage||!data||!Array.isArray(data.kanäle))return;
       const freigegeben=data.kanäle.filter(item=>item&&item.aktiv===true&&
         allowed.has(item.id)&&typeof item.url==='string'&&item.url.startsWith('https://'));
+      for(const channel of freigegeben)freigegebeneKanaele.add(channel.id);
+      teilenButtonsAktualisieren();
       for(const channel of freigegeben){
         const link=document.createElement('a');
         link.href=channel.url;
