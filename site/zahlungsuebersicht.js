@@ -13,13 +13,14 @@
       const gueltigeZahlungen=zahlungen.filter(z=>Number.isSafeInteger(z?.betragCent)&&z.betragCent>0);
       const eingegangenCent=gueltigeZahlungen.reduce((summe,z)=>summe+z.betragCent,0);
       const status=String(buchung?.status||'offen');
+      const externAbgerechnet=data.partnerhausAbwicklung===true;
       const abgeschlossen=['storniert','abgelehnt'].includes(status);
-      const offenCent=gesamtpreisCent===null||abgeschlossen?0:Math.max(0,gesamtpreisCent-eingegangenCent);
+      const offenCent=externAbgerechnet||gesamtpreisCent===null||abgeschlossen?0:Math.max(0,gesamtpreisCent-eingegangenCent);
       const gutschriftCent=Number.isSafeInteger(data.zahlungsgutschriftCent)&&data.zahlungsgutschriftCent>0
         ?data.zahlungsgutschriftCent:Math.max(0,eingegangenCent-(gesamtpreisCent??eingegangenCent));
       return {id:buchung?.id||'',status,buchungsnummer:data.buchungsnummer||buchung?.buchungsnummer||'',
         name:data.name||'Unbekannt',angebot:data.angebot||'Programm unbekannt',datum:data.datum||'',
-        gesamtpreisCent,eingegangenCent,offenCent,gutschriftCent,zahlungen:gueltigeZahlungen};
+        gesamtpreisCent,eingegangenCent,offenCent,gutschriftCent,externAbgerechnet,zahlungen:gueltigeZahlungen};
     });
     return {
       eintraege,
