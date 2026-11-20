@@ -22,6 +22,7 @@ const { createPdf: erstelleRechnungsPdf, formatDate: rechnungsDatumFormatieren }
 const { createBuchungsbestaetigungsMailer } = require('./lib/buchungsbestaetigungs-email');
 const { createPruefungApi } = require('./lib/stationspruefung-api');
 const { createEinsatzplanungApi } = require('./lib/einsatzplanung-api');
+const { terminGeaendert, direkterTerminwechselGrund } = require('./lib/terminwechsel-sicherheit');
 const { createKundenbestaetigungService } = require('./lib/kundenbestaetigung-service');
 const { sonderangebotVorschlaege } = require('./lib/sonderangebot-vorschlaege');
 const { createNetzwerkpartnerApi } = require('./lib/netzwerkpartner-api');
@@ -1313,8 +1314,10 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         if(!q.rowCount)return {fehlt:true};
         const row=q.rows[0];
         if(row.anliegen!=='umbuchung'||row.anfrage_status!=='wartet_verwaltung')return {erledigt:true};
+        if(row.data?.programmStattgefunden===true&&d.status==='freigegeben')return {programmAbgeschlossen:true};
         if(['storniert','abgelehnt'].includes(row.buchungsstatus))return {buchungBeendet:true};
         const data=row.data||{},altDatum=data.datum,altUhrzeit=data.uhrzeit||'';
+        let alteEinteilungen=[];
         if(d.status==='freigegeben'){
           if(row.wunschdatum<heuteInBerlin())return {wunschAbgelaufen:true};
           const shifted={...data,datum:row.wunschdatum,uhrzeit:row.wunschzeit};
@@ -1330,9 +1333,47 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
             if(Number(belegung.rows[0].gebucht)+Number(shifted.teilnehmer||1)>Number(programm.rows[0].kapazitaet))
               return {konflikt:'Die Kapazität für diesen Einzelplatztermin ist ausgeschöpft.'};
           }
-          shifted.umbuchung={status:'freigegeben',altDatum,altUhrzeit,wunschtermin:row.wunschdatum,
-            wunschzeit:row.wunschzeit,freigegebenAm:new Date().toISOString()};
-          await client.query('UPDATE brilon_buchungen SET data=$1::jsonb,updated_at=NOW() WHERE id=$2',[JSON.stringify(shifted),row.buchung_id]);
+          const wirklichAnders=terminGeaendert(data,shifted);
+          if(wirklichAnders){
+            // Keine Änderung, solange ein vorheriger Kunden-Mailversand laufen könnte.
+            const versand=await client.query(`SELECT status FROM brilon_kundenbestaetigungen
+              WHERE buchung_id=$1 FOR UPDATE`,[row.buchung_id]);
+            if(versand.rows[0]?.status==='versand_laeuft')return {bestaetigungsversandLaeuft:true};
+            const staff=await client.query(`SELECT e.mitarbeiter_id,e.status,m.name,m.email
+              FROM brilon_einsaetze e JOIN brilon_pruef_mitarbeitende m ON m.id=e.mitarbeiter_id
+              WHERE e.buchung_id=$1 FOR UPDATE OF e`,[row.buchung_id]);
+            if(staff.rows.some(e=>e.status==='abgeschlossen'))return {personalBereitsAbgeschlossen:true};
+            alteEinteilungen=staff.rows.filter(e=>['eingeteilt','bestaetigt'].includes(e.status));
+            shifted.terminHistorie=[...(Array.isArray(data.terminHistorie)?data.terminHistorie:[]).slice(-19),
+              {datum:altDatum,uhrzeit:altUhrzeit,status:row.buchungsstatus,
+                geaendertAm:new Date().toISOString(),anfrageId:row.anfrage_id,
+                einteilungen:staff.rows.map(e=>({mitarbeiterId:e.mitarbeiter_id,status:e.status}))}];
+            if(data.bestaetigungsEmail){
+              shifted.bestaetigungsEmailHistorie=[...(Array.isArray(data.bestaetigungsEmailHistorie)?
+                data.bestaetigungsEmailHistorie:[]).slice(-19),data.bestaetigungsEmail];
+              delete shifted.bestaetigungsEmail;
+            }
+            if(data.partnerhausWeiterleitung){
+              shifted.partnerhausWeiterleitungHistorie=[...(Array.isArray(data.partnerhausWeiterleitungHistorie)?
+                data.partnerhausWeiterleitungHistorie:[]).slice(-19),data.partnerhausWeiterleitung];
+              delete shifted.partnerhausWeiterleitung;
+            }
+            // Neue Uhrzeit: alle bisherigen Einteilungen verlieren die Gültigkeit.
+            // Neuverteilung erfolgt über die Einsatzplanung samt Arbeitszeitprüfung.
+            await client.query(`DELETE FROM brilon_einsaetze
+              WHERE buchung_id=$1 AND status IN ('beworben','eingeteilt','bestaetigt','abgelehnt')`,[row.buchung_id]);
+            await client.query(`UPDATE brilon_kundenbestaetigungen
+              SET status='abgebrochen',aktualisiert_am=NOW(),
+                fehler='Termin wurde geändert; neue Mitarbeiterzusage erforderlich.'
+              WHERE buchung_id=$1 AND status IN ('geplant','gesendet','fehler')`,[row.buchung_id]);
+          }
+          shifted.umbuchung={status:wirklichAnders?'personalpruefung':'freigegeben',
+            altDatum,altUhrzeit,wunschtermin:row.wunschdatum,
+            wunschzeit:row.wunschzeit,freigegebenAm:new Date().toISOString(),
+            ...(wirklichAnders?{benoetigtNeueMitarbeiterzusage:true}: {})};
+          await client.query(`UPDATE brilon_buchungen SET data=$1::jsonb,
+            status=CASE WHEN $3::boolean THEN 'offen' ELSE status END,updated_at=NOW()
+            WHERE id=$2`,[JSON.stringify(shifted),row.buchung_id,wirklichAnders]);
         }else{
           data.umbuchung={status:'abgelehnt',altDatum,altUhrzeit,wunschtermin:row.wunschdatum,
             wunschzeit:row.wunschzeit,abgelehntAm:new Date().toISOString()};
@@ -1340,9 +1381,17 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
         }
         await client.query('UPDATE brilon_buchungswiderrufe SET status=$1,abgeschlossen_am=NOW() WHERE id=$2',
           [d.status,row.anfrage_id]);
-        return {status:d.status,buchungsnummer:row.buchungsnummer||data.buchungsnummer,data:d.status==='freigegeben'?{...data,datum:row.wunschdatum,uhrzeit:row.wunschzeit}:data};
+        return {status:d.status,buchungId:row.buchung_id,anfrageId:row.anfrage_id,
+          benoetigtNeueMitarbeiterzusage:d.status==='freigegeben'&&
+            (data.datum!==row.wunschdatum||String(data.uhrzeit||'')!==String(row.wunschzeit||'')),
+          alteEinteilungen:typeof alteEinteilungen!=='undefined'?alteEinteilungen:[],
+          buchungsnummer:row.buchungsnummer||data.buchungsnummer,
+          data:d.status==='freigegeben'?{...data,datum:row.wunschdatum,uhrzeit:row.wunschzeit}:data};
       });
       if(result.fehlt)return reply(res,404,{error:'Umbuchungsanfrage nicht gefunden.'});
+      if(result.programmAbgeschlossen)return reply(res,409,{error:'Ein bereits als durchgeführt dokumentiertes Programm darf nicht umgebucht werden.'});
+      if(result.bestaetigungsversandLaeuft)return reply(res,409,{error:'Die Kundenbestätigung wird derzeit versendet. Bitte zuerst den Versandstatus klären.'});
+      if(result.personalBereitsAbgeschlossen)return reply(res,409,{error:'Zu dieser Buchung sind bereits Arbeitszeiten abgeschlossen. Die Umbuchung benötigt eine gesonderte Klärung.'});
       if(result.erledigt)return reply(res,409,{error:'Diese Umbuchungsanfrage wurde bereits bearbeitet.'});
       if(result.buchungBeendet)return reply(res,409,{error:'Die Buchung wurde inzwischen beendet.'});
       if(result.wunschAbgelaufen)return reply(res,409,{error:'Der gewünschte Termin liegt inzwischen in der Vergangenheit.'});
@@ -1351,12 +1400,35 @@ Promise.allSettled(benachrichtigungen).then(ergebnisse => {
       if(/^\S+@\S+\.\S+$/.test(email)){
         const approved=result.status==='freigegeben';
         const text=approved
-          ?`Guten Tag ${data.name||''},\n\ndeine Umbuchungsanfrage für die Buchung ${result.buchungsnummer||''} wurde freigegeben. Der Termin ist jetzt auf ${data.datum} um ${data.uhrzeit||'—'} Uhr geändert.\n\nViele Grüße\nKlettern & Abenteuer Brilon`
+          ?`Guten Tag ${data.name||''},\n\ndeine Umbuchungsanfrage für die Buchung ${result.buchungsnummer||''} wurde geprüft. Der Termin ist auf ${data.datum} um ${data.uhrzeit||'—'} Uhr vorgemerkt.${result.benoetigtNeueMitarbeiterzusage?' Die bisherigen Mitarbeiterzusagen gelten für den neuen Termin nicht. Erst nach erneuter Mitarbeiterfreigabe und einer neuen verbindlichen Buchungsbestätigung ist der geänderte Termin verbindlich.':''}\n\nViele Grüße\nKlettern & Abenteuer Brilon`
           :`Guten Tag ${data.name||''},\n\nleider können wir deine Umbuchungsanfrage für die Buchung ${result.buchungsnummer||''} auf ${data.umbuchung?.wunschtermin||''} um ${data.umbuchung?.wunschzeit||'—'} Uhr nicht freigeben. Deine ursprüngliche Buchung bleibt bestehen: ${data.datum} um ${data.uhrzeit||'—'} Uhr.\n\nViele Grüße\nKlettern & Abenteuer Brilon`;
         brevoMail(email,approved?'Umbuchung freigegeben – Klettern & Abenteuer':'Umbuchungsanfrage – Entscheidung der Verwaltung',text)
           .catch(error=>console.error('Entscheidungs-E-Mail zur Umbuchung fehlgeschlagen:',error.code||'unbekannter Fehler'));
       }
-      return reply(res,200,{success:true,status:result.status});
+      // Personen auf bisherigen Buchungseinsätzen über die Terminverschiebung informieren.
+      let mitarbeiterHinweis={status:'keine_einteilung',anzahl:0};
+      if(result.benoetigtNeueMitarbeiterzusage){
+        const list=Array.isArray(result.alteEinteilungen)?result.alteEinteilungen:[];
+        const empfaenger=list.filter(x=>/^\S+@\S+\.\S+$/.test(x.email||''));
+        const meldungen=await Promise.allSettled(empfaenger.map(person=>
+          brevoMail(person.email,'Terminverschiebung – neue Zusage erforderlich',
+            `Hallo ${person.name||''},\n\nder ursprünglich geplante Einsatz für ${data.angebot||'das Programm'} am ${data.umbuchung?.altDatum||'bisherigen Datum'} wurde auf ${data.datum} um ${data.uhrzeit||'—'} Uhr verschoben. Deine bisherige Zusage wurde deshalb aufgehoben. Eine erneute Einteilung muss durch die Verwaltung erfolgen. Bitte den neuen Termin erst nach erneuter Anfrage im Mitarbeiterbereich zusagen.\n\nKlettern & Abenteuer`,
+            {idempotencyKey:crypto.randomUUID()})
+        ));
+        const ok=meldungen.filter(x=>x.status==='fulfilled').length;
+        mitarbeiterHinweis={status:meldungen.length===0?'keine_adresse':
+            ok===meldungen.length?'angenommen':ok>0?'teilweise_fehlgeschlagen':'fehlgeschlagen',
+          anzahl:list.length,angenommen:ok};
+        try{
+          await pool.query(`UPDATE brilon_buchungen SET
+            data=jsonb_set(data,'{umbuchung,mitarbeiterHinweis}',$2::jsonb,true),
+            updated_at=NOW() WHERE id=$1 AND data #>> '{umbuchung,status}'='personalpruefung'`,
+            [result.buchungId,JSON.stringify(mitarbeiterHinweis)]);
+        }catch(error){console.error('Mitarbeiter-Hinweisstatus konnte nicht gespeichert werden:',error.code||'DB_ERROR');}
+      }
+      return reply(res,200,{success:true,status:result.status,
+        benoetigtNeueMitarbeiterzusage:Boolean(result.benoetigtNeueMitarbeiterzusage),
+        mitarbeiterHinweis});
     }
 
     if(route==='/api/admin/rechnungsdaten'&&req.method==='GET'){
@@ -1856,6 +1928,15 @@ const alt=await client.query(
         
 const alterStatus = alt.rows[0].status;
     const buchungsdaten = alt.rows[0].data;
+        if(terminGeaendert(buchungsdaten,aenderungen)){
+          const direkterGrund=direkterTerminwechselGrund(alterStatus,0);
+          if(direkterGrund)return {terminwechselGesperrt:direkterGrund};
+          const belegte=await client.query(`SELECT COUNT(*)::int AS anzahl
+            FROM brilon_einsaetze WHERE buchung_id=$1
+              AND status IN ('eingeteilt','bestaetigt','abgeschlossen')`,[id]);
+          const grund=direkterTerminwechselGrund(alterStatus,Number(belegte.rows[0]?.anzahl||0));
+          if(grund)return {terminwechselGesperrt:grund};
+        }
         if(aenderungen)Object.assign(buchungsdaten,aenderungen);
 
         if(status==='bestaetigt'&&buchungsdaten.empfehlung&&!buchungsdaten.empfehlung.bestaetigtAm)
@@ -1940,6 +2021,8 @@ return {
 
       if(ergebnis.fehlt)
         return reply(res,404,{error:'Buchung nicht gefunden.'});
+      if(ergebnis.terminwechselGesperrt)
+        return reply(res,409,{error:ergebnis.terminwechselGesperrt});
       if(ergebnis.konflikt)
         return reply(res,409,{error:ergebnis.konflikt});
       if(ergebnis.anschlussElternUngueltig)
