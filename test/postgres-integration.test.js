@@ -21,6 +21,12 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const pool = new Pool({ connectionString: integrationUrl, ssl: false });
   await pool.query(`CREATE TABLE IF NOT EXISTS brilon_buchungen (
     id UUID PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  // Das Programmschema wird in Produktion bereits vor der schmalen
+  // Program-Feld-Migration angelegt. Im isolierten Test ebenso vorbereiten.
+  await pool.query(`CREATE TABLE IF NOT EXISTS brilon_angebote(
+    id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL,beschreibung TEXT DEFAULT '',
+    dauer INTEGER,preise JSONB NOT NULL DEFAULT '{}'::jsonb,
+    aktiv BOOLEAN NOT NULL DEFAULT false,created_at TIMESTAMPTZ DEFAULT NOW())`);
   t.after(async () => {
     await pool.end();
   });
