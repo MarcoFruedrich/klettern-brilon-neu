@@ -165,7 +165,8 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     const share=page.locator('#angebote-uebersicht .whatsapp-share-link').first();
     assert.match(await share.getAttribute('href'),/api\.whatsapp\.com\/send\?text=/);
     const message=new URL(await share.getAttribute('href')).searchParams.get('text');
-    assert.match(message,/\?programm=1#buchung/);
+    assert.match(message,/\?programm=1&standort=Brilon#buchung/,
+      'Geteilte Programme müssen den ausgewählten Standort mitgeben');
     assert.match(message,/reguläre Buchungsformular/);
     assert.equal(await page.locator('#booking').isVisible(),true);
     await page.close();
@@ -188,7 +189,8 @@ test('Browser: responsive Website, Navigation und unverbindliche Buchungsanfrage
     assert.match(await page.locator('#booking textarea[name="nachricht"]').inputValue(),/Anfrage zur Sonderaktion: Kletter-Extra/);
     const share=page.locator('#specials .whatsapp-share-link').first();
     const message=new URL(await share.getAttribute('href')).searchParams.get('text');
-    assert.match(message,/\?aktion=aktion-77#buchung/);
+    assert.match(message,/\?aktion=aktion-77&standort=Brilon#buchung/,
+      'Geteilte Sonderaktionen müssen den ausgewählten Standort mitgeben');
     assert.equal(await page.locator('#booking').isVisible(),true);
     await page.close();
   });
