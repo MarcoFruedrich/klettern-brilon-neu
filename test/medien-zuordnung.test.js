@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {bildHochladenUndZuordnen}=require('../lib/medien-zuordnung');
 
-function scenario({uploadError=null,dbRows=1,dbError=null,cleanupError=null}={}){
+function scenario({uploadError=null,dbRows=1,dbError=null,cleanupError=null,dbCommitBeforeError=false,verificationError=null}={}){
   const calls=[],files=new Map();
   const publicBase='https://beispiel.supabase.co/storage/v1/object/public/angebotsbilder/';
   const bucket={
@@ -27,12 +27,17 @@ function scenario({uploadError=null,dbRows=1,dbError=null,cleanupError=null}={})
   const image=Buffer.from('mock image: already validated and recoded');
   const save=async url=>{
     calls.push({kind:'assign',url});
-    if(dbError)throw dbError;
+    if(dbError){if(dbCommitBeforeError)db.set('offer-11',url);throw dbError;}
     if(dbRows===1)db.set('offer-11',url);
     return {rowCount:dbRows};
   };
   const run=(pfad='11/test.jpg')=>bildHochladenUndZuordnen({
-    bucket,pfad,bild:image,contentType:'image/jpeg',zuordnen:save,logger
+    bucket,pfad,bild:image,contentType:'image/jpeg',zuordnen:save,
+    zuordnungPruefen:async()=>{
+      calls.push({kind:'verify'});
+      if(verificationError)throw verificationError;
+      return db.get('offer-11')||null;
+    },logger
   });
   return {run,db,files,calls,publicBase};
 }
@@ -90,8 +95,10 @@ test('Bei einem unklaren DB-Fehler wird niemals ein möglicherweise zugeordnetes
 test('Schlägt das Entfernen eines nicht zugeordneten Bildes fehl, wird niemals Erfolg gemeldet',async()=>{
   const x=scenario({dbRows:0,cleanupError:new Error('storage unavailable')});
   const result=await x.run();
-  assert.equal(result.status,409);
+  assert.equal(result.status,503);
   assert.equal(result.success,undefined);
+  assert.match(result.error,/nicht automatisch entfernt/);
+  assert.equal(x.files.has('11/test.jpg'),true);
   assert.equal(x.calls.some(c=>c.kind==='log'),true);
 });
 
@@ -104,7 +111,39 @@ test('Beide HTTP-Routen verwenden die geprüfte Upload- und Zuordnungsfunktion',
   for(const section of [program,special]){
     assert.match(section,/bildHochladenUndZuordnen\(\{/);
     assert.match(section,/zuordnen:url=>pool\.query\(/);
+    assert.match(section,/zuordnungPruefen:async\(\)=>\{/,
+      'Nach unsicherer SQL-Antwort muss die Zuordnung aus der Datenbank neu gelesen werden');
   }
   assert.match(server,/SELECT id,name,beschreibung,dauer,preise,bild_url,kategorie,zielgruppe/,
     'Die öffentliche Programm-API muss das gespeicherte Bild zurückgeben');
+});
+
+test('Unterbrochene DB-Antwort wird durch bestätigten Datenbank-Lesetest als Erfolg erkannt',async()=>{
+  const x=scenario({dbError:new Error('Antwort verloren'),dbCommitBeforeError:true});
+  const result=await x.run();
+  assert.equal(result.status,200);
+  assert.equal(result.success,true);
+  assert.equal(x.files.has('11/test.jpg'),true);
+  assert.equal(x.db.get('offer-11'),result.bild_url);
+  assert.ok(x.calls.some(c=>c.kind==='verify'));
+  assert.equal(x.calls.some(c=>c.kind==='remove'),false);
+});
+
+test('Nicht lesbare Datenbankzuordnung bleibt ungeklärt und wird niemals voreilig gelöscht',async()=>{
+  const x=scenario({dbError:new Error('Verbindung beendet'),verificationError:new Error('Postgres offline')});
+  const result=await x.run();
+  assert.equal(result.status,503);
+  assert.equal(result.unklar,true);
+  assert.equal(x.files.has('11/test.jpg'),true);
+  assert.equal(x.calls.some(c=>c.kind==='remove'),false);
+});
+
+test('Fehlgeschlagener Update trotz lesbarer Vorversion bleibt zur manuellen Klärung erhalten',async()=>{
+  const x=scenario({dbError:new Error('Transaktion abgebrochen')});
+  x.db.set('offer-11','https://beispiel.supabase.co/storage/v1/object/public/angebotsbilder/11/alt.jpg');
+  const result=await x.run();
+  assert.equal(result.status,503);
+  assert.equal(result.unklar,true);
+  assert.equal(x.files.has('11/test.jpg'),true);
+  assert.equal(x.calls.some(c=>c.kind==='remove'),false);
 });
