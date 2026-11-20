@@ -3181,11 +3181,32 @@ if(route==='/api/admin/medien'){
   if(!await admin(req,res))return;
   if(!supabase)return reply(res,503,{error:'Bildspeicher ist nicht konfiguriert.'});
   const bucket=supabase.storage.from('angebotsbilder');
+  // Auch Medien der Besuchergruppen werden genutzt: ohne diesen Abgleich kann
+  // eine Umbenennung oder Löschung noch veröffentlichte Gruppenbilder zerstören.
+  async function benutzteGruppenbilder(){
+    let rows;
+    try{
+      ({rows}=await pool.query('SELECT daten FROM brilon_besuchergruppen WHERE id=1'));
+    }catch(error){
+      if(error?.code==='42P01')return new Set(); // Gruppenverwaltung noch nicht eingerichtet
+      throw error;
+    }
+    const urls=new Set();
+    for(const row of rows){
+      if(!Array.isArray(row.daten))continue;
+      for(const gruppe of row.daten){
+        if(typeof gruppe?.bild==='string'&&gruppe.bild)urls.add(gruppe.bild);
+        if(typeof gruppe?.iconBild==='string'&&gruppe.iconBild)urls.add(gruppe.iconBild);
+      }
+    }
+    return urls;
+  }
   if(req.method==='GET'){
     const bilder=[];
     const referenzen=await pool.query(`SELECT bild_url AS url FROM brilon_angebote WHERE bild_url IS NOT NULL
       UNION SELECT data->>'bild_url' AS url FROM brilon_aktionen WHERE data->>'bild_url' IS NOT NULL`);
     const verwendeteUrls=new Set(referenzen.rows.map(eintrag=>eintrag.url));
+    for(const url of await benutzteGruppenbilder())verwendeteUrls.add(url);
     async function einlesen(ordner='',tiefe=0){
       if(tiefe>3||bilder.length>=500)return;
       const {data,error}=await bucket.list(ordner,{limit:500,sortBy:{column:'created_at',order:'desc'}});
@@ -3195,7 +3216,9 @@ if(route==='/api/admin/medien'){
         if(item.id===null&&!item.metadata){await einlesen(pfad,tiefe+1);continue;}
         if(!/\.(png|jpe?g|webp|gif)$/i.test(item.name))continue;
         const url=bucket.getPublicUrl(pfad).data.publicUrl;
-        bilder.push({name:item.name,pfad,url,groesse:item.metadata?.size||0,verwendet:verwendeteUrls.has(url)});
+        bilder.push({name:item.name,pfad,url,groesse:item.metadata?.size||0,
+          aktualisiertAm:item.updated_at||item.created_at||'',
+          verwendet:verwendeteUrls.has(url)});
       }
     }
     try{await einlesen();return reply(res,200,{bilder:bilder.slice(0,500)});}
@@ -3282,8 +3305,9 @@ if(route==='/api/admin/medien'){
     const verwendet=await pool.query(`SELECT
       EXISTS(SELECT 1 FROM brilon_angebote WHERE bild_url=$1) AS programme,
       EXISTS(SELECT 1 FROM brilon_aktionen WHERE data->>'bild_url'=$1) AS aktionen`,[url]);
-    if(verwendet.rows[0]?.programme||verwendet.rows[0]?.aktionen)
-      return reply(res,409,{error:'Das Bild wird noch verwendet. Bitte zuerst die Programm- bzw. Aktionszuordnung ändern.'});
+    if(verwendet.rows[0]?.programme||verwendet.rows[0]?.aktionen||
+       (await benutzteGruppenbilder()).has(url))
+      return reply(res,409,{error:'Das Bild wird noch verwendet. Bitte zuerst die Zuordnung in Programmen, Sonderaktionen oder Besuchergruppen entfernen.'});
     if(req.method==='DELETE'){
       const {error}=await bucket.remove([pfad]);
       if(error)return reply(res,502,{error:'Löschen fehlgeschlagen: '+error.message});
