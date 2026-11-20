@@ -2,12 +2,15 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {standard,normalisiereGespeichert,validiereAenderung,fuerWebsite}=require('../lib/social-links');
 
-test('WhatsApp startet veröffentlicht und lässt sich deaktivieren, ohne die Adresse zu verlieren',()=>{
+test('WhatsApp ist ohne Verwaltungsfreigabe verborgen und lässt sich aktivieren und wieder deaktivieren',()=>{
   const first=standard();
   const whatsapp=first.find(item=>item.id==='whatsapp');
-  assert.equal(whatsapp.aktiv,true);
+  assert.equal(whatsapp.aktiv,false);
   assert.match(whatsapp.url,/^https:\/\/wa\.me\/message\//);
-  const updated=validiereAenderung({kanäle:first.map(item=>item.id==='whatsapp'?{...item,aktiv:false}:item)});
+  assert.equal(fuerWebsite(first).length,0);
+  const enabled=validiereAenderung({kanäle:first.map(item=>item.id==='whatsapp'?{...item,aktiv:true}:item)});
+  assert.equal(fuerWebsite(enabled).find(item=>item.id==='whatsapp')?.aktiv,true);
+  const updated=validiereAenderung({kanäle:enabled.map(item=>item.id==='whatsapp'?{...item,aktiv:false}:item)});
   assert.equal(updated.find(item=>item.id==='whatsapp').url,whatsapp.url);
   assert.equal(fuerWebsite(updated).some(item=>item.id==='whatsapp'),false);
   assert.equal(normalisiereGespeichert(updated).find(item=>item.id==='whatsapp').aktiv,false);
