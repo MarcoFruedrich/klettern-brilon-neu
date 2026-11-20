@@ -8,13 +8,18 @@ const server=fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
 const begin=server.indexOf('function programmStandorteValidieren(');
 const after=server.indexOf('async function programmStandorteAktivPruefen(',begin);
 assert.ok(begin>0&&after>begin,'Mehrfachstandort-Validierung muss vorhanden sein');
-const validieren=new Function(server.slice(begin,after)+'\nreturn programmStandorteValidieren;')();
+const {programmStandorteValidieren:validieren,programmStandorteErwartet:erwarteteStandorte,
+  programmStandortVergleichSql:sqlVergleich}=new Function(server.slice(begin,after)+
+  '\nreturn {programmStandorteValidieren,programmStandorteErwartet,programmStandortVergleichSql};')();
 const routeStart=server.indexOf('const programmStandortRoute=route.match(');
 const routeEnd=server.indexOf('const preisRoute = route.match(',routeStart);
 assert.ok(routeStart>0&&routeEnd>routeStart,'Separater Standort-Speicherweg muss vorhanden sein');
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
-const save=new AsyncFunction('route','req','res','body','reply','pool','programmStandorteValidieren','programmStandorteAktivPruefen',
+const rawSave=new AsyncFunction('route','req','res','body','reply','pool','programmStandorteValidieren',
+  'programmStandorteAktivPruefen','programmStandorteErwartet','programmStandortVergleichSql',
   server.slice(routeStart,routeEnd));
+const save=(route,req,res,body,reply,pool,validate,active)=>
+  rawSave(route,req,res,body,reply,pool,validate,active,erwarteteStandorte,sqlVergleich);
 
 test('Mehrere gültige Standorte bleiben in ursprünglicher Auswahl erhalten',()=>{
   const orte=['Jugendherberge Brilon','Olpe','Rüthen'];
@@ -41,6 +46,8 @@ test('Eigenständiger Speicherweg ändert nur Standortliste und Hauptstandort',a
   assert.match(queryCalls[0].sql,/SET veranstaltungsorte=/);
   assert.doesNotMatch(queryCalls[0].sql,/preise|gruppenstufen|kapazitaet|buchbar/i);
   assert.deepEqual(JSON.parse(queryCalls[0].args[1]),orte);
+  assert.match(queryCalls[0].sql,/\$4::jsonb IS NULL/,
+    'Der getrennte Speicherweg schützt vor zeitlich veralteten Standortänderungen');
 });
 
 test('Ungültige oder deaktivierte Standortauswahl wird ohne Datenänderung abgelehnt',async()=>{
