@@ -47,7 +47,7 @@ test('Partnerhausbuchung wird ohne eigene Zahlungsaufforderung an den Gast best�
 test('Einzelplatz ohne Anzahlung behält seine besondere Bestätigungsregel',()=>{
   const mail=kundenmailNachTrainerzusage({...base,buchungsmodus:'einzelplatz',mindestteilnehmer:5},bank);
   assert.equal(mail.verbindlich,true);
-  assert.match(mail.text,/Keine Anzahlung erforderlich/);
+  assert.match(mail.text,/Anzahlung ist nicht erforderlich/);
   assert.match(mail.text,/ab 5 Anmeldungen/);
 });
 
