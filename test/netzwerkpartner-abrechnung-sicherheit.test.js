@@ -46,10 +46,11 @@ test('Partnerrechnung verwendet einen gültigen, stabilen UUID-Idempotenzschlüs
   assert.equal(sent.length,1,'Schon angenommene Rechnung darf nicht doppelt versandt werden');
 });
 
-function presenceCase({billed=false,invalidSecond=false}={}){
+function presenceCase({billed=false,invalidSecond=false,duplicate=false}={}){
   const sqlCalls=[],emails=[],updates=[];
   let bodyValue={zeitId,eintraege:[{teilnahmeId:participant1,anwesend:true,personen:2}]};
   if(invalidSecond)bodyValue.eintraege.push({teilnahmeId:participant2,anwesend:true,personen:1});
+  if(duplicate)bodyValue.eintraege.push({teilnahmeId:participant1,anwesend:false,personen:0});
   const databaseQuery=async(sql,params=[])=>{
     sqlCalls.push(sql);
     if(/^\s*(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql))return {rows:[],rowCount:0};
@@ -107,15 +108,11 @@ test('Anwesenheitsdaten werden nur an den vereinbarten Partner geschickt',async(
   assert.deepEqual(x.emails,['vereinbarter-partner@example.test']);
 });
 
-test('Doppelte Anwesenheitseinträge werden bereits vor einer Datenbankänderung abgelehnt',async()=>{
-  const x=presenceCase();
-  // Die Eingabe wird in diesem Fall gezielt unabhängig von der Datenbank ersetzt.
-  const pool={query:async()=>{throw Error('Keine Datenbankabfrage erwartet');}};
-  const handler=createSpontanGruppenApi({...baseDeps,pool,body:async()=>({
-    zeitId,eintraege:[{teilnahmeId:participant1,anwesend:true,personen:2},
-      {teilnahmeId:participant1,anwesend:false,personen:0}]
-  })});
-  // Standort-/Zugangsprüfung erfolgt absichtlich vor der Duplikatkontrolle.
-  // Dieser zusätzliche Test ist in einem isolierten API-Wrapper nicht sinnvoll.
-  assert.ok(typeof handler==='function');
+test('Doppelte Anwesenheitseinträge werden vor einer Änderung abgelehnt',async()=>{
+  const x=presenceCase({duplicate:true});
+  const result=await x.call();
+  assert.equal(result.status,400);
+  assert.match(result.data.error,/mehrfach/);
+  assert.equal(x.updates.length,0);
+  assert.ok(!x.sqlCalls.includes('BEGIN'));
 });
