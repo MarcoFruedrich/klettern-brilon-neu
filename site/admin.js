@@ -421,6 +421,24 @@ async function refresh() {
         c.append(versand);
       }
 
+      const rueckmeldungen=b.data.mitarbeiterRueckmeldungen;
+      if(rueckmeldungen&&typeof rueckmeldungen==='object'&&!Array.isArray(rueckmeldungen)){
+        const records=Object.values(rueckmeldungen).filter(item=>item&&typeof item==='object');
+        if(records.length){
+          const ueberblick=el('div');
+          ueberblick.className='booking-email-status';
+          ueberblick.append(el('strong','Verwaltungsbenachrichtigungen zu Mitarbeiter-Rückmeldungen:'));
+          const names={angenommen:'vom E-Mail-Anbieter angenommen',fehlgeschlagen:'fehlgeschlagen',
+            unklar:'ungeklärt – bitte prüfen',wird_versendet:'Versand läuft',
+            keine_adresse:'Verwaltungsadresse fehlt'};
+          for(const item of records){
+            ueberblick.append(el('p',(item.entscheidung==='abgelehnt'?'Absage':'Zusage')+
+              ': '+(names[item.status]||'Status nicht bestätigt')+
+              (item.fehler?' · '+item.fehler:'')));
+          }
+          c.append(ueberblick);
+        }
+      }
       const gesamtpreis = Number(b.data.gesamtpreis);
 
 if (b.data.partnerhausAbwicklung===true) {
