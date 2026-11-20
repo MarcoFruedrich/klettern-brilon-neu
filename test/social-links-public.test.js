@@ -14,7 +14,7 @@ function browserFixture(fetchImpl){
     replaceChildren(){this.children=[];},
     append(...nodes){this.children.push(...nodes);}
   };
-  const elements=[],windowHandlers={},documentHandlers={};
+  const elements=[],shareButtons=[],windowHandlers={},documentHandlers={};
   const document={
     hidden:false,
     getElementById(id){return id==='social-contact-links'?contacts:null;},
@@ -22,8 +22,12 @@ function browserFixture(fetchImpl){
       if(selector!=='#social-whatsapp-button')return null;
       return elements.find(node=>node.id==='social-whatsapp-button')||null;
     },
+    querySelectorAll(selector){
+      return selector==='[data-social-channel-action]'?shareButtons:[];
+    },
     createElement(tag){
-      return {tag,attributes:{},setAttribute(k,v){this.attributes[k]=v;},
+      return {tag,attributes:{},dataset:{},hidden:false,
+        setAttribute(k,v){this.attributes[k]=v;},
         remove(){const i=elements.indexOf(this);if(i>=0)elements.splice(i,1);}};
     },
     createTextNode(value){return {textContent:value};},
@@ -34,7 +38,7 @@ function browserFixture(fetchImpl){
   vm.runInNewContext(script,{document,window,fetch:fetchImpl,console:{warn(){}}});
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
   return {
-    contacts,elements,document,windowHandlers,documentHandlers,flush,
+    contacts,elements,document,window,shareButtons,windowHandlers,documentHandlers,flush,
     links:()=>contacts.children.filter(item=>item.tag==='a')
   };
 }
@@ -106,4 +110,35 @@ test('Verspätete Netzwerkantwort darf eine inzwischen deaktivierte Schaltfläch
   await view.flush();
   assert.equal(view.links().length,0);
   assert.equal(view.elements.length,0);
+});
+
+test('WhatsApp-Teilen auf Programm- und Tagesangebotskarten folgt demselben Verwaltungsschalter',async()=>{
+  let channels=[{id:'whatsapp',url:'https://wa.me/4912345678',aktiv:false}];
+  const view=browserFixture(async()=>({ok:true,json:async()=>({kanäle:channels})}));
+  await view.flush();
+
+  const publicApp=fs.readFileSync(path.join(__dirname,'../site/app.js'),'utf8');
+  const start=publicApp.indexOf('function whatsappTeilButton(');
+  const end=publicApp.indexOf('// Tages- und Sonderangebote',start);
+  assert.ok(start>0&&end>start,'WhatsApp-Teilfunktion auf Angeboten ist vorhanden');
+  const createShare=new Function('document','window','whatsappTeilLink',
+    publicApp.slice(start,end)+'\\nreturn whatsappTeilButton;')(
+    view.document,view.window,()=>'https://api.whatsapp.com/send?text=probe');
+
+  const programShare=createShare('Klettern','Information','/#buchung');
+  const specialShare=createShare('Kletteraktion','Information','/#aktionen');
+  view.shareButtons.push(programShare,specialShare);
+  assert.equal(programShare.hidden,true);
+  assert.equal(specialShare.hidden,true);
+  channels=[{id:'whatsapp',url:'https://wa.me/4912345678',aktiv:true}];
+  view.windowHandlers.focus();
+  await view.flush();
+  assert.equal(programShare.hidden,false);
+  assert.equal(specialShare.hidden,false);
+  channels=[{id:'whatsapp',url:'https://wa.me/4912345678',aktiv:false}];
+  view.windowHandlers.focus();
+  await view.flush();
+  assert.equal(programShare.hidden,true);
+  assert.equal(specialShare.hidden,true);
+  assert.equal(view.elements.length,0,'Auch die schwebende WhatsApp-Schaltfläche wird ausgeblendet');
 });
