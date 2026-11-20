@@ -322,7 +322,8 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
     veranstaltungsorte:['Brilon',ciPlaceRuethen],veranstaltungsort:'Brilon'
   });
   assert.equal(veraltetGesamt.status,409,
-    'Auch das allgemeine Programmspeichern muss veraltete Standortzuordnungen ablehnen');
+    'Auch das allgemeine Programmspeichern muss veraltete Standortzuordnungen ablehnen: '
+    +(await veraltetGesamt.text())+'; Server: '+errors.slice(-2000));
   let gespeicherteOrte=await pool.query('SELECT veranstaltungsorte,preise FROM brilon_angebote WHERE id=$1',[standortProgrammId]);
   assert.deepEqual(gespeicherteOrte.rows[0].veranstaltungsorte,['Brilon',ciPlaceOlpe],
     'Konfliktbehandlung darf die früher korrekt gespeicherte Standortliste nicht ändern');
