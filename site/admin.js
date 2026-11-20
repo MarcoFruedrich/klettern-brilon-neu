@@ -2662,8 +2662,9 @@ beschreibung.style.width = '100%';
       const standortLegende=document.createElement('legend');standortLegende.textContent='Veröffentlichte Standorte';standortFeld.append(standortLegende);
       const standortAuswahl=document.createElement('div');standortAuswahl.className='check-grid';
       const aktiveOrte=verwaltungsOrte.filter(item=>item.aktiv);
-      const bestehendeOrte=Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
-        ?angebot.veranstaltungsorte:[angebot.veranstaltungsort].filter(Boolean);
+      const gespeicherteStandorte=()=>Array.isArray(angebot.veranstaltungsorte)&&angebot.veranstaltungsorte.length
+        ?[...angebot.veranstaltungsorte]:[angebot.veranstaltungsort].filter(Boolean);
+      const bestehendeOrte=gespeicherteStandorte();
       for(const ort of aktiveOrte){
         const label=document.createElement('label');label.className='check';
         const input=document.createElement('input');input.type='checkbox';input.name='programm-standort';input.value=ort.name;input.checked=bestehendeOrte.includes(ort.name);
@@ -2672,7 +2673,7 @@ beschreibung.style.width = '100%';
       for(const ort of bestehendeOrte.filter(name=>!aktiveOrte.some(item=>item.name===name))){
         const label=document.createElement('label');label.className='check';
         const input=document.createElement('input');input.type='checkbox';input.name='programm-standort';input.value=ort;input.checked=true;
-        label.append(input,el('span',ort+' (inaktiv, bestehende Zuordnung)'));standortAuswahl.append(label);
+        label.append(input,el('span',ort+' (Standort inaktiv: zum Speichern bitte abwählen oder zuerst wieder aktivieren)'));standortAuswahl.append(label);
       }
       standortFeld.append(standortAuswahl);
       const standortSpeichern=document.createElement('button');
@@ -2693,7 +2694,8 @@ beschreibung.style.width = '100%';
         try{
           const gespeichert=await api('/api/admin/angebote/'+angebot.id+'/standorte',{
             method:'PATCH',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({veranstaltungsorte:ausgewaehlt,veranstaltungsort:
+            body:JSON.stringify({veranstaltungsorte:ausgewaehlt,
+              erwarteteVeranstaltungsorte:gespeicherteStandorte(),veranstaltungsort:
               ausgewaehlt.includes(angebot.veranstaltungsort)?angebot.veranstaltungsort:ausgewaehlt[0]})
           });
           if(!Array.isArray(gespeichert.veranstaltungsorte)||
@@ -2948,6 +2950,7 @@ preisButton.addEventListener('click', async () => {
         name:programmName.value,kategorie:kategorie.value,zielgruppe:zielgruppe.value,
         besuchergruppen:[...besuchergruppenFeld.querySelectorAll('input:checked')].map(input=>input.value),
         veranstaltungsorte:ausgewaehlteStandorte,
+        erwarteteVeranstaltungsorte:gespeicherteStandorte(),
         veranstaltungsort:ausgewaehlteStandorte.includes(angebot.veranstaltungsort)
           ?angebot.veranstaltungsort:ausgewaehlteStandorte[0],dauer:Number(dauer.value),kapazitaet:Number(kapazitaet.value),
         verfuegbare_termine:termine.value.split('\n').map(x=>x.trim()).filter(Boolean),

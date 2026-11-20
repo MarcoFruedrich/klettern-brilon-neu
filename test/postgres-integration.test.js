@@ -21,6 +21,12 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
   const pool = new Pool({ connectionString: integrationUrl, ssl: false });
   await pool.query(`CREATE TABLE IF NOT EXISTS brilon_buchungen (
     id UUID PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  // Das Programmschema wird in Produktion bereits vor der schmalen
+  // Program-Feld-Migration angelegt. Im isolierten Test ebenso vorbereiten.
+  await pool.query(`CREATE TABLE IF NOT EXISTS brilon_angebote(
+    id BIGSERIAL PRIMARY KEY,name TEXT NOT NULL,beschreibung TEXT DEFAULT '',
+    dauer INTEGER,preise JSONB NOT NULL DEFAULT '{}'::jsonb,
+    aktiv BOOLEAN NOT NULL DEFAULT false,created_at TIMESTAMPTZ DEFAULT NOW())`);
   t.after(async () => {
     await pool.end();
   });
@@ -37,7 +43,7 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
       ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: integrationUrl,
       DATABASE_SSL_MODE: 'disable', RUN_SCHEMA_MIGRATIONS: 'true', RUN_INVOICE_MIGRATION: 'true',
       RUN_PRUEF_SCHEMA_MIGRATION: 'true',
-      RUN_PLACES_MIGRATION: 'true',
+      RUN_PLACES_MIGRATION: 'true', RUN_PROGRAM_FIELDS_MIGRATION: 'true',
       RUN_EMPLOYEE_AREAS_MIGRATION: 'true',
       PUBLIC_BASE_URL:`http://127.0.0.1:${port}`,
       BREVO_API_KEY: '', BREVO_SENDER_EMAIL: '', BOOKING_NOTIFY_EMAIL: '',
@@ -281,6 +287,68 @@ test('Echte PostgreSQL: parallele Buchungen, Kapazität und Eindeutigkeit',
 
   // Stationsprüfprotokoll: eigene Mitarbeiterkonten, Code und Mangelbericht.
   const csrf=csrfToken;
+
+  // Mehrstandort-Speicherung mit echter isolierter PostgreSQL-Datenbank:
+  // ein veraltetes zweites Browserfenster darf zwischenzeitlich neu zugeordnete
+  // Standorte weder beim Standort-Button noch beim Programmspeichern verlieren.
+  const ciPlaceOlpe='CI-Olpe-'+crypto.randomUUID();
+  const ciPlaceRuethen='CI-Ruethen-'+crypto.randomUUID();
+  await pool.query('INSERT INTO brilon_orte(name,aktiv) VALUES ($1,true),($2,true)',[ciPlaceOlpe,ciPlaceRuethen]);
+  const siteTest=await pool.query(`INSERT INTO brilon_angebote
+      (name,beschreibung,dauer,preise,gruppenstufen,aktiv,kapazitaet,
+        buchbar,veroeffentlicht,veranstaltungsort,veranstaltungsorte)
+    VALUES ($1,'Mehrstandort-Speichertest',60,$2::jsonb,$3::jsonb,true,5,true,true,'Brilon',$4::jsonb)
+    RETURNING id`,[
+      'CI Standortkonflikt '+crypto.randomUUID(),
+      JSON.stringify({'1-4':100}),
+      JSON.stringify([{min:1,max:4,preis:100,dauer:60}]),
+      JSON.stringify(['Brilon'])
+    ]);
+  const standortProgrammId=String(siteTest.rows[0].id);
+  const standortPatch=(endpoint,data)=>fetch(root+'/api/admin/angebote/'+standortProgrammId+endpoint,{
+    method:'PATCH',headers:{Cookie:cookie,Origin:root,'Content-Type':'application/json',
+      'X-CSRF-Token':csrf},
+    body:JSON.stringify(data)
+  });
+  const ersterSpeicher=await standortPatch('/standorte',{
+    erwarteteVeranstaltungsorte:['Brilon'],
+    veranstaltungsorte:['Brilon',ciPlaceOlpe],veranstaltungsort:'Brilon'
+  });
+  assert.equal(ersterSpeicher.status,200,
+    'Neue Mehrfachstandorte müssen über den separaten Speicherbutton übernommen werden');
+  assert.deepEqual((await ersterSpeicher.json()).veranstaltungsorte,['Brilon',ciPlaceOlpe]);
+  const veraltetStandort=await standortPatch('/standorte',{
+    erwarteteVeranstaltungsorte:['Brilon'],
+    veranstaltungsorte:['Brilon',ciPlaceRuethen],veranstaltungsort:'Brilon'
+  });
+  assert.equal(veraltetStandort.status,409,
+    'Ein veralteter Standortdialog darf die inzwischen hinzugefügte Zuordnung nicht löschen');
+  const veraltetGesamt=await standortPatch('',{
+    erwarteteVeranstaltungsorte:['Brilon'],
+    veranstaltungsorte:['Brilon',ciPlaceRuethen],veranstaltungsort:'Brilon'
+  });
+  assert.equal(veraltetGesamt.status,409,
+    'Auch das allgemeine Programmspeichern muss veraltete Standortzuordnungen ablehnen: '
+    +(await veraltetGesamt.text())+'; Server: '+errors.slice(-2000));
+  let gespeicherteOrte=await pool.query('SELECT veranstaltungsorte,preise FROM brilon_angebote WHERE id=$1',[standortProgrammId]);
+  assert.deepEqual(gespeicherteOrte.rows[0].veranstaltungsorte,['Brilon',ciPlaceOlpe],
+    'Konfliktbehandlung darf die früher korrekt gespeicherte Standortliste nicht ändern');
+  assert.deepEqual(gespeicherteOrte.rows[0].preise,{'1-4':100},
+    'Standortwechsel darf die Preisstaffeln nicht überschreiben');
+  const aktuellGesamt=await standortPatch('',{
+    erwarteteVeranstaltungsorte:['Brilon',ciPlaceOlpe],
+    veranstaltungsorte:['Brilon',ciPlaceOlpe,ciPlaceRuethen],veranstaltungsort:'Brilon'
+  });
+  assert.equal(aktuellGesamt.status,200,
+    'Nach erneuter Übernahme des aktuellen Stands müssen alle drei Standorte speicherbar sein');
+  gespeicherteOrte=await pool.query('SELECT veranstaltungsorte FROM brilon_angebote WHERE id=$1',[standortProgrammId]);
+  assert.deepEqual(gespeicherteOrte.rows[0].veranstaltungsorte,['Brilon',ciPlaceOlpe,ciPlaceRuethen]);
+  const oeffentlicheStandorte=await fetch(root+'/api/angebote');
+  assert.equal(oeffentlicheStandorte.status,200);
+  assert.deepEqual((await oeffentlicheStandorte.json())
+    .find(item=>String(item.id)===standortProgrammId).veranstaltungsorte,
+    ['Brilon',ciPlaceOlpe,ciPlaceRuethen]);
+
   const adminPost=(url,data)=>fetch(root+url,{method:'POST',headers:{
     Origin:root,Cookie:cookie,'Content-Type':'application/json','X-CSRF-Token':csrf
   },body:JSON.stringify(data)});
