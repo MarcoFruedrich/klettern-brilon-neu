@@ -24,7 +24,8 @@ test('Live-Prüfung verändert keine Buchungen',async()=>{
     const json=obj!==null;
     const result=json?JSON.stringify(obj):u.pathname.endsWith('.js')?
       'function testing(){return true;}' : '<html><body>Website</body></html>';
-    return {ok:true,url:uri,headers:{get:()=>json?'application/json':'text/html'},
+    return {ok:!u.pathname.startsWith('/api/admin/'),status:u.pathname.startsWith('/api/admin/')?401:200,
+      url:uri,headers:{get:()=>json?'application/json':'text/html'},
       json:async()=>JSON.parse(result),text:async()=>result};
   };
   const r=await smoke({base:'https://example.test/',fetcher:fake});
@@ -52,7 +53,8 @@ test('Leere aktive Standorte sind sichtbar, aber zerstören keine funktionsfähi
       p==='/api/belegte-zeiten'?{zeiten:[]}:null;
     const json=data!==null,content=json?JSON.stringify(data):p.endsWith('.js')?
       'function test(){return true;}' : '<html><body>OK</body></html>';
-    return {ok:true,url:uri,headers:{get:()=>json?'application/json':'text/html'},
+    return {ok:!url.pathname.startsWith('/api/admin/'),status:url.pathname.startsWith('/api/admin/')?401:200,
+      url:uri,headers:{get:()=>json?'application/json':'text/html'},
       json:async()=>JSON.parse(content),text:async()=>content};
   };
   const result=await smoke({base:'https://example.test/',fetcher:reply});

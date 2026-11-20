@@ -1,5 +1,6 @@
 'use strict';
 const fs=require('node:fs');
+const path=require('node:path');
 
 function standortFehler(orte,angebote,aktionen=[]){
   if(!Array.isArray(orte)||!Array.isArray(angebote)||!Array.isArray(aktionen))
@@ -44,21 +45,41 @@ async function smoke({base,domain=false,fetcher=fetch,timeout=18000}={}){
     try{const note=await fn();rows.push({name,pass:true,note:note||'OK'});}
     catch(e){rows.push({name,pass:false,note:String(e?.message||e).slice(0,150)});}
   }
+  const allPages=fs.readdirSync(path.join(__dirname,'..','site'))
+    .filter(name=>/\.html$/.test(name)).map(name=>'/'+name);
   const pages=domain?['/','/widerruf.html']:
-    ['/','/admin.html','/mitarbeiterbereich.html','/netzwerkpartnerbereich.html',
-     '/widerruf.html','/datenschutz.html','/impressum.html','/gps.html',
-     '/tablet.html','/pruefung.html','/spontangruppen.html'];
+    ['/',...allPages.filter(name=>name!=='/index.html')];
+  const assets=new Set();
   for(const p of pages){
     await check('Seite '+p,async()=>{
       const html=await get(p);
       if(!/<html[\s>]/i.test(html)||!/<body[\s>]/i.test(html))throw Error('HTML unvollständig');
+      if(!domain){
+        for(const match of html.matchAll(/<(?:script|link)\b[^>]*?(?:src|href)="([^"]+)"/gi)){
+          const asset=match[1];
+          if(asset.startsWith('/')&&/^\/[^?#]+\.(?:js|css)(?:\?|#|$)/i.test(asset))
+            assets.add(asset);
+        }
+      }
       return 'HTML erreichbar';
     });
   }
   if(!domain){
-    for(const p of ['/app.js','/admin.js','/social-links-public.js']){
-      await check('Skript '+p,async()=>{if((await get(p)).length<50)throw Error('Skript fehlt');});
+    for(const p of new Set(['/app.js','/admin.js','/social-links-public.js',...assets])){
+      await check('Skript/Style '+p.replace(/\?.*$/,''),async()=>{
+        if((await get(p)).length<20)throw Error('Datei fehlt oder ist leer.');
+      });
     }
+    await check('Verwaltungs-API erfordert Anmeldung',async()=>{
+      for(const route of ['/api/admin/buchungen','/api/admin/angebote']){
+        const target=new URL(route,url);
+        const r=await fetcher(target.toString(),{method:'GET',redirect:'manual',
+          signal:AbortSignal.timeout(timeout)});
+        if(r.status!==401&&r.status!==403)
+          throw Error('Unerwarteter öffentlicher HTTP-Status '+r.status+' bei '+route);
+      }
+      return 'Verwaltungsdaten nicht ohne Anmeldung abrufbar';
+    });
     let orte,angebote,aktionen;
     await check('/api/orte',async()=>{
       orte=await get('/api/orte',true);
