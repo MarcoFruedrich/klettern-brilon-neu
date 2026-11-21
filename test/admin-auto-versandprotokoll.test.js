@@ -57,3 +57,15 @@ test('Verwaltungs-Buchungsformular und rechter Kalenderbereich zeigen dieselben 
   assert.match(html,/admin-versandstatus.js/);
   assert.ok(html.indexOf('admin-versandstatus.js')<html.indexOf('<script src="/admin.js'));
 });
+
+test('Verwaltungs-Zahlungsbutton ist während automatischer Planung und nach Annahme gesperrt',()=>{
+  const admin=read('site/admin.js');
+  assert.match(admin,/wirdAutomatischVersandt=\['geplant','versand_laeuft','gesendet'\]/);
+  assert.match(admin,/zahlungSenden\.disabled=partner\|\|einzelslot\|\|wirdAutomatischVersandt\|\|gesendet/);
+  assert.match(admin,/Automatischer Versand eingeplant/);
+  assert.match(admin,/Automatischer Versand dokumentiert/);
+});
+test('Datenbank-Test-Double verwechselt Payment-Übersicht nicht mit Kalender-Unterabfrage',()=>{
+  const source=read('test-support/mocks/pg/index.js');
+  assert.match(source,/sql\.includes\('SELECT id,status,buchungsnummer,'\)/);
+});

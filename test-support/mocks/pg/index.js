@@ -320,7 +320,7 @@ class Pool {
       if(sql.includes('titel,datum::text AS datum'))return {rows:this.calendar,rowCount:this.calendar.length};
       return {rows:[],rowCount:0};
     }
-    if (sql.includes('jsonb_build_object')&&sql.includes('FROM brilon_buchungen')) {
+    if (sql.includes('SELECT id,status,buchungsnummer,')&&sql.includes('jsonb_build_object')&&sql.includes('FROM brilon_buchungen')) {
       const rows=this.bookings.map(item=>({id:item.id,status:item.status,buchungsnummer:item.buchungsnummer,
         data:{buchungsnummer:item.data.buchungsnummer,name:item.data.name,angebot:item.data.angebot,datum:item.data.datum,
           gesamtpreis:item.data.gesamtpreis,zahlungen:item.data.zahlungen,zahlungsgutschriftCent:item.data.zahlungsgutschriftCent}}));
@@ -329,7 +329,8 @@ class Pool {
     if (sql.includes('FROM brilon_buchungen')&&sql.includes("data->>'datum'>=$1")) {
       const rows=this.bookings.filter(item=>item.data.datum>=params[0]&&item.data.datum<params[1]&&
         ['offen','bestaetigt'].includes(item.status||'offen'))
-        .map(item=>({id:item.id,data:item.data,status:item.status,created_at:item.created_at||new Date(0)}));
+        .map(item=>({id:item.id,data:item.data,status:item.status,created_at:item.created_at||new Date(0),
+          kundenmail:item.kundenmail||null,zahlungsinfo_gesendet_am:item.zahlungsinfo_gesendet_am||null}));
       return {rows,rowCount:rows.length};
     }
     if(/SELECT\s+data\s+FROM brilon_buchungen/.test(sql)&&sql.includes("data->>'datum'=$1")){

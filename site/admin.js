@@ -783,30 +783,33 @@ loeschen.onclick = async () => {
 zahlungSenden.className = 'btn secondary';
 
 function zahlungsButtonAktualisieren() {
-  const gesendet = Boolean(b.zahlungsinfo_gesendet_am);
-
-  zahlungSenden.textContent = gesendet
-    ? '✓ Zahlungsinformationen gesendet'
-    : 'Zahlungsinformationen senden';
-
-  zahlungSenden.style.backgroundColor = gesendet ? '#168447' : '';
-  zahlungSenden.style.color = gesendet ? '#ffffff' : '';
+  const q=b.kundenmail||null;
+  const gesendet=Boolean(b.zahlungsinfo_gesendet_am);
+  const automatic=window.KletternAdminVersandstatus?.auswerten(b);
+  const wirdAutomatischVersandt=['geplant','versand_laeuft','gesendet'].includes(q?.status);
+  const einzelslot=b.data.buchungsmodus==='einzelplatz';
+  const partner=b.data.partnerhausAbwicklung===true;
+  zahlungSenden.textContent=partner?'Zahlungsinformationen über Netzwerkpartner':
+    einzelslot?'Keine Anzahlung erforderlich':
+    wirdAutomatischVersandt&&q?.status==='geplant'?'Automatischer Versand eingeplant':
+    wirdAutomatischVersandt&&q?.status==='versand_laeuft'?'Automatischer Versand läuft':
+    wirdAutomatischVersandt&&q?.status==='gesendet'?'✓ Automatischer Versand dokumentiert':
+    gesendet?'✓ Zahlungsinformationen vom Anbieter angenommen':
+    'Zahlungsinformationen manuell senden';
+  zahlungSenden.disabled=partner||einzelslot||wirdAutomatischVersandt||gesendet;
+  zahlungSenden.style.backgroundColor=automatic?.tone==='success'?'#168447':'';
+  zahlungSenden.style.color=automatic?.tone==='success'?'#ffffff':'';
+  zahlungSenden.title=partner
+    ?'Abrechnung und Kundeninformation übernimmt der Netzwerkpartner.'
+    :wirdAutomatischVersandt
+      ?'Der Versand nach Mitarbeiterzusage wird automatisch gemäß dem hinterlegten Zeitfenster verarbeitet. Keine erneute manuelle E-Mail senden.'
+      :gesendet?'Die Nachricht wurde bereits vom Anbieter angenommen; bitte nicht erneut senden.'
+      :'Nur manueller Ausnahmeversand nach Prüfung des bisherigen Versandstatus.';
 }
 
 zahlungsButtonAktualisieren();
 
 zahlungSenden.type = 'button';
-zahlungSenden.disabled = false;
-if(b.data.partnerhausAbwicklung===true){
-  zahlungSenden.disabled=true;
-  zahlungSenden.textContent='Zahlungsinformationen über Netzwerkpartner';
-  zahlungSenden.title='Nach Mitarbeiterzusage erhält der Partner eine Benachrichtigung und informiert den Kunden über eigene Zahlungsbedingungen.';
-}
-if(b.data.buchungsmodus==='einzelplatz'&&b.data.partnerhausAbwicklung!==true){
-  zahlungSenden.disabled=true;
-  zahlungSenden.textContent='Keine Anzahlung erforderlich';
-  zahlungSenden.title='Für diese Einzelplatzreservierung wird keine Anzahlung angefordert.';
-}
   zahlungSenden.onclick = async () => {
   const bestaetigt = confirm(
     'Möchtest du die Zahlungsinformationen wirklich an diesen Kunden senden?'
@@ -830,12 +833,9 @@ if(b.data.buchungsmodus==='einzelplatz'&&b.data.partnerhausAbwicklung!==true){
   } catch (fehler) {
     meldung.textContent = 'Fehler beim Zahlungsversand: ' + fehler.message;
   } finally {
-    zahlungSenden.disabled = b.data.partnerhausAbwicklung===true||
-      b.data.buchungsmodus==='einzelplatz';
+    zahlungsButtonAktualisieren();
   }
 };
-if(b.data.partnerhausAbwicklung!==true)
-  zahlungSenden.title = 'Zahlungsinformationen per E-Mail an den Kunden senden';
       const exportLink=el('a','Alle Buchungen dieser Kontakt-E-Mail exportieren (JSON)');
       exportLink.href='/api/admin/buchungen/'+encodeURIComponent(b.id)+'/export';
       exportLink.className='btn secondary';
