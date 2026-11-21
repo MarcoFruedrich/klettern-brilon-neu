@@ -2994,6 +2994,20 @@ preis=safeText(d.preis,50);
             ?program.rows[0].veranstaltungsorte:[program.rows[0].veranstaltungsort];
           if(!sites.includes(data.veranstaltungsort)||String(data.datum)!==String(origin.rows[0].data?.datum))
             return {status:409,error:'Standort oder Datum passen nicht mehr zur Hauptbuchung.'};
+          // Die Höhe der Ermäßigung ist verbindlich für diesen Vorschlag.
+          // Manuelles Bearbeiten des Angebots darf nicht versehentlich einen
+          // höheren Preis als den zuvor errechneten Rabattpreis freigeben.
+          const basispreis=Number(data.originalpreis);
+          if(!Number.isFinite(basispreis)||basispreis<0||
+            preis>Math.max(0,(Math.round(basispreis*100)-Math.round(basispreis*10))/100))
+            return {status:409,error:'Anschlussangebote müssen mindestens 10 % unter dem ursprünglichen Gruppenpreis liegen.'};
+          const readyStaff=await client.query(`SELECT e.mitarbeiter_id FROM brilon_einsaetze e
+            JOIN brilon_pruef_mitarbeitende m ON m.id=e.mitarbeiter_id
+            WHERE e.buchung_id=$1 AND e.status='bestaetigt'
+              AND e.anschluss_option IN ($2,'beides') AND m.aktiv=true
+              AND m.freigabe_am IS NOT NULL LIMIT 1`,[data.quelle_buchung_id,data.vorschlagsrichtung]);
+          if(!readyStaff.rowCount)
+            return {status:409,error:'Für diesen Anschlusszeitraum ist keine bestätigte Mitarbeiterkapazität mehr vorhanden.'};
           const days=program.rows[0].verfuegbare_termine;
           if(Array.isArray(days)&&days.length&&!days.includes(data.datum))
             return {status:409,error:'Das Programm ist an diesem Datum nicht freigegeben.'};
