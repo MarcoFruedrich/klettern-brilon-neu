@@ -250,7 +250,10 @@
         title:b.angebot||'Programm',site:b.ort||b.veranstaltungsort||b.standort||'',status:b.status||'offen',
         staff:Array.isArray(b.staff)?b.staff:[],name:b.name||'',email:b.email||'',telefon:b.telefon||'',
         buchungsnummer:b.buchungsnummer||'',teilnehmer:b.teilnehmer||'',nachricht:b.nachricht||'',
-        duration:reliable?length:null
+        duration:reliable?length:null,
+        kundenmail:b.kundenmail||null,
+        zahlungsinfo_gesendet_am:b.zahlungsinfo_gesendet_am||null,
+        data:b.data||b
       });
     }
     for (const e of own) {
@@ -321,6 +324,9 @@
             angebot:source.angebot||b.angebot,
             ort:source.veranstaltungsort||source.ort||b.ort||b.veranstaltungsort,
             status:row?.status||b.status||'offen',
+            kundenmail:row?.kundenmail||null,
+            zahlungsinfo_gesendet_am:row?.zahlungsinfo_gesendet_am||null,
+            data:source,
             staff:staffing.get(id)||staffing.get(b.id)||[]
           });
         }
@@ -665,7 +671,17 @@
       card.append(mk('h4','',(e.site?'⌖ '+e.site+' – ':'')+e.title));
       card.append(mk('p','',e.start==null?'Ganztägig':prettyTime(e.start)+' – '+prettyTime(e.end)+' Uhr'+(e.reliable?'':' (Dauer ggf. offen)')));
       if(e.type==='buchung') {
-        card.append(mk('p','',e.status==='bestaetigt'?'Status: Bestätigt':'Status: Anfrage'));
+        card.append(mk('p','',e.status==='bestaetigt'?'Status: Buchung bestätigt':'Status: Buchungsanfrage'));
+        const mailState=window.KletternAdminVersandstatus?.auswerten(e);
+        if(mailState){
+          const versand=mk('section','ck-mail-documentation');
+          versand.append(mk('strong','','Automatischer Versand nach Mitarbeiterzusage'));
+          versand.append(mk('p','',mailState.hinweis));
+          versand.append(mk('p','','Empfänger: '+mailState.empfaenger));
+          if(mailState.detail)versand.append(mk('p','',mailState.detail));
+          if(mailState.tone==='warning')versand.classList.add('payment-warning');
+          card.append(versand);
+        }
         const details=[
           ['Buchungsnummer',e.buchungsnummer],['Kunde',e.name],['E-Mail',e.email],['Telefon',e.telefon],
           ['Teilnehmende',e.teilnehmer],['Nachricht',e.nachricht]
@@ -754,7 +770,7 @@
               method:'PATCH',headers:{'Content-Type':'application/json'},
               body:JSON.stringify({status:'bestaetigt',bearbeitungsnotiz:''})
             });
-            feedback.textContent='Buchung bestätigt; die bestehende Kundenbenachrichtigung wurde ausgelöst.';await load();
+            feedback.textContent='Buchung bestätigt. Den davon getrennten E-Mail-Versandstatus siehst du im Buchungsdetail.';await load();
           }catch(error){feedback.textContent='Buchung konnte nicht bestätigt werden: '+(error.message||'Fehler');confirmButton.disabled=false;}
         }));
       } else {

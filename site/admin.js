@@ -399,6 +399,20 @@ async function refresh() {
           new Date(b.created_at).toLocaleString('de-DE'))
       );
 
+      // Persistenter, buchungsbezogener Versandverlauf aus der serverseitigen
+      // Kundenbenachrichtigungs-Warteschlange (auch nach Neuladen/Neustart).
+      const autoVersand=window.KletternAdminVersandstatus?.auswerten(b);
+      if(autoVersand){
+        const automatic=el('section');
+        automatic.className='booking-email-status';
+        automatic.append(el('strong','Automatischer Versand nach Mitarbeiterzusage'));
+        automatic.append(el('p',autoVersand.hinweis));
+        automatic.append(el('p','Empfänger: '+autoVersand.empfaenger));
+        if(autoVersand.detail)automatic.append(el('p',autoVersand.detail));
+        if(autoVersand.tone==='warning')automatic.classList.add('payment-warning');
+        c.append(automatic);
+      }
+
       if(b.status==='bestaetigt'){
         const protokoll=b.data.bestaetigungsEmail;
         const versand=el('p');

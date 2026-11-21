@@ -2532,7 +2532,12 @@ preis=safeText(d.preis,50);
         const endDate=new Date(Date.UTC(Number(match[1]),Number(match[2]),1));
         const ende=endDate.toISOString().slice(0,10);
         const q=await pool.query(
-          `SELECT id,data,status,bearbeitungsnotiz,created_at
+          `SELECT id,data,status,bearbeitungsnotiz,created_at,zahlungsinfo_gesendet_am,
+             (SELECT jsonb_build_object('status',q.status,'faellig_ab',q.faellig_ab,
+               'versendet_am',q.versendet_am,'fehler',q.fehler,
+               'anlass_mitarbeiter_id',q.anlass_mitarbeiter_id)
+             FROM brilon_kundenbestaetigungen q
+             WHERE q.buchung_id=brilon_buchungen.id) AS kundenmail
            FROM brilon_buchungen
            WHERE data->>'datum'>=$1 AND data->>'datum'<$2
              AND COALESCE(status,'offen') IN ('offen','bestaetigt')
@@ -2827,7 +2832,12 @@ preis=safeText(d.preis,50);
                data->>'email',data->>'angebot') ILIKE '%' || $2 || '%')`;
           const count=await pool.query(`SELECT COUNT(*)::text AS anzahl FROM brilon_buchungen ${where}`,filterParams);
           const q=await pool.query(
-            `SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am
+            `SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am,
+             (SELECT jsonb_build_object('status',q.status,'faellig_ab',q.faellig_ab,
+               'versendet_am',q.versendet_am,'fehler',q.fehler,
+               'anlass_mitarbeiter_id',q.anlass_mitarbeiter_id)
+             FROM brilon_kundenbestaetigungen q
+             WHERE q.buchung_id=brilon_buchungen.id) AS kundenmail
              FROM brilon_buchungen ${where}
              ORDER BY created_at DESC,id DESC LIMIT $3 OFFSET $4`,
             [...filterParams,proSeite,(seite-1)*proSeite]
@@ -2835,7 +2845,12 @@ preis=safeText(d.preis,50);
           return reply(res,200,{buchungen:q.rows,anzahl:Number(count.rows[0]?.anzahl||0),seite,proSeite});
         }
         const q=await pool.query(
-          `SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am
+          `SELECT id,data,status,bearbeitungsnotiz,created_at,updated_at,zahlungsinfo_gesendet_am,
+             (SELECT jsonb_build_object('status',q.status,'faellig_ab',q.faellig_ab,
+               'versendet_am',q.versendet_am,'fehler',q.fehler,
+               'anlass_mitarbeiter_id',q.anlass_mitarbeiter_id)
+             FROM brilon_kundenbestaetigungen q
+             WHERE q.buchung_id=brilon_buchungen.id) AS kundenmail
            FROM brilon_buchungen
            WHERE ($1::text='alle' OR COALESCE(status,'offen')=$1)
              AND ($2::text='' OR concat_ws(' ',data->>'name',buchungsnummer,data->>'buchungsnummer',
