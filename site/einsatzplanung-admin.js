@@ -175,6 +175,24 @@
         if(ueberfaellig||['fehler','abgebrochen'].includes(pending.status))
           hinweis.className='payment-warning';
         card.append(hinweis);
+        if(ueberfaellig){
+          const verify=el('button','Versand jetzt prüfen');
+          verify.type='button';verify.className='btn secondary';
+          verify.onclick=async()=>{
+            verify.disabled=true;
+            try{
+              const result=await api('/api/admin/einsatzplanung/kundenmail/'+b.id+'/pruefen',
+                {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+              await laden();
+              if(result?.status==='fehler'||result?.status==='abgebrochen')
+                alert('Versand nicht erfolgreich: '+(result.fehler||result.status));
+            }catch(err){
+              alert('Versandprüfung fehlgeschlagen: '+err.message);
+              verify.disabled=false;
+            }
+          };
+          card.append(verify);
+        }
         if(pending.status==='geplant'){
           const cancel=el('button','Kundenbestätigung stoppen');cancel.type='button';cancel.className='btn secondary';
           cancel.onclick=async()=>{
