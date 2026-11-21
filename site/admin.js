@@ -2842,41 +2842,6 @@ const dauerVariantenHinweis=el('p','Ein Teilnehmerbereich darf mehrfach vorkomme
 dauerVariantenHinweis.className='hint';
 
 preisbereich.append(tierLegend,dauerVariantenHinweis,tierEditor,addTierButton);
-
-// Betreibervorgabe 21.11.2026: Gruppenpreise für Jugendherberge Brilon.
-// Die Preise werden nie beim Öffnen automatisch überschrieben. Bei mehreren
-// Standorten müssen für unterschiedliche Preise getrennte Programme existieren.
-const brilonVorlage=window.BrilonPreisvorlagen?.get(angebot.name);
-if(brilonVorlage){
-  const sites=gespeicherteStandorte();
-  const istNurBrilon=sites.length===1&&sites[0]==='Jugendherberge Brilon';
-  const box=document.createElement('div');box.className='booking';
-  const heading=el('h4','Brilon-Preisvorlage · '+brilonVorlage.name);
-  const beschreibung=el('p','Preisstaffeln: '+brilonVorlage.stufen
-    .map(v=>v.min+'–'+v.max+' Pers. · '+v.dauer/60+' Std. · '+v.preis+' €').join(' | '));
-  beschreibung.className='hint';
-  const apply=document.createElement('button');apply.type='button';
-  apply.className='btn secondary';apply.textContent='Brilon-Preisstaffeln ins Formular übernehmen';
-  const note=el('p',istNurBrilon
-    ?'Nur Formular-Vorbelegung: Erst „Programm speichern“ schreibt die Preise in die Datenbank.'
-    :'Nicht übernehmbar: Dieses Programm ist nicht ausschließlich der Jugendherberge Brilon zugeordnet. Preisstaffeln gelten aktuell standortübergreifend. Bitte ein eigenes Brilon-Programm verwenden.');
-  note.className='hint';
-  apply.disabled=!istNurBrilon;
-  apply.addEventListener('click',()=>{
-    if(!window.confirm('Die bisherigen Staffelwerte dieses Programms im Formular durch die Brilon-Preisvorlage ersetzen? Gespeichert wird erst mit „Programm speichern“.'))return;
-    modus.value='gruppe';
-    dauerModus.value='gruppenstufe';
-    dauer.value=String(Math.min(...brilonVorlage.stufen.map(v=>v.dauer)));
-    kapazitaet.value='15';
-    programmStufenEditor(tierEditor,brilonVorlage.stufen);
-    preisEingabenAktualisieren();
-    gruppenDauerEingabenAktualisieren();
-    note.textContent='Vorlage im Formular vorbereitet. Kontrolliere die Staffelpreise und klicke anschließend auf „Programm speichern“.';
-  });
-  box.append(heading,beschreibung,apply,note);
-  preisbereich.insertBefore(box,tierLegend);
-}
-
 function preisEingabenAktualisieren(){
   const einzel=modus.value==='einzelplatz';
   tierLegend.hidden=einzel;tierEditor.hidden=einzel;addTierButton.hidden=einzel;
