@@ -2269,14 +2269,14 @@ if (neuesAngebotForm) {
   function angebotsKapazitaetPruefen() {
     const einzelplaetze = angebotsModus.value === 'einzelplatz';
     if(einzelplatzFelder)einzelplatzFelder.hidden=!einzelplaetze;
-    angebotsKapazitaet.min = einzelplaetze ? '5' : '1';
-    angebotsKapazitaet.max = einzelplaetze ? '12' : '1000';
+    angebotsKapazitaet.min = '1';
+    angebotsKapazitaet.max = '500';
     angebotsKapazitaetLabel.querySelector('.field-hint')?.remove();
     if(createTierFieldset){createTierFieldset.hidden=einzelplaetze;createTierEditor?.querySelectorAll('input').forEach(input=>input.required=!einzelplaetze&&neuesAngebotForm.elements.dauer_modus.value!=='fest');}
     if (einzelplaetze) {
       const hinweis = document.createElement('span');
       hinweis.className = 'field-hint';
-      hinweis.textContent = 'Bei Einzelplätzen sind 5 bis 12 Teilnehmende möglich.';
+      hinweis.textContent = 'Offenes Gruppenangebot: Mindest- und Höchstzahl individuell festlegen; Einzelpreis je Anmeldung.';
       angebotsKapazitaetLabel.append(hinweis);
     }
   }
@@ -2804,12 +2804,12 @@ beschreibung.style.width = '100%';
       const hinweise=feld('Besondere Hinweise',angebot.hinweise,'hinweise','textarea');
       const modusLabel=document.createElement('label');modusLabel.textContent='Buchungsart';
       const modus=document.createElement('select');
-      for(const [value,label] of [['gruppe','Gruppenanfrage'],['einzelplatz','Einzelplätze reservieren']]){
+      for(const [value,label] of [['gruppe','Gruppenanfrage'],['einzelplatz','Offenes Gruppenangebot – Einzelanmeldung']]){
         const option=el('option',label);option.value=value;modus.append(option);
       }
       modus.value=angebot.buchungsmodus||'gruppe';modusLabel.append(modus);metadaten.append(modusLabel);
       const mindest=feld('Mindestanmeldungen für Durchführung',angebot.mindestteilnehmer||5,'mindestteilnehmer','number');
-      mindest.min='5';mindest.max='12';
+      mindest.min='1';mindest.max='500';
       const einzelpreis=feld('Preis pro Person (€)',angebot.preis_pro_person||'','preis_pro_person','number');
       einzelpreis.min='0.01';einzelpreis.step='0.01';
       const bookable=document.createElement('input');bookable.type='checkbox';bookable.checked=angebot.buchbar===true;
