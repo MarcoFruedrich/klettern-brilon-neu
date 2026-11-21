@@ -4830,11 +4830,10 @@ await pool.query(`
     if(process.env.MOCK_PG!=='1'){
       try{
         await pool.query('SELECT buchung_id FROM brilon_kundenbestaetigungen LIMIT 0');
-        const confirmationTimer=setInterval(()=>{
-          kundenService.processQueue().catch(error=>console.error('Kundenbestätigungen prüfen:',error.message));
-        },60_000);
-        confirmationTimer.unref();
-        kundenService.processQueue().catch(error=>console.error('Kundenbestätigungen bei Start:',error.message));
+        // Verarbeitet überfällige Einträge direkt nach Serverstart und
+        // prüft neue Fälligkeiten alle 15 Sekunden plus präzisem Due-Timer.
+        // Auch nach einem Render-Neustart werden geplante E-Mails wiedergefunden.
+        kundenService.startWorker();
       }catch(error){console.warn('Automatische Kundenbestätigung nicht gestartet: Versandtabelle fehlt.',error.message);}
     }
     if(process.env.MOCK_PG!=='1'){

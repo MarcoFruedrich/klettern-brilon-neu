@@ -43,14 +43,24 @@
           const descriptions={keine:'Keine zusätzliche Kapazität',davor:'Zusätzlicher Termin davor möglich',danach:'Zusätzlicher Termin danach möglich',beides:'Zusätzliche Termine davor und danach möglich'};
           card.append(Object.assign(el('p',descriptions[t.anschluss_option]||''),{className:'staff-customer-mail-status'}));
         }
-        if(!t.manueller_termin&&t.kundenbestaetigung_status==='geplant'&&t.kundenbestaetigung_faellig_ab)
-          card.append(Object.assign(el('p','Kundenbestätigung geplant für '+new Date(t.kundenbestaetigung_faellig_ab).toLocaleString('de-DE')),
+        const mailStatus=t.kundenbestaetigung_status;
+        const faellig=t.kundenbestaetigung_faellig_ab?new Date(t.kundenbestaetigung_faellig_ab):null;
+        const ueberfaellig=mailStatus==='geplant'&&faellig&&Date.now()>faellig.getTime()+60_000;
+        if(!t.manueller_termin&&mailStatus==='geplant'&&faellig)
+          card.append(Object.assign(el('p',ueberfaellig
+            ?'Kunden-/Zahlungsinformation ist überfällig. Bitte die Verwaltung kontaktieren.'
+            :'Kunden-/Zahlungsinformation geplant für '+faellig.toLocaleString('de-DE')),
             {className:'staff-customer-mail-status'}));
-        else if(!t.manueller_termin&&t.kundenbestaetigung_status==='gesendet'&&t.kundenbestaetigung_versendet_am)
-          card.append(Object.assign(el('p','Kundenbestätigung wurde am '+new Date(t.kundenbestaetigung_versendet_am).toLocaleString('de-DE')+' vom E-Mail-Anbieter angenommen.'),
+        else if(!t.manueller_termin&&mailStatus==='gesendet'&&t.kundenbestaetigung_versendet_am)
+          card.append(Object.assign(el('p','Kunden-/Zahlungsinformation wurde am '+
+            new Date(t.kundenbestaetigung_versendet_am).toLocaleString('de-DE')+
+            ' vom E-Mail-Anbieter angenommen. Zustellung noch nicht bestätigt.'),
             {className:'staff-customer-mail-status'}));
-        else if(!t.manueller_termin&&t.kundenbestaetigung_status==='fehler')
-          card.append(Object.assign(el('p','Kundenbestätigung konnte nicht versendet werden. Die Verwaltung muss den Versand prüfen.'),
+        else if(!t.manueller_termin&&mailStatus==='versand_laeuft')
+          card.append(Object.assign(el('p','Kunden-/Zahlungsinformation wird gerade versendet.'),
+            {className:'staff-customer-mail-status'}));
+        else if(!t.manueller_termin&&['fehler','abgebrochen'].includes(mailStatus))
+          card.append(Object.assign(el('p','Kunden-/Zahlungsinformation nicht gesendet. Die Verwaltung muss den Versandstatus prüfen.'),
             {className:'staff-customer-mail-status'}));
         if(!t.manueller_termin&&t.zahlungsinfo_gesendet_am)
           card.append(Object.assign(el('p','Zahlungsinformationen zur Anzahlung wurden am '+new Date(t.zahlungsinfo_gesendet_am).toLocaleString('de-DE')+' vom E-Mail-Anbieter angenommen.'),
@@ -132,4 +142,10 @@
   const observer=new MutationObserver(()=>{if(!workspace.hidden)loadPlanning();});
   observer.observe(workspace,{attributes:true,attributeFilter:['hidden']});
   if(!workspace.hidden)loadPlanning();
+  // Mitarbeiter sehen nach Ablauf des Versandfensters auch ohne manuellen
+  // Reload, ob die Benachrichtigung tatsächlich vom Anbieter angenommen wurde.
+  const autoRefresh=setInterval(()=>{
+    if(!workspace.hidden&&!document.hidden)loadPlanning();
+  },30_000);
+  autoRefresh.unref?.();
 })();

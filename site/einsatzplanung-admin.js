@@ -162,8 +162,19 @@
       roster.append(statusList);card.append(roster);
       const pending=notificationMap.get(b.id);
       if(pending){
-        card.append(el('p','Kundenbestätigung: '+pending.status+
-          (pending.faellig_ab?' · geplant ab '+new Date(pending.faellig_ab).toLocaleString('de-DE'):'') ));
+        const faellig=pending.faellig_ab?new Date(pending.faellig_ab):null;
+        const ueberfaellig=pending.status==='geplant'&&faellig&&Date.now()>faellig.getTime()+60_000;
+        const beschreibung=ueberfaellig?'VERSAND ÜBERFÄLLIG – Versanddienst prüfen':
+          pending.status==='gesendet'?'Vom E-Mail-Anbieter angenommen':
+          pending.status==='versand_laeuft'?'E-Mail-Versand läuft':
+          pending.status==='fehler'?'E-Mail-Versand fehlgeschlagen':
+          pending.status==='abgebrochen'?'E-Mail-Versand gestoppt / blockiert':pending.status;
+        const hinweis=el('p','Kunden-/Zahlungsinformation: '+beschreibung+
+          (faellig?' · vorgesehen '+faellig.toLocaleString('de-DE'):'')+
+          (pending.fehler?' · Grund: '+pending.fehler:''));
+        if(ueberfaellig||['fehler','abgebrochen'].includes(pending.status))
+          hinweis.className='payment-warning';
+        card.append(hinweis);
         if(pending.status==='geplant'){
           const cancel=el('button','Kundenbestätigung stoppen');cancel.type='button';cancel.className='btn secondary';
           cancel.onclick=async()=>{
