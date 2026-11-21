@@ -563,10 +563,10 @@
   <p class="hint">Wähle eine oder mehrere Gruppen. Das Programm wird ihnen zugeordnet und auf der Website passend gefiltert.</p>
   <fieldset class="angebot-standort-auswahl"><legend>Veranstaltungsorte (Mehrfachauswahl)</legend><div id="angebot-orte-auswahl" class="check-grid"></div><small>Das Programm wird an allen angehakten Standorten auf der Website angezeigt.</small></fieldset>
   <label>Kapazität (Teilnehmende)<input name="kapazitaet" type="number" min="1" max="500" value="20" required></label>
-  <label>Buchungsart<select name="buchungsmodus"><option value="gruppe">Gruppenanfrage</option><option value="einzelplatz">Einzelplätze reservieren</option></select></label>
-  <div class="two"><label>Mindestanmeldungen für Durchführung<input name="mindestteilnehmer" type="number" min="5" max="12" value="5"></label>
+  <label>Buchungsart<select name="buchungsmodus"><option value="gruppe">Gruppenanfrage</option><option value="einzelplatz">Offenes Gruppenangebot – Einzelanmeldung</option></select></label>
+  <div class="two"><label>Mindestanmeldungen für Durchführung<input name="mindestteilnehmer" type="number" min="1" max="500" value="5"></label>
   <label>Preis pro Person (€)<input name="preis_pro_person" type="number" min="0.01" step="0.01"></label></div>
-  <p class="hint">Bei Einzelplätzen gilt eine Kapazität von 5 bis 12 Plätzen. Eine Anmeldung reserviert einen Platz; eine Anzahlung wird nicht angefordert.</p>
+  <p class="hint">Offenes Gruppenangebot: Mindest- und Höchstteilnehmerzahl individuell festlegen (Standard mindestens 5). Jede Anmeldung reserviert genau einen Platz zum Einzelpreis. Das Programm findet erst ab Erreichen der Mindestzahl statt; keine Anzahlung.</p>
   <label>Verfügbare Termine (ein Datum pro Zeile; leer = offen)<textarea name="verfuegbare_termine" rows="3" placeholder="2026-12-01"></textarea></label>
   <label>Besondere Hinweise<textarea name="hinweise" rows="2" maxlength="1000"></textarea></label>
   <label class="check"><input name="buchbar" type="checkbox" checked><span>Buchbar</span></label>
