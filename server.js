@@ -3760,10 +3760,10 @@ if (route === '/api/admin/angebote' && req.method === 'POST') {
     return reply(res,400,{error:'Bitte eine Kapazität zwischen 1 und 500 Teilnehmenden eingeben.'});
   if(termine.some(t=>!gueltigesDatum(t)))
     return reply(res,400,{error:'Bitte nur gültige Termine im Format JJJJ-MM-TT eingeben.'});
-  if(buchungsmodus==='einzelplatz'&&(kapazitaet<5||kapazitaet>12||
-     !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<5||mindestteilnehmer>kapazitaet||
+  if(buchungsmodus==='einzelplatz'&&(kapazitaet<1||kapazitaet>500||
+     !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<1||mindestteilnehmer>kapazitaet||
      !Number.isFinite(preisProPerson)||preisProPerson<=0))
-    return reply(res,400,{error:'Bei Einzelplätzen müssen Kapazität und Mindestanmeldungen zwischen 5 und 12 liegen. Der Preis pro Person muss größer als 0 € sein.'});
+    return reply(res,400,{error:'Bei Einzelplätzen müssen Mindestanmeldungen mindestens 1 und höchstens die gewählte Kapazität (maximal 500) betragen. Der Preis pro Person muss größer als 0 € sein.'});
 
   if(!await programmStandorteAktivPruefen(veranstaltungsorte))
     return reply(res,400,{error:'Mindestens ein ausgewählter Standort ist nicht angelegt oder nicht aktiv.'});
@@ -3903,8 +3903,8 @@ const neuePreise=preiseAusStufen(validStufen.stufen);
 
 if(!name||!kategorie||!veranstaltungsort||!Number.isInteger(dauer)||dauer<15||dauer>1440||
    !Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500||termine.some(t=>!gueltigesDatum(t))||
-   (buchungsmodus==='einzelplatz'&&(!Number.isInteger(kapazitaet)||kapazitaet<5||kapazitaet>12||
-     !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<5||mindestteilnehmer>kapazitaet||
+   (buchungsmodus==='einzelplatz'&&(!Number.isInteger(kapazitaet)||kapazitaet<1||kapazitaet>500||
+     !Number.isInteger(mindestteilnehmer)||mindestteilnehmer<1||mindestteilnehmer>kapazitaet||
      !Number.isFinite(preisProPerson)||preisProPerson<=0)))
   return reply(res,400,{error:'Dauer, Kapazität oder verfügbare Termine sind ungültig.'});
 if(!await programmStandorteAktivPruefen(veranstaltungsorte))
