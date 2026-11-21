@@ -700,16 +700,27 @@
           const info=mk('p','ck-followup-availability','Bestätigte Anschlusskapazität: '+
             connectionStaff.map(person=>person.name+' ('+connectionLabels[person.anschluss_option]+')').join(', '));
           card.append(info);
-          card.append(btn('Anschlussangebote anzeigen','ck-plan-followup',async event=>{
-            const button=event.currentTarget;button.disabled=true;stateText.textContent='Anschlussangebote werden geladen …';
-            try{
-              const result=await api('/api/admin/aktionen/vorschlaege',{method:'POST',headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({buchung_id:e.id})});
-              stateText.textContent=result.nachricht||'Anschlussangebote wurden erstellt und veröffentlicht.';
-              window.dispatchEvent(new CustomEvent('klettern:sonderangebote-aktualisieren'));
-              window.adminNavigateToElement?.('special-offers-section');
-            }catch(error){stateText.textContent=error.message||'Zusatzangebote konnten nicht vorgeschlagen werden.';button.disabled=false;}
-          }));
+          const offerActions=mk('div','ck-booking-actions');
+          const choices=[['davor','Angebot davor erstellen'],['danach','Angebot danach erstellen']];
+          for(const [direction,label] of choices){
+            if(!connectionStaff.some(person=>person.anschluss_option===direction||person.anschluss_option==='beides'))continue;
+            offerActions.append(btn(label,'ck-plan-followup',async event=>{
+              const button=event.currentTarget;button.disabled=true;
+              stateText.textContent='Prüfe 15 Minuten Puffer, Standort, Verfügbarkeit und Rabatt …';
+              try{
+                const result=await api('/api/admin/aktionen/vorschlaege',{
+                  method:'POST',headers:{'Content-Type':'application/json'},
+                  body:JSON.stringify({buchung_id:e.id,richtung:direction})
+                });
+                if(!result.anzahl)throw new Error('Kein neuer Anschlussvorschlag verfügbar.');
+                stateText.textContent=result.nachricht||'Anschlussangebot als Vorschlag erstellt.';
+                window.dispatchEvent(new CustomEvent('klettern:sonderangebote-aktualisieren'));
+                window.adminNavigateToElement?.('special-offers-section');
+              }catch(error){stateText.textContent=error.message||'Anschlussangebot konnte nicht vorbereitet werden.';}
+              finally{button.disabled=false;}
+            }));
+          }
+          card.append(offerActions);
         }
         const applicantsList=(e.staff||[]).filter(s=>s.status==='beworben');
         if(applicantsList.length){
