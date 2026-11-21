@@ -9,6 +9,8 @@ test('Partnerbuchungen zeigen automatische Partnerinformation in der Verwaltung'
   assert.match(code,/Zahlungsinformationen über Netzwerkpartner/);
 });
 test('Verwaltung verhindert direkten Zahlungsversand bei Partner-Abrechnung auch nach Klick',()=>{
-  assert.match(code,/if\(b\.data\.partnerhausAbwicklung===true\)\{\s*zahlungSenden\.disabled=true/);
-  assert.match(code,/zahlungSenden\.disabled = b\.data\.partnerhausAbwicklung===true\|\|/);
+  assert.match(code,/const partner=b\.data\.partnerhausAbwicklung===true/);
+  assert.match(code,/zahlungSenden\.disabled=partner\|\|einzelslot\|\|wirdAutomatischVersandt\|\|gesendet/);
+  assert.match(code,/zahlungSenden\.title=partner/);
+  assert.match(code,/zahlungSenden\.disabled=partner\|\|einzelslot\|\|wirdAutomatischVersandt\|\|gesendet/);
 });
