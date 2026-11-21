@@ -2956,11 +2956,86 @@ preis=safeText(d.preis,50);
         return reply(res,200,{success:true,gpsSpieleGeloescht:loeschung.gpsSpieleGeloescht});
       }
 
+
+      // Anschlussangebote aus einer bestätigten Buchung als prüfbare Entwürfe.
+      if(route==='/api/admin/aktionen/vorschlaege'&&req.method==='POST'){
+        const d=await body(req);
+        if(!/^[0-9a-f-]{36}$/i.test(String(d?.buchung_id||'')))
+          return reply(res,400,{error:'Ungültige Buchung.'});
+        const result=await sonderangebotVorschlaege(pool,d.buchung_id,{
+          entwurf:true,richtung:d.richtung||'beides'
+        });
+        return reply(res,result.ok?201:(result.status||409),result.ok?result:{error:result.error});
+      }
+
+      const actionApproval=route.match(/^\/api\/admin\/aktionen\/([0-9a-fA-F-]{36})\/freigeben$/);
+      if(actionApproval&&req.method==='POST'){
+        const d=await body(req);
+        const titel=safeText(d?.titel,120),beschreibung=safeText(d?.beschreibung,1000);
+        const preis=Number(d?.preis),programmId=String(d?.programm_id||'').trim();
+        if(!titel||!Number.isFinite(preis)||preis<0||!/^\d+(?:\.\d{1,2})?$/.test(String(d?.preis))||
+          !/^[1-9]\d{0,15}$/.test(programmId))
+          return reply(res,400,{error:'Bitte gültigen Titel, Preis und buchbares Programm angeben.'});
+        const result=await reservierungsTransaktion(async client=>{
+          const old=await client.query("SELECT id,data FROM brilon_aktionen WHERE id=$1 FOR UPDATE",[actionApproval[1]]);
+          if(!old.rowCount)return {status:404,error:'Vorschlag nicht gefunden.'};
+          const data=old.rows[0].data||{};
+          if(data.status!=='vorschlag')return {status:409,error:'Nur unveröffentlichte Vorschläge dürfen freigegeben werden.'};
+          if(!data.quelle_buchung_id||!['davor','danach'].includes(data.vorschlagsrichtung))
+            return {status:409,error:'Der Ursprungstermin ist nicht nachvollziehbar.'};
+          const origin=await client.query('SELECT status,data FROM brilon_buchungen WHERE id=$1 FOR UPDATE',[data.quelle_buchung_id]);
+          if(!origin.rowCount||origin.rows[0].status!=='bestaetigt')
+            return {status:409,error:'Die zugehörige Hauptbuchung ist nicht mehr verbindlich bestätigt.'};
+          const program=await client.query(`SELECT id,veranstaltungsort,veranstaltungsorte,verfuegbare_termine
+            FROM brilon_angebote WHERE id=$1 AND aktiv=true AND buchbar=true
+              AND veroeffentlicht=true AND archiviert=false`,[programmId]);
+          if(!program.rowCount)return {status:409,error:'Das zugeordnete Programm ist nicht mehr buchbar.'};
+          const sites=Array.isArray(program.rows[0].veranstaltungsorte)&&program.rows[0].veranstaltungsorte.length
+            ?program.rows[0].veranstaltungsorte:[program.rows[0].veranstaltungsort];
+          if(!sites.includes(data.veranstaltungsort)||String(data.datum)!==String(origin.rows[0].data?.datum))
+            return {status:409,error:'Standort oder Datum passen nicht mehr zur Hauptbuchung.'};
+          const days=program.rows[0].verfuegbare_termine;
+          if(Array.isArray(days)&&days.length&&!days.includes(data.datum))
+            return {status:409,error:'Das Programm ist an diesem Datum nicht freigegeben.'};
+          const hhmm=value=>/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(value||''))?
+            Number(value.slice(0,2))*60+Number(value.slice(3,5)):NaN;
+          const start=hhmm(data.uhrzeit),end=hhmm(data.endzeit);
+          const mainStart=hhmm(origin.rows[0].data?.uhrzeit),mainEnd=mainStart+Number(origin.rows[0].data?.dauer);
+          if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||
+            !Number.isFinite(mainEnd)||
+            (data.vorschlagsrichtung==='davor'?end!==mainStart-15:start!==mainEnd+15))
+            return {status:409,error:'Der vorgeschriebene Puffer von 15 Minuten ist nicht mehr gewährleistet.'};
+          const occupied=await client.query(`SELECT id,data FROM brilon_buchungen WHERE id<>$1
+            AND data->>'datum'=$2 AND data->>'veranstaltungsort'=$3
+            AND status IN ('offen','bestaetigt')`,[data.quelle_buchung_id,data.datum,data.veranstaltungsort]);
+          for(const other of occupied.rows){
+            const otherStart=hhmm(other.data?.uhrzeit),otherDuration=Number(other.data?.dauer);
+            if(!Number.isFinite(otherStart)||!Number.isFinite(otherDuration)||otherDuration<=0||
+              start<otherStart+otherDuration&&otherStart<end)
+              return {status:409,error:'Das Zeitfenster wird inzwischen von einer Buchung belegt.'};
+          }
+          const blocked=await client.query(`SELECT uhrzeit::text AS uhrzeit,endzeit::text AS endzeit
+            FROM brilon_kalender WHERE typ='sperrzeit' AND datum<=$1::date
+              AND COALESCE(enddatum,datum)>=$1::date
+              AND (COALESCE(cardinality(standorte),0)=0 OR $2=ANY(standorte))`,[data.datum,data.veranstaltungsort]);
+          for(const item of blocked.rows){
+            const from=hhmm(String(item.uhrzeit||'').slice(0,5)),to=hhmm(String(item.endzeit||'').slice(0,5));
+            if(!Number.isFinite(from)||!Number.isFinite(to)||start<to&&from<end)
+              return {status:409,error:'Das Zeitfenster ist mittlerweile gesperrt.'};
+          }
+          const updated={...data,titel,beschreibung,preis:preis.toFixed(2),
+            programm_id:programmId,status:'veroeffentlicht',veranstaltungsorte:[data.veranstaltungsort]};
+          await client.query('UPDATE brilon_aktionen SET data=$2::jsonb WHERE id=$1',[actionApproval[1],JSON.stringify(updated)]);
+          return {status:200,success:true};
+        });
+        return reply(res,result.status,result.success?{success:true}:{error:result.error});
+      }
+
       if(route==='/api/admin/aktionen'&&req.method==='GET'){
         const q=await pool.query(
           `SELECT id,data->>'titel' AS titel,data->>'datum' AS datum,
             data->>'beschreibung' AS beschreibung,data->>'preis' AS preis,
-            data->>'bild_url' AS bild_url,data->>'programm_id' AS programm_id,data->'veranstaltungsorte' AS veranstaltungsorte,data->>'veranstaltungsort' AS veranstaltungsort
+            data->>'bild_url' AS bild_url,data->>'programm_id' AS programm_id,data->'veranstaltungsorte' AS veranstaltungsorte,data->>'veranstaltungsort' AS veranstaltungsort, data->>'status' AS status, data->>'originalpreis' AS originalpreis, data->>'rabatt_prozent' AS rabatt_prozent, data->>'quelle_buchung_id' AS quelle_buchung_id, data->>'vorschlagsrichtung' AS vorschlagsrichtung, data->'vorschlagsmitarbeiter' AS vorschlagsmitarbeiter, data->>'uhrzeit' AS uhrzeit, data->>'endzeit' AS endzeit, data->>'quellprogramm' AS quellprogramm, data->>'teilnehmer' AS teilnehmer
            FROM brilon_aktionen ORDER BY data->>'datum' ASC NULLS LAST,id DESC LIMIT 100`);
         return reply(res,200,q.rows);
       }
