@@ -43,7 +43,8 @@
         (zahlungGesendet||zahlungsProtokoll.status==='angenommen')?'Zahlungsinformationen':'Kundeninformation';
       return {...base,tone:'success',
         hinweis:'Automatische '+art+' nach Mitarbeiterzusage vom Anbieter angenommen.',
-        detail:(gesendet?'Annahme am '+gesendet+'. ':'')+suffix};
+        detail:(geplant?'Geplant ab '+geplant+'. ':'')+
+          (gesendet?'Annahme am '+gesendet+'. ':'')+suffix};
     }
     if(q?.status==='fehler'||q?.status==='abgebrochen'){
       return {...base,tone:'warning',

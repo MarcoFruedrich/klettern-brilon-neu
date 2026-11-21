@@ -680,6 +680,8 @@
           versand.append(mk('p','','Empfänger: '+mailState.empfaenger));
           if(mailState.detail)versand.append(mk('p','',mailState.detail));
           if(mailState.tone==='warning')versand.classList.add('payment-warning');
+          if(['geplant','versand_laeuft'].includes(mailState.status))
+            versand.append(btn('Versandstatus aktualisieren','ck-refresh-mail',()=>load()));
           card.append(versand);
         }
         const details=[
@@ -927,4 +929,14 @@
   });
   observer.observe(workspace,{attributes:true,attributeFilter:['hidden']});
   if(!workspace.hidden)load();
+  // Wird ein bereits geöffneter Kalendereintrag nach Ablauf des Zeitfensters
+  // automatisch per E-Mail verarbeitet, aktualisiert sich das Seitenpanel.
+  // Während Nutzer ein Formular bearbeiten, wird die Anzeige nicht ersetzt.
+  const mailStatusRefresh=setInterval(()=>{
+    if(workspace.hidden||section.hidden||document.hidden||chosen.newEntrySlot)return;
+    const active=document.activeElement;
+    if(active&&detail.contains(active)&&active.matches('input, textarea, select'))return;
+    void load();
+  },30_000);
+  mailStatusRefresh.unref?.();
 })();

@@ -69,3 +69,17 @@ test('Datenbank-Test-Double verwechselt Payment-Übersicht nicht mit Kalender-Un
   const source=read('test-support/mocks/pg/index.js');
   assert.match(source,/sql\.includes\('SELECT id,status,buchungsnummer,'\)/);
 });
+
+test('Nach automatisch angenommener Nachricht bleiben Plan- und Annahmezeit erhalten',()=>{
+  const doc=auswerten(booking);
+  assert.match(doc.detail,/Geplant ab/);
+  assert.match(doc.detail,/Annahme am/);
+  assert.match(doc.detail,/Zustellung ins Postfach nicht nachgewiesen/);
+});
+test('Kalender aktualisiert protokollierten Versand automatisch, ohne Eingabemasken zu überschreiben',()=>{
+  const code=read('site/admin-kalender-v2.js');
+  assert.match(code,/Versandstatus aktualisieren/);
+  assert.match(code,/30_000/);
+  assert.match(code,/chosen\.newEntrySlot/);
+  assert.match(code,/detail\.contains\(active\)/);
+});
